@@ -33,7 +33,7 @@ import {
     safeUint8ToBuffer,
     safeWriteUInt32BE,
     safeReadUint32BE,
-    deepCopyBuffer
+    deepCopyBuffer, safeReadUint8
 } from '../../utils/buffer.js';
 import addressUtils from './utils/address.js';
 import adminEntryUtils from './utils/adminEntry.js';
@@ -4334,6 +4334,7 @@ class State extends ReadyResource {
             sv: safeUint8ToBuffer(1),
             cd: encodedConfigData
         });
+
         if (encodedConsensusConfig.length === 0) {
             this.#safeLogApply(
                 OperationType.SET_GENESIS_EPOCH,
@@ -4342,6 +4343,7 @@ class State extends ReadyResource {
             );
             return Status.FAILURE;
         }
+
         const genesisEpoch = await createGenesisEpochProof(
             this.#config,
             requesterAddressString,
@@ -4440,9 +4442,18 @@ class State extends ReadyResource {
             this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "System admin and node public keys do not match.", node.from.key)
             return Status.FAILURE;
         }
-        console.log("op:", op)
 
         const encodedConsensusConfig = safeEncodeConsensusConfig(op.cco.cc);
+
+        if (encodedConsensusConfig.length === 0) {
+            this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Failed to encode consensus config.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        if (!this.#validateConsensusConfigApply(op.cco.cc)) {
+            this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Consensus config validation failed.", node.from.key);
+            return Status.FAILURE;
+        }
 
         const message = createMessage(
             this.#config.networkId,
@@ -4499,19 +4510,56 @@ class State extends ReadyResource {
             this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG,"Failed to read current consensus config index from buffer", node.from.key)
             return Status.FAILURE;
         }
+        // TODO: DELETE THIS MAGIC NUMBER
+        if (currentConsensusConfigIndex === 0xFFFFFFFF) {
+            this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Consensus config index overflow.", node.from.key)
+            return Status.FAILURE;
+        }
 
-        console.log("decodedConsensusConfig",op.cco.cc);
-        const incrementedConsensusConfigIndex = currentConsensusConfigIndex + 1
-        const genesisConsensusConfigKey = EntryType.CONSENSUS_CONFIG_RECORD + incrementedConsensusConfigIndex;
+        const nextConsensusConfigIndex = currentConsensusConfigIndex + 1;
+        const nextConsensusConfigKey = EntryType.CONSENSUS_CONFIG_RECORD + nextConsensusConfigIndex;
 
+        const nextConsensusConfigIndexBuffer = safeWriteUInt32BE(nextConsensusConfigIndex);
+        if (nextConsensusConfigIndexBuffer.length === 0) {
+            this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Failed to encode next consensus config index.", node.from.key)
+            return Status.FAILURE;
+        }
 
-
+        await batch.put(nextConsensusConfigKey, encodedConsensusConfig);
+        await batch.put(EntryType.CONSENSUS_CONFIG_CURRENT, nextConsensusConfigIndexBuffer);
+        await batch.put(txHashHexString, node.value);
 
         if (this.#config.enableTxApplyLogs) {
             console.info(`VDF params updated addr:wk:tx - ${requesterAddressString}:${decodedAdminEntry.wk.toString('hex')}:${txHashHexString}`);
         }
 
         return Status.SUCCESS;
+    }
+
+    #validateConsensusConfigApply(consensusConfig) {
+        let isValid =  false
+        const schemaVersion = safeReadUint8(consensusConfig.sv);
+
+        if (schemaVersion ===  null) {
+            return isValid;
+        }
+
+        switch (schemaVersion) {
+            case 1: {
+                const configData = safeDecodeVdfConfig(consensusConfig.cd);
+                if (
+                    configData !== null &&
+                    !isZeroBuffer(configData.difficulty) &&
+                    !isZeroBuffer(configData.discriminantBitSize)
+                ) {
+                    isValid = true;
+                }
+                break;
+            }
+            default:
+                break;
+        }
+        return isValid;
     }
 
 }
