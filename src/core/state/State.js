@@ -17,12 +17,13 @@ import {
     CustomEventType,
     VDF_DIFFICULTY_SIZE,
     VDF_DISCRIMINANT_SIZE,
+    MAX_UINT32,
 } from '../../utils/constants.js';
 import { isHexString, sleep, isTransactionRecordPut } from '../../utils/helpers.js';
 import tracCryptoApi from 'trac-crypto-api';
 import StateValidationSchema from './validators/StateValidationSchema.js';
 import {
-    safeDecodeApplyOperation, safeDecodeConsensusConfig,
+    safeDecodeApplyOperation,
     safeEncodeConsensusConfig
 } from '../../codecs/apply/applyOperationCodec.js';
 import {
@@ -679,7 +680,7 @@ class State extends ReadyResource {
                 this.#safeLogApply("Node payload exceeds the maximum operation payload size.", node.from.key)
                 invalidOperations++;
                 continue;
-            };
+            }
 
             const op = safeDecodeApplyOperation(node.value);
 
@@ -4510,8 +4511,7 @@ class State extends ReadyResource {
             this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG,"Failed to read current consensus config index from buffer", node.from.key)
             return Status.FAILURE;
         }
-        // TODO: DELETE THIS MAGIC NUMBER
-        if (currentConsensusConfigIndex === 0xFFFFFFFF) {
+        if (currentConsensusConfigIndex === MAX_UINT32) {
             this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Consensus config index overflow.", node.from.key)
             return Status.FAILURE;
         }

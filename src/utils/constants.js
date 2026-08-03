@@ -214,8 +214,7 @@ export const BALANCE_BYTE_LENGTH = 16;
 export const SIGNATURE_BYTE_LENGTH = 64;
 export const PEER_PUBLIC_KEY_HEX_LENGTH = 64;
 export const AMOUNT_BYTE_LENGTH = 16;
-export const MIN_SAFE_VALIDATION_INTEGER = 0x00000001;
-export const MAX_SAFE_VALIDATION_INTEGER = 0xFFFFFFFF;
+export const MAX_UINT32 = 0xFFFFFFFF;
 
 // consensus
 export const PROTOCOL_VERSION_BYTE_LENGTH = 1; // 1 BYTE 0-255
