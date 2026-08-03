@@ -18,7 +18,7 @@ async function runStateTests() {
     await import('./txOperation/state.apply.txOperation.test.js');
     await import('./transfer/state.apply.transfer.test.js');
     await import('./adminRecovery/state.apply.adminRecovery.test.js');
-    await import('./setVdfParams/state.apply.setVdfParams.test.js');
+    await import('./setConsensusConfig/state.apply.setConsensusConfig.test.js');
     test.resume();
 }
 

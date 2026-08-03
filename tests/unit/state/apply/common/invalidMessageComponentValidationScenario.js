@@ -61,7 +61,7 @@ function mutateComponent(t, validPayload, componentKey) {
 }
 
 function findParentWithKey(payload, key) {
-    const parents = ['cao', 'bio', 'aco', 'tro', 'rao', 'bdo', 'txo'];
+    const parents = ['cao', 'bio', 'aco', 'tro', 'rao', 'bdo', 'txo', 'cco'];
     for (const parentKey of parents) {
         const parent = payload[parentKey];
         if (parent?.[key]) return parent;

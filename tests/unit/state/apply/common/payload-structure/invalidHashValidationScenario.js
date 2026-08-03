@@ -56,6 +56,9 @@ async function defaultMutateHash(t, validPayload) {
         case Boolean(decodedPayload.txo?.tx):
             decodedPayload.txo.tx = invalidHash;
             break;
+        case Boolean(decodedPayload.cco?.tx):
+            decodedPayload.cco.tx = invalidHash;
+            break;
         default:
             return validPayload;
     }
