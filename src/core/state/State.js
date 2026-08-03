@@ -265,6 +265,7 @@ class State extends ReadyResource {
         this.#store = store;
 
         this.check = new Check(config);
+        installSignedAutobaseStore(this.#store, () => this.#base?.local?.keyPair ?? null);
         this.#base = new Autobase(this.#store, this.#config.bootstrap, {
             ackInterval: ACK_INTERVAL,
             valueEncoding: AUTOBASE_VALUE_ENCODING,
