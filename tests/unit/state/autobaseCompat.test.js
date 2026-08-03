@@ -1,5 +1,5 @@
 import test from 'brittle';
-import { installSignedAutobaseStore } from '../../../src/core/state/State.js';
+import { installSignedAutobaseStore, installSignedCorestoreStorageFactory } from '../../../src/core/state/State.js';
 
 test('MSB Autobase store wrapper covers genesis direct state appends after ready', async (t) => {
     const appendCalls = [];
@@ -215,4 +215,36 @@ test('MSB Autobase store wrapper covers core state atomic session heads', async 
 
     t.is(heads.length, 1, 'core state atomic session creation is wrapped');
     t.is(heads[0].head.signature.length, 0, 'null state atomic session head signature becomes an empty signature buffer');
+});
+
+test('MSB Corestore factory wrapper covers created HypercoreStorage instances', async (t) => {
+    const heads = [];
+    const hypercoreStorage = {
+        write() {
+            return { setHead() {} };
+        },
+        async createAtomicSession(atom, head) {
+            heads.push({ atom, head });
+            return {};
+        }
+    };
+    const corestore = {
+        storage: {
+            async create() {
+                return hypercoreStorage;
+            }
+        }
+    };
+
+    installSignedCorestoreStorageFactory(corestore);
+    const storage = await corestore.storage.create();
+    await storage.createAtomicSession({ view: {} }, {
+        fork: 0,
+        length: 1,
+        rootHash: Buffer.alloc(32, 12),
+        signature: null
+    });
+
+    t.is(heads.length, 1, 'created HypercoreStorage instance is wrapped');
+    t.is(heads[0].head.signature.length, 0, 'factory-normalized atomic head has an empty signature buffer');
 });

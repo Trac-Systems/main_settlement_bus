@@ -125,6 +125,29 @@ function installSignedAutobaseCoreStorage(core) {
     return core;
 }
 
+export function installSignedCorestoreStorageFactory(store) {
+    const storage = store?.storage ?? store;
+    if (!storage || storage.__msbSignedStorageFactoryInstalled === true) return store;
+
+    Object.defineProperty(storage, '__msbSignedStorageFactoryInstalled', {
+        value: true,
+        enumerable: false,
+        configurable: false
+    });
+
+    for (const method of ['create', 'resume', '_create', '_resumeFromPointers']) {
+        if (typeof storage[method] !== 'function') continue;
+        const original = storage[method].bind(storage);
+        storage[method] = (...args) => {
+            const result = original(...args);
+            return result && typeof result.then === 'function'
+                ? result.then(installSignedAutobaseStorage)
+                : installSignedAutobaseStorage(result);
+        };
+    }
+    return store;
+}
+
 function installSignedAutobaseSessionState(session, keyPairFor) {
     if (!session?.state || typeof session.state.append !== 'function') return session;
     if (session.state.__msbSignedAutobaseAppendInstalled === true) return session;
@@ -272,6 +295,7 @@ class State extends ReadyResource {
         this.#store = store;
 
         this.check = new Check(config);
+        installSignedCorestoreStorageFactory(this.#store);
         installSignedAutobaseStore(this.#store, () => this.#base?.local?.keyPair ?? null);
         this.#base = new Autobase(this.#store, this.#config.bootstrap, {
             ackInterval: ACK_INTERVAL,
