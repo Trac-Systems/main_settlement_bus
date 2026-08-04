@@ -285,7 +285,7 @@ class Network extends ReadyResource {
         }
     }
 
-    async tryConnect(publicKey, type, manager) {
+    async tryConnect(publicKey, type) {
         if (!this.#swarm) throw new Error('Network swarm is not initialized');
         if (this.#pendingConnections.has(publicKey) || this.#pendingConnections.size >= this.#config.maxPendingConnections) {
             this.#logger.debug(`Network.tryConnect: Connection to peer: ${publicKey} as type: ${type} is already pending or max pending connections reached.`);
@@ -299,7 +299,7 @@ class Network extends ReadyResource {
             }
         }, this.#config.connectTimeoutMs);
 
-        this.#pendingConnections.set(publicKey, { type, timeoutId, manager });
+        this.#pendingConnections.set(publicKey, { type, timeoutId });
 
         const target = b4a.from(publicKey, 'hex');
         if (!this.#swarm.peers.has(publicKey)) {
@@ -330,7 +330,7 @@ class Network extends ReadyResource {
             this.#pendingConnections.delete(publicKey);
 
             if (pending.type === 'indexer') {
-                await pending.manager?.add(connection.remotePublicKey, connection);
+                await this.#indexerConnectionManager.add(connection.remotePublicKey, connection);
             } else if (pending.type === 'validator') {
                 await this.#validatorConnectionManager.add(publicKey, connection);
             }

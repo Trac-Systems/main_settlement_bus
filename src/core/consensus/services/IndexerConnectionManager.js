@@ -41,7 +41,7 @@ class IndexerConnectionManager extends PeerConnectionManager {
             const isPending = this.#network.isConnectionPending(publicKeyHex);
             if (isConnected || isPending) continue;
 
-            await this.#network.tryConnect(publicKeyHex, "indexer", this);
+            await this.#network.tryConnect(publicKeyHex, "indexer");
         }
     }
 
