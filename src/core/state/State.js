@@ -52,6 +52,7 @@ import {
     toTerm,
 } from './utils/balance.js';
 import deploymentEntryUtils from './utils/deploymentEntry.js';
+import { deepCopyBuffer } from '../../utils/buffer.js';
 import { Status } from './utils/transaction.js';
 import remote from 'hypercore/lib/fully-remote-proof.js'
 import PQueue from 'p-queue';
@@ -4187,7 +4188,7 @@ class State extends ReadyResource {
     }
 
     async #handleApplySetGenesisEpoch(op, view, base, node, batch) {
-        if (!this.#stateValidationSchema.validateSetGenesisEpochOperation(op)) {
+        if (!this.#stateValidationSchema.validateConsensusControlOperation(op)) {
             this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Contract schema validation failed.", node.from.key)
             return Status.FAILURE;
         }
@@ -4239,10 +4240,10 @@ class State extends ReadyResource {
         // verify requester signature
         const message = createMessage(
             this.#config.networkId,
-            op.sgo.txv,
-            op.sgo.df,
-            op.sgo.db,
-            op.sgo.in,
+            op.cco.txv,
+            op.cco.df,
+            op.cco.db,
+            op.cco.in,
             OperationType.SET_GENESIS_EPOCH
         );
 
@@ -4252,14 +4253,14 @@ class State extends ReadyResource {
         }
 
         const hash = await tracCryptoApi.hash.blake3Safe(message);
-        if (!b4a.equals(hash, op.sgo.tx)) {
+        if (!b4a.equals(hash, op.cco.tx)) {
             this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Message hash does not match the tx_hash.", node.from.key)
             return Status.FAILURE;
         }
 
         // verify signature
-        const isMessageVerified = tracCryptoApi.signature.verify(op.sgo.is, op.sgo.tx, adminPublicKey)
-        const txHashHexString = op.sgo.tx.toString('hex');
+        const isMessageVerified = tracCryptoApi.signature.verify(op.cco.is, op.cco.tx, adminPublicKey)
+        const txHashHexString = op.cco.tx.toString('hex');
 
         if (!isMessageVerified) {
             this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Failed to verify message signature.", node.from.key)
@@ -4273,7 +4274,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         }
 
-        if (!b4a.equals(op.sgo.txv, indexersSequenceState)) {
+        if (!b4a.equals(op.cco.txv, indexersSequenceState)) {
             this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Transaction was not executed.", node.from.key)
             return Status.FAILURE;
         }
@@ -4535,11 +4536,7 @@ class State extends ReadyResource {
         const nextConsensusConfigIndexBuffer = safeWriteUInt32BE(nextConsensusConfigIndex);
 
         if (nextConsensusConfigIndexBuffer.length === 0) {
-            this.#safeLogApply(
-                OperationType.SET_CONSENSUS_CONFIG,
-                "Failed to encode next consensus config index.",
-                node.from.key
-            );
+            this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Failed to encode next consensus config index.", node.from.key);
             return Status.FAILURE;
         }
 
