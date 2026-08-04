@@ -1041,6 +1041,7 @@ $root.network = (function() {
                     case 112:
                     case 113:
                     case 114:
+                    case 115:
                         break;
                     }
                 return null;
@@ -1382,6 +1383,10 @@ $root.network = (function() {
                 case "RESULT_CODE_CONSENSUS_INDEXER_ROLE_INVALID":
                 case 114:
                     message.result = 114;
+                    break;
+                case "RESULT_CODE_CONSENSUS_INVALID_ADDRESS_ASSERTION":
+                case 115:
+                    message.result = 115;
                     break;
                 }
                 return message;
@@ -2020,6 +2025,7 @@ $root.network = (function() {
                     case 112:
                     case 113:
                     case 114:
+                    case 115:
                         break;
                     }
                 return null;
@@ -2376,6 +2382,10 @@ $root.network = (function() {
                 case 114:
                     message.result = 114;
                     break;
+                case "RESULT_CODE_CONSENSUS_INVALID_ADDRESS_ASSERTION":
+                case 115:
+                    message.result = 115;
+                    break;
                 }
                 return message;
             };
@@ -2572,6 +2582,7 @@ $root.common = (function() {
          * @property {number} RESULT_CODE_CONSENSUS_EPOCH_INVALID=112 RESULT_CODE_CONSENSUS_EPOCH_INVALID value
          * @property {number} RESULT_CODE_CONSENSUS_PREVIOUS_EPOCH_RECORD_HASH_INVALID=113 RESULT_CODE_CONSENSUS_PREVIOUS_EPOCH_RECORD_HASH_INVALID value
          * @property {number} RESULT_CODE_CONSENSUS_INDEXER_ROLE_INVALID=114 RESULT_CODE_CONSENSUS_INDEXER_ROLE_INVALID value
+         * @property {number} RESULT_CODE_CONSENSUS_INVALID_ADDRESS_ASSERTION=115 RESULT_CODE_CONSENSUS_INVALID_ADDRESS_ASSERTION value
          */
         v1.ResultCode = (function() {
             var valuesById = {}, values = Object.create(valuesById);
@@ -2652,6 +2663,7 @@ $root.common = (function() {
             values[valuesById[112] = "RESULT_CODE_CONSENSUS_EPOCH_INVALID"] = 112;
             values[valuesById[113] = "RESULT_CODE_CONSENSUS_PREVIOUS_EPOCH_RECORD_HASH_INVALID"] = 113;
             values[valuesById[114] = "RESULT_CODE_CONSENSUS_INDEXER_ROLE_INVALID"] = 114;
+            values[valuesById[115] = "RESULT_CODE_CONSENSUS_INVALID_ADDRESS_ASSERTION"] = 115;
             return values;
         })();
 

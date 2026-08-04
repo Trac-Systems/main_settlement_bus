@@ -187,7 +187,7 @@ test('V1EpochProofProposalRequest rejects proposer that is not an indexer', asyn
     await assertProtocolError(
         t,
         async () => validator.validate(payload, {remotePublicKey: wallet.publicKey}),
-        ConsensusResultCode.INDEXER_ROLE_INVALID,
+        ConsensusResultCode.INVALID_ADDRESS_ASSERTION,
         'Incoming address is not an indexer.'
     );
 });

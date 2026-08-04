@@ -210,8 +210,8 @@ test('handleRequest maps consensus validation errors to signed rejection respons
     const message = proofProposalMessage();
     const connection = createConnection(calls);
     const validationError = new V1ConsensusProtocolError(
-        ConsensusResultCode.INVALID_PAYLOAD,
-        'invalid proof proposal'
+        ConsensusResultCode.INVALID_ADDRESS_ASSERTION,
+        'invalid address assertion'
     );
     const handler = setupHandler(t, calls, {
         wallet,
@@ -233,11 +233,11 @@ test('handleRequest maps consensus validation errors to signed rejection respons
     ]);
 
     const failureContext = calls[2].context;
-    t.is(failureContext.resultCode, ConsensusResultCode.INVALID_PAYLOAD);
+    t.is(failureContext.resultCode, ConsensusResultCode.INVALID_ADDRESS_ASSERTION);
     t.is(failureContext.error, validationError);
 
     const proofProposalResponse = connection.sent[0].proof_proposal_response;
-    t.is(proofProposalResponse.result, ConsensusResultCode.INVALID_PAYLOAD);
+    t.is(proofProposalResponse.result, ConsensusResultCode.INVALID_ADDRESS_ASSERTION);
     t.absent(proofProposalResponse.approval);
     t.ok(await verifyProofProposalResponseSignature(proofProposalResponse, wallet.publicKey));
 });

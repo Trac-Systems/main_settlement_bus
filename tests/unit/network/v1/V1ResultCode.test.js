@@ -91,7 +91,8 @@ const expectedConsensusResultCodeMap = Object.freeze({
     RESPONSE_APPROVAL_INVALID: 111,
     EPOCH_INVALID: 112,
     PREVIOUS_EPOCH_RECORD_HASH_INVALID: 113,
-    INDEXER_ROLE_INVALID: 114
+    INDEXER_ROLE_INVALID: 114,
+    INVALID_ADDRESS_ASSERTION: 115
 });
 
 const sharedResultCode = networkV1Generated.common.v1.ResultCode;
@@ -129,6 +130,10 @@ test('ConsensusResultCode uses the consensus range from the shared protobuf enum
     t.is(
         sharedResultCode.RESULT_CODE_CONSENSUS_INDEXER_ROLE_INVALID,
         ConsensusResultCode.INDEXER_ROLE_INVALID
+    );
+    t.is(
+        sharedResultCode.RESULT_CODE_CONSENSUS_INVALID_ADDRESS_ASSERTION,
+        ConsensusResultCode.INVALID_ADDRESS_ASSERTION
     );
 });
 

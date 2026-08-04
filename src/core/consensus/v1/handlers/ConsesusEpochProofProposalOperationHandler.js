@@ -45,7 +45,9 @@ class ConsensusEpochProofProposalOperationHandler extends ConnectionOperationHan
         } catch (e) {
             validationError = e;
             resultCode = getResultCode(e);
-            // TODO: If INVALID_ADDRESS_ASSERTION is introduced, blacklist the specific remote address/pubKey.
+            if (resultCode === ConsensusResultCode.INVALID_ADDRESS_ASSERTION) {
+                // TODO: Blacklist connection.remotePublicKey when peer blacklisting is implemented.
+            }
             this.#emitEvent(CustomEventType.EPOCH_PROPOSAL_VALIDATION_FAILURE, {
                 ...eventContext,
                 resultCode,

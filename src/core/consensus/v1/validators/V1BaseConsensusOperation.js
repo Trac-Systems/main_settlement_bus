@@ -313,18 +313,21 @@ class V1BaseConsensusOperation {
      * that address against the current indexer set.
      *
      * @param {Buffer} remotePublicKey Public key received from the peer connection.
+     * @param {number} [notIndexerResultCode=ConsensusResultCode.INDEXER_ROLE_INVALID]
+     * Result code used when the remote address is not an indexer.
      * @returns {Promise<void>}
      * @throws {V1ConsensusProtocolError} When the remote address is not an indexer.
      */
-    async validateAddressIsIndexer(remotePublicKey) {
-        // TODO: In the future, we should handle this specific error to not only drop the connection
-        // but also blacklist the specific node.
-        // Such an error would mean that someone is trying to impersonate an indexer.
+    async validateAddressIsIndexer(
+        // TODO: The impersonation is handled with a specific error code and should lead to blacklisting.
+        remotePublicKey,
+        notIndexerResultCode = ConsensusResultCode.INDEXER_ROLE_INVALID
+    ) {
         const address = tracCryptoApi.address.encode(this._config.addressPrefix, remotePublicKey);
         const isIndexer = await this._state.isIndexerAddress(address);
         if (!isIndexer) {
             throw new V1ConsensusProtocolError(
-                ConsensusResultCode.INDEXER_ROLE_INVALID,
+                notIndexerResultCode,
                 'Incoming address is not an indexer.'
             )
         }
