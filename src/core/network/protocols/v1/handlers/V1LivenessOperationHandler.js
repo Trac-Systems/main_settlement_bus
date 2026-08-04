@@ -18,7 +18,7 @@ class V1LivenessOperationHandler extends V1BaseOperationHandler {
         this.#v1LivenessResponseValidator = new V1LivenessResponse(config);
     }
 
-    async handleRequest(message, connection) {
+    async handleRequest(message, connection, protocolSession) {
         let resultCode = ResultCode.OK;
         let endConnection = false;
         try {
@@ -36,6 +36,7 @@ class V1LivenessOperationHandler extends V1BaseOperationHandler {
         try {
             const response = await this.#buildLivenessResponsePayload(message.id, NETWORK_CAPABILITIES, resultCode);
             await this.sendResponseAndMaybeClose(
+                protocolSession,
                 connection,
                 response,
                 endConnection

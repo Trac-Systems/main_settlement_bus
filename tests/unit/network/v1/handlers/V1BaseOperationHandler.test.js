@@ -180,7 +180,7 @@ test('handlePendingResponseError: protocol error -> does not close connection di
         'Should pass protocol error without wrapping'
     );
 
-    t.absent(ended, 'Connection closing is delegated to ConnectionManager');
+    t.absent(ended, 'Connection closing is delegated to ValidatorConnectionManager');
 });
 
 test('handlePendingResponseError: delegates logging -> calls displayError', async (t) => {

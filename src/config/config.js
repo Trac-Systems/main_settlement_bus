@@ -218,8 +218,16 @@ export class Config {
         return this.#config.epochInterval
     }
 
-    get epochThreshold() {
-        return this.#config.epochThreshold
+    get epochSignatureTimeout() {
+        return this.#config.epochSignatureTimeout
+    }
+
+    get epochRemoteProposalTimeout() {
+        return this.#config.epochRemoteProposalTimeout
+    }
+
+    get epochAppendTimeout() {
+        return this.#config.epochAppendTimeout
     }
 
     get maxPendingRequestsInPendingRequestsService() {

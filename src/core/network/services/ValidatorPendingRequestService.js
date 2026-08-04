@@ -2,6 +2,7 @@ import {NetworkOperationType, PEER_PUBLIC_KEY_HEX_LENGTH, ResultCode} from '../.
 import {isHexString, publicKeyToAddress} from '../../../utils/helpers.js';
 import {V1ProtocolError} from "../protocols/v1/V1ProtocolError.js";
 import b4a from 'b4a';
+import BasePendingRequestService from '../../shared/BasePendingRequestService.js';
 
 export class ValidatorPendingRequestServiceTimeoutError extends Error {
     constructor(requestId, peerAddress, timeoutMs) {
@@ -10,22 +11,17 @@ export class ValidatorPendingRequestServiceTimeoutError extends Error {
     }
 }
 
-export default class ValidatorPendingRequestService {
-    #pendingRequests;
+export default class ValidatorPendingRequestService extends BasePendingRequestService {
     #requestMessageTypes = [NetworkOperationType.LIVENESS_REQUEST, NetworkOperationType.BROADCAST_TRANSACTION_REQUEST];
     #config;
 
     constructor(config) {
-        this.#pendingRequests = new Map(); // Map<id, pendingRequestEntry>
+        super();
         this.#config = config;
     }
 
-    has(id) {
-        return this.#pendingRequests.has(id);
-    }
-
     isProbePending(peerPubKeyHex) {
-        for (const [, entry] of this.#pendingRequests) {
+        for (const [, entry] of this._pendingRequests) {
             if (entry.requestedTo === peerPubKeyHex && entry.requestType === NetworkOperationType.LIVENESS_REQUEST) {
                 return true;
             }
@@ -54,11 +50,11 @@ export default class ValidatorPendingRequestService {
         this.#validateRegisterInput(peerPubKeyHex, message);
         const id = message.id;
         const peerAddress = publicKeyToAddress(peerPubKeyHex, this.#config);
-        if (this.#pendingRequests.size >= this.#config.maxPendingRequestsInPendingRequestsService) {
+        if (this._pendingRequests.size >= this.#config.maxPendingRequestsInPendingRequestsService) {
             throw new Error('Maximum number of pending requests reached.');
         }
 
-        if (this.#pendingRequests.has(id)) {
+        if (this._pendingRequests.has(id)) {
             throw new Error(`Pending request with ID ${id} from peer ${peerPubKeyHex} already exists.`);
         }
 
@@ -89,7 +85,7 @@ export default class ValidatorPendingRequestService {
 
         }, this.#config.pendingRequestTimeout);
 
-        this.#pendingRequests.set(id, entry);
+        this._pendingRequests.set(id, entry);
         return promise;
     }
 
@@ -97,21 +93,6 @@ export default class ValidatorPendingRequestService {
         if (message.type !== NetworkOperationType.BROADCAST_TRANSACTION_REQUEST) return null;
         const txData = message.broadcast_transaction_request?.data;
         return b4a.isBuffer(txData) ? txData : null;
-    }
-
-    getAndDeletePendingRequest(id) {
-        const entry = this.#pendingRequests.get(id);
-        if (!entry) return null;
-
-        clearTimeout(entry.timeoutId);
-        this.#pendingRequests.delete(id);
-        return entry;
-    }
-
-    getPendingRequest(id) {
-        const entry = this.#pendingRequests.get(id);
-        if (!entry) return null;
-        return entry;
     }
 
     // for now, we are resolving only resultCode, but we can extend it in the future if needed...
@@ -122,48 +103,10 @@ export default class ValidatorPendingRequestService {
         return true;
     }
 
-    rejectPendingRequest(id, error) {
-        const entry = this.getAndDeletePendingRequest(id);
-        if (!entry) return false;
-        entry.reject(error instanceof Error ? error : new Error(error?.message ?? 'Unexpected error'));
-        return true;
-    }
-
-    rejectPendingRequestsForPeer(peerPubKeyHex, error) {
-        const idsToReject = [];
-        for (const [id, entry] of this.#pendingRequests) {
-            if (entry.requestedTo === peerPubKeyHex) idsToReject.push(id);
-        }
-
-        for (const id of idsToReject) {
-            this.rejectPendingRequest(id, error);
-        }
-
-        return idsToReject.length;
-    }
-
-    stopPendingRequestTimeout(id) {
-        const entry = this.#pendingRequests.get(id);
-        if (!entry) return false;
-
-        clearTimeout(entry.timeoutId);
-        entry.timeoutId = null;
-        return true;
-    }
-
-    close() {
-        for (const [id, entry] of this.#pendingRequests) {
-            clearTimeout(entry.timeoutId);
-            try {
-                entry.reject(
-                    new V1ProtocolError(
-                        ResultCode.UNEXPECTED_ERROR,
-                        `Pending request ${id} cancelled (shutdown).`)
-                );
-            } catch (error) {
-                console.error(`ValidatorPendingRequestService.close: failed to reject pending request ${id}:`, error);
-            }
-        }
-        this.#pendingRequests.clear();
+    _createShutdownError(id) {
+        return new V1ProtocolError(
+            ResultCode.UNEXPECTED_ERROR,
+            `Pending request ${id} cancelled (shutdown).`
+        );
     }
 }

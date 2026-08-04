@@ -3,7 +3,6 @@ import b4a from 'b4a';
 import EventEmitter from 'bare-events';
 import tracCryptoApi from 'trac-crypto-api';
 import { WalletProvider } from 'trac-wallet';
-
 import ConsensusEpochProofProposalOperationHandler from '../../../src/core/consensus/v1/handlers/ConsesusEpochProofProposalOperationHandler.js';
 import V1EpochProofProposalRequest from '../../../src/core/consensus/v1/validators/V1EpochProofProposalRequest.js';
 import V1EpochProofProposalApproval from '../../../src/core/consensus/v1/validators/V1EpochProofProposalApproval.js';
@@ -68,10 +67,12 @@ function createConnection(calls, overrides = {}) {
         ended: false,
         flushed: false,
         protocolSession: {
-            sendAndForget(response) {
-                calls.push({ name: 'send', response });
-                if (overrides.sendError) throw overrides.sendError;
-                connection.sent.push(response);
+            indexers: {
+                sendAndForget(response) {
+                    calls.push({ name: 'send', response });
+                    if (overrides.sendError) throw overrides.sendError;
+                    connection.sent.push(response);
+                }
             }
         },
         async flush() {
@@ -84,7 +85,7 @@ function createConnection(calls, overrides = {}) {
         }
     };
 
-    return connection;
+    return connection
 }
 
 function setupHandler(t, calls, options = {}) {
@@ -158,7 +159,7 @@ test('handleRequest validates proposal, emits success events, and sends signed O
         }
     });
 
-    const result = await handler.handleRequest(message, connection);
+    const result = await handler.handleRequest(message, connection, connection.protocolSession.indexers, connection.protocolSession.indexers);
 
     t.absent(result);
     t.is(validatorPayload, message);
@@ -167,9 +168,7 @@ test('handleRequest validates proposal, emits success events, and sends signed O
         'onEpochProposalReceived',
         'validateRequest',
         'onEpochProposalValidationSuccess',
-        'send',
-        'flush',
-        'end'
+        'send'
     ]);
 
     const receivedContext = calls[0].context;
@@ -183,8 +182,9 @@ test('handleRequest validates proposal, emits success events, and sends signed O
     t.is(successContext.resultCode, ConsensusResultCode.OK);
 
     t.is(connection.sent.length, 1);
-    t.ok(connection.flushed);
-    t.ok(connection.ended);
+    // the indexer connection is kept alive after responding, so it can be reused for future proposal rounds
+    t.absent(connection.flushed);
+    t.absent(connection.ended);
 
     const response = connection.sent[0];
     t.is(response.type, ConsensusOperationType.PROOF_PROPOSAL_APPROVAL);
@@ -221,15 +221,13 @@ test('handleRequest maps consensus validation errors to signed rejection respons
         }
     });
 
-    await handler.handleRequest(message, connection);
+    await handler.handleRequest(message, connection, connection.protocolSession.indexers);
 
     t.alike(callNames(calls), [
         'onEpochProposalReceived',
         'validateRequest',
         'onEpochProposalValidationFailure',
-        'send',
-        'flush',
-        'end'
+        'send'
     ]);
 
     const failureContext = calls[2].context;
@@ -255,7 +253,7 @@ test('handleRequest maps unexpected validation errors to UNEXPECTED_ERROR respon
         }
     });
 
-    await handler.handleRequest(message, connection);
+    await handler.handleRequest(message, connection, connection.protocolSession.indexers);
 
     const failureContext = calls[2].context;
     const proofProposalResponse = connection.sent[0].proof_proposal_response;
@@ -293,15 +291,13 @@ test('handleRequest sends signed rejection for malformed proof proposal with val
         }
     });
 
-    await handler.handleRequest(message, connection);
+    await handler.handleRequest(message, connection, connection.protocolSession.indexers);
 
     t.alike(callNames(calls), [
         'onEpochProposalReceived',
         'validateRequest',
         'onEpochProposalValidationFailure',
-        'send',
-        'flush',
-        'end'
+        'send'
     ]);
     t.absent(proofProposalRead);
 
@@ -331,7 +327,7 @@ test('handleRequest ends connection without response when session id is invalid'
         }
     });
 
-    await handler.handleRequest(message, connection);
+    await handler.handleRequest(message, connection, connection.protocolSession.indexers);
 
     t.alike(callNames(calls), [
         'onEpochProposalReceived',
@@ -362,7 +358,7 @@ test('handleRequest ends the connection when response sending fails', async t =>
         displayErrors.push({ step, remotePublicKey, error });
     };
 
-    await handler.handleRequest(message, connection);
+    await handler.handleRequest(message, connection, connection.protocolSession.indexers);
 
     t.alike(callNames(calls), [
         'onEpochProposalReceived',
@@ -399,7 +395,7 @@ test('handleApproval validates OK responses, emits success, and returns approval
         }
     });
 
-    const result = await handler.handleApproval(message, connection, proofProposal);
+    const result = await handler.handleApproval(message, connection, connection.protocolSession.indexers, proofProposal);
 
     t.is(validatorPayload, message);
     t.is(validatorConnection, connection);

@@ -38,6 +38,8 @@ class V1Protocol extends ProtocolInterface {
             }
         });
 
+        if (!this.#channel) return; // connection already destroyed before protocol setup completed
+
         this.#channel.open();
 
         this.#session = this.#channel.addMessage({
@@ -72,11 +74,11 @@ class V1Protocol extends ProtocolInterface {
     }
 
     sendAndForget(message) {
-        this.#session.send(encodeV1networkOperation(message));
+        this.#session?.send(encodeV1networkOperation(message));
     }
 
     close() {
-        this.#channel.close();
+        this.#channel?.close();
     }
 }
 

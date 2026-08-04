@@ -26,6 +26,10 @@ const mockWallet = {
     networkId: 1
 };
 
+const protocolSession = {
+    sendAndForget: () => {}
+}
+
 class MockConnection {
     constructor() {
         this.remotePublicKey = b4a.alloc(32);
@@ -33,7 +37,7 @@ class MockConnection {
         this.sentPayload = null;
         this.flushCalled = false;
         this.protocolSession = {
-            sendAndForget: () => {}
+            validator: protocolSession
         };
     }
 
@@ -68,7 +72,7 @@ test('handleRequest: request validation and response send -> covers success and 
 
         const conn = new MockConnection();
 
-        await handler.handleRequest({ id: 'msg-success' }, conn);
+        await handler.handleRequest({ id: 'msg-success' }, conn, protocolSession);
 
         // Real factory is not being asserted
         t.pass('Success path executed');
@@ -91,7 +95,7 @@ test('handleRequest: request validation and response send -> covers success and 
 
         const conn = new MockConnection();
 
-        await handler.handleRequest({ id: 'msg-end' }, conn);
+        await handler.handleRequest({ id: 'msg-end' }, conn, protocolSession);
 
         t.ok(conn.ended);
         t.ok(conn.flushCalled);
@@ -114,7 +118,7 @@ test('handleRequest: request validation and response send -> covers success and 
 
         const conn = new MockConnection();
 
-        await handler.handleRequest({ id: 'msg-no-end' }, conn);
+        await handler.handleRequest({ id: 'msg-no-end' }, conn, protocolSession);
 
         t.absent(conn.ended);
         t.absent(conn.flushCalled);
@@ -135,11 +139,11 @@ test('handleRequest: request validation and response send -> covers success and 
 
         const conn = new MockConnection();
 
-        conn.protocolSession.sendAndForget = () => {
+        conn.protocolSession.validator.sendAndForget = () => {
             throw new Error('send fail');
         };
 
-        await handler.handleRequest({ id: 'msg-send-fail' }, conn);
+        await handler.handleRequest({ id: 'msg-send-fail' }, conn, conn.protocolSession.validator);
 
         t.ok(conn.ended);
     }

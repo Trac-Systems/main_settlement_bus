@@ -25,6 +25,8 @@ class ConsensusV1Protocol {
             onclose() {}
         });
 
+        if (!this.#channel) return; // connection already destroyed before protocol setup completed
+
         this.#channel.open();
 
         this.#session = this.#channel.addMessage({
@@ -50,11 +52,11 @@ class ConsensusV1Protocol {
     }
 
     sendAndForget(message) {
-        this.#session.send(encodeConsensusMessage(message));
+        this.#session?.send(encodeConsensusMessage(message));
     }
 
     close() {
-        this.#channel.close();
+        this.#channel?.close();
     }
 }
 
