@@ -4,11 +4,12 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { execFileSync } from 'child_process';
 
-function generatePbjsModule(pbjsPath, protoRootPath, entryPath, outputPath) {
+function generatePbjsModule(pbjsPath, protoRootPath, entryPath, outputPath, rootName) {
     execFileSync(pbjsPath, [
         '-t', 'static-module',
         '-w', 'commonjs',
         '--keep-case',
+        '--root', rootName,
         '-p', protoRootPath,
         '-o', outputPath,
         entryPath
@@ -50,13 +51,31 @@ function main() {
     fs.mkdirSync(networkOutputDir, { recursive: true });
     fs.mkdirSync(consensusOutputDir, { recursive: true });
 
-    generatePbjsModule(pbjsPath, inputDir, applyOperationsEntryPath, generatedApplyOperationsOutputPath);
+    generatePbjsModule(
+        pbjsPath,
+        inputDir,
+        applyOperationsEntryPath,
+        generatedApplyOperationsOutputPath,
+        'applyOperations'
+    );
     transformPbjsForBare(generatedApplyOperationsOutputPath);
 
-    generatePbjsModule(pbjsPath, inputDir, networkEntryPath, generatedNetworkOutputPath);
+    generatePbjsModule(
+        pbjsPath,
+        inputDir,
+        networkEntryPath,
+        generatedNetworkOutputPath,
+        'networkV1'
+    );
     transformPbjsForBare(generatedNetworkOutputPath);
 
-    generatePbjsModule(pbjsPath, inputDir, consensusEntryPath, generatedConsensusOutputPath);
+    generatePbjsModule(
+        pbjsPath,
+        inputDir,
+        consensusEntryPath,
+        generatedConsensusOutputPath,
+        'consensusV1'
+    );
     transformPbjsForBare(generatedConsensusOutputPath);
 }
 
