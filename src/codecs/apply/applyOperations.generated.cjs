@@ -4012,7 +4012,7 @@ $root.apply = (function() {
              * @interface ISetGenesisEpochOperation
              * @property {Uint8Array|null} [tx] SetGenesisEpochOperation tx
              * @property {Uint8Array|null} [txv] SetGenesisEpochOperation txv
-             * @property {Uint8Array|null} [cd] SetGenesisEpochOperation cd
+             * @property {common.consensus.IConsensusConfig|null} [cc] SetGenesisEpochOperation cc
              * @property {Uint8Array|null} ["in"] SetGenesisEpochOperation in
              * @property {Uint8Array|null} [is] SetGenesisEpochOperation is
              */
@@ -4049,12 +4049,12 @@ $root.apply = (function() {
             SetGenesisEpochOperation.prototype.txv = $util.newBuffer([]);
 
             /**
-             * SetGenesisEpochOperation cd.
-             * @member {Uint8Array} cd
+             * SetGenesisEpochOperation cc.
+             * @member {common.consensus.IConsensusConfig|null|undefined} cc
              * @memberof apply.operations.SetGenesisEpochOperation
              * @instance
              */
-            SetGenesisEpochOperation.prototype.cd = $util.newBuffer([]);
+            SetGenesisEpochOperation.prototype.cc = null;
 
             /**
              * SetGenesisEpochOperation in.
@@ -4100,8 +4100,8 @@ $root.apply = (function() {
                     writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.tx);
                 if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
                     writer.uint32(/* id 2, wireType 2 =*/18).bytes(message.txv);
-                if (message.cd != null && Object.hasOwnProperty.call(message, "cd"))
-                    writer.uint32(/* id 3, wireType 2 =*/26).bytes(message.cd);
+                if (message.cc != null && Object.hasOwnProperty.call(message, "cc"))
+                    $root.common.consensus.ConsensusConfig.encode(message.cc, writer.uint32(/* id 3, wireType 2 =*/26).fork()).ldelim();
                 if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
                     writer.uint32(/* id 5, wireType 2 =*/42).bytes(message["in"]);
                 if (message.is != null && Object.hasOwnProperty.call(message, "is"))
@@ -4151,7 +4151,7 @@ $root.apply = (function() {
                             break;
                         }
                     case 3: {
-                            message.cd = reader.bytes();
+                            message.cc = $root.common.consensus.ConsensusConfig.decode(reader, reader.uint32());
                             break;
                         }
                     case 5: {
@@ -4203,9 +4203,11 @@ $root.apply = (function() {
                 if (message.txv != null && message.hasOwnProperty("txv"))
                     if (!(message.txv && typeof message.txv.length === "number" || $util.isString(message.txv)))
                         return "txv: buffer expected";
-                if (message.cd != null && message.hasOwnProperty("cd"))
-                    if (!(message.cd && typeof message.cd.length === "number" || $util.isString(message.cd)))
-                        return "cd: buffer expected";
+                if (message.cc != null && message.hasOwnProperty("cc")) {
+                    var error = $root.common.consensus.ConsensusConfig.verify(message.cc);
+                    if (error)
+                        return "cc." + error;
+                }
                 if (message["in"] != null && message.hasOwnProperty("in"))
                     if (!(message["in"] && typeof message["in"].length === "number" || $util.isString(message["in"])))
                         return "in: buffer expected";
@@ -4237,11 +4239,11 @@ $root.apply = (function() {
                         $util.base64.decode(object.txv, message.txv = $util.newBuffer($util.base64.length(object.txv)), 0);
                     else if (object.txv.length >= 0)
                         message.txv = object.txv;
-                if (object.cd != null)
-                    if (typeof object.cd === "string")
-                        $util.base64.decode(object.cd, message.cd = $util.newBuffer($util.base64.length(object.cd)), 0);
-                    else if (object.cd.length >= 0)
-                        message.cd = object.cd;
+                if (object.cc != null) {
+                    if (typeof object.cc !== "object")
+                        throw TypeError(".apply.operations.SetGenesisEpochOperation.cc: object expected");
+                    message.cc = $root.common.consensus.ConsensusConfig.fromObject(object.cc);
+                }
                 if (object["in"] != null)
                     if (typeof object["in"] === "string")
                         $util.base64.decode(object["in"], message["in"] = $util.newBuffer($util.base64.length(object["in"])), 0);
@@ -4283,13 +4285,7 @@ $root.apply = (function() {
                         if (options.bytes !== Array)
                             object.txv = $util.newBuffer(object.txv);
                     }
-                    if (options.bytes === String)
-                        object.cd = "";
-                    else {
-                        object.cd = [];
-                        if (options.bytes !== Array)
-                            object.cd = $util.newBuffer(object.cd);
-                    }
+                    object.cc = null;
                     if (options.bytes === String)
                         object["in"] = "";
                     else {
@@ -4309,8 +4305,8 @@ $root.apply = (function() {
                     object.tx = options.bytes === String ? $util.base64.encode(message.tx, 0, message.tx.length) : options.bytes === Array ? Array.prototype.slice.call(message.tx) : message.tx;
                 if (message.txv != null && message.hasOwnProperty("txv"))
                     object.txv = options.bytes === String ? $util.base64.encode(message.txv, 0, message.txv.length) : options.bytes === Array ? Array.prototype.slice.call(message.txv) : message.txv;
-                if (message.cd != null && message.hasOwnProperty("cd"))
-                    object.cd = options.bytes === String ? $util.base64.encode(message.cd, 0, message.cd.length) : options.bytes === Array ? Array.prototype.slice.call(message.cd) : message.cd;
+                if (message.cc != null && message.hasOwnProperty("cc"))
+                    object.cc = $root.common.consensus.ConsensusConfig.toObject(message.cc, options);
                 if (message["in"] != null && message.hasOwnProperty("in"))
                     object["in"] = options.bytes === String ? $util.base64.encode(message["in"], 0, message["in"].length) : options.bytes === Array ? Array.prototype.slice.call(message["in"]) : message["in"];
                 if (message.is != null && message.hasOwnProperty("is"))
@@ -4355,7 +4351,7 @@ $root.apply = (function() {
              * @interface ISetConsensusConfigOperation
              * @property {Uint8Array|null} [tx] SetConsensusConfigOperation tx
              * @property {Uint8Array|null} [txv] SetConsensusConfigOperation txv
-             * @property {apply.operations.IconsensusConfig|null} [cc] SetConsensusConfigOperation cc
+             * @property {common.consensus.IConsensusConfig|null} [cc] SetConsensusConfigOperation cc
              * @property {Uint8Array|null} ["in"] SetConsensusConfigOperation in
              * @property {Uint8Array|null} [is] SetConsensusConfigOperation is
              */
@@ -4393,7 +4389,7 @@ $root.apply = (function() {
 
             /**
              * SetConsensusConfigOperation cc.
-             * @member {apply.operations.IconsensusConfig|null|undefined} cc
+             * @member {common.consensus.IConsensusConfig|null|undefined} cc
              * @memberof apply.operations.SetConsensusConfigOperation
              * @instance
              */
@@ -4444,7 +4440,7 @@ $root.apply = (function() {
                 if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
                     writer.uint32(/* id 2, wireType 2 =*/18).bytes(message.txv);
                 if (message.cc != null && Object.hasOwnProperty.call(message, "cc"))
-                    $root.apply.operations.consensusConfig.encode(message.cc, writer.uint32(/* id 3, wireType 2 =*/26).fork()).ldelim();
+                    $root.common.consensus.ConsensusConfig.encode(message.cc, writer.uint32(/* id 3, wireType 2 =*/26).fork()).ldelim();
                 if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
                     writer.uint32(/* id 4, wireType 2 =*/34).bytes(message["in"]);
                 if (message.is != null && Object.hasOwnProperty.call(message, "is"))
@@ -4494,7 +4490,7 @@ $root.apply = (function() {
                             break;
                         }
                     case 3: {
-                            message.cc = $root.apply.operations.consensusConfig.decode(reader, reader.uint32());
+                            message.cc = $root.common.consensus.ConsensusConfig.decode(reader, reader.uint32());
                             break;
                         }
                     case 4: {
@@ -4547,7 +4543,7 @@ $root.apply = (function() {
                     if (!(message.txv && typeof message.txv.length === "number" || $util.isString(message.txv)))
                         return "txv: buffer expected";
                 if (message.cc != null && message.hasOwnProperty("cc")) {
-                    var error = $root.apply.operations.consensusConfig.verify(message.cc);
+                    var error = $root.common.consensus.ConsensusConfig.verify(message.cc);
                     if (error)
                         return "cc." + error;
                 }
@@ -4585,7 +4581,7 @@ $root.apply = (function() {
                 if (object.cc != null) {
                     if (typeof object.cc !== "object")
                         throw TypeError(".apply.operations.SetConsensusConfigOperation.cc: object expected");
-                    message.cc = $root.apply.operations.consensusConfig.fromObject(object.cc);
+                    message.cc = $root.common.consensus.ConsensusConfig.fromObject(object.cc);
                 }
                 if (object["in"] != null)
                     if (typeof object["in"] === "string")
@@ -4649,7 +4645,7 @@ $root.apply = (function() {
                 if (message.txv != null && message.hasOwnProperty("txv"))
                     object.txv = options.bytes === String ? $util.base64.encode(message.txv, 0, message.txv.length) : options.bytes === Array ? Array.prototype.slice.call(message.txv) : message.txv;
                 if (message.cc != null && message.hasOwnProperty("cc"))
-                    object.cc = $root.apply.operations.consensusConfig.toObject(message.cc, options);
+                    object.cc = $root.common.consensus.ConsensusConfig.toObject(message.cc, options);
                 if (message["in"] != null && message.hasOwnProperty("in"))
                     object["in"] = options.bytes === String ? $util.base64.encode(message["in"], 0, message["in"].length) : options.bytes === Array ? Array.prototype.slice.call(message["in"]) : message["in"];
                 if (message.is != null && message.hasOwnProperty("is"))
@@ -4686,25 +4682,49 @@ $root.apply = (function() {
             return SetConsensusConfigOperation;
         })();
 
-        operations.consensusConfig = (function() {
+        return operations;
+    })();
+
+    return apply;
+})();
+
+$root.common = (function() {
+
+    /**
+     * Namespace common.
+     * @exports common
+     * @namespace
+     */
+    var common = {};
+
+    common.consensus = (function() {
+
+        /**
+         * Namespace consensus.
+         * @memberof common
+         * @namespace
+         */
+        var consensus = {};
+
+        consensus.ConsensusConfig = (function() {
 
             /**
-             * Properties of a consensusConfig.
-             * @memberof apply.operations
-             * @interface IconsensusConfig
-             * @property {Uint8Array|null} [sv] consensusConfig sv
-             * @property {Uint8Array|null} [cd] consensusConfig cd
+             * Properties of a ConsensusConfig.
+             * @memberof common.consensus
+             * @interface IConsensusConfig
+             * @property {Uint8Array|null} [sv] ConsensusConfig sv
+             * @property {Uint8Array|null} [cd] ConsensusConfig cd
              */
 
             /**
-             * Constructs a new consensusConfig.
-             * @memberof apply.operations
-             * @classdesc Represents a consensusConfig.
-             * @implements IconsensusConfig
+             * Constructs a new ConsensusConfig.
+             * @memberof common.consensus
+             * @classdesc Represents a ConsensusConfig.
+             * @implements IConsensusConfig
              * @constructor
-             * @param {apply.operations.IconsensusConfig=} [properties] Properties to set
+             * @param {common.consensus.IConsensusConfig=} [properties] Properties to set
              */
-            function consensusConfig(properties) {
+            function ConsensusConfig(properties) {
                 if (properties)
                     for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
                         if (properties[keys[i]] != null)
@@ -4712,43 +4732,43 @@ $root.apply = (function() {
             }
 
             /**
-             * consensusConfig sv.
+             * ConsensusConfig sv.
              * @member {Uint8Array} sv
-             * @memberof apply.operations.consensusConfig
+             * @memberof common.consensus.ConsensusConfig
              * @instance
              */
-            consensusConfig.prototype.sv = $util.newBuffer([]);
+            ConsensusConfig.prototype.sv = $util.newBuffer([]);
 
             /**
-             * consensusConfig cd.
+             * ConsensusConfig cd.
              * @member {Uint8Array} cd
-             * @memberof apply.operations.consensusConfig
+             * @memberof common.consensus.ConsensusConfig
              * @instance
              */
-            consensusConfig.prototype.cd = $util.newBuffer([]);
+            ConsensusConfig.prototype.cd = $util.newBuffer([]);
 
             /**
-             * Creates a new consensusConfig instance using the specified properties.
+             * Creates a new ConsensusConfig instance using the specified properties.
              * @function create
-             * @memberof apply.operations.consensusConfig
+             * @memberof common.consensus.ConsensusConfig
              * @static
-             * @param {apply.operations.IconsensusConfig=} [properties] Properties to set
-             * @returns {apply.operations.consensusConfig} consensusConfig instance
+             * @param {common.consensus.IConsensusConfig=} [properties] Properties to set
+             * @returns {common.consensus.ConsensusConfig} ConsensusConfig instance
              */
-            consensusConfig.create = function create(properties) {
-                return new consensusConfig(properties);
+            ConsensusConfig.create = function create(properties) {
+                return new ConsensusConfig(properties);
             };
 
             /**
-             * Encodes the specified consensusConfig message. Does not implicitly {@link apply.operations.consensusConfig.verify|verify} messages.
+             * Encodes the specified ConsensusConfig message. Does not implicitly {@link common.consensus.ConsensusConfig.verify|verify} messages.
              * @function encode
-             * @memberof apply.operations.consensusConfig
+             * @memberof common.consensus.ConsensusConfig
              * @static
-             * @param {apply.operations.IconsensusConfig} message consensusConfig message or plain object to encode
+             * @param {common.consensus.IConsensusConfig} message ConsensusConfig message or plain object to encode
              * @param {$protobuf.Writer} [writer] Writer to encode to
              * @returns {$protobuf.Writer} Writer
              */
-            consensusConfig.encode = function encode(message, writer) {
+            ConsensusConfig.encode = function encode(message, writer) {
                 if (!writer)
                     writer = $Writer.create();
                 if (message.sv != null && Object.hasOwnProperty.call(message, "sv"))
@@ -4759,33 +4779,33 @@ $root.apply = (function() {
             };
 
             /**
-             * Encodes the specified consensusConfig message, length delimited. Does not implicitly {@link apply.operations.consensusConfig.verify|verify} messages.
+             * Encodes the specified ConsensusConfig message, length delimited. Does not implicitly {@link common.consensus.ConsensusConfig.verify|verify} messages.
              * @function encodeDelimited
-             * @memberof apply.operations.consensusConfig
+             * @memberof common.consensus.ConsensusConfig
              * @static
-             * @param {apply.operations.IconsensusConfig} message consensusConfig message or plain object to encode
+             * @param {common.consensus.IConsensusConfig} message ConsensusConfig message or plain object to encode
              * @param {$protobuf.Writer} [writer] Writer to encode to
              * @returns {$protobuf.Writer} Writer
              */
-            consensusConfig.encodeDelimited = function encodeDelimited(message, writer) {
+            ConsensusConfig.encodeDelimited = function encodeDelimited(message, writer) {
                 return this.encode(message, writer).ldelim();
             };
 
             /**
-             * Decodes a consensusConfig message from the specified reader or buffer.
+             * Decodes a ConsensusConfig message from the specified reader or buffer.
              * @function decode
-             * @memberof apply.operations.consensusConfig
+             * @memberof common.consensus.ConsensusConfig
              * @static
              * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
              * @param {number} [length] Message length if known beforehand
-             * @returns {apply.operations.consensusConfig} consensusConfig
+             * @returns {common.consensus.ConsensusConfig} ConsensusConfig
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
-            consensusConfig.decode = function decode(reader, length, error) {
+            ConsensusConfig.decode = function decode(reader, length, error) {
                 if (!(reader instanceof $Reader))
                     reader = $Reader.create(reader);
-                var end = length === undefined ? reader.len : reader.pos + length, message = new $root.apply.operations.consensusConfig();
+                var end = length === undefined ? reader.len : reader.pos + length, message = new $root.common.consensus.ConsensusConfig();
                 while (reader.pos < end) {
                     var tag = reader.uint32();
                     if (tag === error)
@@ -4808,30 +4828,30 @@ $root.apply = (function() {
             };
 
             /**
-             * Decodes a consensusConfig message from the specified reader or buffer, length delimited.
+             * Decodes a ConsensusConfig message from the specified reader or buffer, length delimited.
              * @function decodeDelimited
-             * @memberof apply.operations.consensusConfig
+             * @memberof common.consensus.ConsensusConfig
              * @static
              * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
-             * @returns {apply.operations.consensusConfig} consensusConfig
+             * @returns {common.consensus.ConsensusConfig} ConsensusConfig
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
-            consensusConfig.decodeDelimited = function decodeDelimited(reader) {
+            ConsensusConfig.decodeDelimited = function decodeDelimited(reader) {
                 if (!(reader instanceof $Reader))
                     reader = new $Reader(reader);
                 return this.decode(reader, reader.uint32());
             };
 
             /**
-             * Verifies a consensusConfig message.
+             * Verifies a ConsensusConfig message.
              * @function verify
-             * @memberof apply.operations.consensusConfig
+             * @memberof common.consensus.ConsensusConfig
              * @static
              * @param {Object.<string,*>} message Plain object to verify
              * @returns {string|null} `null` if valid, otherwise the reason why it is not
              */
-            consensusConfig.verify = function verify(message) {
+            ConsensusConfig.verify = function verify(message) {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
                 if (message.sv != null && message.hasOwnProperty("sv"))
@@ -4844,17 +4864,17 @@ $root.apply = (function() {
             };
 
             /**
-             * Creates a consensusConfig message from a plain object. Also converts values to their respective internal types.
+             * Creates a ConsensusConfig message from a plain object. Also converts values to their respective internal types.
              * @function fromObject
-             * @memberof apply.operations.consensusConfig
+             * @memberof common.consensus.ConsensusConfig
              * @static
              * @param {Object.<string,*>} object Plain object
-             * @returns {apply.operations.consensusConfig} consensusConfig
+             * @returns {common.consensus.ConsensusConfig} ConsensusConfig
              */
-            consensusConfig.fromObject = function fromObject(object) {
-                if (object instanceof $root.apply.operations.consensusConfig)
+            ConsensusConfig.fromObject = function fromObject(object) {
+                if (object instanceof $root.common.consensus.ConsensusConfig)
                     return object;
-                var message = new $root.apply.operations.consensusConfig();
+                var message = new $root.common.consensus.ConsensusConfig();
                 if (object.sv != null)
                     if (typeof object.sv === "string")
                         $util.base64.decode(object.sv, message.sv = $util.newBuffer($util.base64.length(object.sv)), 0);
@@ -4869,15 +4889,15 @@ $root.apply = (function() {
             };
 
             /**
-             * Creates a plain object from a consensusConfig message. Also converts values to other types if specified.
+             * Creates a plain object from a ConsensusConfig message. Also converts values to other types if specified.
              * @function toObject
-             * @memberof apply.operations.consensusConfig
+             * @memberof common.consensus.ConsensusConfig
              * @static
-             * @param {apply.operations.consensusConfig} message consensusConfig
+             * @param {common.consensus.ConsensusConfig} message ConsensusConfig
              * @param {$protobuf.IConversionOptions} [options] Conversion options
              * @returns {Object.<string,*>} Plain object
              */
-            consensusConfig.toObject = function toObject(message, options) {
+            ConsensusConfig.toObject = function toObject(message, options) {
                 if (!options)
                     options = {};
                 var object = {};
@@ -4905,38 +4925,38 @@ $root.apply = (function() {
             };
 
             /**
-             * Converts this consensusConfig to JSON.
+             * Converts this ConsensusConfig to JSON.
              * @function toJSON
-             * @memberof apply.operations.consensusConfig
+             * @memberof common.consensus.ConsensusConfig
              * @instance
              * @returns {Object.<string,*>} JSON object
              */
-            consensusConfig.prototype.toJSON = function toJSON() {
+            ConsensusConfig.prototype.toJSON = function toJSON() {
                 return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
             };
 
             /**
-             * Gets the default type url for consensusConfig
+             * Gets the default type url for ConsensusConfig
              * @function getTypeUrl
-             * @memberof apply.operations.consensusConfig
+             * @memberof common.consensus.ConsensusConfig
              * @static
              * @param {string} [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
              * @returns {string} The default type url
              */
-            consensusConfig.getTypeUrl = function getTypeUrl(typeUrlPrefix) {
+            ConsensusConfig.getTypeUrl = function getTypeUrl(typeUrlPrefix) {
                 if (typeUrlPrefix === undefined) {
                     typeUrlPrefix = "type.googleapis.com";
                 }
-                return typeUrlPrefix + "/apply.operations.consensusConfig";
+                return typeUrlPrefix + "/common.consensus.ConsensusConfig";
             };
 
-            return consensusConfig;
+            return ConsensusConfig;
         })();
 
-        return operations;
+        return consensus;
     })();
 
-    return apply;
+    return common;
 })();
 
 module.exports = $root;

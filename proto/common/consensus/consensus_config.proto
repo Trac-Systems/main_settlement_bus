@@ -1,0 +1,8 @@
+syntax = "proto3";
+
+package common.consensus;
+
+message ConsensusConfig {
+    bytes sv = 1; // Schema version encoded as uint8.
+    bytes cd = 2; // Version-specific configuration data.
+}
