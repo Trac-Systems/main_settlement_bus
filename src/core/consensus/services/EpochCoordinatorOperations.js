@@ -84,7 +84,6 @@ export class EpochCoordinatorOperations {
             throw err;
         }
 
-        // tratar esse erro pois é critico, só nulo não resolve, tem que checar a signature antes.
         if (!memberSignature) throw new Error('Approval signature not received');
 
         return {
