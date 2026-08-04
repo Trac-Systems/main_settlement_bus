@@ -9,7 +9,7 @@ import {
     safeEncodeConsensusConfig
 } from '../../../src/codecs/apply/applyOperationCodec.js';
 
-const { SetConsensusConfigOperation } = applyOperationsGenerated.apply.operations;
+const { ConsensusControlOperation } = applyOperationsGenerated.apply.operations;
 
 const APPLY_TO_OBJECT_OPTIONS = Object.freeze({
     enums: Number,
@@ -20,15 +20,15 @@ const APPLY_TO_OBJECT_OPTIONS = Object.freeze({
     oneofs: false
 });
 
-test('Consensus config codec uses the SetConsensusConfigOperation wire format', t => {
+test('Consensus config codec uses the ConsensusControlOperation wire format', t => {
     const config = {
         sv: b4a.from([0x01]),
         cd: b4a.from([0x02, 0x03, 0x04])
     };
 
     const encoded = encodeConsensusConfig(config);
-    const decodedWirePayload = SetConsensusConfigOperation.toObject(
-        SetConsensusConfigOperation.decode(encoded),
+    const decodedWirePayload = ConsensusControlOperation.toObject(
+        ConsensusControlOperation.decode(encoded),
         APPLY_TO_OBJECT_OPTIONS
     );
     const decoded = decodeConsensusConfig(encoded);
