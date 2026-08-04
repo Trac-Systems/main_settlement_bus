@@ -95,27 +95,7 @@ const TRANSITIONS = {
 };
 
 export class EpochStateMachine extends StateMachine {
-    #logger;
-
-    constructor(logger, handlers = {}) {
+    constructor(handlers = {}) {
         super(TRANSITIONS, EPOCH_STATES.LOAD_EPOCH_CONTEXT, EPOCH_STATES.LOAD_EPOCH_CONTEXT, handlers);
-        this.#logger = logger;
-    }
-
-    async send(event, payload = {}) {
-        const prev = this.state;
-        const result = await super.send(event, payload);
-        if (result) {
-            this.#logger.info(`[EpochStateMachine] ${prev} --[${event}]--> ${result.next}`);
-        } else {
-            this.#logger.info(`[EpochStateMachine] invalid event=${event} in state=${prev}`);
-        }
-        return result;
-    }
-
-    async enter(payload = {}) {
-        const result = await super.enter(payload);
-        this.#logger.info(`[EpochStateMachine] entering initial state=${result.next}`);
-        return result;
     }
 }

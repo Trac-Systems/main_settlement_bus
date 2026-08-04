@@ -83,7 +83,7 @@ class EpochCoordinatorService extends SchedulableService {
 
         // prevent automatic scheduling which is required because the processing is async.
         hold();
-        const machine = new EpochStateMachine(this.#logger, this.#buildHandlers());
+        const machine = new EpochStateMachine(this.#buildHandlers());
         this.#setupListeners(machine)
 
         const scheduleNext = async (delay) => {
