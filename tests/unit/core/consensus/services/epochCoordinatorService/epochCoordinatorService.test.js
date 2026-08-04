@@ -522,10 +522,77 @@ if (isBareRuntime) {
         }
     });
 
+    // --- APPEND_SET_EPOCH resolves from the real EPOCH_CREATED signal, not a stale getCurrentEpoch read ---
+    // append() only confirms the operation is durable on our local writer core; the consensus
+    // mechanism (autobase apply) still has to process it before the epoch actually advances.
+
+    test('append succeeding does not by itself decide the outcome - it waits for EPOCH_CREATED', async t => {
+        const { service, state, mockOps } = await setup({
+            stateOverrides: { indexerCount: sinon.stub().resolves(1) }, // getCurrentEpoch stays stale at 5n even after append resolves
+        });
+        t.teardown(() => service.close());
+
+        const next = sinon.stub();
+        await service.worker(next, sinon.stub());
+        await drainMicrotasks();
+
+        t.ok(mockOps.appendSetEpoch.calledOnce, 'append was issued');
+        t.absent(next.called, 'a stale getCurrentEpoch right after append must not resolve the cycle');
+
+        await state.emit(EPOCH_CREATED, { epoch: 6n, proposerAddress: 'trac1wallet' });
+        await drainMicrotasks();
+
+        t.ok(next.calledOnce, 'EPOCH_CREATED for our own proposal reached the terminal SEND_APPEND_SIGNAL state');
+    });
+
+    test('EPOCH_CREATED from another proposer for the target epoch reloads instead of accepting our own append', async t => {
+        const getCurrentEpoch = sinon.stub();
+        getCurrentEpoch.onCall(0).resolves(5n); // #shouldRun() guard
+        getCurrentEpoch.onCall(1).resolves(5n); // seed for this cycle (context.currentEpoch)
+        getCurrentEpoch.onCall(2).resolves(5n); // REFRESH_SIGNED_STATE_BEFORE_APPEND still sees the stale epoch, so the first append is issued
+        getCurrentEpoch.resolves(6n); // reload sees the other proposer's epoch once it lands
+
+        const { service, state, mockOps } = await setup({
+            stateOverrides: { indexerCount: sinon.stub().resolves(1), getCurrentEpoch },
+        });
+        t.teardown(() => service.close());
+
+        await service.worker(sinon.stub(), sinon.stub());
+        await drainMicrotasks();
+        t.is(mockOps.appendSetEpoch.callCount, 1);
+
+        await state.emit(EPOCH_CREATED, { epoch: 6n, proposerAddress: 'trac1someone-else' });
+        // The EPOCH_CREATED listener fires the state machine's send() fire-and-forget (an event
+        // emitter can't await its listener's downstream effects), and the reload -> re-append
+        // chain has several hops - a real timer tick lets it fully settle, drainMicrotasks() does not.
+        await flush();
+
+        t.is(mockOps.calculateVDF.callCount, 2, 'restarted from INITIALIZE_VDF against the reloaded epoch');
+        t.is(mockOps.appendSetEpoch.callCount, 2, 'the reloaded pass appends again for the new target epoch');
+    });
+
+    test('EPOCH_CREATED for an unrelated epoch is ignored while waiting in APPEND_SET_EPOCH', async t => {
+        const { service, state, mockOps } = await setup({
+            stateOverrides: { indexerCount: sinon.stub().resolves(1) },
+        });
+        t.teardown(() => service.close());
+
+        const next = sinon.stub();
+        await service.worker(next, sinon.stub());
+        await drainMicrotasks();
+
+        await state.emit(EPOCH_CREATED, { epoch: 99n, proposerAddress: 'trac1wallet' });
+        await drainMicrotasks();
+
+        t.absent(next.called, 'an EPOCH_CREATED for an unrelated epoch must not resolve this cycle');
+        t.is(mockOps.appendSetEpoch.callCount, 1, 'no retry triggered by the unrelated event');
+    });
+
     test('a fresh cycle naturally picks up an epoch that advanced since the last cycle', async t => {
-    // A successful append is terminal (SEND_APPEND_SIGNAL has no outgoing transition) - there is
-    // no in-cycle wait-and-recheck. Discovering that someone else's epoch landed in the meantime
-    // is just what LOAD_EPOCH_CONTEXT does on every fresh cycle, nothing special about backoff.
+    // Each worker() call starts an independent machine from LOAD_EPOCH_CONTEXT. The first
+    // cycle's machine is left waiting in APPEND_SET_EPOCH here (no EPOCH_CREATED emitted, no
+    // timeout ticked) - the point of this test is that discovering someone else's epoch landed
+    // in the meantime is just what LOAD_EPOCH_CONTEXT does on every fresh cycle.
         let service;
         try {
             const getCurrentEpoch = sinon.stub().resolves(5n);
@@ -537,7 +604,7 @@ if (isBareRuntime) {
 
             await service.worker(sinon.stub(), sinon.stub());
             await drainMicrotasks();
-            t.is(mockOps.appendSetEpoch.callCount, 1, 'first cycle appends successfully and ends');
+            t.is(mockOps.appendSetEpoch.callCount, 1, 'first cycle issues the append');
 
             // Someone else's epoch landed before the next scheduler tick.
             getCurrentEpoch.resolves(6n);
@@ -602,11 +669,11 @@ if (isBareRuntime) {
                 config: { epochAppendTimeout: 1000 },
             });
 
-            await service.worker(sinon.stub(), sinon.stub()); // append succeeds, moves to BACKOFF
+            await service.worker(sinon.stub(), sinon.stub()); // append succeeds, waits in APPEND_SET_EPOCH for EPOCH_CREATED/timeout
             await service.close();
 
-            await clock.tickAsync(1100); // must not throw - the cycle was already torn down
-            t.pass('closing mid-cycle does not crash when the pending BACKOFF timer later fires');
+            await clock.tickAsync(1100); // must not throw when the still-pending append timeout later fires BACKOFF
+            t.pass('closing mid-cycle does not crash when the pending append timeout later fires');
         } finally {
             clock.restore();
         }

@@ -223,28 +223,16 @@ class EpochCoordinatorService extends SchedulableService {
     }
 
     async #handleAppendSetEpoch(context, machine) {
-        let winningProposer = null;
-        const stopListening = listenTo(this.#state, CustomEventType.EPOCH_CREATED, ({ epoch, proposerAddress }) => {
-            if (epoch === context.currentEpoch + 1n) winningProposer = proposerAddress;
-        });
-
-        this.#operations.appendSetEpoch(context.setEpochPayload).then(
-            async () => {
-                stopListening();
-                const latestEpoch = await this.#state.getCurrentEpoch();
-                if (latestEpoch <= context.currentEpoch) {
-                    await machine.send(EPOCH_EVENTS.APPEND_FAILED);
-                } else if (winningProposer === this.#wallet.address) {
-                    await machine.send(EPOCH_EVENTS.APPEND_ACCEPTED);
-                } else {
-                    await machine.send(EPOCH_EVENTS.TARGET_EPOCH_ALREADY_SIGNED);
-                }
-            },
-            async () => {
-                stopListening();
-                await machine.send(EPOCH_EVENTS.APPEND_FAILED);
-            }
-        )
+        try {
+            await this.#operations.appendSetEpoch(context.setEpochPayload);
+            // append() only confirms the operation is durable on our local writer core.
+            // The consensus mechanism (autobase apply) still has to process it before the
+            // epoch actually advances, so resolution happens via the EPOCH_CREATED listener
+            // wired in #setupListeners (or the append timeout), not here.
+        } catch (error) {
+            this.#logger.error(error);
+            await machine.send(EPOCH_EVENTS.APPEND_FAILED);
+        }
     }
 
     async #handleSendAppendSignal(context, _machine) {
@@ -340,6 +328,7 @@ class EpochCoordinatorService extends SchedulableService {
 
         let signatureTimer = null;
         let appendTimer = null;
+        let stopAppendListener = null;
         stateMachine.on('*', ({ next, prev }) => {
             if (next === EPOCH_STATES.COLLECT_APPROVALS && prev !== EPOCH_STATES.COLLECT_APPROVALS) {
                 signatureTimer = setTimeout(() => stateMachine.send(EPOCH_EVENTS.APPROVAL_COLLECTION_FAILED), this.#config.epochSignatureTimeout);
@@ -349,12 +338,26 @@ class EpochCoordinatorService extends SchedulableService {
 
             if (next === EPOCH_STATES.APPEND_SET_EPOCH && prev !== EPOCH_STATES.APPEND_SET_EPOCH) {
                 appendTimer = setTimeout(() => stateMachine.send(EPOCH_EVENTS.APPEND_FAILED), this.#config.epochAppendTimeout);
+
+                
+                const targetEpoch = stateMachine.context.currentEpoch + 1n;
+                stopAppendListener = listenTo(this.#state, CustomEventType.EPOCH_CREATED, ({ epoch, proposerAddress }) => {
+                    if (epoch !== targetEpoch) return;
+                    stateMachine.send(
+                        proposerAddress === this.#wallet.address
+                            ? EPOCH_EVENTS.APPEND_ACCEPTED
+                            : EPOCH_EVENTS.TARGET_EPOCH_ALREADY_SIGNED
+                    );
+                });
             } else if (prev === EPOCH_STATES.APPEND_SET_EPOCH && next !== EPOCH_STATES.APPEND_SET_EPOCH) {
                 clearTimeout(appendTimer);
+                stopAppendListener?.();
+                stopAppendListener = null;
             }
         })
         toClean.push(() => clearTimeout(signatureTimer))
         toClean.push(() => clearTimeout(appendTimer))
+        toClean.push(() => stopAppendListener?.())
 
         stateMachine.once('close', () => toClean.forEach(cleanup => cleanup()))
     }
