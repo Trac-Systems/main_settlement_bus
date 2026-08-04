@@ -14,8 +14,6 @@ import {
     NETWORK_ID_BYTE_LENGTH,
     EPOCH_BYTE_LENGTH,
     VDF_BLOB_PROOF_SIZE,
-    VDF_DIFFICULTY_SIZE,
-    VDF_DISCRIMINANT_SIZE,
     CONSENSUS_CONFIG_SCHEMA_VERSION_BYTE_LENGTH,
     CONSENSUS_CONFIG_DATA_MAX_SIZE,
 } from '../../../utils/constants.js';
@@ -679,8 +677,19 @@ class StateValidationSchema {
                 props: {
                     tx: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
                     txv: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
-                    df: {type: 'buffer', length: VDF_DIFFICULTY_SIZE, required: true},
-                    db: {type: 'buffer', length: VDF_DISCRIMINANT_SIZE, required: true},
+                    cc: {
+                        strict: true,
+                        type: 'object',
+                        required: true,
+                        props: {
+                            sv: {type: 'buffer', length: CONSENSUS_CONFIG_SCHEMA_VERSION_BYTE_LENGTH, required: true},
+                            cd: {
+                                type: 'buffer_max_length',
+                                maxLength: CONSENSUS_CONFIG_DATA_MAX_SIZE,
+                                required: true
+                            },
+                        }
+                    },
                     in: {type: 'buffer', length: NONCE_BYTE_LENGTH, required: true},
                     is: {type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true},
                 }
