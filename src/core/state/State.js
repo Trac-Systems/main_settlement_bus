@@ -15,14 +15,13 @@ import {
     TRAC_NAMESPACE,
     EventType,
     CustomEventType,
-    VDF_DIFFICULTY_SIZE,
-    VDF_DISCRIMINANT_SIZE,
     MAX_UINT32,
 } from '../../utils/constants.js';
 import { isHexString, sleep, isTransactionRecordPut } from '../../utils/helpers.js';
 import tracCryptoApi from 'trac-crypto-api';
 import StateValidationSchema from './validators/StateValidationSchema.js';
 import {
+    decodeConsensusConfig,
     safeDecodeApplyOperation,
     safeEncodeConsensusConfig
 } from '../../codecs/apply/applyOperationCodec.js';
@@ -58,6 +57,7 @@ import remote from 'hypercore/lib/fully-remote-proof.js'
 import PQueue from 'p-queue';
 import { createGenesisEpochProof } from './utils/epochProof.js';
 import {
+    decodeVdfConfig,
     safeDecodeVdfConfig,
     safeEncodeVdfConfig
 } from '../../codecs/consensus/v1/vdfConfigCodec.js';
@@ -627,34 +627,49 @@ class State extends ReadyResource {
         return this.#bee;
     }
 
-    async getSignedVDFParams() {
-        const vdfParamsBuffer = await this.getSigned(EntryType.VDF_PARAMS);
-        if (_.isNil(vdfParamsBuffer)) return null;
+    async getSignedConsensusConfig() {
+        const decodeConfigAtPointer = async currentConfigPointer => {
+            if (!b4a.isBuffer(currentConfigPointer) || currentConfigPointer.length !== 4) {
+                throw new Error('Invalid current consensus config pointer.');
+            }
 
-        const expectedLength = VDF_DIFFICULTY_SIZE + VDF_DISCRIMINANT_SIZE;
-        if (!b4a.isBuffer(vdfParamsBuffer)) {
-            throw new Error("Invalid VDF params value: expected a buffer.");
-        }
-        if (vdfParamsBuffer.length !== expectedLength) {
-            throw new Error(`Invalid VDF params length: expected ${expectedLength}, got ${vdfParamsBuffer.length}.`);
-        }
-        const decodedVdfParams = safeDecodeVdfConfig(vdfParamsBuffer);
-        if (decodedVdfParams === null) {
-            throw new Error("Invalid VDF params value.");
-        }
+            const currentConfigIndex = currentConfigPointer.readUInt32BE(0);
 
-        return {
-            vdfDifficulty: decodedVdfParams.difficulty.readUInt32BE(0),
-            vdfDiscriminantSize: decodedVdfParams.discriminantBitSize.readUInt16BE(0),
+            const encodedConsensusConfig = await this.getSigned(EntryType.CONSENSUS_CONFIG_RECORD + currentConfigIndex);
+            if (_.isNil(encodedConsensusConfig)) {
+                throw new Error(`Consensus config record ${currentConfigIndex} does not exist.`);
+            }
+
+            const consensusConfig = decodeConsensusConfig(encodedConsensusConfig);
+            const schemaVersion = consensusConfig.sv.readUInt8(0);
+            switch (schemaVersion) {
+                case 1: {
+                    const decodedVdfConfig = decodeVdfConfig(consensusConfig.cd);
+                    return {
+                        schemaVersion,
+                        configData: {
+                            difficulty: decodedVdfConfig.difficulty.readUInt32BE(0),
+                            discriminantBitSize: decodedVdfConfig.discriminantBitSize.readUInt16BE(0),
+                        }
+                    };
+                }
+                default:
+                    throw new Error(`Unsupported consensus config schema version: ${schemaVersion}.`);
+            }
         };
+
+        const currentConfigPointer = await this.getSigned(EntryType.CONSENSUS_CONFIG_CURRENT);
+        if (_.isNil(currentConfigPointer)) return null;
+
+        return await decodeConfigAtPointer(currentConfigPointer);
     }
 
-    async requireSignedVDFParams() {
-        const params = await this.getSignedVDFParams();
-        if (_.isNil(params)) {
-            throw new Error("VDF parameters are not initialized.");
+    async requireSignedConsensusConfig() {
+        const consensusConfig = await this.getSignedConsensusConfig();
+        if (_.isNil(consensusConfig)) {
+            throw new Error('Consensus config is not initialized.');
         }
-        return params;
+        return consensusConfig;
     }
 
     // ATTENTION: DO NOT USE METHODS ABOVE IN APPLY PART!

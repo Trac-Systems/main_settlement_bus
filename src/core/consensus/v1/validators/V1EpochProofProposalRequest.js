@@ -14,7 +14,7 @@ class V1EpochProofProposalRequest extends V1BaseConsensusOperation {
      * @param {Config} config Application configuration used by base validation
      * and network identity checks.
      * @param {State} state Ledger state. It must expose `requireCurrentEpoch()`,
-     * `requireEpoch(epoch)`, `requireSignedVDFParams()`, and `isIndexerAddress(address)`.
+     * `requireEpoch(epoch)`, `requireSignedConsensusConfig()`, and `isIndexerAddress(address)`.
      * @throws {Error} When consensus schemas cannot be initialized from the configuration.
      */
     constructor(config, state) {
@@ -47,7 +47,11 @@ class V1EpochProofProposalRequest extends V1BaseConsensusOperation {
             const currentEpoch = await this._state.requireCurrentEpoch();
             this.validateIncomingEpoch(payload.proof_proposal, currentEpoch);
             await this.validatePreviousEpochRecordHash(payload.proof_proposal, currentEpoch);
-            const vdfParams = await this._state.requireSignedVDFParams();
+            const consensusConfig = await this._state.requireSignedConsensusConfig();
+            const vdfParams = {
+                vdfDifficulty: consensusConfig.configData.difficulty,
+                vdfDiscriminantSize: consensusConfig.configData.discriminantBitSize
+            };
             await this.validateProofProposalVdfParametersHash(payload.proof_proposal, vdfParams);
             await this.validateProofProposalVdfProof(payload.proof_proposal, vdfParams);
             return true;

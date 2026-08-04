@@ -52,9 +52,12 @@ function createState({
     return {
         requireCurrentEpoch: async () => currentEpoch,
         requireEpoch: async () => currentEpochHash,
-        requireSignedVDFParams: async () => ({
-            vdfDifficulty,
-            vdfDiscriminantSize
+        requireSignedConsensusConfig: async () => ({
+            schemaVersion: 1,
+            configData: {
+                difficulty: vdfDifficulty,
+                discriminantBitSize: vdfDiscriminantSize
+            }
         }),
         isIndexerAddress: async () => isIndexer
     };
@@ -165,16 +168,16 @@ test('V1EpochProofProposalRequest validates proof proposal signature', async t =
         currentEpochHash: genesisEpochHash
     });
     const requireCurrentEpoch = state.requireCurrentEpoch;
-    const requireSignedVDFParams = state.requireSignedVDFParams;
+    const requireSignedConsensusConfig = state.requireSignedConsensusConfig;
     let currentEpochReads = 0;
     let vdfParamsReads = 0;
     state.requireCurrentEpoch = async () => {
         currentEpochReads++;
         return await requireCurrentEpoch();
     };
-    state.requireSignedVDFParams = async () => {
+    state.requireSignedConsensusConfig = async () => {
         vdfParamsReads++;
-        return await requireSignedVDFParams();
+        return await requireSignedConsensusConfig();
     };
     const validator = new V1EpochProofProposalRequest(config, state);
     const payload = await buildProofProposalPayload(wallet, {
