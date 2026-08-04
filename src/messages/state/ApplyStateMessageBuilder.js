@@ -2,22 +2,17 @@ import b4a from 'b4a';
 import tracCryptoApi from 'trac-crypto-api';
 
 import { createMessage, toHex } from '../../utils/buffer.js';
-import {
-    OperationType,
-    VDF_DIFFICULTY_SIZE,
-    VDF_DISCRIMINANT_SIZE
-} from '../../utils/constants.js';
+import { OperationType } from '../../utils/constants.js';
 import { addressToBuffer, bufferToAddress } from '../../core/state/utils/address.js';
 import { isAddressValid } from "../../core/state/utils/address.js";
 import {
     isAdminControl,
     isBalanceInitialization,
     isBootstrapDeployment,
+    isConsensusControl,
     isCoreAdmin,
     isRoleAccess,
-    isSetConsensusConfig,
     isSetEpoch,
-    isSetGenesisEpoch,
     isTransaction,
     isTransfer,
     operationToPayload
@@ -57,8 +52,6 @@ class ApplyStateMessageBuilder {
     #proofData;
     #txHash;
     #txValidity;
-    #vdfDifficulty;
-    #vdfDiscriminantSize;
     #wallet;
     #writingKey;
 
@@ -192,16 +185,6 @@ class ApplyStateMessageBuilder {
     setConsensusConfig(encodedConsensusConfig) {
         this.#consensusConfig = decodeConsensusConfig(encodedConsensusConfig);
         this.#encodedConsensusConfig = encodedConsensusConfig;
-        return this;
-    }
-
-    setVdfDifficulty(vdfDifficulty) {
-        this.#vdfDifficulty = this.#normalizeHexBuffer(vdfDifficulty, VDF_DIFFICULTY_SIZE, 'VDF difficulty');
-        return this;
-    }
-
-    setVdfDiscriminantSize(vdfDiscriminantSize) {
-        this.#vdfDiscriminantSize = this.#normalizeHexBuffer(vdfDiscriminantSize, VDF_DISCRIMINANT_SIZE, 'VDF discriminant size');
         return this;
     }
 
@@ -576,20 +559,6 @@ class ApplyStateMessageBuilder {
                 );
                 break;
             case OperationType.SET_GENESIS_EPOCH:
-                this.#requireFields([
-                    [this.#txValidity, 'Transaction validity'],
-                    [this.#vdfDifficulty, 'Difficulty'],
-                    [this.#vdfDiscriminantSize, 'Discriminant size']
-                ]);
-                msg = createMessage(
-                    this.#config.networkId,
-                    this.#txValidity,
-                    this.#vdfDifficulty,
-                    this.#vdfDiscriminantSize,
-                    nonce,
-                    this.#operationType
-                );
-                break;
             case OperationType.SET_CONSENSUS_CONFIG:
                 this.#requireFields([
                     [this.#txValidity, 'Transaction validity'],
@@ -692,17 +661,7 @@ class ApplyStateMessageBuilder {
                 is: signature
             };
         }
-        if (isSetGenesisEpoch(this.#operationType)) {
-            return {
-                tx,
-                txv: this.#txValidity,
-                df: this.#vdfDifficulty,
-                db: this.#vdfDiscriminantSize,
-                in: nonce,
-                is: signature
-            };
-        }
-        if (isSetConsensusConfig(this.#operationType)) {
+        if (isConsensusControl(this.#operationType)) {
             return {
                 tx,
                 txv: this.#txValidity,

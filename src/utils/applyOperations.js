@@ -54,14 +54,9 @@ const isSetEpoch = type => {
     ].includes(type);
 }
 
-const isSetGenesisEpoch = type => {
+const isConsensusControl = type => {
     return [
-        OperationType.SET_GENESIS_EPOCH
-    ].includes(type);
-}
-
-const isSetConsensusConfig = type => {
-    return [
+        OperationType.SET_GENESIS_EPOCH,
         OperationType.SET_CONSENSUS_CONFIG
     ].includes(type);
 }
@@ -101,11 +96,7 @@ const operationToPayload = type => {
             jsonPath: 'seo'
         },
         {
-            condition: isSetGenesisEpoch,
-            jsonPath: 'sgo'
-        },
-        {
-            condition: isSetConsensusConfig,
+            condition: isConsensusControl,
             jsonPath: 'cco'
         }
     ]
@@ -123,6 +114,5 @@ export {
     isTransfer,
     isBalanceInitialization,
     isSetEpoch,
-    isSetGenesisEpoch,
-    isSetConsensusConfig
+    isConsensusControl
 }

@@ -4,6 +4,7 @@ package apply.operations;
 
 import "common/consensus/consensus_config.proto";
 
+// SET_GENESIS_EPOCH, SET_CONSENSUS_CONFIG
 message ConsensusControlOperation {
     bytes tx                             = 1; // Transaction hash (unique identifier for the transaction)
     bytes txv                            = 2; // Transaction expiration
