@@ -66,14 +66,14 @@ class Scheduler {
         // `scheduleNext` arms the timer directly instead of returning a delay for `run()` to hand
         // back to its caller - a delay handed back here would be meaningless once `run()` has
         // already resolved.
-        let handedOff = false;
+        let scheduleCalled = false;
 
         const hold = () => {
-            handedOff = true;
+            scheduleCalled = true;
         }
 
         const scheduleNext = (ms) => {
-            handedOff = true;
+            scheduleCalled = true;
             this.#next(Scheduler.#validateDelay(ms, 'scheduleNext delayMs'));
         };
 
@@ -88,7 +88,7 @@ class Scheduler {
             this.#currentWorkerRun = null;
         }
 
-        if (!handedOff) {
+        if (!scheduleCalled) {
             this.#next(this.defaultInterval);
         }
     }

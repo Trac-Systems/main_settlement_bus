@@ -46,14 +46,12 @@ class MessageOrchestrator {
      */
     #pickValidatorForMessage(message) {
         const requesterAddress = message?.address;
+
+        if (!requesterAddress) return null
         
         const connected = this.validatorConnectionManager.connectedPeers();
         if (!Array.isArray(connected) || connected.length === 0) {
             return null;
-        }
-
-        if (!requesterAddress) {
-            return this.#pickRandomValidator(connected);
         }
 
         const eligible = connected.filter((publicKey) => {
@@ -223,19 +221,6 @@ class MessageOrchestrator {
             return true;
         }
         return false;
-    }
-
-    /**
-     * Picks a random validator from the given array of validator public keys.
-     * @param {String[]} validatorPubKeys - An array of validator public key hex strings
-     * @returns {String|null} - A randomly selected validator public key
-     */
-    #pickRandomValidator(validatorPubKeys) {
-        if (validatorPubKeys.length === 0) {
-            return null;
-        }
-        const index = Math.floor(Math.random() * validatorPubKeys.length);
-        return validatorPubKeys[index];
     }
 
     incrementSentCount(validatorPubKey) {
