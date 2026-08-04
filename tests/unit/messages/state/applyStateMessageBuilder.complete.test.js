@@ -8,11 +8,7 @@ import {
     safeDecodeApplyOperation,
     safeEncodeApplyOperation,
 } from '../../../../src/codecs/apply/applyOperationCodec.js';
-import {
-    OperationType,
-    VDF_DIFFICULTY_SIZE,
-    VDF_DISCRIMINANT_SIZE
-} from '../../../../src/utils/constants.js';
+import { OperationType } from '../../../../src/utils/constants.js';
 import { config } from '../../../helpers/config.js';
 import { testKeyPair1, testKeyPair2 } from '../../../fixtures/apply.fixtures.js';
 import { addressToBuffer } from '../../../../src/core/state/utils/address.js';
@@ -597,11 +593,14 @@ test('ApplyStateMessageBuilder complete set epoch operation codec roundtrip', as
     t.ok(b4a.equals(decoded.seo.app[1], approvals[1]));
 });
 
-test('ApplyStateMessageBuilder complete set genesis epoch operation (sgo)', async t => {
+test('ApplyStateMessageBuilder complete set genesis epoch operation (cco)', async t => {
     const wallet = await createWallet(testKeyPair1.mnemonic);
     const txValidity = toBuf(hex('11', 32));
-    const vdfDifficulty = toBuf(hex('22', VDF_DIFFICULTY_SIZE));
-    const vdfDiscriminantSize = toBuf(hex('33', VDF_DISCRIMINANT_SIZE));
+    const consensusConfig = {
+        sv: b4a.from([0x01]),
+        cd: toBuf(hex('22', 6))
+    };
+    const encodedConsensusConfig = encodeConsensusConfig(consensusConfig);
 
     const builder = new ApplyStateMessageBuilder(wallet, config);
     await builder
@@ -610,32 +609,44 @@ test('ApplyStateMessageBuilder complete set genesis epoch operation (sgo)', asyn
         .setOperationType(OperationType.SET_GENESIS_EPOCH)
         .setAddress(wallet.address)
         .setTxValidity(txValidity)
-        .setVdfDifficulty(vdfDifficulty)
-        .setVdfDiscriminantSize(vdfDiscriminantSize)
+        .setConsensusConfig(encodedConsensusConfig)
         .build();
 
     const payload = builder.getPayload();
+    const expectedTx = await tracCryptoApi.hash.blake3(createMessage(
+        config.networkId,
+        txValidity,
+        encodedConsensusConfig,
+        payload.cco.in,
+        OperationType.SET_GENESIS_EPOCH
+    ));
+
     t.is(payload.type, OperationType.SET_GENESIS_EPOCH);
     expectAddressBuffer(t, payload.address, 'address');
     t.ok(b4a.equals(payload.address, addressToBuffer(wallet.address, config.addressPrefix)));
-    expectPayloadKeys(t, payload, 'sgo');
-    expectKeys(t, payload.sgo, ['tx', 'txv', 'df', 'db', 'in', 'is'], 'sgo');
-    expectBufferField(t, payload.sgo.tx, 32, 'sgo.tx');
-    expectBufferField(t, payload.sgo.txv, 32, 'sgo.txv');
-    expectBufferField(t, payload.sgo.df, VDF_DIFFICULTY_SIZE, 'sgo.df');
-    expectBufferField(t, payload.sgo.db, VDF_DISCRIMINANT_SIZE, 'sgo.db');
-    expectBufferField(t, payload.sgo.in, 32, 'sgo.in');
-    expectBufferField(t, payload.sgo.is, 64, 'sgo.is');
-    t.ok(b4a.equals(payload.sgo.txv, txValidity));
-    t.ok(b4a.equals(payload.sgo.df, vdfDifficulty));
-    t.ok(b4a.equals(payload.sgo.db, vdfDiscriminantSize));
+    expectPayloadKeys(t, payload, 'cco');
+    expectKeys(t, payload.cco, ['tx', 'txv', 'cc', 'in', 'is'], 'cco');
+    expectKeys(t, payload.cco.cc, ['sv', 'cd'], 'cco.cc');
+    expectBufferField(t, payload.cco.tx, 32, 'cco.tx');
+    expectBufferField(t, payload.cco.txv, 32, 'cco.txv');
+    expectBufferField(t, payload.cco.cc.sv, 1, 'cco.cc.sv');
+    expectBufferField(t, payload.cco.in, 32, 'cco.in');
+    expectBufferField(t, payload.cco.is, 64, 'cco.is');
+    t.ok(b4a.equals(payload.cco.tx, expectedTx));
+    t.ok(b4a.equals(payload.cco.txv, txValidity));
+    t.ok(b4a.equals(payload.cco.cc.sv, consensusConfig.sv));
+    t.ok(b4a.equals(payload.cco.cc.cd, consensusConfig.cd));
+    t.ok(wallet.verify(payload.cco.is, payload.cco.tx, wallet.publicKey));
 });
 
 test('ApplyStateMessageBuilder complete set genesis epoch operation codec roundtrip', async t => {
     const wallet = await createWallet(testKeyPair1.mnemonic);
     const txValidity = toBuf(hex('44', 32));
-    const vdfDifficulty = toBuf(hex('55', VDF_DIFFICULTY_SIZE));
-    const vdfDiscriminantSize = toBuf(hex('66', VDF_DISCRIMINANT_SIZE));
+    const consensusConfig = {
+        sv: b4a.from([0x01]),
+        cd: toBuf(hex('55', 6))
+    };
+    const encodedConsensusConfig = encodeConsensusConfig(consensusConfig);
 
     const builder = new ApplyStateMessageBuilder(wallet, config);
     await builder
@@ -644,8 +655,7 @@ test('ApplyStateMessageBuilder complete set genesis epoch operation codec roundt
         .setOperationType(OperationType.SET_GENESIS_EPOCH)
         .setAddress(wallet.address)
         .setTxValidity(txValidity)
-        .setVdfDifficulty(vdfDifficulty)
-        .setVdfDiscriminantSize(vdfDiscriminantSize)
+        .setConsensusConfig(encodedConsensusConfig)
         .build();
 
     const payload = builder.getPayload();
@@ -656,14 +666,15 @@ test('ApplyStateMessageBuilder complete set genesis epoch operation codec roundt
     t.ok(encoded.length > 0);
     t.is(decoded.type, OperationType.SET_GENESIS_EPOCH);
     t.ok(b4a.equals(decoded.address, addressToBuffer(wallet.address, config.addressPrefix)));
-    t.alike(Object.keys(decoded).sort(), ['address', 'sgo', 'type']);
-    t.alike(Object.keys(decoded.sgo).sort(), ['db', 'df', 'in', 'is', 'tx', 'txv']);
-    t.ok(b4a.equals(decoded.sgo.tx, payload.sgo.tx));
-    t.ok(b4a.equals(decoded.sgo.txv, txValidity));
-    t.ok(b4a.equals(decoded.sgo.df, vdfDifficulty));
-    t.ok(b4a.equals(decoded.sgo.db, vdfDiscriminantSize));
-    t.ok(b4a.equals(decoded.sgo.in, payload.sgo.in));
-    t.ok(b4a.equals(decoded.sgo.is, payload.sgo.is));
+    t.alike(Object.keys(decoded).sort(), ['address', 'cco', 'type']);
+    t.alike(Object.keys(decoded.cco).sort(), ['cc', 'in', 'is', 'tx', 'txv']);
+    t.alike(Object.keys(decoded.cco.cc).sort(), ['cd', 'sv']);
+    t.ok(b4a.equals(decoded.cco.tx, payload.cco.tx));
+    t.ok(b4a.equals(decoded.cco.txv, txValidity));
+    t.ok(b4a.equals(decoded.cco.cc.sv, consensusConfig.sv));
+    t.ok(b4a.equals(decoded.cco.cc.cd, consensusConfig.cd));
+    t.ok(b4a.equals(decoded.cco.in, payload.cco.in));
+    t.ok(b4a.equals(decoded.cco.is, payload.cco.is));
 });
 
 test('ApplyStateMessageBuilder complete set consensus config operation (cco)', async t => {

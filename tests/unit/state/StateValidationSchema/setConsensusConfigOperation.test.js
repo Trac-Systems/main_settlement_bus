@@ -14,17 +14,17 @@ import { config } from '../../../helpers/config.js';
 
 const stateValidationSchema = new StateValidationSchema(config);
 
-test('validateSetConsensusConfigOperation - happy path', t => {
+test('validateConsensusControlOperation - config update happy path', t => {
     t.ok(
-        stateValidationSchema.validateSetConsensusConfigOperation(CCO.valid_set_consensus_config_operation),
+        stateValidationSchema.validateConsensusControlOperation(CCO.valid_set_consensus_config_operation),
         'Valid data for set consensus config operation should pass the validation'
     );
 });
 
-test('validateSetConsensusConfigOperation - type level validation (cco)', t => {
+test('validateConsensusControlOperation - config update type level validation (cco)', t => {
     topLevelValidationTests(
         t,
-        stateValidationSchema.validateSetConsensusConfigOperation.bind(stateValidationSchema),
+        stateValidationSchema.validateConsensusControlOperation.bind(stateValidationSchema),
         CCO.valid_set_consensus_config_operation,
         'cco',
         not_allowed_data_types,
@@ -32,10 +32,10 @@ test('validateSetConsensusConfigOperation - type level validation (cco)', t => {
     );
 });
 
-test('validateSetConsensusConfigOperation - value level validation (cco)', t => {
+test('validateConsensusControlOperation - config update value level validation (cco)', t => {
     valueLevelValidationTest(
         t,
-        stateValidationSchema.validateSetConsensusConfigOperation.bind(stateValidationSchema),
+        stateValidationSchema.validateConsensusControlOperation.bind(stateValidationSchema),
         CCO.valid_set_consensus_config_operation,
         'cco',
         CCO.set_consensus_config_value_fields,
@@ -43,28 +43,28 @@ test('validateSetConsensusConfigOperation - value level validation (cco)', t => 
     );
 });
 
-test('validateSetConsensusConfigOperation - address buffer length validation - TOP LEVEL', t => {
+test('validateConsensusControlOperation - config update address buffer length validation - TOP LEVEL', t => {
     addressBufferLengthTest(
         t,
-        stateValidationSchema.validateSetConsensusConfigOperation.bind(stateValidationSchema),
+        stateValidationSchema.validateConsensusControlOperation.bind(stateValidationSchema),
         CCO.valid_set_consensus_config_operation,
     );
 });
 
-test('validateSetConsensusConfigOperation - fields buffer length validation - VALUE LEVEL (cco)', t => {
+test('validateConsensusControlOperation - config update fields buffer length validation - VALUE LEVEL (cco)', t => {
     fieldsBufferLengthTest(
         t,
-        stateValidationSchema.validateSetConsensusConfigOperation.bind(stateValidationSchema),
+        stateValidationSchema.validateConsensusControlOperation.bind(stateValidationSchema),
         CCO.valid_set_consensus_config_operation,
         'cco',
         CCO.required_length_of_fields_for_set_consensus_config
     );
 });
 
-test('validateSetConsensusConfigOperation - consensus config value level validation (cco.cc)', t => {
+test('validateConsensusControlOperation - config update value level validation (cco.cc)', t => {
     const validOperation = CCO.valid_set_consensus_config_operation;
     const validateConsensusConfig = fixture =>
-        stateValidationSchema.validateSetConsensusConfigOperation({
+        stateValidationSchema.validateConsensusControlOperation({
             ...validOperation,
             cco: {
                 ...validOperation.cco,
@@ -83,10 +83,10 @@ test('validateSetConsensusConfigOperation - consensus config value level validat
     );
 });
 
-test('validateSetConsensusConfigOperation - config data buffer size validation (cco.cc.cd)', t => {
+test('validateConsensusControlOperation - config update data buffer size validation (cco.cc.cd)', t => {
     const validOperation = CCO.valid_set_consensus_config_operation;
     const validateConfigData = cd =>
-        stateValidationSchema.validateSetConsensusConfigOperation({
+        stateValidationSchema.validateConsensusControlOperation({
             ...validOperation,
             cco: {
                 ...validOperation.cco,
@@ -111,10 +111,10 @@ test('validateSetConsensusConfigOperation - config data buffer size validation (
     );
 });
 
-test('validateSetConsensusConfigOperation - schema version uint8 validation (cco.cc.sv)', t => {
+test('validateConsensusControlOperation - config update schema version uint8 validation (cco.cc.sv)', t => {
     const validOperation = CCO.valid_set_consensus_config_operation;
     const validateSchemaVersion = sv =>
-        stateValidationSchema.validateSetConsensusConfigOperation({
+        stateValidationSchema.validateConsensusControlOperation({
             ...validOperation,
             cco: {
                 ...validOperation.cco,
