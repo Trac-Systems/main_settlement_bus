@@ -4012,8 +4012,7 @@ $root.apply = (function() {
              * @interface ISetGenesisEpochOperation
              * @property {Uint8Array|null} [tx] SetGenesisEpochOperation tx
              * @property {Uint8Array|null} [txv] SetGenesisEpochOperation txv
-             * @property {Uint8Array|null} [df] SetGenesisEpochOperation df
-             * @property {Uint8Array|null} [db] SetGenesisEpochOperation db
+             * @property {Uint8Array|null} [cd] SetGenesisEpochOperation cd
              * @property {Uint8Array|null} ["in"] SetGenesisEpochOperation in
              * @property {Uint8Array|null} [is] SetGenesisEpochOperation is
              */
@@ -4050,20 +4049,12 @@ $root.apply = (function() {
             SetGenesisEpochOperation.prototype.txv = $util.newBuffer([]);
 
             /**
-             * SetGenesisEpochOperation df.
-             * @member {Uint8Array} df
+             * SetGenesisEpochOperation cd.
+             * @member {Uint8Array} cd
              * @memberof apply.operations.SetGenesisEpochOperation
              * @instance
              */
-            SetGenesisEpochOperation.prototype.df = $util.newBuffer([]);
-
-            /**
-             * SetGenesisEpochOperation db.
-             * @member {Uint8Array} db
-             * @memberof apply.operations.SetGenesisEpochOperation
-             * @instance
-             */
-            SetGenesisEpochOperation.prototype.db = $util.newBuffer([]);
+            SetGenesisEpochOperation.prototype.cd = $util.newBuffer([]);
 
             /**
              * SetGenesisEpochOperation in.
@@ -4109,10 +4100,8 @@ $root.apply = (function() {
                     writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.tx);
                 if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
                     writer.uint32(/* id 2, wireType 2 =*/18).bytes(message.txv);
-                if (message.df != null && Object.hasOwnProperty.call(message, "df"))
-                    writer.uint32(/* id 3, wireType 2 =*/26).bytes(message.df);
-                if (message.db != null && Object.hasOwnProperty.call(message, "db"))
-                    writer.uint32(/* id 4, wireType 2 =*/34).bytes(message.db);
+                if (message.cd != null && Object.hasOwnProperty.call(message, "cd"))
+                    writer.uint32(/* id 3, wireType 2 =*/26).bytes(message.cd);
                 if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
                     writer.uint32(/* id 5, wireType 2 =*/42).bytes(message["in"]);
                 if (message.is != null && Object.hasOwnProperty.call(message, "is"))
@@ -4162,11 +4151,7 @@ $root.apply = (function() {
                             break;
                         }
                     case 3: {
-                            message.df = reader.bytes();
-                            break;
-                        }
-                    case 4: {
-                            message.db = reader.bytes();
+                            message.cd = reader.bytes();
                             break;
                         }
                     case 5: {
@@ -4218,12 +4203,9 @@ $root.apply = (function() {
                 if (message.txv != null && message.hasOwnProperty("txv"))
                     if (!(message.txv && typeof message.txv.length === "number" || $util.isString(message.txv)))
                         return "txv: buffer expected";
-                if (message.df != null && message.hasOwnProperty("df"))
-                    if (!(message.df && typeof message.df.length === "number" || $util.isString(message.df)))
-                        return "df: buffer expected";
-                if (message.db != null && message.hasOwnProperty("db"))
-                    if (!(message.db && typeof message.db.length === "number" || $util.isString(message.db)))
-                        return "db: buffer expected";
+                if (message.cd != null && message.hasOwnProperty("cd"))
+                    if (!(message.cd && typeof message.cd.length === "number" || $util.isString(message.cd)))
+                        return "cd: buffer expected";
                 if (message["in"] != null && message.hasOwnProperty("in"))
                     if (!(message["in"] && typeof message["in"].length === "number" || $util.isString(message["in"])))
                         return "in: buffer expected";
@@ -4255,16 +4237,11 @@ $root.apply = (function() {
                         $util.base64.decode(object.txv, message.txv = $util.newBuffer($util.base64.length(object.txv)), 0);
                     else if (object.txv.length >= 0)
                         message.txv = object.txv;
-                if (object.df != null)
-                    if (typeof object.df === "string")
-                        $util.base64.decode(object.df, message.df = $util.newBuffer($util.base64.length(object.df)), 0);
-                    else if (object.df.length >= 0)
-                        message.df = object.df;
-                if (object.db != null)
-                    if (typeof object.db === "string")
-                        $util.base64.decode(object.db, message.db = $util.newBuffer($util.base64.length(object.db)), 0);
-                    else if (object.db.length >= 0)
-                        message.db = object.db;
+                if (object.cd != null)
+                    if (typeof object.cd === "string")
+                        $util.base64.decode(object.cd, message.cd = $util.newBuffer($util.base64.length(object.cd)), 0);
+                    else if (object.cd.length >= 0)
+                        message.cd = object.cd;
                 if (object["in"] != null)
                     if (typeof object["in"] === "string")
                         $util.base64.decode(object["in"], message["in"] = $util.newBuffer($util.base64.length(object["in"])), 0);
@@ -4307,18 +4284,11 @@ $root.apply = (function() {
                             object.txv = $util.newBuffer(object.txv);
                     }
                     if (options.bytes === String)
-                        object.df = "";
+                        object.cd = "";
                     else {
-                        object.df = [];
+                        object.cd = [];
                         if (options.bytes !== Array)
-                            object.df = $util.newBuffer(object.df);
-                    }
-                    if (options.bytes === String)
-                        object.db = "";
-                    else {
-                        object.db = [];
-                        if (options.bytes !== Array)
-                            object.db = $util.newBuffer(object.db);
+                            object.cd = $util.newBuffer(object.cd);
                     }
                     if (options.bytes === String)
                         object["in"] = "";
@@ -4339,10 +4309,8 @@ $root.apply = (function() {
                     object.tx = options.bytes === String ? $util.base64.encode(message.tx, 0, message.tx.length) : options.bytes === Array ? Array.prototype.slice.call(message.tx) : message.tx;
                 if (message.txv != null && message.hasOwnProperty("txv"))
                     object.txv = options.bytes === String ? $util.base64.encode(message.txv, 0, message.txv.length) : options.bytes === Array ? Array.prototype.slice.call(message.txv) : message.txv;
-                if (message.df != null && message.hasOwnProperty("df"))
-                    object.df = options.bytes === String ? $util.base64.encode(message.df, 0, message.df.length) : options.bytes === Array ? Array.prototype.slice.call(message.df) : message.df;
-                if (message.db != null && message.hasOwnProperty("db"))
-                    object.db = options.bytes === String ? $util.base64.encode(message.db, 0, message.db.length) : options.bytes === Array ? Array.prototype.slice.call(message.db) : message.db;
+                if (message.cd != null && message.hasOwnProperty("cd"))
+                    object.cd = options.bytes === String ? $util.base64.encode(message.cd, 0, message.cd.length) : options.bytes === Array ? Array.prototype.slice.call(message.cd) : message.cd;
                 if (message["in"] != null && message.hasOwnProperty("in"))
                     object["in"] = options.bytes === String ? $util.base64.encode(message["in"], 0, message["in"].length) : options.bytes === Array ? Array.prototype.slice.call(message["in"]) : message["in"];
                 if (message.is != null && message.hasOwnProperty("is"))
