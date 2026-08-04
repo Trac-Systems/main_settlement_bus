@@ -26,11 +26,13 @@ export class EpochCoordinatorOperations {
     }
 
     async calculateVDF(challenge, difficulty, discriminantSizeBits) {
-        const vdf = await this.#vdfService.calculateVDF(
+        const { result, error } = await this.#vdfService.calculateVDF(
             challenge,
             difficulty,
             discriminantSizeBits,
         );
+        if (error) throw new Error(error);
+        const vdf = result;
         return { solution: vdf.solution, difficulty, discriminantSizeBits };
     }  
 

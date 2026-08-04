@@ -122,9 +122,14 @@ class EpochCoordinatorService extends SchedulableService {
             vdfHash
         );
 
-        const vdf = await this.#operations.calculateVDF(challenge, vdfDifficulty, vdfDiscriminantSize);
-        machine.appendContext({ vdf });
-        await machine.send(EPOCH_EVENTS.LOCAL_PROOF_READY);
+        try {
+            const vdf = await this.#operations.calculateVDF(challenge, vdfDifficulty, vdfDiscriminantSize);
+            machine.appendContext({ vdf });
+            await machine.send(EPOCH_EVENTS.LOCAL_PROOF_READY);    
+        } catch (error) {
+            this.#logger.error(error);
+            await machine.send(EPOCH_EVENTS.SOLVER_FAILURE);
+        }
     }
 
     async #handleBuildAndSignProofProposal(context, machine) {
