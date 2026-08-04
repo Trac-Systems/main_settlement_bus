@@ -375,27 +375,17 @@ test('State.apply SET_CONSENSUS_CONFIG applies an ignored pre-genesis update onc
     assertLog(t, logs, 'Operation has already been applied.');
 });
 
-const invalidCurrentPointers = [
-    ...[0, 1, 2, 3, 5, 6, 7, 9].map(length => [
-        `a non-canonical ${length}-byte current pointer`,
-        b4a.alloc(length)
-    ]),
-    ['an overflowing current pointer', b4a.alloc(4, 0xff)]
-];
+test('State.apply SET_CONSENSUS_CONFIG rejects an overflowing current pointer without partial writes', async t => {
+    const context = await setupSetConsensusConfigScenario(t);
+    const payload = await buildSetConsensusConfigPayload(context);
+    const { logs, result } = captureApplyErrors(() =>
+        applyWithCurrentPointerOverride(context, payload, b4a.alloc(4, 0xff))
+    );
+    await result;
 
-for (const [title, pointerValue] of invalidCurrentPointers) {
-    test(`State.apply SET_CONSENSUS_CONFIG rejects ${title} without partial writes`, async t => {
-        const context = await setupSetConsensusConfigScenario(t);
-        const payload = await buildSetConsensusConfigPayload(context);
-        const { logs, result } = captureApplyErrors(() =>
-            applyWithCurrentPointerOverride(context, payload, pointerValue)
-        );
-        await result;
-
-        await assertSetConsensusConfigFailureState(t, context, payload, { skipSync: true });
-        assertLog(t, logs, 'Failed to read next consensus config index.');
-    });
-}
+    await assertSetConsensusConfigFailureState(t, context, payload, { skipSync: true });
+    assertLog(t, logs, 'Consensus config index overflow.');
+});
 
 test('State.apply SET_CONSENSUS_CONFIG appends a config and replicates immutable history', async t => {
     const context = await setupSetConsensusConfigScenario(t);

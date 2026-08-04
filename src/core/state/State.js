@@ -4532,6 +4532,16 @@ class State extends ReadyResource {
 
         const nextConsensusConfigIndex = currentConsensusConfigIndex + 1;
         const nextConsensusConfigKey = EntryType.CONSENSUS_CONFIG_RECORD + nextConsensusConfigIndex;
+        const nextConsensusConfigIndexBuffer = safeWriteUInt32BE(nextConsensusConfigIndex);
+
+        if (nextConsensusConfigIndexBuffer.length === 0) {
+            this.#safeLogApply(
+                OperationType.SET_CONSENSUS_CONFIG,
+                "Failed to encode next consensus config index.",
+                node.from.key
+            );
+            return Status.FAILURE;
+        }
 
         await batch.put(EntryType.CONSENSUS_CONFIG_CURRENT, nextConsensusConfigIndexBuffer);
         await batch.put(nextConsensusConfigKey, encodedConsensusConfig);
