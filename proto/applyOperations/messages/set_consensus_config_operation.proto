@@ -2,15 +2,12 @@ syntax = "proto3";
 
 package apply.operations;
 
-message SetConsensusConfigOperation {
-    bytes tx              = 1; // Transaction hash (unique identifier for the transaction)
-    bytes txv             = 2; // Transaction expiration
-    consensusConfig cc    = 3; // consensus configuration
-    bytes in              = 4; // Nonce of the invoker (admin)
-    bytes is              = 5; // Signature of the invoker (admin)
-}
+import "common/consensus/consensus_config.proto";
 
-message consensusConfig {
-  bytes sv    = 1; // schema version - uint8
-  bytes cd    = 2; // config data - generic bytes
+message SetConsensusConfigOperation {
+    bytes tx                            = 1; // Transaction hash (unique identifier for the transaction)
+    bytes txv                           = 2; // Transaction expiration
+    .common.consensus.ConsensusConfig cc = 3; // Consensus configuration
+    bytes in                            = 4; // Nonce of the invoker (admin)
+    bytes is                            = 5; // Signature of the invoker (admin)
 }
