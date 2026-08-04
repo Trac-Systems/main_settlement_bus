@@ -301,7 +301,7 @@ if (isBareRuntime) {
         t.teardown(async () => await network.close());
     });
 
-    test('Network#tryConnect returns CONNECTED and promotes into the caller-supplied indexer manager', async t => {
+    test('Network#tryConnect returns CONNECTED and promotes into the network-owned indexer manager', async t => {
         const publicKey = 'f'.repeat(64);
         const { network, swarmInstance } = await loadNetwork();
 
@@ -310,13 +310,13 @@ if (isBareRuntime) {
         swarmInstance.peers.set(publicKey, { publicKey: publicKeyBuffer });
         swarmInstance._allConnections.set(publicKeyBuffer, connection);
 
-        // Indexer connections are now owned by a caller-supplied, per-round manager
-        // (created by EpochCoordinatorService) rather than a persistent Network-owned one.
-        const indexerConnectionManagerMock = { add: sinon.stub().resolves() };
+        // Indexer connections are promoted into the single indexer manager Network
+        // owns for its lifetime (network.indexerConnectionManager), not a per-call one.
+        const addSpy = sinon.spy(network.indexerConnectionManager, 'add');
 
-        const status = await network.tryConnect(publicKey, 'indexer', indexerConnectionManagerMock);
+        const status = await network.tryConnect(publicKey, 'indexer');
         t.is(status, CONNECTION_STATUS.CONNECTED, 'returns CONNECTED for ready indexer peer');
-        t.ok(indexerConnectionManagerMock.add.calledWith(publicKeyBuffer, connection), 'connection was promoted into the supplied manager');
+        t.ok(addSpy.calledWith(publicKeyBuffer, connection), 'connection was promoted into the network-owned indexer manager');
         t.absent(network.isConnectionPending(publicKey), 'pending indexer connection was cleared');
         t.teardown(async () => await network.close());
     });

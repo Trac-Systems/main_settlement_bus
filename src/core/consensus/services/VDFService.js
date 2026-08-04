@@ -14,10 +14,7 @@ export class VDFService extends ReadyResource {
     
     async calculateVDF(challenge, difficulty, discriminantSizeBits) {
         const response = this.#queue.then(() => this.#calculate(challenge, difficulty, discriminantSizeBits));
-        if (response.result) {
-            this.#queue = response.result.catch(() => {});
-        }
-        
+        this.#queue = response.catch(() => {});
         return response;
     }
 

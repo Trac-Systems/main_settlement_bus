@@ -44,28 +44,34 @@ test('calculateVDF returns result field from port.read response', async t => {
     await service.ready();
     t.teardown(() => service.close());
 
-    const result = await service.calculateVDF(Buffer.alloc(32), 500, 1024);
+    const { result, error } = await service.calculateVDF(Buffer.alloc(32), 500, 1024);
     t.alike(result, expectedResult);
+    t.absent(error);
 });
 
-test('calculateVDF returns null when response contains error', async t => {
+test('calculateVDF returns error field when response contains error', async t => {
     const portMock = makePortMock();
     portMock.read.resolves({ error: 'VDF computation failed' });
     const service = makeService(portMock);
     await service.ready();
     t.teardown(() => service.close());
 
-    t.is(await service.calculateVDF(Buffer.alloc(32), 100, 512), null);
+    const { result, error } = await service.calculateVDF(Buffer.alloc(32), 100, 512);
+    t.absent(result);
+    t.is(error, 'VDF computation failed');
 });
 
-test('calculateVDF returns null when port.read throws', async t => {
+test('calculateVDF returns error field when port.read throws', async t => {
     const portMock = makePortMock();
     portMock.read.rejects(new Error('port closed unexpectedly'));
     const service = makeService(portMock);
     await service.ready();
     t.teardown(() => service.close());
 
-    t.is(await service.calculateVDF(Buffer.alloc(32), 100, 512), null);
+    const { result, error } = await service.calculateVDF(Buffer.alloc(32), 100, 512);
+    t.absent(result);
+    t.ok(error instanceof Error);
+    t.is(error.message, 'port closed unexpectedly');
 });
 
 test('concurrent calculateVDF calls are serialized', async t => {
@@ -89,11 +95,11 @@ test('concurrent calculateVDF calls are serialized', async t => {
     const [resA, resB] = await Promise.all([callA, callB]);
 
     t.is(portMock.write.callCount, 2);
-    t.is(resA, 'result-A');
-    t.is(resB, 'result-B');
+    t.alike(resA, { result: 'result-A' });
+    t.alike(resB, { result: 'result-B' });
 });
 
-test('queue continues after call returns null (error response)', async t => {
+test('queue continues after call returns an error response', async t => {
     const portMock = makePortMock();
     portMock.read
         .onFirstCall().resolves({ error: 'failed' })
@@ -105,8 +111,8 @@ test('queue continues after call returns null (error response)', async t => {
     const resA = await service.calculateVDF(Buffer.alloc(32, 1), 100, 512);
     const resB = await service.calculateVDF(Buffer.alloc(32, 2), 100, 512);
 
-    t.is(resA, null);
-    t.is(resB, 'ok');
+    t.alike(resA, { error: 'failed' });
+    t.alike(resB, { result: 'ok' });
 });
 
 test('queue continues after port.read throws', async t => {
@@ -121,8 +127,9 @@ test('queue continues after port.read throws', async t => {
     const resA = await service.calculateVDF(Buffer.alloc(32, 1), 100, 512);
     const resB = await service.calculateVDF(Buffer.alloc(32, 2), 100, 512);
 
-    t.is(resA, null);
-    t.is(resB, 'ok');
+    t.ok(resA.error instanceof Error);
+    t.is(resA.error.message, 'port error');
+    t.alike(resB, { result: 'ok' });
 });
 
 // ---- Bare-only tests ----
@@ -199,9 +206,9 @@ if (isBare) {
         t.teardown(() => service.close());
 
         const challenge = Buffer.alloc(32, 1);
-        const result = await service.calculateVDF(challenge, DIFFICULTY, DISCRIMINANT_BITS);
+        const { result, error } = await service.calculateVDF(challenge, DIFFICULTY, DISCRIMINANT_BITS);
 
-        t.ok(result !== null, 'null means @tracsystems/trac-vdf is missing or dist/ was not built');
+        t.absent(error, 'an error means @tracsystems/trac-vdf is missing or dist/ was not built');
         t.alike(result.challenge, challenge);
         t.is(result.difficulty, DIFFICULTY);
         t.is(result.discriminantSizeBits, DISCRIMINANT_BITS);
@@ -216,8 +223,8 @@ if (isBare) {
 
         for (const fill of [1, 2, 3]) {
             const challenge = Buffer.alloc(32, fill);
-            const result = await service.calculateVDF(challenge, DIFFICULTY, DISCRIMINANT_BITS);
-            t.ok(result !== null, `request ${fill} returned null — lib broken or missing`);
+            const { result, error } = await service.calculateVDF(challenge, DIFFICULTY, DISCRIMINANT_BITS);
+            t.absent(error, `request ${fill} returned an error — lib broken or missing`);
             t.alike(result.challenge, challenge);
         }
     });
@@ -229,17 +236,19 @@ if (isBare) {
         await service.ready();
         t.teardown(() => service.close());
 
-        const result = await service.calculateVDF(Buffer.alloc(32, 5), DIFFICULTY, DISCRIMINANT_BITS);
-        t.ok(result !== null, 'null means @tracsystems/trac-vdf is missing or dist/ was not built');
+        const { result, error } = await service.calculateVDF(Buffer.alloc(32, 5), DIFFICULTY, DISCRIMINANT_BITS);
+        t.absent(error, 'an error means @tracsystems/trac-vdf is missing or dist/ was not built');
+        t.ok(result);
     });
 
-    test('[bare] real VDF: invalid discriminantSizeBits causes worker to return null', { timeout: 10000 }, async t => {
+    test('[bare] real VDF: invalid discriminantSizeBits causes worker to return an error', { timeout: 10000 }, async t => {
         const service = new VDFBare();
         await service.ready();
         t.teardown(() => service.close());
 
-        const result = await service.calculateVDF(Buffer.alloc(32, 1), DIFFICULTY, 1);
-        t.is(result, null);
+        const { result, error } = await service.calculateVDF(Buffer.alloc(32, 1), DIFFICULTY, 1);
+        t.absent(result);
+        t.ok(error);
     });
 }
 
@@ -254,9 +263,9 @@ if (!isBare) {
         t.teardown(() => service.close());
 
         const challenge = Buffer.alloc(32, 1);
-        const result = await service.calculateVDF(challenge, DIFFICULTY, DISCRIMINANT_BITS);
+        const { result, error } = await service.calculateVDF(challenge, DIFFICULTY, DISCRIMINANT_BITS);
 
-        t.ok(result !== null, 'null means @tracsystems/trac-vdf is missing or dist/ was not built');
+        t.absent(error, 'an error means @tracsystems/trac-vdf is missing or dist/ was not built');
         t.ok(result.challenge instanceof Uint8Array);
         t.is(result.difficulty, DIFFICULTY);
         t.is(result.discriminantSizeBits, DISCRIMINANT_BITS);
@@ -264,12 +273,14 @@ if (!isBare) {
         t.ok(result.solution.length > 0);
     });
 
-    test('[node] real VDF: invalid args cause worker to return null', { timeout: 10000 }, async t => {
+    test('[node] real VDF: invalid args cause worker to return an error', { timeout: 10000 }, async t => {
         const service = new VDFNode();
         await service.ready();
         t.teardown(() => service.close());
 
-        t.is(await service.calculateVDF(Buffer.alloc(32, 1), DIFFICULTY, -1), null);
+        const { result, error } = await service.calculateVDF(Buffer.alloc(32, 1), DIFFICULTY, -1);
+        t.absent(result);
+        t.ok(error);
     });
 
     test('[node] real VDF: multiple sequential requests all succeed', { timeout: 60000 }, async t => {
@@ -279,18 +290,19 @@ if (!isBare) {
 
         for (const fill of [1, 2, 3]) {
             const challenge = Buffer.alloc(32, fill);
-            const result = await service.calculateVDF(challenge, DIFFICULTY, DISCRIMINANT_BITS);
-            t.ok(result !== null, `request ${fill} returned null — lib broken or missing`);
+            const { result, error } = await service.calculateVDF(challenge, DIFFICULTY, DISCRIMINANT_BITS);
+            t.absent(error, `request ${fill} returned an error — lib broken or missing`);
             t.ok(result.solution instanceof Uint8Array);
         }
     });
 
-    test('[node] calculateVDF returns null when worker exits unexpectedly', { timeout: 5000 }, async t => {
+    test('[node] calculateVDF returns an error when worker exits unexpectedly', { timeout: 5000 }, async t => {
         const crashWorkerURL = new URL('./fixtures/crash-worker.js', import.meta.url);
         const service = new VDFNode(crashWorkerURL);
         await service.ready();
 
-        const result = await service.calculateVDF(Buffer.alloc(32, 1), 100, 512);
-        t.is(result, null);
+        const { result, error } = await service.calculateVDF(Buffer.alloc(32, 1), 100, 512);
+        t.absent(result);
+        t.ok(error);
     });
 }

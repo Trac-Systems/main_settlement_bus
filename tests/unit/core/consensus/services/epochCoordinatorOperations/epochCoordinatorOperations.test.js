@@ -32,7 +32,7 @@ const makeState = (overrides = {}) => ({
 });
 
 const makeVdfService = (overrides = {}) => ({
-    calculateVDF: sinon.stub().resolves({ solution: b4a.alloc(516, 0xff) }),
+    calculateVDF: sinon.stub().resolves({ result: { solution: b4a.alloc(516, 0xff) } }),
     ...overrides,
 });
 
@@ -71,7 +71,7 @@ const opsWithMocks = async (mocks = {}) => {
 test('calculateVDF calls vdfService with hash/difficulty/discriminantSizeBits and returns the solution', async t => {
     const hash = b4a.alloc(32, 0xcc);
     const solution = b4a.alloc(516, 0xdd);
-    const vdfService = makeVdfService({ calculateVDF: sinon.stub().resolves({ solution }) });
+    const vdfService = makeVdfService({ calculateVDF: sinon.stub().resolves({ result: { solution } }) });
     const ops = makeOps({ vdfService });
 
     const result = await ops.calculateVDF(hash, 150, 4096);
