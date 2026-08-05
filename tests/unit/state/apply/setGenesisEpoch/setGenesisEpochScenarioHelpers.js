@@ -417,6 +417,28 @@ export async function applyWithGenesisProofHashFailure(context, payload) {
     return injected;
 }
 
+export async function applyWithGenesisEpochEncodingFailure(context, payload) {
+    const originalFrom = b4a.from;
+    let injected = false;
+
+    b4a.from = (value, ...args) => {
+        const encodedValue = originalFrom(value, ...args);
+        if (!injected && isEncodedGenesisEpochProof(encodedValue)) {
+            injected = true;
+            throw new Error('forced genesis epoch encoding failure');
+        }
+        return encodedValue;
+    };
+
+    try {
+        await appendAndUpdate(context.adminBootstrap.base, payload);
+    } finally {
+        b4a.from = originalFrom;
+    }
+
+    return injected;
+}
+
 function patchEntriesForNextApply(base, overrides) {
     const originalApply = base._handlers.apply;
     let shouldPatchNextApply = true;
@@ -480,4 +502,12 @@ function buffersHaveSameBytes(left, right) {
         if (left[index] !== right[index]) return false;
     }
     return true;
+}
+
+function isEncodedGenesisEpochProof(value) {
+    const epochProof = safeDecodeEpochProof(value);
+    if (!epochProof || epochProof.app.length !== 0) return false;
+
+    const proofProposal = safeDecodeProofProposal(epochProof.pd);
+    return proofProposal !== null;
 }
