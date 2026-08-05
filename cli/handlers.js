@@ -208,8 +208,8 @@ export class Handlers {
         return txDetails;
     }
 
-    async handleEpochGenesisInitialization(params) {
-        return this.#msb.handleEpochGenesisInitialization(params);
+    async handleEpochGenesisInitialization(consensusConfig) {
+        return this.#msb.handleEpochGenesisInitialization(consensusConfig);
     }
 
     async handleSetConsensusConfig(consensusConfig) {

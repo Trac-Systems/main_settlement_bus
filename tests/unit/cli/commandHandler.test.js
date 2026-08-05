@@ -144,8 +144,11 @@ test("CommandHandler collects genesis epoch params before confirmation", async (
     await handler.handle("yes");
 
     t.ok(msb.handleEpochGenesisInitialization.calledOnceWithExactly({
-        vdfDifficulty: "55000000",
-        vdfDiscriminantSize: "2048"
+        schemaVersion: 1,
+        configData: {
+            difficulty: 55_000_000,
+            discriminantBitSize: 2048
+        }
     }));
 });
 
@@ -170,6 +173,35 @@ test("CommandHandler re-prompts invalid genesis epoch params and cancels on no",
 
     t.ok(console.log.calledWith("Genesis epoch initialization cancelled."));
     t.ok(msb.handleEpochGenesisInitialization.notCalled);
+});
+
+test("CommandHandler enforces genesis config bounds", async (t) => {
+    stubConsole(t);
+
+    const { handler, msb } = createSubject();
+
+    await handler.handle("/init_genesis");
+    await handler.handle("4_294_967_296");
+
+    t.ok(console.log.calledWith("Invalid difficulty. Please enter a positive integer (example 55_000_000)."));
+    t.ok(!console.log.calledWith("Set VDF discriminant bit size (example 2048):"));
+
+    await handler.handle("4_294_967_295");
+    await handler.handle("65_536");
+
+    t.ok(console.log.calledWith("Invalid discriminant bit size. Please enter a positive integer (example 2048)."));
+    t.ok(msb.handleEpochGenesisInitialization.notCalled);
+
+    await handler.handle("65_535");
+    await handler.handle("yes");
+
+    t.ok(msb.handleEpochGenesisInitialization.calledOnceWithExactly({
+        schemaVersion: 1,
+        configData: {
+            difficulty: 0xFFFFFFFF,
+            discriminantBitSize: 0xFFFF
+        }
+    }));
 });
 
 test("CommandHandler collects a consensus config JSON object before confirmation", async (t) => {

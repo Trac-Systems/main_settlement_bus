@@ -13,7 +13,9 @@ import {
     BOOTSTRAP_HEXSTRING_LENGTH,
     BALANCE_MIGRATION_SLEEP_INTERVAL,
     WHITELIST_MIGRATION_DIR,
-    OperationType
+    OperationType,
+    MAX_VDF_DIFFICULTY,
+    MAX_VDF_DISCRIMINANT_BIT_SIZE
 } from "./utils/constants.js";
 import { decimalStringToBigInt, bigIntTo16ByteBuffer, bufferToBigInt, bigIntToDecimalString } from "./utils/amountSerialization.js"
 import {
@@ -1066,7 +1068,7 @@ export class MainSettlementBus extends ReadyResource {
         await this.#state.append(encodedPayload);
     }
 
-    async handleEpochGenesisInitialization(params) {
+    async handleEpochGenesisInitialization(consensusConfig) {
         if (!this.#config.enableWallet) {
             throw new Error("Can not initialize genesis epoch - wallet is not enabled.");
         }
@@ -1090,27 +1092,14 @@ export class MainSettlementBus extends ReadyResource {
             throw new Error("Can not initialize genesis epoch - VDF parameters already exist.");
         }
 
-        const { vdfDifficulty, vdfDiscriminantSize } = params;
-        const difficultyNumber = Number(vdfDifficulty);
-        const discriminantNumber = Number(vdfDiscriminantSize);
-
-        if (!Number.isInteger(difficultyNumber) || difficultyNumber <= 0) {
-            throw new Error("VDF difficulty must be a positive unsigned 32-bit integer.");
-        }
-        if (!Number.isInteger(discriminantNumber) || discriminantNumber <= 0) {
-            throw new Error("VDF discriminant size must be a positive unsigned 16-bit integer.");
-        }
-
-        const vdfDifficultyBuffer = uint32ToBuffer(difficultyNumber);
-        const vdfDiscriminantSizeBuffer = uint16ToBuffer(discriminantNumber);
+        const encodedConsensusConfig = this.#validateAndEncodeConsensusConfig(consensusConfig);
 
         const txValidity = await this.#state.getIndexerSequenceState();
         const payload = await applyStateMessageFactory(this.#wallet, this.#config)
             .buildCompleteSetGenesisEpochMessage(
                 this.#wallet.address,
                 txValidity,
-                vdfDifficultyBuffer,
-                vdfDiscriminantSizeBuffer,
+                encodedConsensusConfig,
             )
         const encodedPayload = encodeApplyOperation(payload);
         await this.#state.append(encodedPayload);
@@ -1133,6 +1122,20 @@ export class MainSettlementBus extends ReadyResource {
             throw new Error("Can not set consensus config - you are not the admin.");
         }
 
+        const encodedConsensusConfig = this.#validateAndEncodeConsensusConfig(consensusConfig);
+
+        const txValidity = await this.#state.getIndexerSequenceState();
+        const payload = await applyStateMessageFactory(this.#wallet, this.#config)
+            .buildCompleteSetConsensusConfigMessage(
+                this.#wallet.address,
+                txValidity,
+                encodedConsensusConfig
+            );
+        const encodedPayload = encodeApplyOperation(payload);
+        await this.#state.append(encodedPayload);
+    }
+
+    #validateAndEncodeConsensusConfig(consensusConfig) {
         if (!this.#hasExactKeys(consensusConfig, ["schemaVersion", "configData"])) {
             throw new Error(
                 "Consensus config must contain only schemaVersion and configData."
@@ -1166,15 +1169,7 @@ export class MainSettlementBus extends ReadyResource {
             cd: encodedConfigData
         });
 
-        const txValidity = await this.#state.getIndexerSequenceState();
-        const payload = await applyStateMessageFactory(this.#wallet, this.#config)
-            .buildCompleteSetConsensusConfigMessage(
-                this.#wallet.address,
-                txValidity,
-                encodedConsensusConfig
-            );
-        const encodedPayload = encodeApplyOperation(payload);
-        await this.#state.append(encodedPayload);
+        return encodedConsensusConfig;
     }
 
     // TODO: REFACTOR - In the future, this function should be extracted into another module.
@@ -1188,7 +1183,7 @@ export class MainSettlementBus extends ReadyResource {
         if (
             !Number.isInteger(configData.difficulty) ||
             configData.difficulty <= 0 ||
-            configData.difficulty > 0xFFFFFFFF
+            configData.difficulty > MAX_VDF_DIFFICULTY
         ) {
             throw new Error(
                 "VDF difficulty must be a positive unsigned 32-bit integer."
@@ -1198,7 +1193,7 @@ export class MainSettlementBus extends ReadyResource {
         if (
             !Number.isInteger(configData.discriminantBitSize) ||
             configData.discriminantBitSize <= 0 ||
-            configData.discriminantBitSize > 0xFFFF
+            configData.discriminantBitSize > MAX_VDF_DISCRIMINANT_BIT_SIZE
         ) {
             throw new Error(
                 "VDF discriminant bit size must be a positive unsigned 16-bit integer."
