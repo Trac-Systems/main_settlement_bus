@@ -1089,7 +1089,7 @@ export class MainSettlementBus extends ReadyResource {
 
         const existingConsensusConfig = await this.#state.getSignedConsensusConfig();
         if (existingConsensusConfig) {
-            throw new Error("Can not initialize genesis epoch - VDF parameters already exist.");
+            throw new Error("Can not initialize genesis epoch - consensus config already exists.");
         }
 
         const encodedConsensusConfig = this.#validateAndEncodeConsensusConfig(consensusConfig);

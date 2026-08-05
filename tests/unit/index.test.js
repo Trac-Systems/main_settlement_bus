@@ -395,7 +395,7 @@ if (isBareRuntime) {
         await msb.ready();
 
         loaded.state.getAdminEntry.resolves(adminEntryFor(wallet, loaded.state));
-        loaded.state.getSignedVDFParams.resolves(null);
+        loaded.state.getSignedConsensusConfig.resolves(null);
 
         const invalidConfigs = [
             null,
@@ -421,7 +421,7 @@ if (isBareRuntime) {
         await msb.close();
     });
 
-    test('MainSettlementBus rejects genesis epoch initialization when VDF params already exist', async t => {
+    test('MainSettlementBus rejects genesis epoch initialization when consensus config already exists', async t => {
         const consoleLog = sinon.stub(console, 'log');
         t.teardown(() => consoleLog.restore());
 
@@ -443,7 +443,7 @@ if (isBareRuntime) {
 
         await t.exception(
             () => msb.handleEpochGenesisInitialization(validGenesisConsensusConfig()),
-            errorMessageIncludes('VDF parameters already exist')
+            errorMessageIncludes('consensus config already exists')
         );
 
         t.ok(loaded.state.append.notCalled);

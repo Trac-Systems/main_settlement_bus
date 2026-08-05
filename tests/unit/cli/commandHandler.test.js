@@ -233,6 +233,18 @@ test("CommandHandler collects a consensus config JSON object before confirmation
     t.ok(msb.handleSetConsensusConfig.calledOnceWithExactly(consensusConfig));
 });
 
+test("CommandHandler ignores commands prefixed with the consensus config command", async (t) => {
+    stubConsole(t);
+
+    const { handler, msb } = createSubject();
+
+    await handler.handle("/set_consensus_config_extra");
+
+    t.ok(console.log.notCalled);
+    t.ok(console.info.notCalled);
+    t.ok(msb.handleSetConsensusConfig.notCalled);
+});
+
 test("CommandHandler re-prompts malformed or incomplete consensus config JSON", async (t) => {
     stubConsole(t);
 

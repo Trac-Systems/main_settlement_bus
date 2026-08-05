@@ -249,7 +249,7 @@ export class CommandHandler {
                 process: async () => this.#queueEpochGenesisInitialization()
             },
             {
-                evaluate: ({ input }) => input.startsWith(COMMANDS.SET_CONSENSUS_CONFIG),
+                evaluate: ({ command }) => command === COMMANDS.SET_CONSENSUS_CONFIG,
                 process: async () => this.#queueSetConsensusConfig()
             },
             {
