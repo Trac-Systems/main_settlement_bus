@@ -15,7 +15,7 @@ import {
     TRAC_NAMESPACE,
     EventType,
     CustomEventType,
-    MAX_UINT32,
+    UINT32_MAX,
 } from '../../utils/constants.js';
 import { isHexString, sleep, isTransactionRecordPut } from '../../utils/helpers.js';
 import tracCryptoApi from 'trac-crypto-api';
@@ -52,7 +52,6 @@ import {
     toTerm,
 } from './utils/balance.js';
 import deploymentEntryUtils from './utils/deploymentEntry.js';
-import { deepCopyBuffer } from '../../utils/buffer.js';
 import { Status } from './utils/transaction.js';
 import remote from 'hypercore/lib/fully-remote-proof.js'
 import PQueue from 'p-queue';
@@ -4526,7 +4525,7 @@ class State extends ReadyResource {
             this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG,"Failed to read current consensus config index from buffer", node.from.key)
             return Status.FAILURE;
         }
-        if (currentConsensusConfigIndex === MAX_UINT32) {
+        if (currentConsensusConfigIndex === UINT32_MAX) {
             this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Consensus config index overflow.", node.from.key)
             return Status.FAILURE;
         }

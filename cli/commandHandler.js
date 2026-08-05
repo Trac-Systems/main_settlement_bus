@@ -3,6 +3,10 @@ import _ from "lodash";
 import { Handlers } from "./handlers.js";
 import { isHexString } from "../src/utils/helpers.js";
 import { bigIntToDecimalString } from "../src/utils/amountSerialization.js";
+import {
+    MAX_VDF_DIFFICULTY,
+    MAX_VDF_DISCRIMINANT_BIT_SIZE
+} from "../src/utils/constants.js";
 
 export const COMMANDS = {
     HELP: "/help",
@@ -319,7 +323,7 @@ export class CommandHandler {
         const pendingGenesisInitialization = this.#pendingGenesisInitialization;
 
         if (pendingGenesisInitialization.step === "difficulty") {
-            const difficulty = this.#parseGenesisEpochInteger(input);
+            const difficulty = this.#parsePositiveInteger(input, BigInt(MAX_VDF_DIFFICULTY));
             if (!difficulty) {
                 console.log("Invalid difficulty. Please enter a positive integer (example 55_000_000).");
                 console.log(this.#getGenesisDifficultyPrompt());
@@ -332,7 +336,7 @@ export class CommandHandler {
             return;
         }
 
-        const discriminantBitSize = this.#parseGenesisEpochInteger(input);
+        const discriminantBitSize = this.#parsePositiveInteger(input, BigInt(MAX_VDF_DISCRIMINANT_BIT_SIZE));
         if (!discriminantBitSize) {
             console.log("Invalid discriminant bit size. Please enter a positive integer (example 2048).");
             console.log(this.#getGenesisDiscriminantBitSizePrompt());
@@ -349,9 +353,12 @@ export class CommandHandler {
     }
 
     #queueEpochGenesisConfirmation({ difficulty, discriminantBitSize }) {
-        const params = {
-            vdfDifficulty: difficulty.value,
-            vdfDiscriminantSize: discriminantBitSize.value
+        const consensusConfig = {
+            schemaVersion: 1,
+            configData: {
+                difficulty: Number(difficulty.value),
+                discriminantBitSize: Number(discriminantBitSize.value)
+            }
         };
 
         console.info("Genesis Epoch Initialization Parameters:");
@@ -362,15 +369,11 @@ export class CommandHandler {
             prompt: "Do you want to proceed? (yes/no)",
             invalidMessage: 'Invalid input. Please answer "yes" or "no".',
             failureMessage: "Genesis epoch initialization failed",
-            onConfirm: async () => this.#handlers.handleEpochGenesisInitialization(params),
+            onConfirm: async () => this.#handlers.handleEpochGenesisInitialization(consensusConfig),
             onDecline: async () => console.log("Genesis epoch initialization cancelled.")
         };
 
         console.log(this.#pendingConfirmation.prompt);
-    }
-
-    #parseGenesisEpochInteger(input) {
-        return this.#parsePositiveInteger(input);
     }
 
     #queueSetConsensusConfig() {
@@ -432,7 +435,7 @@ export class CommandHandler {
         const pendingSetVdfParams = this.#pendingSetVdfParams;
 
         if (pendingSetVdfParams.step === "difficulty") {
-            const difficulty = this.#parsePositiveInteger(input, 0xFFFFFFFFn);
+            const difficulty = this.#parsePositiveInteger(input, BigInt(MAX_VDF_DIFFICULTY));
             if (!difficulty) {
                 console.log(
                     "Invalid difficulty. Please enter an integer between 1 and 4_294_967_295."
@@ -447,7 +450,7 @@ export class CommandHandler {
             return;
         }
 
-        const discriminantBitSize = this.#parsePositiveInteger(input, 0xFFFFn);
+        const discriminantBitSize = this.#parsePositiveInteger(input, BigInt(MAX_VDF_DISCRIMINANT_BIT_SIZE));
         if (!discriminantBitSize) {
             console.log(
                 "Invalid discriminant bit size. Please enter an integer between 1 and 65_535."
