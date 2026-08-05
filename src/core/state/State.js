@@ -30,7 +30,6 @@ import {
     ZERO_WK,
     NULL_BUFFER,
     isZeroBuffer,
-    safeUint8ToBuffer,
     safeWriteUInt32BE,
     safeReadUint32BE,
     deepCopyBuffer, safeReadUint8
@@ -59,7 +58,6 @@ import { createGenesisEpochProof } from './utils/epochProof.js';
 import {
     decodeVdfConfig,
     safeDecodeVdfConfig,
-    safeEncodeVdfConfig
 } from '../../codecs/consensus/v1/vdfConfigCodec.js';
 import _ from 'lodash';
 
@@ -4236,12 +4234,23 @@ class State extends ReadyResource {
             return Status.FAILURE;
         }
 
+        const encodedConsensusConfig = safeEncodeConsensusConfig(op.cco.cc);
+
+        if (encodedConsensusConfig.length === 0) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Failed to encode consensus config.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        if (!this.#validateConsensusConfigApply(op.cco.cc)) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Consensus config validation failed.", node.from.key);
+            return Status.FAILURE;
+        }
+
         // verify requester signature
         const message = createMessage(
             this.#config.networkId,
             op.cco.txv,
-            op.cco.df,
-            op.cco.db,
+            encodedConsensusConfig,
             op.cco.in,
             OperationType.SET_GENESIS_EPOCH
         );
@@ -4300,11 +4309,12 @@ class State extends ReadyResource {
             return Status.IGNORE;
         }
 
-        const genesisConsensusConfigKey = EntryType.CONSENSUS_CONFIG_RECORD + 0;
-        const currentConsensusConfigId = await this.#getEntryApply(
+        const currentConsensusConfigIndex = await this.#getEntryApply(
             EntryType.CONSENSUS_CONFIG_CURRENT,
             batch
         );
+
+        const genesisConsensusConfigKey = EntryType.CONSENSUS_CONFIG_RECORD + 0;
 
         const genesisConsensusConfig = await this.#getEntryApply(
             genesisConsensusConfigKey,
@@ -4312,7 +4322,7 @@ class State extends ReadyResource {
         );
 
         // Check if currently genesis config exists
-        if (currentConsensusConfigId !== null || genesisConsensusConfig !== null) {
+        if (currentConsensusConfigIndex !== null || genesisConsensusConfig !== null) {
             this.#safeLogApply(
                 OperationType.SET_GENESIS_EPOCH,
                 "Genesis consensus config is set. Cannot set a new genesis epoch",
@@ -4321,52 +4331,14 @@ class State extends ReadyResource {
             return Status.IGNORE;
         }
 
-        const vdfDifficultyBuffer = op.sgo.df;
-        const vdfDiscriminantBitSizeBuffer = op.sgo.db;
-
-        if (
-            isZeroBuffer(vdfDifficultyBuffer) ||
-            isZeroBuffer(vdfDiscriminantBitSizeBuffer)
-        ) {
-            this.#safeLogApply(
-                OperationType.SET_GENESIS_EPOCH,
-                "VDF parameters must be greater than zero. Cannot set a new genesis epoch",
-                node.from.key
-            );
-            return Status.FAILURE;
-        }
-
-        const encodedConfigData = safeEncodeVdfConfig({
-            difficulty: vdfDifficultyBuffer,
-            discriminantBitSize: vdfDiscriminantBitSizeBuffer
-        });
-
-        if (encodedConfigData.length === 0) {
-            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Could not encode vdf parameters. Cannot set a new genesis epoch", node.from.key)
-            return Status.FAILURE;
-        }
-
-        const encodedConsensusConfig = safeEncodeConsensusConfig({
-            sv: safeUint8ToBuffer(1),
-            cd: encodedConfigData
-        });
-
-        if (encodedConsensusConfig.length === 0) {
-            this.#safeLogApply(
-                OperationType.SET_GENESIS_EPOCH,
-                "Could not encode genesis consensus config. Cannot set a new genesis epoch",
-                node.from.key
-            );
-            return Status.FAILURE;
-        }
 
         const genesisEpoch = await createGenesisEpochProof(
             this.#config,
             requesterAddressString,
-            encodedConfigData
+            encodedConsensusConfig
         );
 
-        if (!genesisEpoch) {
+        if (genesisEpoch === null) {
             this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Could not initialize genesis epoch", node.from.key)
             return Status.FAILURE;
         }
@@ -4414,7 +4386,7 @@ class State extends ReadyResource {
     }
 
     async #handleApplySetConsensusConfig(op, _view, base, node, batch) {
-        if (!this.#stateValidationSchema.validateSetConsensusConfigOperation(op)) {
+        if (!this.#stateValidationSchema.validateConsensusControlOperation(op)) {
             this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Contract schema validation failed.", node.from.key)
             return Status.FAILURE;
         }

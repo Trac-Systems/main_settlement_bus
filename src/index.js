@@ -713,45 +713,45 @@ export class MainSettlementBus extends ReadyResource {
         }
     }
 
-    async banValidator(addresstToBan) {
+    async banValidator(addressToBan) {
         if (!this.#config.enableWallet) {
             throw new Error(
-                `Can not ban writer with address: ${addresstToBan} - wallet is not enabled.`
+                `Can not ban writer with address: ${addressToBan} - wallet is not enabled.`
             );
         }
         const adminEntry = await this.#state.getAdminEntry();
 
         if (!adminEntry) {
             throw new Error(
-                `Can not ban writer with address: ${addresstToBan} - admin entry has not been initialized.`
+                `Can not ban writer with address: ${addressToBan} - admin entry has not been initialized.`
             );
         }
 
-        if (!isAddressValid(addresstToBan, this.#config.addressPrefix)) {
+        if (!isAddressValid(addressToBan, this.#config.addressPrefix)) {
             throw new Error(
-                `Can not ban writer with address:  ${addresstToBan} - invalid address.`
+                `Can not ban writer with address:  ${addressToBan} - invalid address.`
             );
         }
 
         if (!this.isAdmin(adminEntry)) {
             throw new Error(
-                `Can not ban writer with address: ${addresstToBan} - You are not an admin.`
+                `Can not ban writer with address: ${addressToBan} - You are not an admin.`
             );
         }
 
-        const isWhitelisted = await this.#state.isAddressWhitelisted(addresstToBan);
-        const nodeEntry = await this.#state.getNodeEntry(addresstToBan);
+        const isWhitelisted = await this.#state.isAddressWhitelisted(addressToBan);
+        const nodeEntry = await this.#state.getNodeEntry(addressToBan);
 
         if (!isWhitelisted || null === nodeEntry || nodeEntry.isIndexer === true) {
             throw new Error(
-                `Can not ban writer with address: ${addresstToBan} - node is not whitelisted or is an indexer.`
+                `Can not ban writer with address: ${addressToBan} - node is not whitelisted or is an indexer.`
             );
         }
         const txValidity = await this.#state.getIndexerSequenceState();
         const assembledBanValidatorMessage = await applyStateMessageFactory(this.#wallet, this.#config)
             .buildCompleteBanWriterMessage(
                 this.#wallet.address,
-                addresstToBan,
+                addressToBan,
                 txValidity,
             )
         const encodedPayload = safeEncodeApplyOperation(assembledBanValidatorMessage)
@@ -1164,12 +1164,10 @@ export class MainSettlementBus extends ReadyResource {
                 );
         }
 
-        const encodedConsensusConfig = encodeConsensusConfig({
+        return encodeConsensusConfig({
             sv: uint8ToBuffer(schemaVersion),
             cd: encodedConfigData
         });
-
-        return encodedConsensusConfig;
     }
 
     // TODO: REFACTOR - In the future, this function should be extracted into another module.

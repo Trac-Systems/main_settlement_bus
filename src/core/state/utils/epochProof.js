@@ -19,7 +19,7 @@ export async function createGenesisEpochProof(config, proposerAddress, encodedCo
     if (proposer.length === 0) {
         return null;
     }
-
+    // TODO: To be deleted because we are going to replace vdfParametersHash with parameters directly to save 28 bytes
     const vdfParametersHash = await tracCryptoApi.hash.blake3Safe(encodedConfigData);
     if (!isBufferValid(vdfParametersHash, HASH_BYTE_LENGTH)) {
         return null;
@@ -35,6 +35,7 @@ export async function createGenesisEpochProof(config, proposerAddress, encodedCo
     }
     const epoch = b4a.alloc(8, 0); // Epoch Zero
 
+    // TODO: To be deleted because we are going to replace vdfParametersHash with parameters directly to save 28 bytes
     const proofData = {
         protocol_version: protocolVersion,
         network_id: networkId,
@@ -56,5 +57,10 @@ export async function createGenesisEpochProof(config, proposerAddress, encodedCo
         app: []
     }
 
-    return safeEncodeEpochProof(genesisEpochProof);
+    const encodedEpochProof = safeEncodeEpochProof(genesisEpochProof);
+    if (encodedEpochProof.length === 0) {
+        return null;
+    }
+
+    return encodedEpochProof;
 }
