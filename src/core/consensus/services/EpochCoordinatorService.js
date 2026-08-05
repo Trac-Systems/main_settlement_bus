@@ -326,6 +326,13 @@ class EpochCoordinatorService extends SchedulableService {
         })
         toClean.push(cleanProposal)
 
+        const cleanEpochCreated = listenTo(this.#state, CustomEventType.EPOCH_CREATED, () => {
+            if (stateMachine.state !== EPOCH_STATES.APPEND_SET_EPOCH) {
+                stateMachine.context.next(this.#intervalMs);
+            }
+        })
+        toClean.push(cleanEpochCreated)
+
         // Machine states
 
         let signatureTimer = null;
@@ -338,10 +345,11 @@ class EpochCoordinatorService extends SchedulableService {
                 clearTimeout(signatureTimer);
             }
 
-            if (next === EPOCH_STATES.APPEND_SET_EPOCH && prev !== EPOCH_STATES.APPEND_SET_EPOCH) {
+            // APPEND_SET_EPOCH has no self-loop transition, so unlike COLLECT_APPROVALS above,
+            // there's no re-entry case to guard against here.
+            if (next === EPOCH_STATES.APPEND_SET_EPOCH) {
                 appendTimer = setTimeout(() => stateMachine.send(EPOCH_EVENTS.APPEND_FAILED), this.#config.epochAppendTimeout);
 
-                
                 const targetEpoch = stateMachine.context.currentEpoch + 1n;
                 stopAppendListener = listenTo(this.#state, CustomEventType.EPOCH_CREATED, ({ epoch, proposerAddress }) => {
                     if (epoch !== targetEpoch) return;
@@ -351,7 +359,7 @@ class EpochCoordinatorService extends SchedulableService {
                             : EPOCH_EVENTS.TARGET_EPOCH_ALREADY_SIGNED
                     );
                 });
-            } else if (prev === EPOCH_STATES.APPEND_SET_EPOCH && next !== EPOCH_STATES.APPEND_SET_EPOCH) {
+            } else if (prev === EPOCH_STATES.APPEND_SET_EPOCH) {
                 clearTimeout(appendTimer);
                 stopAppendListener?.();
                 stopAppendListener = null;

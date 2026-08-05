@@ -618,8 +618,7 @@ if (isBareRuntime) {
 
     // --- EPOCH_CREATED global listener ---
 
-    // EPOCH_CREATED handling is not implemented in EpochCoordinatorService yet - skipped until it lands.
-    test.skip('EPOCH_CREATED always restarts the cycle, regardless of current machine state', async t => {
+    test('EPOCH_CREATED always restarts the cycle, regardless of current machine state', async t => {
         const { service, state } = await setup({
             stateOverrides: { indexerCount: sinon.stub().resolves(3) },
             opsOverrides: { collectSignature: sinon.stub().returns(new Promise(() => {})) }, // never resolves
@@ -635,8 +634,7 @@ if (isBareRuntime) {
         t.ok(next.calledWith(CONFIG.epochInterval));
     });
 
-    // EPOCH_CREATED handling is not implemented in EpochCoordinatorService yet - skipped until it lands.
-    test.skip('a stale COLLECT_APPROVALS timeout firing after EPOCH_CREATED does not restart a second time', async t => {
+    test('a stale COLLECT_APPROVALS timeout firing after EPOCH_CREATED does not restart a second time', async t => {
         const clock = sinon.useFakeTimers();
         let service;
         try {
