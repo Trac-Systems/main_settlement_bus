@@ -57,5 +57,10 @@ export async function createGenesisEpochProof(config, proposerAddress, encodedCo
         app: []
     }
 
-    return safeEncodeEpochProof(genesisEpochProof);
+    const encodedEpochProof = safeEncodeEpochProof(genesisEpochProof);
+    if (encodedEpochProof.length === 0) {
+        return null;
+    }
+
+    return encodedEpochProof;
 }
