@@ -4237,12 +4237,12 @@ class State extends ReadyResource {
         const encodedConsensusConfig = safeEncodeConsensusConfig(op.cco.cc);
 
         if (encodedConsensusConfig.length === 0) {
-            this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Failed to encode consensus config.", node.from.key);
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Failed to encode consensus config.", node.from.key);
             return Status.FAILURE;
         }
 
         if (!this.#validateConsensusConfigApply(op.cco.cc)) {
-            this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Consensus config validation failed.", node.from.key);
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Consensus config validation failed.", node.from.key);
             return Status.FAILURE;
         }
 
