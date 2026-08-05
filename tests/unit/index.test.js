@@ -144,6 +144,17 @@ function validConsensusConfig() {
     };
 }
 
+function validGenesisConsensusConfig(configData = {}) {
+    return {
+        schemaVersion: 1,
+        configData: {
+            difficulty: 55_000_000,
+            discriminantBitSize: 2048,
+            ...configData,
+        },
+    };
+}
+
 if (isBareRuntime) {
     test('MainSettlementBus startup role log coverage is Node-only', t => {
         t.pass('skipped in Bare because esmock depends on node:module');
@@ -164,7 +175,7 @@ if (isBareRuntime) {
         await msb.close();
     });
 
-    test('MainSettlementBus appends genesis epoch initialization with encoded VDF params', async t => {
+    test('MainSettlementBus appends genesis epoch initialization with generic consensus config', async t => {
         const consoleLog = sinon.stub(console, 'log');
         t.teardown(() => consoleLog.restore());
 
@@ -180,10 +191,7 @@ if (isBareRuntime) {
         loaded.state.getSigned.resolves(null);
         loaded.state.getIndexerSequenceState.resolves(txValidity);
 
-        await msb.handleEpochGenesisInitialization({
-            vdfDifficulty: '55000000',
-            vdfDiscriminantSize: '2048',
-        });
+        await msb.handleEpochGenesisInitialization(validGenesisConsensusConfig());
 
         t.ok(loaded.state.getSignedConsensusConfig.calledOnce);
         t.ok(loaded.state.getIndexerSequenceState.calledOnce);
@@ -194,11 +202,23 @@ if (isBareRuntime) {
 
         t.is(decoded.type, OperationType.SET_GENESIS_EPOCH);
         t.ok(b4a.equals(decoded.address, addressToBuffer(wallet.address, config.addressPrefix)));
-        t.ok(b4a.equals(decoded.sgo.txv, txValidity));
-        t.is(decoded.sgo.df.length, 4);
-        t.is(decoded.sgo.db.length, 2);
-        t.is(decoded.sgo.df.readUInt32BE(0), 55000000);
-        t.is(decoded.sgo.db.readUInt16BE(0), 2048);
+        t.ok(b4a.equals(decoded.cco.txv, txValidity));
+        t.is(decoded.cco.cc.sv.readUInt8(0), 1);
+
+        const decodedVdfConfig = decodeVdfConfig(decoded.cco.cc.cd);
+        t.is(decodedVdfConfig.difficulty.readUInt32BE(0), 55_000_000);
+        t.is(decodedVdfConfig.discriminantBitSize.readUInt16BE(0), 2048);
+
+        const encodedConsensusConfig = encodeConsensusConfig(decoded.cco.cc);
+        const message = createMessage(
+            config.networkId,
+            decoded.cco.txv,
+            encodedConsensusConfig,
+            decoded.cco.in,
+            OperationType.SET_GENESIS_EPOCH
+        );
+        const expectedHash = await tracCryptoApi.hash.blake3(message);
+        t.ok(b4a.equals(decoded.cco.tx, expectedHash));
 
         await msb.close();
     });
@@ -209,10 +229,7 @@ if (isBareRuntime) {
         const msb = new loaded.MainSettlementBus(config);
 
         await t.exception(
-            () => msb.handleEpochGenesisInitialization({
-                vdfDifficulty: '55000000',
-                vdfDiscriminantSize: '2048',
-            }),
+            () => msb.handleEpochGenesisInitialization(validGenesisConsensusConfig()),
             errorMessageIncludes('wallet is not enabled')
         );
     });
@@ -231,10 +248,7 @@ if (isBareRuntime) {
         loaded.state.getAdminEntry.resolves(null);
 
         await t.exception(
-            () => msb.handleEpochGenesisInitialization({
-                vdfDifficulty: '55000000',
-                vdfDiscriminantSize: '2048',
-            }),
+            () => msb.handleEpochGenesisInitialization(validGenesisConsensusConfig()),
             errorMessageIncludes('admin has not been initialized')
         );
 
@@ -257,10 +271,7 @@ if (isBareRuntime) {
         loaded.state.getAdminEntry.resolves({ address: 'admin-address' });
 
         await t.exception(
-            () => msb.handleEpochGenesisInitialization({
-                vdfDifficulty: '55000000',
-                vdfDiscriminantSize: '2048',
-            }),
+            () => msb.handleEpochGenesisInitialization(validGenesisConsensusConfig()),
             errorMessageIncludes('wallet is not initialized')
         );
 
@@ -286,10 +297,7 @@ if (isBareRuntime) {
         }));
 
         await t.exception(
-            () => msb.handleEpochGenesisInitialization({
-                vdfDifficulty: '55000000',
-                vdfDiscriminantSize: '2048',
-            }),
+            () => msb.handleEpochGenesisInitialization(validGenesisConsensusConfig()),
             errorMessageIncludes('you are not the admin')
         );
 
@@ -315,10 +323,7 @@ if (isBareRuntime) {
         }));
 
         await t.exception(
-            () => msb.handleEpochGenesisInitialization({
-                vdfDifficulty: '55000000',
-                vdfDiscriminantSize: '2048',
-            }),
+            () => msb.handleEpochGenesisInitialization(validGenesisConsensusConfig()),
             errorMessageIncludes('you are not the admin')
         );
 
@@ -343,10 +348,7 @@ if (isBareRuntime) {
         loaded.state.getSignedConsensusConfig.resolves(null);
 
         await t.exception(
-            () => msb.handleEpochGenesisInitialization({
-                vdfDifficulty: '0',
-                vdfDiscriminantSize: '2048',
-            }),
+            () => msb.handleEpochGenesisInitialization(validGenesisConsensusConfig({difficulty: 0})),
             errorMessageIncludes('VDF difficulty must be a positive unsigned 32-bit integer.')
         );
 
@@ -356,7 +358,7 @@ if (isBareRuntime) {
         await msb.close();
     });
 
-    test('MainSettlementBus rejects genesis epoch initialization when VDF discriminant size is not positive', async t => {
+    test('MainSettlementBus rejects genesis epoch initialization when VDF discriminant bit size is not positive', async t => {
         const consoleLog = sinon.stub(console, 'log');
         t.teardown(() => consoleLog.restore());
 
@@ -371,12 +373,47 @@ if (isBareRuntime) {
         loaded.state.getSignedConsensusConfig.resolves(null);
 
         await t.exception(
-            () => msb.handleEpochGenesisInitialization({
-                vdfDifficulty: '55000000',
-                vdfDiscriminantSize: '0',
-            }),
-            errorMessageIncludes('VDF discriminant size must be a positive unsigned 16-bit integer.')
+            () => msb.handleEpochGenesisInitialization(validGenesisConsensusConfig({discriminantBitSize: 0})),
+            errorMessageIncludes('VDF discriminant bit size must be a positive unsigned 16-bit integer.')
         );
+
+        t.ok(loaded.state.getIndexerSequenceState.notCalled);
+        t.ok(loaded.state.append.notCalled);
+
+        await msb.close();
+    });
+
+    test('MainSettlementBus rejects invalid generic genesis config before submission', async t => {
+        const consoleLog = sinon.stub(console, 'log');
+        t.teardown(() => consoleLog.restore());
+
+        const loaded = await loadMainSettlementBus();
+        const config = buildGenesisConfig();
+        const wallet = await createWallet(config);
+        const msb = new loaded.MainSettlementBus(config, wallet);
+
+        await msb.ready();
+
+        loaded.state.getAdminEntry.resolves(adminEntryFor(wallet, loaded.state));
+        loaded.state.getSignedVDFParams.resolves(null);
+
+        const invalidConfigs = [
+            null,
+            [],
+            'config',
+            {},
+            { schemaVersion: 1 },
+            { configData: {} },
+            { schemaVersion: 1, configData: {}, extra: true },
+            { schemaVersion: '1', configData: {} },
+            { schemaVersion: 0, configData: {} },
+            { schemaVersion: 256, configData: {} },
+            { schemaVersion: 2, configData: {} },
+        ];
+
+        for (const invalidConfig of invalidConfigs) {
+            await t.exception(() => msb.handleEpochGenesisInitialization(invalidConfig));
+        }
 
         t.ok(loaded.state.getIndexerSequenceState.notCalled);
         t.ok(loaded.state.append.notCalled);
@@ -405,10 +442,7 @@ if (isBareRuntime) {
         });
 
         await t.exception(
-            () => msb.handleEpochGenesisInitialization({
-                vdfDifficulty: '55000000',
-                vdfDiscriminantSize: '2048',
-            }),
+            () => msb.handleEpochGenesisInitialization(validGenesisConsensusConfig()),
             errorMessageIncludes('VDF parameters already exist')
         );
 
