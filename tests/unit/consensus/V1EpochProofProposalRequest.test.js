@@ -35,6 +35,13 @@ const TEST_VDF_PARAMS = Object.freeze({
 const vdfProofCache = new Map();
 const defaultPreviousEpochRecordHash = b4a.alloc(32, 1);
 
+function keepBareEventLoopAlive(t) {
+    if (typeof globalThis.Bare === 'undefined') return;
+
+    const interval = setInterval(() => {}, 100);
+    t.teardown(() => clearInterval(interval));
+}
+
 function createState({
     currentEpoch = 0n,
     currentEpochHash = defaultPreviousEpochRecordHash,
@@ -45,9 +52,12 @@ function createState({
     return {
         requireCurrentEpoch: async () => currentEpoch,
         requireEpoch: async () => currentEpochHash,
-        requireSignedVDFParams: async () => ({
-            vdfDifficulty,
-            vdfDiscriminantSize
+        requireSignedConsensusConfig: async () => ({
+            schemaVersion: 1,
+            configData: {
+                difficulty: vdfDifficulty,
+                discriminantBitSize: vdfDiscriminantSize
+            }
         }),
         isIndexerAddress: async () => isIndexer
     };
@@ -147,6 +157,10 @@ async function assertProtocolError(t, action, resultCode, messageIncludes) {
 }
 
 test('V1EpochProofProposalRequest validates proof proposal signature', async t => {
+    // Bare does not track Emscripten's cold asynchronous WASM initialization
+    // as an active event-loop handle, so Brittle can otherwise report a deadlock.
+    keepBareEventLoopAlive(t);
+
     const wallet = await createWallet();
     const genesisEpochHash = await buildGenesisEpochHash(wallet);
     const state = createState({
@@ -154,16 +168,16 @@ test('V1EpochProofProposalRequest validates proof proposal signature', async t =
         currentEpochHash: genesisEpochHash
     });
     const requireCurrentEpoch = state.requireCurrentEpoch;
-    const requireSignedVDFParams = state.requireSignedVDFParams;
+    const requireSignedConsensusConfig = state.requireSignedConsensusConfig;
     let currentEpochReads = 0;
     let vdfParamsReads = 0;
     state.requireCurrentEpoch = async () => {
         currentEpochReads++;
         return await requireCurrentEpoch();
     };
-    state.requireSignedVDFParams = async () => {
+    state.requireSignedConsensusConfig = async () => {
         vdfParamsReads++;
-        return await requireSignedVDFParams();
+        return await requireSignedConsensusConfig();
     };
     const validator = new V1EpochProofProposalRequest(config, state);
     const payload = await buildProofProposalPayload(wallet, {

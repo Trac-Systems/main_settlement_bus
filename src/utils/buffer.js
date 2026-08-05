@@ -76,6 +76,17 @@ export const safeUint8ToBuffer = (value, offset = 0) => {
     }
 }
 
+export const safeReadUint8 = (buffer, offset = 0) => {
+    try {
+        if (!b4a.isBuffer(buffer) || buffer.length < offset + 1) {
+            return null;
+        }
+        return buffer.readUInt8(offset);
+    } catch {
+        return null;
+    }
+}
+
 export function uint16ToBuffer(value, offset = 0) {
     if (!Number.isInteger(value) || value < 0 || value > 0xFFFF) {
         throw new Error(`Value must be an unsigned 16-bit integer.`);
@@ -181,4 +192,11 @@ export const createMessage = (...args) => {
 
     if (buffers.length === 0) return NULL_BUFFER;
     return b4a.concat(buffers);
+}
+
+export function isZeroBuffer(buffer) {
+    if (!b4a.isBuffer(buffer)) {
+        return false;
+    }
+    return buffer.every(byte => byte === 0);
 }

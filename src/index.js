@@ -1085,8 +1085,8 @@ export class MainSettlementBus extends ReadyResource {
             throw new Error("Can not initialize genesis epoch - you are not the admin.");
         }
 
-        const existingVDFParams = await this.#state.getSignedVDFParams();
-        if (existingVDFParams) {
+        const existingConsensusConfig = await this.#state.getSignedConsensusConfig();
+        if (existingConsensusConfig) {
             throw new Error("Can not initialize genesis epoch - VDF parameters already exist.");
         }
 

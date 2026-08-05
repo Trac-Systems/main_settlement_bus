@@ -42,10 +42,13 @@ async function loadMainSettlementBus() {
             this.getAdminEntry = sinon.stub().resolves(null);
             this.getNodeEntry = sinon.stub().resolves(null);
             this.getSigned = sinon.stub().resolves(null);
-            this.getSignedVDFParams = sinon.stub().resolves(null);
-            this.requireSignedVDFParams = sinon.stub().resolves({
-                vdfDifficulty: 55_000_000,
-                vdfDiscriminantSize: 2048,
+            this.getSignedConsensusConfig = sinon.stub().resolves(null);
+            this.requireSignedConsensusConfig = sinon.stub().resolves({
+                schemaVersion: 1,
+                configData: {
+                    difficulty: 55_000_000,
+                    discriminantBitSize: 2048,
+                }
             });
             this.getIndexerSequenceState = sinon.stub().resolves(b4a.from('11'.repeat(32), 'hex'));
             this.append = sinon.stub().resolves();
@@ -182,7 +185,7 @@ if (isBareRuntime) {
             vdfDiscriminantSize: '2048',
         });
 
-        t.ok(loaded.state.getSignedVDFParams.calledOnce);
+        t.ok(loaded.state.getSignedConsensusConfig.calledOnce);
         t.ok(loaded.state.getIndexerSequenceState.calledOnce);
         t.ok(loaded.state.append.calledOnce);
 
@@ -235,7 +238,7 @@ if (isBareRuntime) {
             errorMessageIncludes('admin has not been initialized')
         );
 
-        t.ok(loaded.state.getSignedVDFParams.notCalled);
+        t.ok(loaded.state.getSignedConsensusConfig.notCalled);
         t.ok(loaded.state.append.notCalled);
 
         await msb.close();
@@ -261,7 +264,7 @@ if (isBareRuntime) {
             errorMessageIncludes('wallet is not initialized')
         );
 
-        t.ok(loaded.state.getSignedVDFParams.notCalled);
+        t.ok(loaded.state.getSignedConsensusConfig.notCalled);
         t.ok(loaded.state.append.notCalled);
 
         await msb.close();
@@ -290,7 +293,7 @@ if (isBareRuntime) {
             errorMessageIncludes('you are not the admin')
         );
 
-        t.ok(loaded.state.getSignedVDFParams.notCalled);
+        t.ok(loaded.state.getSignedConsensusConfig.notCalled);
         t.ok(loaded.state.append.notCalled);
 
         await msb.close();
@@ -319,7 +322,7 @@ if (isBareRuntime) {
             errorMessageIncludes('you are not the admin')
         );
 
-        t.ok(loaded.state.getSignedVDFParams.notCalled);
+        t.ok(loaded.state.getSignedConsensusConfig.notCalled);
         t.ok(loaded.state.append.notCalled);
 
         await msb.close();
@@ -337,7 +340,7 @@ if (isBareRuntime) {
         await msb.ready();
 
         loaded.state.getAdminEntry.resolves(adminEntryFor(wallet, loaded.state));
-        loaded.state.getSignedVDFParams.resolves(null);
+        loaded.state.getSignedConsensusConfig.resolves(null);
 
         await t.exception(
             () => msb.handleEpochGenesisInitialization({
@@ -365,7 +368,7 @@ if (isBareRuntime) {
         await msb.ready();
 
         loaded.state.getAdminEntry.resolves(adminEntryFor(wallet, loaded.state));
-        loaded.state.getSignedVDFParams.resolves(null);
+        loaded.state.getSignedConsensusConfig.resolves(null);
 
         await t.exception(
             () => msb.handleEpochGenesisInitialization({
@@ -393,9 +396,12 @@ if (isBareRuntime) {
         await msb.ready();
 
         loaded.state.getAdminEntry.resolves(adminEntryFor(wallet, loaded.state));
-        loaded.state.getSignedVDFParams.resolves({
-            vdfDifficulty: 16_843_009,
-            vdfDiscriminantSize: 257,
+        loaded.state.getSignedConsensusConfig.resolves({
+            schemaVersion: 1,
+            configData: {
+                difficulty: 16_843_009,
+                discriminantBitSize: 257,
+            }
         });
 
         await t.exception(
@@ -429,7 +435,7 @@ if (isBareRuntime) {
 
         await msb.handleSetConsensusConfig(validConsensusConfig());
 
-        t.ok(loaded.state.requireSignedVDFParams.notCalled);
+        t.ok(loaded.state.requireSignedConsensusConfig.notCalled);
         t.ok(loaded.state.getIndexerSequenceState.calledOnce);
         t.ok(loaded.state.append.calledOnce);
 
@@ -488,7 +494,7 @@ if (isBareRuntime) {
             errorMessageIncludes('admin has not been initialized')
         );
 
-        t.ok(loaded.state.requireSignedVDFParams.notCalled);
+        t.ok(loaded.state.requireSignedConsensusConfig.notCalled);
         t.ok(loaded.state.append.notCalled);
 
         await msb.close();
@@ -514,7 +520,7 @@ if (isBareRuntime) {
             errorMessageIncludes('you are not the admin')
         );
 
-        t.ok(loaded.state.requireSignedVDFParams.notCalled);
+        t.ok(loaded.state.requireSignedConsensusConfig.notCalled);
         t.ok(loaded.state.append.notCalled);
 
         await msb.close();
@@ -551,7 +557,7 @@ if (isBareRuntime) {
             await t.exception(() => msb.handleSetConsensusConfig(invalidConfig));
         }
 
-        t.ok(loaded.state.requireSignedVDFParams.notCalled);
+        t.ok(loaded.state.requireSignedConsensusConfig.notCalled);
         t.ok(loaded.state.getIndexerSequenceState.notCalled);
         t.ok(loaded.state.append.notCalled);
 
@@ -598,7 +604,7 @@ if (isBareRuntime) {
             }));
         }
 
-        t.ok(loaded.state.requireSignedVDFParams.notCalled);
+        t.ok(loaded.state.requireSignedConsensusConfig.notCalled);
         t.ok(loaded.state.getIndexerSequenceState.notCalled);
         t.ok(loaded.state.append.notCalled);
 

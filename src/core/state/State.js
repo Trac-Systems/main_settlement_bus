@@ -15,14 +15,26 @@ import {
     TRAC_NAMESPACE,
     EventType,
     CustomEventType,
-    VDF_DIFFICULTY_SIZE,
-    VDF_DISCRIMINANT_SIZE,
+    MAX_UINT32,
 } from '../../utils/constants.js';
 import { isHexString, sleep, isTransactionRecordPut } from '../../utils/helpers.js';
 import tracCryptoApi from 'trac-crypto-api';
 import StateValidationSchema from './validators/StateValidationSchema.js';
-import { safeDecodeApplyOperation } from '../../codecs/apply/applyOperationCodec.js';
-import { createMessage, ZERO_WK, NULL_BUFFER } from '../../utils/buffer.js';
+import {
+    decodeConsensusConfig,
+    safeDecodeApplyOperation,
+    safeEncodeConsensusConfig
+} from '../../codecs/apply/applyOperationCodec.js';
+import {
+    createMessage,
+    ZERO_WK,
+    NULL_BUFFER,
+    isZeroBuffer,
+    safeUint8ToBuffer,
+    safeWriteUInt32BE,
+    safeReadUint32BE,
+    deepCopyBuffer, safeReadUint8
+} from '../../utils/buffer.js';
 import addressUtils from './utils/address.js';
 import adminEntryUtils from './utils/adminEntry.js';
 import nodeEntryUtils, { setWritingKey, NODE_ENTRY_SIZE } from './utils/nodeEntry.js';
@@ -39,14 +51,13 @@ import {
     BALANCE_ZERO,
     toTerm,
 } from './utils/balance.js';
-import { safeWriteUInt32BE } from '../../utils/buffer.js';
 import deploymentEntryUtils from './utils/deploymentEntry.js';
-import { deepCopyBuffer } from '../../utils/buffer.js';
 import { Status } from './utils/transaction.js';
 import remote from 'hypercore/lib/fully-remote-proof.js'
 import PQueue from 'p-queue';
 import { createGenesisEpochProof } from './utils/epochProof.js';
 import {
+    decodeVdfConfig,
     safeDecodeVdfConfig,
     safeEncodeVdfConfig
 } from '../../codecs/consensus/v1/vdfConfigCodec.js';
@@ -616,34 +627,49 @@ class State extends ReadyResource {
         return this.#bee;
     }
 
-    async getSignedVDFParams() {
-        const vdfParamsBuffer = await this.getSigned(EntryType.VDF_PARAMS);
-        if (_.isNil(vdfParamsBuffer)) return null;
+    async getSignedConsensusConfig() {
+        const decodeConfigAtPointer = async currentConfigPointer => {
+            if (!b4a.isBuffer(currentConfigPointer) || currentConfigPointer.length !== 4) {
+                throw new Error('Invalid current consensus config pointer.');
+            }
 
-        const expectedLength = VDF_DIFFICULTY_SIZE + VDF_DISCRIMINANT_SIZE;
-        if (!b4a.isBuffer(vdfParamsBuffer)) {
-            throw new Error("Invalid VDF params value: expected a buffer.");
-        }
-        if (vdfParamsBuffer.length !== expectedLength) {
-            throw new Error(`Invalid VDF params length: expected ${expectedLength}, got ${vdfParamsBuffer.length}.`);
-        }
-        const decodedVdfParams = safeDecodeVdfConfig(vdfParamsBuffer);
-        if (decodedVdfParams === null) {
-            throw new Error("Invalid VDF params value.");
-        }
+            const currentConfigIndex = currentConfigPointer.readUInt32BE(0);
 
-        return {
-            vdfDifficulty: decodedVdfParams.difficulty.readUInt32BE(0),
-            vdfDiscriminantSize: decodedVdfParams.discriminantBitSize.readUInt16BE(0),
+            const encodedConsensusConfig = await this.getSigned(EntryType.CONSENSUS_CONFIG_RECORD + currentConfigIndex);
+            if (_.isNil(encodedConsensusConfig)) {
+                throw new Error(`Consensus config record ${currentConfigIndex} does not exist.`);
+            }
+
+            const consensusConfig = decodeConsensusConfig(encodedConsensusConfig);
+            const schemaVersion = consensusConfig.sv.readUInt8(0);
+            switch (schemaVersion) {
+                case 1: {
+                    const decodedVdfConfig = decodeVdfConfig(consensusConfig.cd);
+                    return {
+                        schemaVersion,
+                        configData: {
+                            difficulty: decodedVdfConfig.difficulty.readUInt32BE(0),
+                            discriminantBitSize: decodedVdfConfig.discriminantBitSize.readUInt16BE(0),
+                        }
+                    };
+                }
+                default:
+                    throw new Error(`Unsupported consensus config schema version: ${schemaVersion}.`);
+            }
         };
+
+        const currentConfigPointer = await this.getSigned(EntryType.CONSENSUS_CONFIG_CURRENT);
+        if (_.isNil(currentConfigPointer)) return null;
+
+        return await decodeConfigAtPointer(currentConfigPointer);
     }
 
-    async requireSignedVDFParams() {
-        const params = await this.getSignedVDFParams();
-        if (_.isNil(params)) {
-            throw new Error("VDF parameters are not initialized.");
+    async requireSignedConsensusConfig() {
+        const consensusConfig = await this.getSignedConsensusConfig();
+        if (_.isNil(consensusConfig)) {
+            throw new Error('Consensus config is not initialized.');
         }
-        return params;
+        return consensusConfig;
     }
 
     // ATTENTION: DO NOT USE METHODS ABOVE IN APPLY PART!
@@ -669,7 +695,7 @@ class State extends ReadyResource {
                 this.#safeLogApply("Node payload exceeds the maximum operation payload size.", node.from.key)
                 invalidOperations++;
                 continue;
-            };
+            }
 
             const op = safeDecodeApplyOperation(node.value);
 
@@ -722,7 +748,7 @@ class State extends ReadyResource {
             [OperationType.TRANSFER]: this.#handleApplyTransferOperation.bind(this),
             [OperationType.SET_EPOCH]: this.#handleApplySetEpochOperation.bind(this),
             [OperationType.SET_GENESIS_EPOCH]: this.#handleApplySetGenesisEpoch.bind(this),
-            [OperationType.SET_VDF_PARAMS]: this.#handleApplySetVdfParams.bind(this),
+            [OperationType.SET_CONSENSUS_CONFIG]: this.#handleApplySetConsensusConfig.bind(this),
         };
         return handlers[type] || null;
     }
@@ -4274,28 +4300,72 @@ class State extends ReadyResource {
             return Status.IGNORE;
         }
 
-        // check if VDF params have been initialized if yes - failure
-        const vdfParams = await this.#getEntryApply(EntryType.VDF_PARAMS, batch);
-        if (vdfParams !== null) {
-            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "VDF params are set. Cannot set a new genesis epoch", node.from.key)
+        const genesisConsensusConfigKey = EntryType.CONSENSUS_CONFIG_RECORD + 0;
+        const currentConsensusConfigId = await this.#getEntryApply(
+            EntryType.CONSENSUS_CONFIG_CURRENT,
+            batch
+        );
+
+        const genesisConsensusConfig = await this.#getEntryApply(
+            genesisConsensusConfigKey,
+            batch
+        );
+
+        // Check if currently genesis config exists
+        if (currentConsensusConfigId !== null || genesisConsensusConfig !== null) {
+            this.#safeLogApply(
+                OperationType.SET_GENESIS_EPOCH,
+                "Genesis consensus config is set. Cannot set a new genesis epoch",
+                node.from.key
+            );
             return Status.IGNORE;
         }
 
-        // extract diff and dbs in this case we should check if this is not less than 0 and not higer than 4/2 bytes
         const vdfDifficultyBuffer = op.sgo.df;
-        // can not be zero
         const vdfDiscriminantBitSizeBuffer = op.sgo.db;
-        // can not be zero
-        const encodedVdfParamsEntry = safeEncodeVdfConfig({
+
+        if (
+            isZeroBuffer(vdfDifficultyBuffer) ||
+            isZeroBuffer(vdfDiscriminantBitSizeBuffer)
+        ) {
+            this.#safeLogApply(
+                OperationType.SET_GENESIS_EPOCH,
+                "VDF parameters must be greater than zero. Cannot set a new genesis epoch",
+                node.from.key
+            );
+            return Status.FAILURE;
+        }
+
+        const encodedConfigData = safeEncodeVdfConfig({
             difficulty: vdfDifficultyBuffer,
             discriminantBitSize: vdfDiscriminantBitSizeBuffer
         });
-        if (encodedVdfParamsEntry.length === 0) {
+
+        if (encodedConfigData.length === 0) {
             this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Could not encode vdf parameters. Cannot set a new genesis epoch", node.from.key)
-            return Status.IGNORE;
+            return Status.FAILURE;
         }
 
-        const genesisEpoch = await createGenesisEpochProof(this.#config, requesterAddressString, encodedVdfParamsEntry);
+        const encodedConsensusConfig = safeEncodeConsensusConfig({
+            sv: safeUint8ToBuffer(1),
+            cd: encodedConfigData
+        });
+
+        if (encodedConsensusConfig.length === 0) {
+            this.#safeLogApply(
+                OperationType.SET_GENESIS_EPOCH,
+                "Could not encode genesis consensus config. Cannot set a new genesis epoch",
+                node.from.key
+            );
+            return Status.FAILURE;
+        }
+
+        const genesisEpoch = await createGenesisEpochProof(
+            this.#config,
+            requesterAddressString,
+            encodedConfigData
+        );
+
         if (!genesisEpoch) {
             this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Could not initialize genesis epoch", node.from.key)
             return Status.FAILURE;
@@ -4303,19 +4373,35 @@ class State extends ReadyResource {
 
         // initialize CurrentEpoch field
         const zeroAsUint64Buffer = b4a.alloc(8, 0);
-        await batch.put(EntryType.EPOCH_CURRENT, zeroAsUint64Buffer);
+        await batch.put(
+            EntryType.EPOCH_CURRENT,
+            zeroAsUint64Buffer
+        );
         
         // initialize Epoch Field
         const epochProofHash = await tracCryptoApi.hash.blake3Safe(genesisEpoch);
-        await batch.put(epochZero, epochProofHash);
+        await batch.put(
+            epochZero,
+            epochProofHash
+        );
 
         // initialize EpochHash Field
         const epochProofHashString = epochProofHash.toString('hex');
         const epochHashLedgerEntry = EntryType.EPOCH_HASH + epochProofHashString;
-        await batch.put(epochHashLedgerEntry, genesisEpoch);
-        
-        // initialize VDFParams
-        await batch.put(EntryType.VDF_PARAMS, encodedVdfParamsEntry);
+        await batch.put(
+            epochHashLedgerEntry,
+            genesisEpoch
+        );
+
+        // initialize consensus config schema V1 and make record 0 current
+        await batch.put(
+            EntryType.CONSENSUS_CONFIG_CURRENT,
+            safeWriteUInt32BE(0)
+        );
+        await batch.put(
+            genesisConsensusConfigKey,
+            encodedConsensusConfig
+        );
 
         // Put txHashHexString into the state to avoid replay attack
         await batch.put(txHashHexString, node.value);
@@ -4327,121 +4413,138 @@ class State extends ReadyResource {
         return Status.SUCCESS;
     }
 
-    async #handleApplySetVdfParams(op, _view, base, node, batch) {
-        if (!this.#stateValidationSchema.validateSetVdfParamsOperation(op)) {
-            this.#safeLogApply(OperationType.SET_VDF_PARAMS, "Contract schema validation failed.", node.from.key)
+    async #handleApplySetConsensusConfig(op, _view, base, node, batch) {
+        if (!this.#stateValidationSchema.validateSetConsensusConfigOperation(op)) {
+            this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Contract schema validation failed.", node.from.key)
             return Status.FAILURE;
         }
 
         const requesterAddressString = addressUtils.bufferToAddress(op.address, this.#config.addressPrefix);
         if (requesterAddressString === null) {
-            this.#safeLogApply(OperationType.SET_VDF_PARAMS, "Requester address is invalid.", node.from.key)
+            this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Requester address is invalid.", node.from.key)
             return Status.FAILURE;
         }
 
         const requesterPublicKey = tracCryptoApi.address.decodeSafe(requesterAddressString);
         if (b4a.equals(requesterPublicKey, NULL_BUFFER)) {
-            this.#safeLogApply(OperationType.SET_VDF_PARAMS, "Failed to decode requester public key.", node.from.key)
+            this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Failed to decode requester public key.", node.from.key)
             return Status.FAILURE;
         }
 
         const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
         if (adminEntry === null) {
-            this.#safeLogApply(OperationType.SET_VDF_PARAMS, "Invalid admin entry.", node.from.key)
+            this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Invalid admin entry.", node.from.key)
             return Status.FAILURE;
         }
 
         const decodedAdminEntry = adminEntryUtils.decode(adminEntry, this.#config.addressPrefix);
         if (decodedAdminEntry === null) {
-            this.#safeLogApply(OperationType.SET_VDF_PARAMS, "Failed to decode admin entry.", node.from.key)
+            this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Failed to decode admin entry.", node.from.key)
             return Status.FAILURE;
         }
 
         if (!this.#isAdminApply(decodedAdminEntry, node)) {
-            this.#safeLogApply(OperationType.SET_VDF_PARAMS, "Node is not allowed to perform this operation. (ADMIN ONLY)", node.from.key)
+            this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Node is not allowed to perform this operation. (ADMIN ONLY)", node.from.key)
             return Status.FAILURE;
         }
 
         const adminPublicKey = tracCryptoApi.address.decodeSafe(decodedAdminEntry.address);
         if (b4a.equals(adminPublicKey, NULL_BUFFER)) {
-            this.#safeLogApply(OperationType.SET_VDF_PARAMS, "Failed to decode admin public key.", node.from.key)
+            this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Failed to decode admin public key.", node.from.key)
             return Status.FAILURE;
         }
 
         if (!b4a.equals(adminPublicKey, requesterPublicKey)) {
-            this.#safeLogApply(OperationType.SET_VDF_PARAMS, "System admin and node public keys do not match.", node.from.key)
+            this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "System admin and node public keys do not match.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const encodedConsensusConfig = safeEncodeConsensusConfig(op.cco.cc);
+
+        if (encodedConsensusConfig.length === 0) {
+            this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Failed to encode consensus config.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        if (!this.#validateConsensusConfigApply(op.cco.cc)) {
+            this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Consensus config validation failed.", node.from.key);
             return Status.FAILURE;
         }
 
         const message = createMessage(
             this.#config.networkId,
-            op.vpo.txv,
-            op.vpo.df,
-            op.vpo.in,
-            OperationType.SET_VDF_PARAMS
+            op.cco.txv,
+            encodedConsensusConfig,
+            op.cco.in,
+            OperationType.SET_CONSENSUS_CONFIG
         );
+
         if (message.length === 0) {
-            this.#safeLogApply(OperationType.SET_VDF_PARAMS, "Invalid requester message.", node.from.key)
+            this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Invalid requester message.", node.from.key)
             return Status.FAILURE;
         }
 
         const hash = await tracCryptoApi.hash.blake3Safe(message);
-        if (!b4a.equals(hash, op.vpo.tx)) {
-            this.#safeLogApply(OperationType.SET_VDF_PARAMS, "Message hash does not match the tx_hash.", node.from.key)
+        if (!b4a.equals(hash, op.cco.tx)) {
+            this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Message hash does not match the tx_hash.", node.from.key)
             return Status.FAILURE;
         }
 
-        const isMessageVerified = tracCryptoApi.signature.verify(op.vpo.is, op.vpo.tx, adminPublicKey);
+        const isMessageVerified = tracCryptoApi.signature.verify(op.cco.is, op.cco.tx, adminPublicKey);
         if (!isMessageVerified) {
-            this.#safeLogApply(OperationType.SET_VDF_PARAMS, "Failed to verify message signature.", node.from.key)
+            this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Failed to verify message signature.", node.from.key)
             return Status.FAILURE;
         }
 
         const indexersSequenceState = await this.#getIndexerSequenceStateApply(base);
         if (indexersSequenceState === null) {
-            this.#safeLogApply(OperationType.SET_VDF_PARAMS, "Indexer sequence state is invalid.", node.from.key)
+            this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Indexer sequence state is invalid.", node.from.key)
             return Status.FAILURE;
         }
 
-        if (!b4a.equals(op.vpo.txv, indexersSequenceState)) {
-            this.#safeLogApply(OperationType.SET_VDF_PARAMS, "Transaction was not executed.", node.from.key)
+        if (!b4a.equals(op.cco.txv, indexersSequenceState)) {
+            this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Transaction was not executed.", node.from.key)
             return Status.FAILURE;
         }
 
-        const txHashHexString = op.vpo.tx.toString('hex');
+        const txHashHexString = op.cco.tx.toString('hex');
         const opEntry = await this.#getEntryApply(txHashHexString, batch);
         if (opEntry !== null) {
-            this.#safeLogApply(OperationType.SET_VDF_PARAMS, "Operation has already been applied.", node.from.key)
+            this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Operation has already been applied.", node.from.key)
             return Status.IGNORE;
         }
 
-        const existingVdfParams = await this.#getEntryApply(EntryType.VDF_PARAMS, batch);
-        if (existingVdfParams === null) {
-            this.#safeLogApply(OperationType.SET_VDF_PARAMS, "VDF params have not been initialized.", node.from.key)
+        const currentConsensusConfigBuffer = await this.#getEntryApply(EntryType.CONSENSUS_CONFIG_CURRENT, batch);
+        if (currentConsensusConfigBuffer === null) {
+            this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Initial consensus config has not been initialized yet", node.from.key)
             return Status.IGNORE;
         }
 
-        const decodedVdfParams = safeDecodeVdfConfig(existingVdfParams);
-        if (decodedVdfParams === null) {
-            this.#safeLogApply(OperationType.SET_VDF_PARAMS, "Stored VDF params are invalid.", node.from.key)
+        const currentConsensusConfigIndex = safeReadUint32BE(currentConsensusConfigBuffer);
+        if (currentConsensusConfigIndex === null) {
+            this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG,"Failed to read current consensus config index from buffer", node.from.key)
+            return Status.FAILURE;
+        }
+        if (currentConsensusConfigIndex === MAX_UINT32) {
+            this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Consensus config index overflow.", node.from.key)
             return Status.FAILURE;
         }
 
-        if (op.vpo.df.readUInt32BE(0) === 0) {
-            this.#safeLogApply(OperationType.SET_VDF_PARAMS, "VDF difficulty must be greater than zero.", node.from.key)
+        const nextConsensusConfigIndex = currentConsensusConfigIndex + 1;
+        const nextConsensusConfigKey = EntryType.CONSENSUS_CONFIG_RECORD + nextConsensusConfigIndex;
+        const nextConsensusConfigIndexBuffer = safeWriteUInt32BE(nextConsensusConfigIndex);
+
+        if (nextConsensusConfigIndexBuffer.length === 0) {
+            this.#safeLogApply(
+                OperationType.SET_CONSENSUS_CONFIG,
+                "Failed to encode next consensus config index.",
+                node.from.key
+            );
             return Status.FAILURE;
         }
 
-        const encodedVdfParams = safeEncodeVdfConfig({
-            difficulty: op.vpo.df,
-            discriminantBitSize: decodedVdfParams.discriminantBitSize
-        });
-        if (encodedVdfParams.length === 0) {
-            this.#safeLogApply(OperationType.SET_VDF_PARAMS, "Could not encode VDF parameters.", node.from.key)
-            return Status.FAILURE;
-        }
-
-        await batch.put(EntryType.VDF_PARAMS, encodedVdfParams);
+        await batch.put(EntryType.CONSENSUS_CONFIG_CURRENT, nextConsensusConfigIndexBuffer);
+        await batch.put(nextConsensusConfigKey, encodedConsensusConfig);
         await batch.put(txHashHexString, node.value);
 
         if (this.#config.enableTxApplyLogs) {
@@ -4450,6 +4553,33 @@ class State extends ReadyResource {
 
         return Status.SUCCESS;
     }
+
+    #validateConsensusConfigApply(consensusConfig) {
+        let isValid =  false
+        const schemaVersion = safeReadUint8(consensusConfig.sv);
+
+        if (schemaVersion ===  null) {
+            return isValid;
+        }
+
+        switch (schemaVersion) {
+            case 1: {
+                const configData = safeDecodeVdfConfig(consensusConfig.cd);
+                if (
+                    configData !== null &&
+                    !isZeroBuffer(configData.difficulty) &&
+                    !isZeroBuffer(configData.discriminantBitSize)
+                ) {
+                    isValid = true;
+                }
+                break;
+            }
+            default:
+                break;
+        }
+        return isValid;
+    }
+
 }
 
 export default State;
