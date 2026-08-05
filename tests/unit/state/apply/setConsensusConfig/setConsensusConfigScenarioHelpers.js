@@ -322,12 +322,18 @@ function isCurrentConfigKey(key) {
 export async function initializeGenesisEpoch(context) {
     const adminNode = context.adminBootstrap;
     const txValidity = await deriveIndexerSequenceState(adminNode.base);
+    const encodedConsensusConfig = encodeConsensusConfig({
+        sv: b4a.from([1]),
+        cd: encodeVdfConfig({
+            difficulty: uint32ToBuffer(GENESIS_DIFFICULTY),
+            discriminantBitSize: uint16ToBuffer(GENESIS_DISCRIMINANT_BIT_SIZE)
+        })
+    });
     const payload = await applyStateMessageFactory(adminNode.wallet, config)
         .buildCompleteSetGenesisEpochMessage(
             adminNode.wallet.address,
             txValidity,
-            uint32ToBuffer(GENESIS_DIFFICULTY),
-            uint16ToBuffer(GENESIS_DISCRIMINANT_BIT_SIZE)
+            encodedConsensusConfig
         );
 
     await appendAndUpdate(adminNode.base, safeEncodeApplyOperation(payload));
