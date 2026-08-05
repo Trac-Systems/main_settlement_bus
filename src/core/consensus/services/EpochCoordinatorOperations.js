@@ -64,7 +64,10 @@ export class EpochCoordinatorOperations {
         };
     }
 
-    async collectSignature(member, request, connectionManager) {
+    async collectSignature(member, {currentEpoch, currentEpochHash, vdf}, connectionManager) {
+        // Unfortunally we need to generate one payload per request because of the session id.
+        // But, we also need a general one (generated previously) because of the signature
+        const request = await this.createProofProposal(currentEpoch, currentEpochHash, vdf);
         const key = b4a.toString(member.key, "hex");
         const addressBuffer = await this.#state.getRegisteredWriterKey(key);
         if (!addressBuffer) throw new Error('Registered writer key not found');

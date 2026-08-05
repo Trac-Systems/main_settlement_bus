@@ -136,8 +136,13 @@ test('sendToIndexer surfaces a non-OK resultCode with no signature', async t => 
 
 // --- collectSignature ---
 
+// collectSignature builds its own per-request proposal internally via createProofProposal
+// (a fresh session id per approver) - that's covered by the createProofProposal tests above,
+// so here it's stubbed out and these tests focus on collectSignature's own logic.
+
 test('collectSignature throws if getRegisteredWriterKey returns null', async t => {
     const ops = makeOps({ state: makeState({ getRegisteredWriterKey: sinon.stub().resolves(null) }) });
+    sinon.stub(ops, 'createProofProposal').resolves({});
     await t.exception(ops.collectSignature({ key: b4a.alloc(32) }, {}, makeConnectionManager()), /Registered writer key not found/);
 });
 
@@ -145,7 +150,9 @@ nodeOnlyTest('collectSignature throws if address cannot be resolved', async t =>
     const make = await opsWithMocks({
         [ADDRESS_UTILS_PATH]: { default: { bufferToAddress: sinon.stub().returns(null) } },
     });
-    await t.exception(make().collectSignature({ key: b4a.alloc(32) }, {}, makeConnectionManager()), /Writer address could not be decoded/);
+    const ops = make();
+    sinon.stub(ops, 'createProofProposal').resolves({});
+    await t.exception(ops.collectSignature({ key: b4a.alloc(32) }, {}, makeConnectionManager()), /Writer address could not be decoded/);
 });
 
 nodeOnlyTest('collectSignature throws with resultCode attached when the peer rejects with a non-OK code', async t => {
@@ -159,9 +166,11 @@ nodeOnlyTest('collectSignature throws with resultCode attached when the peer rej
         send: sinon.stub().resolves({ resultCode: ConsensusResultCode.EPOCH_INVALID }),
     });
 
+    const ops = make();
+    sinon.stub(ops, 'createProofProposal').resolves({});
     let caught;
     try {
-        await make().collectSignature({ key: b4a.alloc(32) }, {}, connectionManager);
+        await ops.collectSignature({ key: b4a.alloc(32) }, {}, connectionManager);
     } catch (err) {
         caught = err;
     }
@@ -179,7 +188,9 @@ nodeOnlyTest('collectSignature throws if resultCode is OK but no signature was r
         send: sinon.stub().resolves({ resultCode: ConsensusResultCode.OK, approval: null }),
     });
 
-    await t.exception(make().collectSignature({ key: b4a.alloc(32) }, {}, connectionManager), /Approval signature not received/);
+    const ops = make();
+    sinon.stub(ops, 'createProofProposal').resolves({});
+    await t.exception(ops.collectSignature({ key: b4a.alloc(32) }, {}, connectionManager), /Approval signature not received/);
 });
 
 nodeOnlyTest('collectSignature returns signature and approver address buffer on success', async t => {
@@ -195,7 +206,9 @@ nodeOnlyTest('collectSignature returns signature and approver address buffer on 
         send: sinon.stub().resolves({ resultCode: ConsensusResultCode.OK, approval: { approval_sig: sig } }),
     });
 
-    const result = await make().collectSignature({ key: memberKey }, {}, connectionManager);
+    const ops = make();
+    sinon.stub(ops, 'createProofProposal').resolves({});
+    const result = await ops.collectSignature({ key: memberKey }, {}, connectionManager);
 
     t.ok(b4a.equals(result.signature, sig));
     t.ok(result.approver);

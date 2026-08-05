@@ -174,17 +174,14 @@ class EpochCoordinatorService extends SchedulableService {
         };
         
         machine.appendContext({ proposals });
-        await this.#dispatchApprovalRequests(approvers, this.#manager, machine, proposals);
+        this.#dispatchApprovalRequests(approvers, this.#manager, machine, proposals);
         await machine.send(EPOCH_EVENTS.PROPOSAL_BROADCAST);
     }
 
-    async #dispatchApprovalRequests(approvers, indexerConnectionManager, machine, proposals) {
+    #dispatchApprovalRequests(approvers, indexerConnectionManager, machine, proposals) {
         for (const member of approvers) {
-            // Unfortunally we need to generate one payload per request because of the session id.
-            // But, we also need a general one (generated previously) because of the signature
             const {currentEpoch, currentEpochHash, vdf} = machine.context;
-            const proofProposalMessage = await this.#operations.createProofProposal(currentEpoch, currentEpochHash, vdf);
-            this.#operations.collectSignature(member, proofProposalMessage, indexerConnectionManager)
+            this.#operations.collectSignature(member, {currentEpoch, currentEpochHash, vdf}, indexerConnectionManager)
                 .then((confirmation) => this.#handleApproval(confirmation, proposals, machine))
                 .catch((err) => this.#handleApprovalFailure(err, member, proposals, machine))
         }
