@@ -426,7 +426,7 @@ export const SGO = {
     valid_set_genesis_epoch_operation: {
         type: OperationType.SET_GENESIS_EPOCH,
         address: addressToBuffer(asAddress('3801ebd1f12462ad335b821807c9d87e4f20d57505222284b2634a7e8e5edac2'), config.addressPrefix),
-        sgo: {
+        cco: {
             tx: b4a.from('1bd4f96adeffba9c04943a82993c5b19660c3a5f572620d82a67464f381640e2', 'hex'),
             txv: b4a.from('f24e61cf7941256b080be2133bccb520414c78021215edfcb781622da526c414', 'hex'),
             cc: {
@@ -438,7 +438,7 @@ export const SGO = {
         }
     },
 
-    top_fields_set_genesis_epoch: ['type', 'address', 'sgo'],
+    top_fields_set_genesis_epoch: ['type', 'address', 'cco'],
     set_genesis_epoch_value_fields: ['tx', 'txv', 'cc', 'in', 'is'],
     consensus_config_fields: ['sv', 'cd'],
     required_length_of_fields_for_set_genesis_epoch: {

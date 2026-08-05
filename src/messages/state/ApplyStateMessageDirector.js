@@ -536,11 +536,10 @@ class ApplyStateMessageDirector {
      * Build a complete set genesis epoch payload.
      * @param {string|Buffer} invokerAddress
      * @param {string|Buffer} txValidity
-     * @param {string|Buffer} vdfDifficulty
-     * @param {string|Buffer} vdfDiscriminantSize
+     * @param {Buffer} encodedConsensusConfig
      * @returns {Promise<object>}
      */
-    async buildCompleteSetGenesisEpochMessage(invokerAddress, txValidity, vdfDifficulty, vdfDiscriminantSize) {
+    async buildCompleteSetGenesisEpochMessage(invokerAddress, txValidity, encodedConsensusConfig) {
         if (!this.#builder) throw new Error('Builder has not been set.');
         await this.#builder
             .setPhase('complete')
@@ -548,8 +547,7 @@ class ApplyStateMessageDirector {
             .setOperationType(OperationType.SET_GENESIS_EPOCH)
             .setAddress(invokerAddress)
             .setTxValidity(txValidity)
-            .setVdfDifficulty(vdfDifficulty)
-            .setVdfDiscriminantSize(vdfDiscriminantSize)
+            .setConsensusConfig(encodedConsensusConfig)
             .build();
         return this.#builder.getPayload();
     }

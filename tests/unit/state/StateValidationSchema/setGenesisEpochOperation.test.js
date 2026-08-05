@@ -9,60 +9,60 @@ import { config } from '../../../helpers/config.js';
 
 const stateValidationSchema = new StateValidationSchema(config);
 
-test('validateSetGenesisEpochOperation - happy path', t => {
+test('validateConsensusControlOperation - genesis happy path', t => {
     t.ok(
-        stateValidationSchema.validateSetGenesisEpochOperation(SGO.valid_set_genesis_epoch_operation),
+        stateValidationSchema.validateConsensusControlOperation(SGO.valid_set_genesis_epoch_operation),
         'Valid data for set genesis epoch operation should pass the validation'
     );
 });
 
-test('validateSetGenesisEpochOperation - type level validation (sgo)', t => {
+test('validateConsensusControlOperation - genesis type level validation (cco)', t => {
     topLevelValidationTests(
         t,
-        stateValidationSchema.validateSetGenesisEpochOperation.bind(stateValidationSchema),
+        stateValidationSchema.validateConsensusControlOperation.bind(stateValidationSchema),
         SGO.valid_set_genesis_epoch_operation,
-        'sgo',
+        'cco',
         not_allowed_data_types,
         SGO.top_fields_set_genesis_epoch
     );
 });
 
-test('validateSetGenesisEpochOperation - value level validation (sgo)', t => {
+test('validateConsensusControlOperation - genesis value level validation (cco)', t => {
     valueLevelValidationTest(
         t,
-        stateValidationSchema.validateSetGenesisEpochOperation.bind(stateValidationSchema),
+        stateValidationSchema.validateConsensusControlOperation.bind(stateValidationSchema),
         SGO.valid_set_genesis_epoch_operation,
-        'sgo',
+        'cco',
         SGO.set_genesis_epoch_value_fields,
         not_allowed_data_types
     );
 });
 
-test('validateSetGenesisEpochOperation - address buffer length validation - TOP LEVEL', t => {
+test('validateConsensusControlOperation - genesis address buffer length validation - TOP LEVEL', t => {
     addressBufferLengthTest(
         t,
-        stateValidationSchema.validateSetGenesisEpochOperation.bind(stateValidationSchema),
+        stateValidationSchema.validateConsensusControlOperation.bind(stateValidationSchema),
         SGO.valid_set_genesis_epoch_operation,
     );
 });
 
-test('validateSetGenesisEpochOperation - fields buffer length validation - VALUE LEVEL (sgo)', t => {
+test('validateConsensusControlOperation - genesis fields buffer length validation - VALUE LEVEL (cco)', t => {
     fieldsBufferLengthTest(
         t,
-        stateValidationSchema.validateSetGenesisEpochOperation.bind(stateValidationSchema),
+        stateValidationSchema.validateConsensusControlOperation.bind(stateValidationSchema),
         SGO.valid_set_genesis_epoch_operation,
-        'sgo',
+        'cco',
         SGO.required_length_of_fields_for_set_genesis_epoch
     );
 });
 
-test('validateSetGenesisEpochOperation - consensus config value level validation (sgo.cc)', t => {
+test('validateConsensusControlOperation - genesis config value level validation (cco.cc)', t => {
     const validOperation = SGO.valid_set_genesis_epoch_operation;
     const validateConsensusConfig = fixture =>
-        stateValidationSchema.validateSetGenesisEpochOperation({
+        stateValidationSchema.validateConsensusControlOperation({
             ...validOperation,
-            sgo: {
-                ...validOperation.sgo,
+            cco: {
+                ...validOperation.cco,
                 cc: fixture.cc
             }
         });
@@ -71,22 +71,22 @@ test('validateSetGenesisEpochOperation - consensus config value level validation
     valueLevelValidationTest(
         t,
         validateConsensusConfig,
-        {cc: validOperation.sgo.cc},
+        {cc: validOperation.cco.cc},
         'cc',
         SGO.consensus_config_fields,
         invalidDataTypes
     );
 });
 
-test('validateSetGenesisEpochOperation - config data buffer size validation (sgo.cc.cd)', t => {
+test('validateConsensusControlOperation - genesis config data buffer size validation (cco.cc.cd)', t => {
     const validOperation = SGO.valid_set_genesis_epoch_operation;
     const validateConfigData = cd =>
-        stateValidationSchema.validateSetGenesisEpochOperation({
+        stateValidationSchema.validateConsensusControlOperation({
             ...validOperation,
-            sgo: {
-                ...validOperation.sgo,
+            cco: {
+                ...validOperation.cco,
                 cc: {
-                    ...validOperation.sgo.cc,
+                    ...validOperation.cco.cc,
                     cd
                 }
             }
@@ -105,15 +105,15 @@ test('validateSetGenesisEpochOperation - config data buffer size validation (sgo
     );
 });
 
-test('validateSetGenesisEpochOperation - schema version uint8 validation (sgo.cc.sv)', t => {
+test('validateConsensusControlOperation - genesis schema version uint8 validation (cco.cc.sv)', t => {
     const validOperation = SGO.valid_set_genesis_epoch_operation;
     const validateSchemaVersion = sv =>
-        stateValidationSchema.validateSetGenesisEpochOperation({
+        stateValidationSchema.validateConsensusControlOperation({
             ...validOperation,
-            sgo: {
-                ...validOperation.sgo,
+            cco: {
+                ...validOperation.cco,
                 cc: {
-                    ...validOperation.sgo.cc,
+                    ...validOperation.cco.cc,
                     sv
                 }
             }

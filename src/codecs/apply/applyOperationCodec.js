@@ -1,7 +1,7 @@
 import b4a from 'b4a';
 import applyOperationsGenerated from './applyOperations.generated.cjs';
 import _ from 'lodash';
-const { Operation, SetEpochOperation, SetConsensusConfigOperation } = applyOperationsGenerated.apply.operations;
+const { Operation, SetEpochOperation, ConsensusControlOperation } = applyOperationsGenerated.apply.operations;
 
 // Options for converting protobuf messages to plain objects, ensuring that bytes are returned as Buffers and enums as numbers.
 const APPLY_TO_OBJECT_OPTIONS = Object.freeze({
@@ -199,21 +199,21 @@ const getValidatedConsensusConfigPayload = (payload) => {
 }
 
 /**
- * Encodes a ConsensusConfig using the SetConsensusConfigOperation wire format.
+ * Encodes a ConsensusConfig using the ConsensusControlOperation wire format.
  *
  * @param {{sv: Buffer, cd: Buffer}} payload - Consensus config payload.
  * @returns {Buffer} Encoded ConsensusConfig.
  */
 export const encodeConsensusConfig = (payload) => {
     const consensusConfigPayload = getValidatedConsensusConfigPayload(payload);
-    const setConsensusConfigPayload = { cc: consensusConfigPayload };
-    const error = SetConsensusConfigOperation.verify(setConsensusConfigPayload);
+    const consensusControlPayload = { cc: consensusConfigPayload };
+    const error = ConsensusControlOperation.verify(consensusControlPayload);
     if (error) throw new Error(error);
-    return b4a.from(SetConsensusConfigOperation.encode(setConsensusConfigPayload).finish());
+    return b4a.from(ConsensusControlOperation.encode(consensusControlPayload).finish());
 }
 
 /**
- * Decodes a ConsensusConfig encoded with the SetConsensusConfigOperation wire format.
+ * Decodes a ConsensusConfig encoded with the ConsensusControlOperation wire format.
  *
  * @param {Buffer} payload - Encoded ConsensusConfig buffer.
  * @returns {{sv: Buffer, cd: Buffer}} Decoded ConsensusConfig.
@@ -223,12 +223,12 @@ export const decodeConsensusConfig = (payload) => {
         throw new Error('Encoded ConsensusConfig must be a buffer.');
     }
 
-    const setConsensusConfigPayload = SetConsensusConfigOperation.toObject(
-        SetConsensusConfigOperation.decode(payload),
+    const consensusControlPayload = ConsensusControlOperation.toObject(
+        ConsensusControlOperation.decode(payload),
         APPLY_TO_OBJECT_OPTIONS
     );
 
-    return getValidatedConsensusConfigPayload(setConsensusConfigPayload.cc);
+    return getValidatedConsensusConfigPayload(consensusControlPayload.cc);
 }
 
 /**

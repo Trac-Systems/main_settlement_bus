@@ -34,8 +34,7 @@ class StateValidationSchema {
     #validateTransferOperationSchema;
     #validateBalanceInitializationSchema;
     #validateSetEpochOperationSchema;
-    #validateSetGenesisEpochOperationSchema;
-    #validateSetConsensusConfigOperationSchema;
+    #validateConsensusControlOperationSchema;
     #proofDataFields;
     #config;
 
@@ -293,8 +292,7 @@ class StateValidationSchema {
         this.#validateTransferOperationSchema = this.#compileTransferOperationSchema();
         this.#validateBalanceInitializationSchema = this.#compileBalanceInitializationSchema();
         this.#validateSetEpochOperationSchema = this.#compileSetEpochOperationSchema();
-        this.#validateSetGenesisEpochOperationSchema = this.#compileSetGenesisEpochOperationSchema();
-        this.#validateSetConsensusConfigOperationSchema = this.#compileSetConsensusConfigOperationSchema();
+        this.#validateConsensusControlOperationSchema = this.#compileConsensusControlOperationSchema();
 
     }
 
@@ -666,46 +664,13 @@ class StateValidationSchema {
         return this.#validateSetEpochOperationSchema(op) === true;
     }
 
-    #compileSetGenesisEpochOperationSchema() {
+    #compileConsensusControlOperationSchema() {
         const schema = {
             $$strict: true,
-            type: this.#operationTypeDomain(OperationType.SET_GENESIS_EPOCH),
-            address: {type: 'buffer', length: this.#config.addressLength, required: true},
-            sgo: {
-                strict: true,
-                type: 'object',
-                props: {
-                    tx: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
-                    txv: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
-                    cc: {
-                        strict: true,
-                        type: 'object',
-                        required: true,
-                        props: {
-                            sv: {type: 'buffer', length: CONSENSUS_CONFIG_SCHEMA_VERSION_BYTE_LENGTH, required: true},
-                            cd: {
-                                type: 'buffer_max_length',
-                                maxLength: CONSENSUS_CONFIG_DATA_MAX_SIZE,
-                                required: true
-                            },
-                        }
-                    },
-                    in: {type: 'buffer', length: NONCE_BYTE_LENGTH, required: true},
-                    is: {type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true},
-                }
-            }
-        };
-        return this.#validator.compile(schema);
-    }
-
-    validateSetGenesisEpochOperation(op) {
-        return this.#validateSetGenesisEpochOperationSchema(op) === true;
-    }
-
-    #compileSetConsensusConfigOperationSchema() {
-        const schema = {
-            $$strict: true,
-            type: this.#operationTypeDomain(OperationType.SET_CONSENSUS_CONFIG),
+            type: this.#operationTypeDomain(
+                OperationType.SET_GENESIS_EPOCH,
+                OperationType.SET_CONSENSUS_CONFIG
+            ),
             address: {type: 'buffer', length: this.#config.addressLength, required: true},
             cco: {
                 strict: true,
@@ -734,8 +699,8 @@ class StateValidationSchema {
         return this.#validator.compile(schema);
     }
 
-    validateSetConsensusConfigOperation(op) {
-        return this.#validateSetConsensusConfigOperationSchema(op) === true;
+    validateConsensusControlOperation(op) {
+        return this.#validateConsensusControlOperationSchema(op) === true;
     }
 
 }
