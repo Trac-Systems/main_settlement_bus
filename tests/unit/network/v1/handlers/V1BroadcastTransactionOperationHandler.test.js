@@ -520,20 +520,18 @@ test('handleRequest: flushes response before closing when protocol error request
     t.alike(events, ['send', 'flush', 'end']);
 });
 
-test('decodeApplyOperation failure branch', async t => {
-
+test('Malformed encoded transaction returns TX_INVALID_PAYLOAD', async t => {
     const handler = setupHandler(t);
 
-    handler.decodeApplyOperation = () => {
-        throw new Error('decode fail');
-    };
-
     await handler.handleRequest(
-        { id: b4a.alloc(32), broadcast_transaction_request: { data: b4a.alloc(1) } },
-        mockConn()
+        {
+            id: b4a.alloc(32),
+            broadcast_transaction_request: { data: b4a.from([0x0a, 0x02, 0x01]) }
+        },
+        mockConn(response => {
+            t.is(response.broadcast_transaction_response.result, ResultCode.TX_INVALID_PAYLOAD);
+        })
     );
-
-    t.pass();
 });
 
 test('Response build internal failure branch', async t => {

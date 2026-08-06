@@ -3,7 +3,7 @@ import b4a from 'b4a';
 
 import V1BroadcastTransactionRequest from '../../../../src/core/network/protocols/v1/validators/V1BroadcastTransactionRequest.js';
 import { V1ProtocolError } from '../../../../src/core/network/protocols/v1/V1ProtocolError.js';
-import { MAX_PARTIAL_TX_PAYLOAD_BYTE_SIZE } from '../../../../src/utils/constants.js';
+import { MAX_PARTIAL_TX_PAYLOAD_BYTE_SIZE, ResultCode } from '../../../../src/utils/constants.js';
 import { config } from '../../../helpers/config.js';
 
 test('V1BroadcastTransactionRequest.validate runs schema, size and signature validation', async t => {
@@ -48,6 +48,7 @@ test('V1BroadcastTransactionRequest.isDataPropertySizeValid throws for oversized
         t.fail('expected size validation to throw');
     } catch (error) {
         t.ok(error instanceof V1ProtocolError);
+        t.is(error.resultCode, ResultCode.SCHEMA_VALIDATION_FAILED);
         t.ok(error.message.includes('exceeds the maximum allowed byte size'));
     }
 });
