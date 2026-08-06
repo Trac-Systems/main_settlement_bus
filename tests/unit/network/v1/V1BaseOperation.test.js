@@ -49,6 +49,19 @@ const buildSignedPayload = async (wallet, type, options = {}) => {
     return builder.getResult();
 };
 
+async function assertProtocolError(t, action, resultCode, messageIncludes) {
+    let error;
+    try {
+        await action();
+    } catch (caughtError) {
+        error = caughtError;
+    }
+
+    t.ok(error instanceof V1ProtocolError);
+    t.is(error?.resultCode, resultCode);
+    t.ok(error?.message.includes(messageIncludes));
+}
+
 test('V1BaseOperation.validate throws "must be implemented" by default', async t => {
     const operation = new V1BaseOperation(config);
 
@@ -61,29 +74,53 @@ test('V1BaseOperation.validate throws "must be implemented" by default', async t
 test('V1BaseOperation.isPayloadSchemaValid handles missing/invalid type cases', async t => {
     const operation = new V1BaseOperation(config);
 
-    t.exception(
+    await assertProtocolError(
+        t,
         () => operation.isPayloadSchemaValid(null),
-        errorMessageIncludes('Payload or payload type is missing')
+        ResultCode.INVALID_PAYLOAD,
+        'Payload or payload type is missing'
     );
 
-    t.exception(
+    await assertProtocolError(
+        t,
         () => operation.isPayloadSchemaValid({ type: null }),
-        errorMessageIncludes('Payload or payload type is missing')
+        ResultCode.INVALID_PAYLOAD,
+        'Payload or payload type is missing'
     );
 
-    t.exception(
+    await assertProtocolError(
+        t,
         () => operation.isPayloadSchemaValid({ type: 1.5 }),
-        errorMessageIncludes('Operation type must be an integer')
+        ResultCode.OPERATION_TYPE_UNKNOWN,
+        'Operation type must be an integer'
     );
 
-    t.exception(
+    await assertProtocolError(
+        t,
         () => operation.isPayloadSchemaValid({ type: 0 }),
-        errorMessageIncludes('Operation type is unspecified')
+        ResultCode.OPERATION_TYPE_UNKNOWN,
+        'Operation type is unspecified'
     );
 
-    t.exception(
+    await assertProtocolError(
+        t,
         () => operation.isPayloadSchemaValid({ type: 9999 }),
-        errorMessageIncludes('Unknown operation type')
+        ResultCode.OPERATION_TYPE_UNKNOWN,
+        'Unknown operation type'
+    );
+});
+
+test('V1BaseOperation.isPayloadSchemaValid returns SCHEMA_VALIDATION_FAILED for an identifiable invalid payload', async t => {
+    const operation = new V1BaseOperation(config);
+    const wallet = await createWallet();
+    const payload = await buildSignedPayload(wallet, NetworkOperationType.LIVENESS_REQUEST);
+    delete payload.liveness_request.nonce;
+
+    await assertProtocolError(
+        t,
+        () => operation.isPayloadSchemaValid(payload),
+        ResultCode.SCHEMA_VALIDATION_FAILED,
+        'Payload is invalid'
     );
 });
 
@@ -130,9 +167,11 @@ test('V1BaseOperation.validateSignature throws V1ProtocolError on wrong public k
 
     const payload = await buildSignedPayload(wallet, NetworkOperationType.LIVENESS_REQUEST);
 
-    await t.exception(
-        async () => operation.validateSignature(payload, otherWallet.publicKey),
-        errorMessageIncludes('signature verification failed')
+    await assertProtocolError(
+        t,
+        () => operation.validateSignature(payload, otherWallet.publicKey),
+        ResultCode.SIGNATURE_INVALID,
+        'signature verification failed'
     );
 });
 
@@ -151,7 +190,7 @@ test('V1BaseOperation.validateSignature rethrows protocol-shaped build errors', 
         t.fail('expected validateSignature to throw');
     } catch (error) {
         t.ok(error instanceof V1ProtocolError);
-        t.is(error.resultCode, ResultCode.INVALID_PAYLOAD);
+        t.is(error.resultCode, ResultCode.OPERATION_TYPE_UNKNOWN);
         t.ok(error.message.includes('Operation type is unspecified'));
     }
 });
@@ -171,7 +210,7 @@ test('V1BaseOperation.validateSignature wraps non-protocol build errors as V1Pro
         t.fail('expected validateSignature to throw');
     } catch (error) {
         t.ok(error instanceof V1ProtocolError);
-        t.is(error.resultCode, ResultCode.INVALID_PAYLOAD);
+        t.is(error.resultCode, ResultCode.UNEXPECTED_ERROR);
         t.ok(error.message.includes('Failed to build signature message'));
     }
 });
@@ -195,8 +234,22 @@ test('V1BaseOperation.validateSignature throws V1ProtocolError when hashing fail
         t.fail('expected validateSignature to throw');
     } catch (error) {
         t.ok(error instanceof V1ProtocolError);
+        t.is(error.resultCode, ResultCode.UNEXPECTED_ERROR);
         t.ok(error.message.includes('Failed to hash signature message'));
     }
+});
+
+test('V1BaseOperation.validateSignature returns UNEXPECTED_ERROR when the remote public key is missing', async t => {
+    const operation = new V1BaseOperation(config);
+    const wallet = await createWallet();
+    const payload = await buildSignedPayload(wallet, NetworkOperationType.LIVENESS_REQUEST);
+
+    await assertProtocolError(
+        t,
+        () => operation.validateSignature(payload),
+        ResultCode.UNEXPECTED_ERROR,
+        'Remote public key is missing'
+    );
 });
 
 test('V1BaseOperation.validateSignature handles verify() throw as invalid signature', async t => {
@@ -273,9 +326,11 @@ test('V1BaseOperation.validateSignature enforces BROADCAST_TRANSACTION_RESPONSE 
         const payload = structuredClone(validBase);
         scenario.mutate(payload);
 
-        await t.exception(
-            async () => operation.validateSignature(payload, wallet.publicKey),
-            errorMessageIncludes(scenario.match)
+        await assertProtocolError(
+            t,
+            () => operation.validateSignature(payload, wallet.publicKey),
+            ResultCode.INVALID_PAYLOAD,
+            scenario.match
         );
     }
 });
@@ -290,9 +345,11 @@ test('V1BaseOperation.validateSignature throws V1ProtocolError for unknown opera
         capabilities: [],
     };
 
-    await t.exception(
-        async () => operation.validateSignature(payload, b4a.alloc(32, 1)),
-        errorMessageIncludes('Unknown operation type')
+    await assertProtocolError(
+        t,
+        () => operation.validateSignature(payload, b4a.alloc(32, 1)),
+        ResultCode.OPERATION_TYPE_UNKNOWN,
+        'Unknown operation type'
     );
 });
 

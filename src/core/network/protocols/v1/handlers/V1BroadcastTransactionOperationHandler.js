@@ -111,7 +111,7 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
         try {
             return unsafeDecodeApplyOperation(message);
         } catch (error) {
-            throw new V1ProtocolError(ResultCode.UNEXPECTED_ERROR, `Failed to decode apply operation from message: ${error.message}`);
+            throw new V1ProtocolError(ResultCode.TX_INVALID_PAYLOAD, `Failed to decode apply operation from message: ${error.message}`);
         }
     }
 
