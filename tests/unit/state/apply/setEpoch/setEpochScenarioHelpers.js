@@ -11,8 +11,8 @@ import {
     encodeApplyOperation
 } from '../../../../../src/codecs/apply/applyOperationCodec.js';
 import {
-    safeEncodeProofProposal,
-    safeEncodeProofProposalApproval
+    encodeProofProposal,
+    encodeProofProposalApproval
 } from '../../../../../src/codecs/consensus/v1/consensusV1OperationCodec.js';
 import { encodeVdfParameters } from '../../../../../src/core/state/utils/epochProof.js';
 import { addressToBuffer } from '../../../../../src/core/state/utils/address.js';
@@ -36,9 +36,9 @@ export async function computeRealVdfSolution(challenge) {
     const service = new Service();
     await service.ready();
     try {
-        const result = await service.calculateVDF(challenge, VDF_DIFFICULTY, VDF_DISCRIMINANT_SIZE);
-        if (!result) {
-            throw new Error('VDF computation failed in test helper (is @tracsystems/trac-vdf built?).');
+        const { result, error } = await service.calculateVDF(challenge, VDF_DIFFICULTY, VDF_DISCRIMINANT_SIZE);
+        if (error) {
+            throw new Error(`VDF computation failed in test helper (is @tracsystems/trac-vdf built?): ${error}`);
         }
         return b4a.from(result.solution);
     } finally {
@@ -172,8 +172,8 @@ export async function buildSetEpochPayload(context, {
         approvals.push(responseMessage.proof_proposal_response.approval);
     }
 
-    const proofData = safeEncodeProofProposal(proofProposal);
-    const encodedApprovals = approvals.map(approval => safeEncodeProofProposalApproval(approval));
+    const proofData = encodeProofProposal(proofProposal);
+    const encodedApprovals = approvals.map(approval => encodeProofProposalApproval(approval));
 
     const message = await applyStateMessageFactory(proposerNode.wallet, config)
         .buildCompleteSetEpochMessage(proposerNode.wallet.address, proofData, encodedApprovals);

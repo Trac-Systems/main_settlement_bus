@@ -1,7 +1,7 @@
 import tracCryptoApi from "trac-crypto-api";
-import { generateUUID, publicKeyToAddress } from '../../../utils/helpers.js';
+import { generateUUID } from '../../../utils/helpers.js';
 import { consensusMessageFactory } from '../../../messages/consensus/v1/consensusMessageFactory.js';
-import addressUtils, { addressToBuffer } from '../../state/utils/address.js';
+import addressUtils from '../../state/utils/address.js';
 import b4a from "b4a";
 import { encodeProofProposal, encodeProofProposalApproval } from '../../../codecs/consensus/v1/consensusV1OperationCodec.js';
 import { applyStateMessageFactory } from '../../../messages/state/applyStateMessageFactory.js';
@@ -91,10 +91,7 @@ export class EpochCoordinatorOperations {
 
         return {
             signature: memberSignature,
-            approver: addressToBuffer(
-                publicKeyToAddress(publicKey, this.#config),
-                this.#config.addressPrefix
-            )
+            approver: addressBuffer
         };
     }
 
