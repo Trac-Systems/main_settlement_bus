@@ -9,6 +9,7 @@ import {
 import { applyStateMessageFactory } from '../../../../../src/messages/state/applyStateMessageFactory.js';
 import {
     safeDecodeApplyOperation,
+    safeEncodeApplyOperation,
     encodeApplyOperation
 } from '../../../../../src/codecs/apply/applyOperationCodec.js';
 import { decodeVdfParameters } from '../../../../../src/core/state/utils/epochProof.js';
