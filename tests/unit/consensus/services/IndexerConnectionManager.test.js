@@ -8,10 +8,10 @@ import IndexerConnectionManager from '../../../../src/core/consensus/services/In
 const mockConfig = { addressPrefix: 'trac' };
 const mockLogger = { debug() {} };
 const mockMessages = {
-    createProtomux: (connection) => connection.protocolSessions.indexer,
+    createProtocolSession: (connection) => connection.protocolSessions.indexer,
     attachChannel(connection) {
         connection.protocolSessions ??= {};
-        connection.protocolSessions.indexer = this.createProtomux(connection);
+        connection.protocolSessions.indexer = this.createProtocolSession(connection);
     },
 };
 

@@ -45,10 +45,10 @@ const createV1Connection = (key, sendHealthCheckStub = sinon.stub().resolves(Res
 }
 
 const makeMessages = () => ({
-    createProtomux: (connection) => connection.protocolSessions.validator,
+    createProtocolSession: (connection) => connection.protocolSessions.validator,
     attachChannel(connection) {
         connection.protocolSessions ??= {};
-        connection.protocolSessions.validator = this.createProtomux(connection);
+        connection.protocolSessions.validator = this.createProtocolSession(connection);
     }
 })
 

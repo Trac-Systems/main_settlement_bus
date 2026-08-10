@@ -222,10 +222,10 @@ nodeOnlyTest('buildSetEpochPayload encodes proof + approvals into the applied pa
     const buildCompleteSetEpochMessage = sinon.stub().resolves(builtMessage);
     const make = await opsWithMocks({
         [APPLY_STATE_FACTORY_PATH]: { applyStateMessageFactory: () => ({ buildCompleteSetEpochMessage }) },
-        [APPLY_CODEC_PATH]: { safeEncodeApplyOperation: sinon.stub().returns(encoded) },
+        [APPLY_CODEC_PATH]: { encodeApplyOperation: sinon.stub().returns(encoded) },
         [CONSENSUS_CODEC_PATH]: {
-            safeEncodeProofProposal: sinon.stub().returns(b4a.alloc(1)),
-            safeEncodeProofProposalApproval: sinon.stub().returns(b4a.alloc(1)),
+            encodeProofProposal: sinon.stub().returns(b4a.alloc(1)),
+            encodeProofProposalApproval: sinon.stub().returns(b4a.alloc(1)),
         },
     });
     const proofProposal = { protocol_version: 1, network_id: 1, epoch: 2, previous_epoch_record_hash: b4a.alloc(32), vdf_parameters_hash: b4a.alloc(258), vdf_proof: b4a.alloc(258), signature: b4a.alloc(64) };
@@ -241,10 +241,10 @@ nodeOnlyTest('buildSetEpochPayload does not append to state', async t => {
     const state = makeState();
     const make = await opsWithMocks({
         [APPLY_STATE_FACTORY_PATH]: { applyStateMessageFactory: () => ({ buildCompleteSetEpochMessage: sinon.stub().resolves({}) }) },
-        [APPLY_CODEC_PATH]: { safeEncodeApplyOperation: sinon.stub().returns(b4a.alloc(64)) },
+        [APPLY_CODEC_PATH]: { encodeApplyOperation: sinon.stub().returns(b4a.alloc(64)) },
         [CONSENSUS_CODEC_PATH]: {
-            safeEncodeProofProposal: sinon.stub().returns(b4a.alloc(1)),
-            safeEncodeProofProposalApproval: sinon.stub().returns(b4a.alloc(1)),
+            encodeProofProposal: sinon.stub().returns(b4a.alloc(1)),
+            encodeProofProposalApproval: sinon.stub().returns(b4a.alloc(1)),
         },
     });
     const proofProposal = { protocol_version: 1, network_id: 1, epoch: 2, previous_epoch_record_hash: b4a.alloc(32), vdf_parameters_hash: b4a.alloc(258), vdf_proof: b4a.alloc(258), signature: b4a.alloc(64) };

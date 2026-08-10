@@ -8,7 +8,7 @@ import { applyStateMessageFactory } from '../../../../../src/messages/state/appl
 import { consensusMessageFactory } from '../../../../../src/messages/consensus/v1/consensusMessageFactory.js';
 import {
     safeDecodeApplyOperation,
-    safeEncodeApplyOperation
+    encodeApplyOperation
 } from '../../../../../src/codecs/apply/applyOperationCodec.js';
 import {
     safeEncodeProofProposal,
@@ -77,7 +77,7 @@ async function initializeGenesisEpoch(context) {
             uint32ToBuffer(VDF_DIFFICULTY),
             uint16ToBuffer(VDF_DISCRIMINANT_SIZE)
         );
-    await appendAndUpdate(adminNode.base, safeEncodeApplyOperation(payload));
+    await appendAndUpdate(adminNode.base, encodeApplyOperation(payload));
 }
 
 export async function appendAndUpdate(base, payload) {
@@ -178,7 +178,7 @@ export async function buildSetEpochPayload(context, {
     const message = await applyStateMessageFactory(proposerNode.wallet, config)
         .buildCompleteSetEpochMessage(proposerNode.wallet.address, proofData, encodedApprovals);
 
-    return safeEncodeApplyOperation(message);
+    return encodeApplyOperation(message);
 }
 
 export function decodeSetEpochPayload(payload) {

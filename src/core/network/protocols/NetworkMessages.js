@@ -42,7 +42,7 @@ class NetworkMessages {
         );
     }
 
-    createProtomux(connection) {
+    createProtocolSession(connection) {
         // Attach a Protomux instance to this Hyperswarm connection.
         // Protomux multiplexes multiple logical protocol channels over a single encrypted stream.
 
@@ -68,7 +68,7 @@ class NetworkMessages {
     attachChannel(connection) {
         connection.protocolSessions ??= {};
         if (connection.protocolSessions.validator) return;
-        connection.protocolSessions.validator = this.createProtomux(connection);
+        connection.protocolSessions.validator = this.createProtocolSession(connection);
     }
 
     prepareConnection(connection) {

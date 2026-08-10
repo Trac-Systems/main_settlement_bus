@@ -13,7 +13,7 @@ class ConsensusMessages {
         this.#consensusRouter = new ConsensusRouterV1(state, wallet, config, pendingRequestService);
     }
 
-    createProtomux(connection) {
+    createProtocolSession(connection) {
         return new ConsensusV1Protocol(
             this.#consensusRouter,
             connection,
@@ -29,7 +29,7 @@ class ConsensusMessages {
     attachChannel(connection) {
         connection.protocolSessions ??= {};
         if (connection.protocolSessions.indexer) return;
-        connection.protocolSessions.indexer = this.createProtomux(connection);
+        connection.protocolSessions.indexer = this.createProtocolSession(connection);
     }
 
     /**

@@ -144,7 +144,7 @@ async function loadNetwork() {
     }
 
     class NetworkMessagesMock {
-        createProtomux(connection) {
+        createProtocolSession(connection) {
             return connection.protocolSessions?.validator ?? {
                 isProbed: () => true,
                 probe: sinon.stub().resolves(),
@@ -155,7 +155,7 @@ async function loadNetwork() {
 
         attachChannel(connection) {
             connection.protocolSessions ??= {};
-            connection.protocolSessions.validator = this.createProtomux(connection);
+            connection.protocolSessions.validator = this.createProtocolSession(connection);
         }
 
         prepareConnection(connection) {

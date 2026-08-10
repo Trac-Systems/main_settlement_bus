@@ -3,10 +3,10 @@ import { generateUUID, publicKeyToAddress } from '../../../utils/helpers.js';
 import { consensusMessageFactory } from '../../../messages/consensus/v1/consensusMessageFactory.js';
 import addressUtils, { addressToBuffer } from '../../state/utils/address.js';
 import b4a from "b4a";
-import { safeEncodeProofProposal, safeEncodeProofProposalApproval } from '../../../codecs/consensus/v1/consensusV1OperationCodec.js';
+import { encodeProofProposal, encodeProofProposalApproval } from '../../../codecs/consensus/v1/consensusV1OperationCodec.js';
 import { applyStateMessageFactory } from '../../../messages/state/applyStateMessageFactory.js';
 import { uint16ToBuffer, uint32ToBuffer } from '../../../utils/buffer.js';
-import { safeEncodeApplyOperation } from '../../../codecs/apply/applyOperationCodec.js';
+import { encodeApplyOperation } from '../../../codecs/apply/applyOperationCodec.js';
 import { encodeVdfParameters } from '../../state/utils/epochProof.js';
 import { blake3 } from 'trac-crypto-api/modules/hash.js';
 import { ConsensusResultCode } from '../../../utils/constants.js';
@@ -99,7 +99,7 @@ export class EpochCoordinatorOperations {
     }
 
     async buildSetEpochPayload(proofProposal, signatures) {
-        const proofData = safeEncodeProofProposal({
+        const proofData = encodeProofProposal({
             protocol_version: proofProposal.protocol_version,
             network_id: proofProposal.network_id,
             epoch: proofProposal.epoch,
@@ -110,18 +110,18 @@ export class EpochCoordinatorOperations {
             signature: proofProposal.signature,
         });
         const approvals = signatures.map(({ signature, approver }) =>
-            safeEncodeProofProposalApproval({
+            encodeProofProposalApproval({
                 approver,
                 approval_sig: signature,
             })
         );
         const message = await applyStateMessageFactory(this.#wallet, this.#config)
             .buildCompleteSetEpochMessage(this.#wallet.address, proofData, approvals);
-        return safeEncodeApplyOperation(message);
+        return encodeApplyOperation(message);
     }
 
-    async appendSetEpoch(payload) {
-        return await this.#state.append(payload);
+    appendSetEpoch(payload) {
+        return this.#state.append(payload);
     }
 
     /** Excludes only self - an admin/indexer counts as a normal approver. */
