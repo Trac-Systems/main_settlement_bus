@@ -135,70 +135,12 @@ test('queue continues after port.read throws', async t => {
 // ---- Bare-only tests ----
 
 if (isBare) {
-    const { default: Channel } = await import('bare-channel');
     const { VDFBare } = await import('../../../../src/core/consensus/services/VDFBare.js');
 
-    function makeThreadMock() {
-        return {
-            terminate: sinon.stub().resolves(),
-            join: sinon.stub().resolves(),
-        };
-    }
-
-    function setupBare(portMock, threadMock) {
-        const savedBare = globalThis.Bare;
-        sinon.stub(Channel.prototype, 'connect').returns(portMock);
-        globalThis.Bare = { Thread: sinon.stub().returns(threadMock) };
-        return () => {
-            sinon.restore();
-            globalThis.Bare = savedBare;
-        };
-    }
-
-    test('VDFBare._open creates a Thread with a file:// worker URL and channel handle', async t => {
-        const portMock = makePortMock();
-        const threadMock = makeThreadMock();
-        const teardown = setupBare(portMock, threadMock);
-        t.teardown(teardown);
-
-        const ThreadStub = globalThis.Bare.Thread;
-        const service = new VDFBare();
-        await service.ready();
-        t.teardown(() => service.close());
-
-        t.ok(ThreadStub.calledOnce);
-        t.ok(ThreadStub.firstCall.args[0].startsWith('file://'));
-        t.ok(ThreadStub.firstCall.args[0].endsWith('vdf-worker.js'));
-        t.is(typeof ThreadStub.firstCall.args[1].data, 'object');
-    });
-
-    test('VDFBare._close terminates thread, joins it, and closes port', async t => {
-        const portMock = makePortMock();
-        const threadMock = makeThreadMock();
-        const teardown = setupBare(portMock, threadMock);
-        t.teardown(teardown);
-
-        const service = new VDFBare();
-        await service.ready();
-        await service.close();
-
-        t.ok(threadMock.terminate.calledOnce);
-        t.ok(threadMock.join.calledOnce);
-        t.ok(portMock.close.calledOnce);
-    });
-
-    test('VDFBare._close calls terminate before join', async t => {
-        const portMock = makePortMock();
-        const threadMock = makeThreadMock();
-        const teardown = setupBare(portMock, threadMock);
-        t.teardown(teardown);
-
-        const service = new VDFBare();
-        await service.ready();
-        await service.close();
-
-        t.ok(threadMock.terminate.calledBefore(threadMock.join));
-    });
+    // Each computation runs in its own disposable OS subprocess (see VDFBare.js for why:
+    // a real solveWesolowski() call leaves native/WASM state that crashes Bare.Thread's
+    // teardown). There's no persistent thread/channel to mock - the "[bare] real VDF" tests
+    // below exercise _open/calculateVDF/close through the real subprocess path instead.
 
     test('[bare] real VDF: returns valid computation result', { timeout: 30000 }, async t => {
         const service = new VDFBare();
@@ -246,7 +188,29 @@ if (isBare) {
         await service.ready();
         t.teardown(() => service.close());
 
-        const { result, error } = await service.calculateVDF(Buffer.alloc(32, 1), DIFFICULTY, 1);
+        const { result, error } = await service.calculateVDF(Buffer.alloc(32, 1), DIFFICULTY, -1);
+        t.absent(result);
+        t.ok(error);
+    });
+
+    test('[bare] calculateVDF returns an error when worker exits unexpectedly', { timeout: 10000 }, async t => {
+        const crashWorkerURL = new URL('./fixtures/crash-worker-bare.js', import.meta.url);
+        const service = new VDFBare(crashWorkerURL);
+        await service.ready();
+        t.teardown(() => service.close());
+
+        const { result, error } = await service.calculateVDF(Buffer.alloc(32, 1), DIFFICULTY, DISCRIMINANT_BITS);
+        t.absent(result);
+        t.ok(error);
+    });
+
+    test('[bare] calculateVDF returns an error instead of crashing when worker writes a non-JSON response', { timeout: 10000 }, async t => {
+        const garbageWorkerURL = new URL('./fixtures/garbage-worker-bare.js', import.meta.url);
+        const service = new VDFBare(garbageWorkerURL);
+        await service.ready();
+        t.teardown(() => service.close());
+
+        const { result, error } = await service.calculateVDF(Buffer.alloc(32, 1), DIFFICULTY, DISCRIMINANT_BITS);
         t.absent(result);
         t.ok(error);
     });
