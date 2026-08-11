@@ -626,40 +626,36 @@ class State extends ReadyResource {
     }
 
     async getSignedConsensusConfig() {
-        const decodeConfigAtPointer = async currentConfigPointer => {
-            if (!b4a.isBuffer(currentConfigPointer) || currentConfigPointer.length !== 4) {
-                throw new Error('Invalid current consensus config pointer.');
-            }
-
-            const currentConfigIndex = currentConfigPointer.readUInt32BE(0);
-
-            const encodedConsensusConfig = await this.getSigned(EntryType.CONSENSUS_CONFIG_RECORD + currentConfigIndex);
-            if (_.isNil(encodedConsensusConfig)) {
-                throw new Error(`Consensus config record ${currentConfigIndex} does not exist.`);
-            }
-
-            const consensusConfig = decodeConsensusConfig(encodedConsensusConfig);
-            const schemaVersion = consensusConfig.sv.readUInt8(0);
-            switch (schemaVersion) {
-                case 1: {
-                    const decodedVdfConfig = decodeVdfConfig(consensusConfig.cd);
-                    return {
-                        schemaVersion,
-                        configData: {
-                            difficulty: decodedVdfConfig.difficulty.readUInt32BE(0),
-                            discriminantBitSize: decodedVdfConfig.discriminantBitSize.readUInt16BE(0),
-                        }
-                    };
-                }
-                default:
-                    throw new Error(`Unsupported consensus config schema version: ${schemaVersion}.`);
-            }
-        };
-
         const currentConfigPointer = await this.getSigned(EntryType.CONSENSUS_CONFIG_CURRENT);
         if (_.isNil(currentConfigPointer)) return null;
 
-        return await decodeConfigAtPointer(currentConfigPointer);
+        if (!b4a.isBuffer(currentConfigPointer) || currentConfigPointer.length !== 4) {
+            throw new Error('Invalid current consensus config pointer.');
+        }
+
+        const currentConfigIndex = currentConfigPointer.readUInt32BE(0);
+
+        const encodedConsensusConfig = await this.getSigned(EntryType.CONSENSUS_CONFIG_RECORD + currentConfigIndex);
+        if (_.isNil(encodedConsensusConfig)) {
+            throw new Error(`Consensus config record ${currentConfigIndex} does not exist.`);
+        }
+
+        const consensusConfig = decodeConsensusConfig(encodedConsensusConfig);
+        const schemaVersion = consensusConfig.sv.readUInt8(0);
+        switch (schemaVersion) {
+            case 1: {
+                const decodedVdfConfig = decodeVdfConfig(consensusConfig.cd);
+                return {
+                    schemaVersion,
+                    configData: {
+                        difficulty: decodedVdfConfig.difficulty.readUInt32BE(0),
+                        discriminantBitSize: decodedVdfConfig.discriminantBitSize.readUInt16BE(0),
+                    }
+                };
+            }
+            default:
+                throw new Error(`Unsupported consensus config schema version: ${schemaVersion}.`);
+        }
     }
 
     async requireSignedConsensusConfig() {
