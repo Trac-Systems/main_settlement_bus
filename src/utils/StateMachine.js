@@ -39,11 +39,13 @@ export class StateMachine extends ReadyResource {
         return this.#context;
     }
 
-    can(event) {
-        return Boolean(this.#transitions[this.#state]?.[event]);
+    shouldRun() {
+        return this.closing === null && !this.closed;
     }
 
     async send(event, payload = {}) {
+        if (!this.shouldRun()) return false;
+
         const next = this.#transitions[this.#state]?.[event];
         if (!next) return false;
 
@@ -52,6 +54,8 @@ export class StateMachine extends ReadyResource {
         const prev = this.#state;
         this.#state = next;
         await this.#emit(event, { machine: this, prev, next, context: this.#context });
+
+        if (!this.shouldRun()) return false;
 
         const transition = { machine: this, prev, next, context: this.#context };
         if (this.#discardState !== null && next === this.#discardState) {
@@ -68,10 +72,15 @@ export class StateMachine extends ReadyResource {
     // dispatches to the current state's handler once, the same way any other transition
     // does, so callers never need to know which state that is.
     async enter(payload = {}) {
+        if (!this.shouldRun()) return false;
+
         this.appendContext(payload);
 
         const transition = { machine: this, prev: null, next: this.#state, context: this.#context };
         await this.#emit('ENTER', transition);
+
+        if (!this.shouldRun()) return false;
+
         await this.#dispatch(this.#state);
 
         return transition;

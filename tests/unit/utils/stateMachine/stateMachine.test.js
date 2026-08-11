@@ -53,23 +53,6 @@ test('constructor starts with empty context', t => {
     t.alike(sm.context, {});
 });
 
-// --- can ---
-
-test('can returns true for a valid event in the current state', t => {
-    const sm = makeMachine();
-    t.ok(sm.can(EVENTS.START));
-});
-
-test('can returns false for an invalid event in the current state', t => {
-    const sm = makeMachine();
-    t.absent(sm.can(EVENTS.FINISH));
-});
-
-test('can returns false for unknown event', t => {
-    const sm = makeMachine();
-    t.absent(sm.can('NO_SUCH_EVENT'));
-});
-
 // --- appendContext ---
 
 test('appendContext merges payload into context', t => {
@@ -91,6 +74,17 @@ test('appendContext with no argument does not throw', t => {
     t.alike(sm.context, {});
 });
 
+test('shouldRun reflects the ReadyResource close lifecycle', async t => {
+    const sm = makeMachine();
+    t.ok(sm.shouldRun());
+
+    const closing = sm.close();
+    t.absent(sm.shouldRun());
+
+    await closing;
+    t.absent(sm.shouldRun());
+});
+
 // --- send ---
 
 test('send returns false for an invalid event', async t => {
@@ -105,10 +99,14 @@ test('send transitions to the next state', async t => {
     t.is(sm.state, STATES.RUNNING);
 });
 
-test('send returns transition object with prev, next, context', async t => {
+test('send returns transition object with machine, prev, next, and context', async t => {
     const sm = makeMachine();
     const result = await sm.send(EVENTS.START, { epoch: 1 });
-    t.alike(result, { prev: STATES.IDLE, next: STATES.RUNNING, context: { epoch: 1 } });
+    t.is(result.machine, sm);
+    t.alike(
+        result,
+        { machine: sm, prev: STATES.IDLE, next: STATES.RUNNING, context: { epoch: 1 } }
+    );
 });
 
 test('send merges payload into context', async t => {
@@ -126,6 +124,47 @@ test('send does not change state on invalid event', async t => {
     const sm = makeMachine();
     await sm.send(EVENTS.FINISH);
     t.is(sm.state, STATES.IDLE);
+});
+
+test('send does not start a transition while closing or closed', async t => {
+    let handlerCalled = false;
+    const sm = new StateMachine(makeTransitions(), STATES.IDLE, STATES.IDLE, {
+        [STATES.RUNNING]: async () => { handlerCalled = true; },
+    });
+
+    const closing = sm.close();
+    t.is(await sm.send(EVENTS.START), false);
+    t.is(sm.state, STATES.IDLE);
+    t.absent(handlerCalled);
+
+    await closing;
+    t.is(await sm.send(EVENTS.START), false);
+});
+
+test('send does not dispatch the target handler when closing starts during event emission', async t => {
+    let handlerCalled = false;
+    const sm = new StateMachine(makeTransitions(), STATES.IDLE, STATES.IDLE, {
+        [STATES.RUNNING]: async () => { handlerCalled = true; },
+    });
+    sm.on(EVENTS.START, () => sm.close());
+
+    t.is(await sm.send(EVENTS.START), false);
+    t.is(sm.state, STATES.RUNNING);
+    t.absent(handlerCalled);
+});
+
+test('enter does not dispatch the initial handler while closing or closed', async t => {
+    let handlerCalled = false;
+    const sm = new StateMachine(makeTransitions(), STATES.IDLE, STATES.IDLE, {
+        [STATES.IDLE]: async () => { handlerCalled = true; },
+    });
+
+    const closing = sm.close();
+    t.is(await sm.enter(), false);
+    t.absent(handlerCalled);
+
+    await closing;
+    t.is(await sm.enter(), false);
 });
 
 // --- discardState ---
