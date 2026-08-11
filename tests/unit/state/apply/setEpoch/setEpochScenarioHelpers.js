@@ -7,7 +7,7 @@ import { deriveIndexerSequenceState, eventFlush } from '../../../../helpers/auto
 import { applyStateMessageFactory } from '../../../../../src/messages/state/applyStateMessageFactory.js';
 import { consensusMessageFactory } from '../../../../../src/messages/consensus/v1/consensusMessageFactory.js';
 import {
-    safeDecodeApplyOperation,
+    unsafeDecodeApplyOperation,
     encodeApplyOperation
 } from '../../../../../src/codecs/apply/applyOperationCodec.js';
 import {
@@ -182,5 +182,5 @@ export async function buildSetEpochPayload(context, {
 }
 
 export function decodeSetEpochPayload(payload) {
-    return safeDecodeApplyOperation(payload);
+    return unsafeDecodeApplyOperation(payload);
 }
