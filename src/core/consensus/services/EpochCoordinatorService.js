@@ -58,8 +58,7 @@ class EpochCoordinatorService extends SchedulableService {
             return false;
         }
 
-        const started = super.start(this.#intervalMs);
-        return started;
+        return super.start(this.#intervalMs);
     }
 
     async stop(waitForCurrent = true) {
