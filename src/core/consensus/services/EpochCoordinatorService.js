@@ -96,9 +96,9 @@ class EpochCoordinatorService extends SchedulableService {
 
     async #handleLoadEpochContext(_context, machine) {
         // "snapshot"
-        const currentEpoch = await this.#state.getCurrentEpoch();
-        const currentEpochHash = await this.#state.getEpoch(currentEpoch);
-        const { vdfDifficulty, vdfDiscriminantSize } = await this.#state.getSignedVDFParams();
+        const currentEpoch = await this.#state.requireCurrentEpoch();
+        const currentEpochHash = await this.#state.requireEpoch(currentEpoch);
+        const { vdfDifficulty, vdfDiscriminantSize } = await this.#state.requireSignedVDFParams();
         const quorum = await this.#getQuorum();
 
         machine.appendContext({ currentEpoch, currentEpochHash, vdfDifficulty, vdfDiscriminantSize, quorum });
@@ -256,9 +256,9 @@ class EpochCoordinatorService extends SchedulableService {
     }
 
     async #handleReloadSignedContext(_context, machine) {
-        const currentEpoch = await this.#state.getCurrentEpoch();
-        const currentEpochHash = await this.#state.getEpoch(currentEpoch);
-        const { vdfDifficulty, vdfDiscriminantSize } = await this.#state.getSignedVDFParams();
+        const currentEpoch = await this.#state.requireCurrentEpoch();
+        const currentEpochHash = await this.#state.requireEpoch(currentEpoch);
+        const { vdfDifficulty, vdfDiscriminantSize } = await this.#state.requireSignedVDFParams();
         const quorum = await this.#getQuorum();
         machine.appendContext({
             currentEpoch,

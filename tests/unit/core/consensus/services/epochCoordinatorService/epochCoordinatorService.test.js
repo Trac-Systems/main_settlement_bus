@@ -26,7 +26,7 @@ const CONFIG = Object.freeze({
 
 function makeState(overrides = {}) {
     const listeners = new Map();
-    return {
+    const state = {
         on: sinon.stub().callsFake((event, fn) => {
             if (!listeners.has(event)) listeners.set(event, []);
             listeners.get(event).push(fn);
@@ -48,6 +48,33 @@ function makeState(overrides = {}) {
         getSignedVDFParams: sinon.stub().resolves({ vdfDifficulty: 100, vdfDiscriminantSize: 2048 }),
         ...overrides,
     };
+
+    // Mirrors State's real requireX()-wraps-getX()-and-throws-on-null semantics, so overriding
+    // getCurrentEpoch/getEpoch/getSignedVDFParams above also drives these consistently instead
+    // of needing every test to stub both the plain and throwing variants separately.
+    state.requireCurrentEpoch = async () => {
+        const epoch = await state.getCurrentEpoch();
+        if (epoch === null || epoch === undefined) {
+            throw new Error('Current epoch is not initialized. Genesis epoch has not been set.');
+        }
+        return epoch;
+    };
+    state.requireEpoch = async (count) => {
+        const epochHash = await state.getEpoch(count);
+        if (epochHash === null || epochHash === undefined) {
+            throw new Error(`Cannot read epoch ${count}: epoch is not initialized or does not exist.`);
+        }
+        return epochHash;
+    };
+    state.requireSignedVDFParams = async () => {
+        const params = await state.getSignedVDFParams();
+        if (params === null || params === undefined) {
+            throw new Error('VDF parameters are not initialized.');
+        }
+        return params;
+    };
+
+    return state;
 }
 
 const makeConfirmation = () => ({ signature: b4a.alloc(64, 0xbb), approver: b4a.alloc(21, 0x01) });
