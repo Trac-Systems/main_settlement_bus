@@ -265,6 +265,17 @@ test('ConnectionManager', () => {
             t.absent(validatorConnectionManager.connected(data.key), 'validator should be removed from the pool')
             t.is(data.connection.end.callCount, 0, 'socket should remain open for in-flight responses')
         })
+
+        test('does not remove a newer connection when a stale, already-replaced connection is passed', async t => {
+            reset()
+            const data = createConnection(testKeyPair5.publicKey)
+            const validatorConnectionManager = makeManager(6, [data])
+            const staleConnection = createConnection(testKeyPair5.publicKey).connection
+
+            validatorConnectionManager.remove(data.key, staleConnection)
+
+            t.ok(validatorConnectionManager.connected(data.key), 'current connection should remain registered')
+        })
     })
 
     test('on close', async () => {

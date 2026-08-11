@@ -92,9 +92,11 @@ class ValidatorConnectionManager extends PeerConnectionManager {
         }
     }
 
-    remove(publicKey) {
+    remove(publicKey, connection = null) {
         const publicKeyHex = this._toHexString(publicKey);
-        if (!this.exists(publicKeyHex)) return;
+        const entry = this._connections.get(publicKeyHex);
+        if (!entry) return;
+        if (connection && entry.connection !== connection) return;
 
         this.#stopHealthCheck(publicKeyHex);
         this._connections.delete(publicKeyHex);
