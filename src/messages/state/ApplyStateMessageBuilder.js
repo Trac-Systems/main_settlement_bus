@@ -2,26 +2,22 @@ import b4a from 'b4a';
 import tracCryptoApi from 'trac-crypto-api';
 
 import { createMessage, toHex } from '../../utils/buffer.js';
-import {
-    OperationType,
-    VDF_DIFFICULTY_SIZE,
-    VDF_DISCRIMINANT_SIZE
-} from '../../utils/constants.js';
+import { OperationType } from '../../utils/constants.js';
 import { addressToBuffer, bufferToAddress } from '../../core/state/utils/address.js';
 import { isAddressValid } from "../../core/state/utils/address.js";
 import {
     isAdminControl,
     isBalanceInitialization,
     isBootstrapDeployment,
+    isConsensusControl,
     isCoreAdmin,
     isRoleAccess,
     isSetEpoch,
-    isSetGenesisEpoch,
-    isSetVdfParams,
     isTransaction,
     isTransfer,
     operationToPayload
 } from '../../utils/applyOperations.js';
+import { decodeConsensusConfig } from '../../codecs/apply/applyOperationCodec.js';
 import { isHexString } from '../../utils/helpers.js';
 
 // Single use per transaction: reuse of this instance needs mutex/queue or fail-fast and can delay validation or break validation rule.
@@ -40,6 +36,8 @@ class ApplyStateMessageBuilder {
     #channel;
     #contentHash;
     #config;
+    #consensusConfig;
+    #encodedConsensusConfig;
     #externalBootstrap;
     #incomingAddress;
     #incomingNonce;
@@ -54,8 +52,6 @@ class ApplyStateMessageBuilder {
     #proofData;
     #txHash;
     #txValidity;
-    #vdfDifficulty;
-    #vdfDiscriminantSize;
     #wallet;
     #writingKey;
 
@@ -186,13 +182,9 @@ class ApplyStateMessageBuilder {
         return this;
     }
 
-    setVdfDifficulty(vdfDifficulty) {
-        this.#vdfDifficulty = this.#normalizeHexBuffer(vdfDifficulty, VDF_DIFFICULTY_SIZE, 'VDF difficulty');
-        return this;
-    }
-
-    setVdfDiscriminantSize(vdfDiscriminantSize) {
-        this.#vdfDiscriminantSize = this.#normalizeHexBuffer(vdfDiscriminantSize, VDF_DISCRIMINANT_SIZE, 'VDF discriminant size');
+    setConsensusConfig(encodedConsensusConfig) {
+        this.#consensusConfig = decodeConsensusConfig(encodedConsensusConfig);
+        this.#encodedConsensusConfig = encodedConsensusConfig;
         return this;
     }
 
@@ -567,29 +559,15 @@ class ApplyStateMessageBuilder {
                 );
                 break;
             case OperationType.SET_GENESIS_EPOCH:
+            case OperationType.SET_CONSENSUS_CONFIG:
                 this.#requireFields([
                     [this.#txValidity, 'Transaction validity'],
-                    [this.#vdfDifficulty, 'Difficulty'],
-                    [this.#vdfDiscriminantSize, 'Discriminant size']
+                    [this.#encodedConsensusConfig, 'Consensus config']
                 ]);
                 msg = createMessage(
                     this.#config.networkId,
                     this.#txValidity,
-                    this.#vdfDifficulty,
-                    this.#vdfDiscriminantSize,
-                    nonce,
-                    this.#operationType
-                );
-                break;
-            case OperationType.SET_VDF_PARAMS:
-                this.#requireFields([
-                    [this.#txValidity, 'Transaction validity'],
-                    [this.#vdfDifficulty, 'Difficulty']
-                ]);
-                msg = createMessage(
-                    this.#config.networkId,
-                    this.#txValidity,
-                    this.#vdfDifficulty,
+                    this.#encodedConsensusConfig,
                     nonce,
                     this.#operationType
                 );
@@ -683,21 +661,11 @@ class ApplyStateMessageBuilder {
                 is: signature
             };
         }
-        if (isSetGenesisEpoch(this.#operationType)) {
+        if (isConsensusControl(this.#operationType)) {
             return {
                 tx,
                 txv: this.#txValidity,
-                df: this.#vdfDifficulty,
-                db: this.#vdfDiscriminantSize,
-                in: nonce,
-                is: signature
-            };
-        }
-        if (isSetVdfParams(this.#operationType)) {
-            return {
-                tx,
-                txv: this.#txValidity,
-                df: this.#vdfDifficulty,
+                cc: this.#consensusConfig,
                 in: nonce,
                 is: signature
             };

@@ -124,7 +124,7 @@ async function mutateAmountSignature(t, validPayload) {
 }
 
 function findSignatureParent(payload) {
-    const signatureParents = ['cao', 'bio', 'aco', 'tro', 'rao', 'bdo', 'txo'];
+    const signatureParents = ['cao', 'bio', 'aco', 'tro', 'rao', 'bdo', 'txo', 'cco'];
     for (const key of signatureParents) {
         const parent = payload[key];
         if (parent?.is) {

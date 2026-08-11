@@ -1,8 +1,10 @@
 import b4a from 'b4a';
 
-import { MIN_SAFE_VALIDATION_INTEGER, MAX_SAFE_VALIDATION_INTEGER } from '../../../../src/utils/constants.js';
 import { partial_operation_value_type } from "../../../fixtures/check.fixtures.js";
 import { config } from '../../../helpers/config.js';
+
+export const MIN_SAFE_VALIDATION_INTEGER = 0x00000001;
+export const MAX_SAFE_VALIDATION_INTEGER = 0xFFFFFFFF;
 
 export function topLevelValidationTests(
     t,

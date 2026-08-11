@@ -5,8 +5,10 @@ import { default as test } from 'brittle';
 async function runTests() {
     test.pause();
     await import('./applyOperationCodec.test.js');
+    await import('./consensusConfigCodec.test.js');
     await import('./networkV1OperationCodec.test.js');
     await import('./consensusV1OperationCodec.test.js');
+    await import('./vdfConfigCodec.test.js');
     test.resume();
 }
 

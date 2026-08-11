@@ -54,15 +54,10 @@ const isSetEpoch = type => {
     ].includes(type);
 }
 
-const isSetGenesisEpoch = type => {
+const isConsensusControl = type => {
     return [
-        OperationType.SET_GENESIS_EPOCH
-    ].includes(type);
-}
-
-const isSetVdfParams = type => {
-    return [
-        OperationType.SET_VDF_PARAMS
+        OperationType.SET_GENESIS_EPOCH,
+        OperationType.SET_CONSENSUS_CONFIG
     ].includes(type);
 }
 
@@ -101,12 +96,8 @@ const operationToPayload = type => {
             jsonPath: 'seo'
         },
         {
-            condition: isSetGenesisEpoch,
-            jsonPath: 'sgo'
-        },
-        {
-            condition: isSetVdfParams,
-            jsonPath: 'vpo'
+            condition: isConsensusControl,
+            jsonPath: 'cco'
         }
     ]
     const match = fromTo.find(entry => !!entry.condition(type))
@@ -123,6 +114,5 @@ export {
     isTransfer,
     isBalanceInitialization,
     isSetEpoch,
-    isSetGenesisEpoch,
-    isSetVdfParams
+    isConsensusControl
 }

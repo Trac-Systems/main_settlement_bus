@@ -22,7 +22,10 @@ export const EntryType = Object.freeze({
     EPOCH_CURRENT: '/epoch/current',
     EPOCH: `/epoch/`,              // Epoch hashes are stored under `/epoch/<n>`
     EPOCH_HASH: `/epochHash/`,     // Epoch proof payloads are stored under `/epochHash/<epochHashHex>`
-    VDF_PARAMS: '/parameters/vdf'
+    VDF_PARAMS: '/parameters/vdf', // TODO: DELETE
+    CONSENSUS_CONFIG_CURRENT: '/consensus/config/current',
+    CONSENSUS_CONFIG_RECORD: '/consensus/config/record/',
+
 });
 
 //ATTENTION - THIS IS USED IN THE APPLY FUNCTION!
@@ -42,7 +45,7 @@ export const OperationType = Object.freeze({
     TRANSFER: ApplyOperationType.TRANSFER,
     SET_EPOCH: ApplyOperationType.SET_EPOCH,
     SET_GENESIS_EPOCH: ApplyOperationType.SET_GENESIS_EPOCH,
-    SET_VDF_PARAMS: ApplyOperationType.SET_VDF_PARAMS,
+    SET_CONSENSUS_CONFIG: ApplyOperationType.SET_CONSENSUS_CONFIG,
 });
 
 export const NetworkOperationType = Object.freeze({
@@ -200,6 +203,7 @@ export const HYPERBEE_VALUE_ENCODING = 'binary';
 // StateValidationSchema.js
 
 //ATTENTION - THIS IS USED IN THE APPLY FUNCTION!
+// Apply schema validation
 export const PUBLIC_KEY_LENGTH = 32
 export const WRITER_BYTE_LENGTH = 32;
 export const BOOTSTRAP_BYTE_LENGTH = 32;
@@ -210,10 +214,8 @@ export const BALANCE_BYTE_LENGTH = 16;
 export const SIGNATURE_BYTE_LENGTH = 64;
 export const PEER_PUBLIC_KEY_HEX_LENGTH = 64;
 export const AMOUNT_BYTE_LENGTH = 16;
-export const MIN_SAFE_VALIDATION_INTEGER = 0x00000001;
-export const MAX_SAFE_VALIDATION_INTEGER = 0xFFFFFFFF;
-
-export const LICENSE_BYTE_LENGTH = 4;
+export const UINT16_MAX = 0xFFFF;
+export const UINT32_MAX = 0xFFFFFFFF;
 
 // consensus
 export const PROTOCOL_VERSION_BYTE_LENGTH = 1; // 1 BYTE 0-255
@@ -222,6 +224,12 @@ export const EPOCH_BYTE_LENGTH = 8; // 8 BYTES - UINT64
 export const VDF_BLOB_PROOF_SIZE = 516;
 export const VDF_DIFFICULTY_SIZE = 4; // 4 BYTES - UINT32
 export const VDF_DISCRIMINANT_SIZE = 2; // 2 BYTES - UINT16
+export const MAX_VDF_DIFFICULTY = UINT32_MAX;
+export const MAX_VDF_DISCRIMINANT_BIT_SIZE = UINT16_MAX;
+export const CONSENSUS_CONFIG_SCHEMA_VERSION_BYTE_LENGTH = 1;
+export const CONSENSUS_CONFIG_DATA_MAX_SIZE = 3072; // 3 KiB
+
+export const LICENSE_BYTE_LENGTH = 4;
 
 // index.js
 export const BOOTSTRAP_HEXSTRING_LENGTH = 64;

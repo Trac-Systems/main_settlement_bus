@@ -1,7 +1,12 @@
 import { randomBytes } from "hypercore-crypto";
+import _ from "lodash";
 import { Handlers } from "./handlers.js";
 import { isHexString } from "../src/utils/helpers.js";
 import { bigIntToDecimalString } from "../src/utils/amountSerialization.js";
+import {
+    MAX_VDF_DIFFICULTY,
+    MAX_VDF_DISCRIMINANT_BIT_SIZE
+} from "../src/utils/constants.js";
 
 export const COMMANDS = {
     HELP: "/help",
@@ -39,6 +44,7 @@ export const COMMANDS = {
     GET_TX_DETAILS: "/get_tx_details",
     GET_EXTENDED_TX_DETAILS: "/get_extended_tx_details",
     EPOCH_GENESIS_INITIALIZATION: "/init_genesis",
+    SET_CONSENSUS_CONFIG: "/set_consensus_config",
     SET_VDF_PARAMS: "/set_vdf_params"
 };
 
@@ -49,6 +55,7 @@ export class CommandHandler {
     #handlers;
     #pendingConfirmation = null;
     #pendingGenesisInitialization = null;
+    #pendingSetConsensusConfig = null;
     #pendingSetVdfParams = null;
 
     constructor({ config, msb, handleClose, wallet }) {
@@ -65,6 +72,10 @@ export class CommandHandler {
 
         if (this.#pendingGenesisInitialization !== null) {
             return this.#handlePendingGenesisInitialization(input);
+        }
+
+        if (this.#pendingSetConsensusConfig !== null) {
+            return this.#handlePendingSetConsensusConfig(input);
         }
 
         if (this.#pendingSetVdfParams !== null) {
@@ -238,7 +249,11 @@ export class CommandHandler {
                 process: async () => this.#queueEpochGenesisInitialization()
             },
             {
-                evaluate: ({ input }) => input.startsWith(COMMANDS.SET_VDF_PARAMS),
+                evaluate: ({ command }) => command === COMMANDS.SET_CONSENSUS_CONFIG,
+                process: async () => this.#queueSetConsensusConfig()
+            },
+            {
+                evaluate: ({ command }) => command === COMMANDS.SET_VDF_PARAMS,
                 process: async () => this.#queueSetVdfParams()
             }
         ];
@@ -308,7 +323,7 @@ export class CommandHandler {
         const pendingGenesisInitialization = this.#pendingGenesisInitialization;
 
         if (pendingGenesisInitialization.step === "difficulty") {
-            const difficulty = this.#parseGenesisEpochInteger(input);
+            const difficulty = this.#parsePositiveInteger(input, BigInt(MAX_VDF_DIFFICULTY));
             if (!difficulty) {
                 console.log("Invalid difficulty. Please enter a positive integer (example 55_000_000).");
                 console.log(this.#getGenesisDifficultyPrompt());
@@ -321,7 +336,7 @@ export class CommandHandler {
             return;
         }
 
-        const discriminantBitSize = this.#parseGenesisEpochInteger(input);
+        const discriminantBitSize = this.#parsePositiveInteger(input, BigInt(MAX_VDF_DISCRIMINANT_BIT_SIZE));
         if (!discriminantBitSize) {
             console.log("Invalid discriminant bit size. Please enter a positive integer (example 2048).");
             console.log(this.#getGenesisDiscriminantBitSizePrompt());
@@ -338,9 +353,12 @@ export class CommandHandler {
     }
 
     #queueEpochGenesisConfirmation({ difficulty, discriminantBitSize }) {
-        const params = {
-            vdfDifficulty: difficulty.value,
-            vdfDiscriminantSize: discriminantBitSize.value
+        const consensusConfig = {
+            schemaVersion: 1,
+            configData: {
+                difficulty: Number(difficulty.value),
+                discriminantBitSize: Number(discriminantBitSize.value)
+            }
         };
 
         console.info("Genesis Epoch Initialization Parameters:");
@@ -351,15 +369,52 @@ export class CommandHandler {
             prompt: "Do you want to proceed? (yes/no)",
             invalidMessage: 'Invalid input. Please answer "yes" or "no".',
             failureMessage: "Genesis epoch initialization failed",
-            onConfirm: async () => this.#handlers.handleEpochGenesisInitialization(params),
+            onConfirm: async () => this.#handlers.handleEpochGenesisInitialization(consensusConfig),
             onDecline: async () => console.log("Genesis epoch initialization cancelled.")
         };
 
         console.log(this.#pendingConfirmation.prompt);
     }
 
-    #parseGenesisEpochInteger(input) {
-        return this.#parsePositiveInteger(input);
+    #queueSetConsensusConfig() {
+        this.#pendingSetConsensusConfig = {};
+
+        console.log(this.#getSetConsensusConfigPrompt());
+    }
+
+    #handlePendingSetConsensusConfig(input) {
+        if (input.trim().toLowerCase() === "/cancel") {
+            this.#pendingSetConsensusConfig = null;
+            console.log("Consensus config update cancelled.");
+            return;
+        }
+
+        const consensusConfig = this.#parseConsensusConfig(input);
+        if (!consensusConfig) {
+            console.log(
+                'Invalid consensus config. Please enter a JSON object containing only "schemaVersion" and "configData".'
+            );
+            console.log(this.#getSetConsensusConfigPrompt());
+            return;
+        }
+
+        this.#pendingSetConsensusConfig = null;
+        return this.#queueSetConsensusConfigConfirmation(consensusConfig);
+    }
+
+    #queueSetConsensusConfigConfirmation(consensusConfig) {
+        console.info("Consensus Config Update:");
+        console.info(JSON.stringify(consensusConfig, null, 2));
+
+        this.#pendingConfirmation = {
+            prompt: "Do you want to proceed? (yes/no)",
+            invalidMessage: 'Invalid input. Please answer "yes" or "no".',
+            failureMessage: "Consensus config update failed",
+            onConfirm: async () => this.#handlers.handleSetConsensusConfig(consensusConfig),
+            onDecline: async () => console.log("Consensus config update cancelled.")
+        };
+
+        console.log(this.#pendingConfirmation.prompt);
     }
 
     #queueSetVdfParams() {
@@ -371,44 +426,98 @@ export class CommandHandler {
     }
 
     #handlePendingSetVdfParams(input) {
-        const difficulty = this.#parsePositiveInteger(input);
-        if (!difficulty) {
-            console.log("Invalid difficulty. Please enter a positive integer (example 55_000_000).");
-            console.log(this.#getSetVdfParamsDifficultyPrompt());
+        if (input.trim().toLowerCase() === "/cancel") {
+            this.#pendingSetVdfParams = null;
+            console.log("VDF params update cancelled.");
             return;
         }
 
+        const pendingSetVdfParams = this.#pendingSetVdfParams;
+
+        if (pendingSetVdfParams.step === "difficulty") {
+            const difficulty = this.#parsePositiveInteger(input, BigInt(MAX_VDF_DIFFICULTY));
+            if (!difficulty) {
+                console.log(
+                    "Invalid difficulty. Please enter an integer between 1 and 4_294_967_295."
+                );
+                console.log(this.#getSetVdfParamsDifficultyPrompt());
+                return;
+            }
+
+            pendingSetVdfParams.difficulty = difficulty;
+            pendingSetVdfParams.step = "discriminantBitSize";
+            console.log(this.#getSetVdfParamsDiscriminantBitSizePrompt());
+            return;
+        }
+
+        const discriminantBitSize = this.#parsePositiveInteger(input, BigInt(MAX_VDF_DISCRIMINANT_BIT_SIZE));
+        if (!discriminantBitSize) {
+            console.log(
+                "Invalid discriminant bit size. Please enter an integer between 1 and 65_535."
+            );
+            console.log(this.#getSetVdfParamsDiscriminantBitSizePrompt());
+            return;
+        }
+
+        const difficulty = pendingSetVdfParams.difficulty;
         this.#pendingSetVdfParams = null;
-        return this.#queueSetVdfParamsConfirmation({ difficulty });
+        return this.#queueSetVdfParamsConfirmation({
+            difficulty,
+            discriminantBitSize
+        });
     }
 
-    #queueSetVdfParamsConfirmation({ difficulty }) {
-        const params = {
-            vdfDifficulty: difficulty.value
+    #queueSetVdfParamsConfirmation({ difficulty, discriminantBitSize }) {
+        const consensusConfig = {
+            schemaVersion: 1,
+            configData: {
+                difficulty: Number(difficulty.value),
+                discriminantBitSize: Number(discriminantBitSize.value)
+            }
         };
 
         console.info("VDF Params Update:");
         console.info(`VDF difficulty: ${difficulty.display}`);
+        console.info(`VDF discriminant bit size: ${discriminantBitSize.display}`);
 
         this.#pendingConfirmation = {
             prompt: "Do you want to proceed? (yes/no)",
             invalidMessage: 'Invalid input. Please answer "yes" or "no".',
             failureMessage: "VDF params update failed",
-            onConfirm: async () => this.#handlers.handleSetVdfParams(params),
+            onConfirm: async () => this.#handlers.handleSetConsensusConfig(consensusConfig),
             onDecline: async () => console.log("VDF params update cancelled.")
         };
 
         console.log(this.#pendingConfirmation.prompt);
     }
 
-    #parsePositiveInteger(input) {
+    #parseConsensusConfig(input) {
+        try {
+            const parsed = JSON.parse(input);
+            if (
+                !_.isPlainObject(parsed) ||
+                Object.keys(parsed).length !== 2 ||
+                !Object.hasOwn(parsed, "schemaVersion") ||
+                !Object.hasOwn(parsed, "configData")
+            ) {
+                return null;
+            }
+
+            return parsed;
+        } catch {
+            return null;
+        }
+    }
+
+    #parsePositiveInteger(input, maximum = null) {
         const display = input.trim();
         if (!/^[0-9]+(?:_[0-9]+)*$/.test(display)) {
             return null;
         }
 
         const value = display.replaceAll("_", "");
-        if (BigInt(value) <= 0n) {
+        const integer = BigInt(value);
+        if (integer <= 0n || (maximum !== null && integer > maximum)) {
             return null;
         }
 
@@ -423,7 +532,15 @@ export class CommandHandler {
         return "Set VDF discriminant bit size (example 2048):";
     }
 
+    #getSetConsensusConfigPrompt() {
+        return 'Set consensus config as JSON, or enter /cancel (example {"schemaVersion":1,"configData":{"difficulty":60000000,"discriminantBitSize":2048}}):';
+    }
+
     #getSetVdfParamsDifficultyPrompt() {
         return "Set new VDF difficulty (example 55_000_000):";
+    }
+
+    #getSetVdfParamsDiscriminantBitSizePrompt() {
+        return "Set new VDF discriminant bit size (example 2048):";
     }
 }

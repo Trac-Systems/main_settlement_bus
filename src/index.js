@@ -2,6 +2,7 @@ import ReadyResource from "ready-resource";
 import Corestore from "corestore";
 import tracCryptoApi from "trac-crypto-api";
 import b4a from "b4a";
+import _ from "lodash";
 import { sleep, isHexString } from "./utils/helpers.js";
 import { applyStateMessageFactory } from "./messages/state/applyStateMessageFactory.js";
 import { isAddressValid } from "./core/state/utils/address.js";
@@ -12,7 +13,9 @@ import {
     BOOTSTRAP_HEXSTRING_LENGTH,
     BALANCE_MIGRATION_SLEEP_INTERVAL,
     WHITELIST_MIGRATION_DIR,
-    OperationType
+    OperationType,
+    MAX_VDF_DIFFICULTY,
+    MAX_VDF_DISCRIMINANT_BIT_SIZE
 } from "./utils/constants.js";
 import { decimalStringToBigInt, bigIntTo16ByteBuffer, bufferToBigInt, bigIntToDecimalString } from "./utils/amountSerialization.js"
 import {
@@ -24,13 +27,15 @@ import fileUtils from './utils/fileUtils.js';
 import migrationUtils from './utils/migrationUtils.js';
 import {
     encodeApplyOperation,
+    encodeConsensusConfig,
     safeDecodeApplyOperation,
     safeEncodeApplyOperation
 } from "./codecs/apply/applyOperationCodec.js";
+import { encodeVdfConfig } from "./codecs/consensus/v1/vdfConfigCodec.js";
 import PartialTransactionValidator from "./core/network/protocols/shared/validators/PartialTransactionValidator.js";
 import PartialTransferValidator from "./core/network/protocols/shared/validators/PartialTransferValidator.js";
 import { BroadcastError, ValidationError } from "./utils/errors.js";
-import { uint16ToBuffer, uint32ToBuffer } from "./utils/buffer.js";
+import { uint8ToBuffer, uint16ToBuffer, uint32ToBuffer } from "./utils/buffer.js";
 
 export class MainSettlementBus extends ReadyResource {
     #store;
@@ -292,7 +297,8 @@ export class MainSettlementBus extends ReadyResource {
             console.log("- /remove_indexer <address>: Change a role of the selected indexer node to default role. Charges a fee.");
             console.log("- /ban_writer <address>: Demote a whitelisted writer to default role and remove it from the whitelist. Charges a fee.");
             console.log("- /init_genesis: Initialize genesis epoch.");
-            console.log("- /set_vdf_params: Update VDF difficulty.");
+            console.log("- /set_consensus_config: Set new configuration data for a specific consensus schema version from JSON.");
+            console.log("- /set_vdf_params: Update VDF difficulty and discriminant bit size.");
         }
         console.log("Available commands:");
         console.log("- /add_writer: Add yourself as a validator to this MSB once whitelisted. Requires a fee + 10x the fee as a stake in $TNK.");
@@ -707,45 +713,45 @@ export class MainSettlementBus extends ReadyResource {
         }
     }
 
-    async banValidator(addresstToBan) {
+    async banValidator(addressToBan) {
         if (!this.#config.enableWallet) {
             throw new Error(
-                `Can not ban writer with address: ${addresstToBan} - wallet is not enabled.`
+                `Can not ban writer with address: ${addressToBan} - wallet is not enabled.`
             );
         }
         const adminEntry = await this.#state.getAdminEntry();
 
         if (!adminEntry) {
             throw new Error(
-                `Can not ban writer with address: ${addresstToBan} - admin entry has not been initialized.`
+                `Can not ban writer with address: ${addressToBan} - admin entry has not been initialized.`
             );
         }
 
-        if (!isAddressValid(addresstToBan, this.#config.addressPrefix)) {
+        if (!isAddressValid(addressToBan, this.#config.addressPrefix)) {
             throw new Error(
-                `Can not ban writer with address:  ${addresstToBan} - invalid address.`
+                `Can not ban writer with address:  ${addressToBan} - invalid address.`
             );
         }
 
         if (!this.isAdmin(adminEntry)) {
             throw new Error(
-                `Can not ban writer with address: ${addresstToBan} - You are not an admin.`
+                `Can not ban writer with address: ${addressToBan} - You are not an admin.`
             );
         }
 
-        const isWhitelisted = await this.#state.isAddressWhitelisted(addresstToBan);
-        const nodeEntry = await this.#state.getNodeEntry(addresstToBan);
+        const isWhitelisted = await this.#state.isAddressWhitelisted(addressToBan);
+        const nodeEntry = await this.#state.getNodeEntry(addressToBan);
 
         if (!isWhitelisted || null === nodeEntry || nodeEntry.isIndexer === true) {
             throw new Error(
-                `Can not ban writer with address: ${addresstToBan} - node is not whitelisted or is an indexer.`
+                `Can not ban writer with address: ${addressToBan} - node is not whitelisted or is an indexer.`
             );
         }
         const txValidity = await this.#state.getIndexerSequenceState();
         const assembledBanValidatorMessage = await applyStateMessageFactory(this.#wallet, this.#config)
             .buildCompleteBanWriterMessage(
                 this.#wallet.address,
-                addresstToBan,
+                addressToBan,
                 txValidity,
             )
         const encodedPayload = safeEncodeApplyOperation(assembledBanValidatorMessage)
@@ -1062,7 +1068,7 @@ export class MainSettlementBus extends ReadyResource {
         await this.#state.append(encodedPayload);
     }
 
-    async handleEpochGenesisInitialization(params) {
+    async handleEpochGenesisInitialization(consensusConfig) {
         if (!this.#config.enableWallet) {
             throw new Error("Can not initialize genesis epoch - wallet is not enabled.");
         }
@@ -1081,72 +1087,129 @@ export class MainSettlementBus extends ReadyResource {
             throw new Error("Can not initialize genesis epoch - you are not the admin.");
         }
 
-        const existingVDFParams = await this.#state.getSignedVDFParams();
-        if (existingVDFParams) {
-            throw new Error("Can not initialize genesis epoch - VDF parameters already exist.");
+        const existingConsensusConfig = await this.#state.getSignedConsensusConfig();
+        if (existingConsensusConfig) {
+            throw new Error("Can not initialize genesis epoch - consensus config already exists.");
         }
 
-        const { vdfDifficulty, vdfDiscriminantSize } = params;
-        const difficultyNumber = Number(vdfDifficulty);
-        const discriminantNumber = Number(vdfDiscriminantSize);
-
-        if (!Number.isInteger(difficultyNumber) || difficultyNumber <= 0) {
-            throw new Error("VDF difficulty must be a positive unsigned 32-bit integer.");
-        }
-        if (!Number.isInteger(discriminantNumber) || discriminantNumber <= 0) {
-            throw new Error("VDF discriminant size must be a positive unsigned 16-bit integer.");
-        }
-
-        const vdfDifficultyBuffer = uint32ToBuffer(difficultyNumber);
-        const vdfDiscriminantSizeBuffer = uint16ToBuffer(discriminantNumber);
+        const encodedConsensusConfig = this.#validateAndEncodeConsensusConfig(consensusConfig);
 
         const txValidity = await this.#state.getIndexerSequenceState();
         const payload = await applyStateMessageFactory(this.#wallet, this.#config)
             .buildCompleteSetGenesisEpochMessage(
                 this.#wallet.address,
                 txValidity,
-                vdfDifficultyBuffer,
-                vdfDiscriminantSizeBuffer,
+                encodedConsensusConfig,
             )
         const encodedPayload = encodeApplyOperation(payload);
         await this.#state.append(encodedPayload);
     }
 
-    async handleSetVdfParams(params) {
+    async handleSetConsensusConfig(consensusConfig) {
         if (!this.#config.enableWallet) {
-            throw new Error("Can not set VDF params - wallet is not enabled.");
+            throw new Error("Can not set consensus config - wallet is not enabled.");
         }
 
         const adminEntry = await this.#state.getAdminEntry();
 
         if (!adminEntry) {
-            throw new Error("Can not set VDF params - admin has not been initialized.");
+            throw new Error("Can not set consensus config - admin has not been initialized.");
         }
         if (!this.#wallet) {
-            throw new Error("Can not set VDF params - wallet is not initialized.");
+            throw new Error("Can not set consensus config - wallet is not initialized.");
         }
         if (!this.isAdmin(adminEntry)) {
-            throw new Error("Can not set VDF params - you are not the admin.");
+            throw new Error("Can not set consensus config - you are not the admin.");
         }
 
-        await this.#state.requireSignedVDFParams();
-
-        const difficultyNumber = Number(params.vdfDifficulty);
-        if (!Number.isInteger(difficultyNumber) || difficultyNumber <= 0) {
-            throw new Error("VDF difficulty must be a positive unsigned 32-bit integer.");
-        }
-
-        const vdfDifficultyBuffer = uint32ToBuffer(difficultyNumber);
+        const encodedConsensusConfig = this.#validateAndEncodeConsensusConfig(consensusConfig);
 
         const txValidity = await this.#state.getIndexerSequenceState();
         const payload = await applyStateMessageFactory(this.#wallet, this.#config)
-            .buildCompleteSetVdfParamsMessage(
+            .buildCompleteSetConsensusConfigMessage(
                 this.#wallet.address,
                 txValidity,
-                vdfDifficultyBuffer,
+                encodedConsensusConfig
             );
         const encodedPayload = encodeApplyOperation(payload);
         await this.#state.append(encodedPayload);
+    }
+
+    #validateAndEncodeConsensusConfig(consensusConfig) {
+        if (!this.#hasExactKeys(consensusConfig, ["schemaVersion", "configData"])) {
+            throw new Error(
+                "Consensus config must contain only schemaVersion and configData."
+            );
+        }
+
+        const { schemaVersion, configData } = consensusConfig;
+        if (
+            !Number.isInteger(schemaVersion) ||
+            schemaVersion <= 0 ||
+            schemaVersion > 0xFF
+        ) {
+            throw new Error(
+                "Consensus config schemaVersion must be an integer from 1 to 255."
+            );
+        }
+
+        let encodedConfigData;
+        switch (schemaVersion) {
+            case 1:
+                encodedConfigData = this.#encodeConfigDataV1(configData);
+                break;
+            default:
+                throw new Error(
+                    `Unsupported consensus config schema version: ${schemaVersion}.`
+                );
+        }
+
+        return encodeConsensusConfig({
+            sv: uint8ToBuffer(schemaVersion),
+            cd: encodedConfigData
+        });
+    }
+
+    // TODO: REFACTOR - In the future, this function should be extracted into another module.
+    #encodeConfigDataV1(configData) {
+        if (!this.#hasExactKeys(configData, ["difficulty", "discriminantBitSize"])) {
+            throw new Error(
+                "Consensus config schema version 1 configData must contain only difficulty and discriminantBitSize."
+            );
+        }
+
+        if (
+            !Number.isInteger(configData.difficulty) ||
+            configData.difficulty <= 0 ||
+            configData.difficulty > MAX_VDF_DIFFICULTY
+        ) {
+            throw new Error(
+                "VDF difficulty must be a positive unsigned 32-bit integer."
+            );
+        }
+
+        if (
+            !Number.isInteger(configData.discriminantBitSize) ||
+            configData.discriminantBitSize <= 0 ||
+            configData.discriminantBitSize > MAX_VDF_DISCRIMINANT_BIT_SIZE
+        ) {
+            throw new Error(
+                "VDF discriminant bit size must be a positive unsigned 16-bit integer."
+            );
+        }
+
+        return encodeVdfConfig({
+            difficulty: uint32ToBuffer(configData.difficulty),
+            discriminantBitSize: uint16ToBuffer(configData.discriminantBitSize)
+        });
+    }
+
+    #hasExactKeys(value, expectedKeys) {
+        return (
+            _.isPlainObject(value) &&
+            Object.keys(value).length === expectedKeys.length &&
+            expectedKeys.every(key => Object.hasOwn(value, key))
+        );
     }
 }
 

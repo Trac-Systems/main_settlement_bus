@@ -3,7 +3,7 @@ import { isBare } from './stateTestUtils.js';
 
 async function runStateTests() {
     test.pause();
-
+    await import('./StateValidationSchema/stateValidationSchema.test.js');
     await import('./utils/address.test.js');
     await import('./utils/adminEntry.test.js');
     await import('./utils/balance.test.js');
@@ -15,10 +15,9 @@ async function runStateTests() {
     await import('./apply/state.apply.test.js');
     if (!isBare()) {
         await import('./stateAdminValidation.test.js');
-        await import('./vdfParams.test.js');
         await import('./State.test.js');
     }
     test.resume();
 }
 
-runStateTests();
+await runStateTests();

@@ -4,11 +4,8 @@ import { WalletProvider } from 'trac-wallet';
 
 import { applyStateMessageFactory } from '../../../../src/messages/state/applyStateMessageFactory.js';
 import { addressToBuffer } from '../../../../src/core/state/utils/address.js';
-import {
-    OperationType,
-    VDF_DIFFICULTY_SIZE,
-    VDF_DISCRIMINANT_SIZE
-} from '../../../../src/utils/constants.js';
+import { encodeConsensusConfig } from '../../../../src/codecs/apply/applyOperationCodec.js';
+import { OperationType } from '../../../../src/utils/constants.js';
 import { config } from '../../../helpers/config.js';
 import { testKeyPair1 } from '../../../fixtures/apply.fixtures.js';
 import {
@@ -43,51 +40,57 @@ test('ApplyStateMessageDirector builds complete set epoch message', async t => {
 test('ApplyStateMessageDirector builds complete set genesis epoch message', async t => {
     const wallet = await createWallet(testKeyPair1.mnemonic);
     const txValidity = b4a.from('11'.repeat(32), 'hex');
-    const vdfDifficulty = b4a.from('22'.repeat(VDF_DIFFICULTY_SIZE), 'hex');
-    const vdfDiscriminantSize = b4a.from('33'.repeat(VDF_DISCRIMINANT_SIZE), 'hex');
+    const consensusConfig = {
+        sv: b4a.from([0x01]),
+        cd: b4a.from('22'.repeat(6), 'hex')
+    };
+    const encodedConsensusConfig = encodeConsensusConfig(consensusConfig);
 
     const payload = await applyStateMessageFactory(wallet, config)
         .buildCompleteSetGenesisEpochMessage(
             wallet.address,
             txValidity,
-            vdfDifficulty,
-            vdfDiscriminantSize
+            encodedConsensusConfig
         );
 
     t.is(payload.type, OperationType.SET_GENESIS_EPOCH);
     t.ok(b4a.equals(payload.address, addressToBuffer(wallet.address, config.addressPrefix)));
-    t.alike(Object.keys(payload).sort(), ['address', 'sgo', 'type']);
-    t.alike(Object.keys(payload.sgo).sort(), ['db', 'df', 'in', 'is', 'tx', 'txv']);
-    t.ok(b4a.equals(payload.sgo.txv, txValidity));
-    t.ok(b4a.equals(payload.sgo.df, vdfDifficulty));
-    t.ok(b4a.equals(payload.sgo.db, vdfDiscriminantSize));
-    t.is(payload.sgo.tx.length, 32);
-    t.is(payload.sgo.df.length, VDF_DIFFICULTY_SIZE);
-    t.is(payload.sgo.db.length, VDF_DISCRIMINANT_SIZE);
-    t.is(payload.sgo.in.length, 32);
-    t.is(payload.sgo.is.length, 64);
+    t.alike(Object.keys(payload).sort(), ['address', 'cco', 'type']);
+    t.alike(Object.keys(payload.cco).sort(), ['cc', 'in', 'is', 'tx', 'txv']);
+    t.alike(Object.keys(payload.cco.cc).sort(), ['cd', 'sv']);
+    t.ok(b4a.equals(payload.cco.txv, txValidity));
+    t.ok(b4a.equals(payload.cco.cc.sv, consensusConfig.sv));
+    t.ok(b4a.equals(payload.cco.cc.cd, consensusConfig.cd));
+    t.is(payload.cco.tx.length, 32);
+    t.is(payload.cco.in.length, 32);
+    t.is(payload.cco.is.length, 64);
 });
 
-test('ApplyStateMessageDirector builds complete set VDF params message', async t => {
+test('ApplyStateMessageDirector builds complete set consensus config message', async t => {
     const wallet = await createWallet(testKeyPair1.mnemonic);
     const txValidity = b4a.from('44'.repeat(32), 'hex');
-    const vdfDifficulty = b4a.from('55'.repeat(VDF_DIFFICULTY_SIZE), 'hex');
+    const consensusConfig = {
+        sv: b4a.from([0x01]),
+        cd: b4a.from([0x55, 0x66, 0x77])
+    };
+    const encodedConsensusConfig = encodeConsensusConfig(consensusConfig);
 
     const payload = await applyStateMessageFactory(wallet, config)
-        .buildCompleteSetVdfParamsMessage(
+        .buildCompleteSetConsensusConfigMessage(
             wallet.address,
             txValidity,
-            vdfDifficulty
+            encodedConsensusConfig
         );
 
-    t.is(payload.type, OperationType.SET_VDF_PARAMS);
+    t.is(payload.type, OperationType.SET_CONSENSUS_CONFIG);
     t.ok(b4a.equals(payload.address, addressToBuffer(wallet.address, config.addressPrefix)));
-    t.alike(Object.keys(payload).sort(), ['address', 'type', 'vpo']);
-    t.alike(Object.keys(payload.vpo).sort(), ['df', 'in', 'is', 'tx', 'txv']);
-    t.ok(b4a.equals(payload.vpo.txv, txValidity));
-    t.ok(b4a.equals(payload.vpo.df, vdfDifficulty));
-    t.is(payload.vpo.df.length, VDF_DIFFICULTY_SIZE);
-    t.is(payload.vpo.tx.length, 32);
-    t.is(payload.vpo.in.length, 32);
-    t.is(payload.vpo.is.length, 64);
+    t.alike(Object.keys(payload).sort(), ['address', 'cco', 'type']);
+    t.alike(Object.keys(payload.cco).sort(), ['cc', 'in', 'is', 'tx', 'txv']);
+    t.alike(Object.keys(payload.cco.cc).sort(), ['cd', 'sv']);
+    t.ok(b4a.equals(payload.cco.txv, txValidity));
+    t.ok(b4a.equals(payload.cco.cc.sv, consensusConfig.sv));
+    t.ok(b4a.equals(payload.cco.cc.cd, consensusConfig.cd));
+    t.is(payload.cco.tx.length, 32);
+    t.is(payload.cco.in.length, 32);
+    t.is(payload.cco.is.length, 64);
 });

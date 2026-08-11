@@ -1,7 +1,7 @@
 import b4a from 'b4a';
 import applyOperationsGenerated from './applyOperations.generated.cjs';
 import _ from 'lodash';
-const { Operation, SetEpochOperation } = applyOperationsGenerated.apply.operations;
+const { Operation, SetEpochOperation, ConsensusControlOperation } = applyOperationsGenerated.apply.operations;
 
 // Options for converting protobuf messages to plain objects, ensuring that bytes are returned as Buffers and enums as numbers.
 const APPLY_TO_OBJECT_OPTIONS = Object.freeze({
@@ -178,4 +178,83 @@ export const safeDecodeEpochProof = (payload) => {
     }
 
     return null;
+}
+
+const getValidatedConsensusConfigPayload = (payload) => {
+    if (!_.isPlainObject(payload)) {
+        throw new Error('ConsensusConfig payload must be an object.');
+    }
+
+    const { sv, cd} = payload;
+
+    if (!b4a.isBuffer(sv) || sv.length !== 1) {
+        throw new Error('Schema version must be a one-byte buffer.');
+    }
+
+    if (!b4a.isBuffer(cd)) {
+        throw new Error('ConsensusConfig configData must be a buffer.');
+    }
+
+    return { sv, cd };
+}
+
+/**
+ * Encodes a ConsensusConfig using the ConsensusControlOperation wire format.
+ *
+ * @param {{sv: Buffer, cd: Buffer}} payload - Consensus config payload.
+ * @returns {Buffer} Encoded ConsensusConfig.
+ */
+export const encodeConsensusConfig = (payload) => {
+    const consensusConfigPayload = getValidatedConsensusConfigPayload(payload);
+    const consensusControlPayload = { cc: consensusConfigPayload };
+    const error = ConsensusControlOperation.verify(consensusControlPayload);
+    if (error) throw new Error(error);
+    return b4a.from(ConsensusControlOperation.encode(consensusControlPayload).finish());
+}
+
+/**
+ * Decodes a ConsensusConfig encoded with the ConsensusControlOperation wire format.
+ *
+ * @param {Buffer} payload - Encoded ConsensusConfig buffer.
+ * @returns {{sv: Buffer, cd: Buffer}} Decoded ConsensusConfig.
+ */
+export const decodeConsensusConfig = (payload) => {
+    if (!b4a.isBuffer(payload)) {
+        throw new Error('Encoded ConsensusConfig must be a buffer.');
+    }
+
+    const consensusControlPayload = ConsensusControlOperation.toObject(
+        ConsensusControlOperation.decode(payload),
+        APPLY_TO_OBJECT_OPTIONS
+    );
+
+    return getValidatedConsensusConfigPayload(consensusControlPayload.cc);
+}
+
+/**
+ * Safely encodes a ConsensusConfig. Returns an empty buffer when the payload is invalid.
+ *
+ * @param {*} payload - Input expected to match ConsensusConfig.
+ * @returns {Buffer} Encoded ConsensusConfig or an empty buffer.
+ */
+export const safeEncodeConsensusConfig = (payload) => {
+    try {
+        return encodeConsensusConfig(payload);
+    } catch {
+        return b4a.alloc(0);
+    }
+}
+
+/**
+ * Safely decodes a ConsensusConfig. Returns null when the input is invalid.
+ *
+ * @param {*} payload - Encoded ConsensusConfig buffer.
+ * @returns {{sv: Buffer, cd: Buffer}|null} Decoded ConsensusConfig or null.
+ */
+export const safeDecodeConsensusConfig = (payload) => {
+    try {
+        return decodeConsensusConfig(payload);
+    } catch {
+        return null;
+    }
 }

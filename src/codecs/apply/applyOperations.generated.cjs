@@ -11,7 +11,7 @@ var $protobuf = require("protobufjs/minimal");
 var $Reader = $protobuf.Reader, $Writer = $protobuf.Writer, $util = $protobuf.util;
 
 // Exported root namespace
-var $root = $protobuf.roots["default"] || ($protobuf.roots["default"] = {});
+var $root = $protobuf.roots.applyOperations || ($protobuf.roots.applyOperations = {});
 
 $root.apply = (function() {
 
@@ -47,8 +47,7 @@ $root.apply = (function() {
              * @property {apply.operations.IBootstrapDeploymentOperation|null} [bdo] Operation bdo
              * @property {apply.operations.ITxOperation|null} [txo] Operation txo
              * @property {apply.operations.ISetEpochOperation|null} [seo] Operation seo
-             * @property {apply.operations.ISetGenesisEpochOperation|null} [sgo] Operation sgo
-             * @property {apply.operations.ISetVdfParamsOperation|null} [vpo] Operation vpo
+             * @property {apply.operations.IConsensusControlOperation|null} [cco] Operation cco
              */
 
             /**
@@ -147,32 +146,24 @@ $root.apply = (function() {
             Operation.prototype.seo = null;
 
             /**
-             * Operation sgo.
-             * @member {apply.operations.ISetGenesisEpochOperation|null|undefined} sgo
+             * Operation cco.
+             * @member {apply.operations.IConsensusControlOperation|null|undefined} cco
              * @memberof apply.operations.Operation
              * @instance
              */
-            Operation.prototype.sgo = null;
-
-            /**
-             * Operation vpo.
-             * @member {apply.operations.ISetVdfParamsOperation|null|undefined} vpo
-             * @memberof apply.operations.Operation
-             * @instance
-             */
-            Operation.prototype.vpo = null;
+            Operation.prototype.cco = null;
 
             // OneOf field names bound to virtual getters and setters
             var $oneOfFields;
 
             /**
              * Operation value.
-             * @member {"cao"|"aco"|"bio"|"tro"|"rao"|"bdo"|"txo"|"seo"|"sgo"|"vpo"|undefined} value
+             * @member {"cao"|"aco"|"bio"|"tro"|"rao"|"bdo"|"txo"|"seo"|"cco"|undefined} value
              * @memberof apply.operations.Operation
              * @instance
              */
             Object.defineProperty(Operation.prototype, "value", {
-                get: $util.oneOfGetter($oneOfFields = ["cao", "aco", "bio", "tro", "rao", "bdo", "txo", "seo", "sgo", "vpo"]),
+                get: $util.oneOfGetter($oneOfFields = ["cao", "aco", "bio", "tro", "rao", "bdo", "txo", "seo", "cco"]),
                 set: $util.oneOfSetter($oneOfFields)
             });
 
@@ -220,10 +211,8 @@ $root.apply = (function() {
                     $root.apply.operations.TxOperation.encode(message.txo, writer.uint32(/* id 9, wireType 2 =*/74).fork()).ldelim();
                 if (message.seo != null && Object.hasOwnProperty.call(message, "seo"))
                     $root.apply.operations.SetEpochOperation.encode(message.seo, writer.uint32(/* id 10, wireType 2 =*/82).fork()).ldelim();
-                if (message.sgo != null && Object.hasOwnProperty.call(message, "sgo"))
-                    $root.apply.operations.SetGenesisEpochOperation.encode(message.sgo, writer.uint32(/* id 11, wireType 2 =*/90).fork()).ldelim();
-                if (message.vpo != null && Object.hasOwnProperty.call(message, "vpo"))
-                    $root.apply.operations.SetVdfParamsOperation.encode(message.vpo, writer.uint32(/* id 12, wireType 2 =*/98).fork()).ldelim();
+                if (message.cco != null && Object.hasOwnProperty.call(message, "cco"))
+                    $root.apply.operations.ConsensusControlOperation.encode(message.cco, writer.uint32(/* id 11, wireType 2 =*/90).fork()).ldelim();
                 return writer;
             };
 
@@ -301,11 +290,7 @@ $root.apply = (function() {
                             break;
                         }
                     case 11: {
-                            message.sgo = $root.apply.operations.SetGenesisEpochOperation.decode(reader, reader.uint32());
-                            break;
-                        }
-                    case 12: {
-                            message.vpo = $root.apply.operations.SetVdfParamsOperation.decode(reader, reader.uint32());
+                            message.cco = $root.apply.operations.ConsensusControlOperation.decode(reader, reader.uint32());
                             break;
                         }
                     default:
@@ -448,24 +433,14 @@ $root.apply = (function() {
                             return "seo." + error;
                     }
                 }
-                if (message.sgo != null && message.hasOwnProperty("sgo")) {
+                if (message.cco != null && message.hasOwnProperty("cco")) {
                     if (properties.value === 1)
                         return "value: multiple values";
                     properties.value = 1;
                     {
-                        var error = $root.apply.operations.SetGenesisEpochOperation.verify(message.sgo);
+                        var error = $root.apply.operations.ConsensusControlOperation.verify(message.cco);
                         if (error)
-                            return "sgo." + error;
-                    }
-                }
-                if (message.vpo != null && message.hasOwnProperty("vpo")) {
-                    if (properties.value === 1)
-                        return "value: multiple values";
-                    properties.value = 1;
-                    {
-                        var error = $root.apply.operations.SetVdfParamsOperation.verify(message.vpo);
-                        if (error)
-                            return "vpo." + error;
+                            return "cco." + error;
                     }
                 }
                 return null;
@@ -554,7 +529,7 @@ $root.apply = (function() {
                 case 15:
                     message.type = 15;
                     break;
-                case "SET_VDF_PARAMS":
+                case "SET_CONSENSUS_CONFIG":
                 case 16:
                     message.type = 16;
                     break;
@@ -604,15 +579,10 @@ $root.apply = (function() {
                         throw TypeError(".apply.operations.Operation.seo: object expected");
                     message.seo = $root.apply.operations.SetEpochOperation.fromObject(object.seo);
                 }
-                if (object.sgo != null) {
-                    if (typeof object.sgo !== "object")
-                        throw TypeError(".apply.operations.Operation.sgo: object expected");
-                    message.sgo = $root.apply.operations.SetGenesisEpochOperation.fromObject(object.sgo);
-                }
-                if (object.vpo != null) {
-                    if (typeof object.vpo !== "object")
-                        throw TypeError(".apply.operations.Operation.vpo: object expected");
-                    message.vpo = $root.apply.operations.SetVdfParamsOperation.fromObject(object.vpo);
+                if (object.cco != null) {
+                    if (typeof object.cco !== "object")
+                        throw TypeError(".apply.operations.Operation.cco: object expected");
+                    message.cco = $root.apply.operations.ConsensusControlOperation.fromObject(object.cco);
                 }
                 return message;
             };
@@ -684,15 +654,10 @@ $root.apply = (function() {
                     if (options.oneofs)
                         object.value = "seo";
                 }
-                if (message.sgo != null && message.hasOwnProperty("sgo")) {
-                    object.sgo = $root.apply.operations.SetGenesisEpochOperation.toObject(message.sgo, options);
+                if (message.cco != null && message.hasOwnProperty("cco")) {
+                    object.cco = $root.apply.operations.ConsensusControlOperation.toObject(message.cco, options);
                     if (options.oneofs)
-                        object.value = "sgo";
-                }
-                if (message.vpo != null && message.hasOwnProperty("vpo")) {
-                    object.vpo = $root.apply.operations.SetVdfParamsOperation.toObject(message.vpo, options);
-                    if (options.oneofs)
-                        object.value = "vpo";
+                        object.value = "cco";
                 }
                 return object;
             };
@@ -746,7 +711,7 @@ $root.apply = (function() {
          * @property {number} TRANSFER=13 TRANSFER value
          * @property {number} SET_EPOCH=14 SET_EPOCH value
          * @property {number} SET_GENESIS_EPOCH=15 SET_GENESIS_EPOCH value
-         * @property {number} SET_VDF_PARAMS=16 SET_VDF_PARAMS value
+         * @property {number} SET_CONSENSUS_CONFIG=16 SET_CONSENSUS_CONFIG value
          */
         operations.OperationType = (function() {
             var valuesById = {}, values = Object.create(valuesById);
@@ -766,7 +731,7 @@ $root.apply = (function() {
             values[valuesById[13] = "TRANSFER"] = 13;
             values[valuesById[14] = "SET_EPOCH"] = 14;
             values[valuesById[15] = "SET_GENESIS_EPOCH"] = 15;
-            values[valuesById[16] = "SET_VDF_PARAMS"] = 16;
+            values[valuesById[16] = "SET_CONSENSUS_CONFIG"] = 16;
             return values;
         })();
 
@@ -4004,29 +3969,28 @@ $root.apply = (function() {
             return SetEpochOperation;
         })();
 
-        operations.SetGenesisEpochOperation = (function() {
+        operations.ConsensusControlOperation = (function() {
 
             /**
-             * Properties of a SetGenesisEpochOperation.
+             * Properties of a ConsensusControlOperation.
              * @memberof apply.operations
-             * @interface ISetGenesisEpochOperation
-             * @property {Uint8Array|null} [tx] SetGenesisEpochOperation tx
-             * @property {Uint8Array|null} [txv] SetGenesisEpochOperation txv
-             * @property {Uint8Array|null} [df] SetGenesisEpochOperation df
-             * @property {Uint8Array|null} [db] SetGenesisEpochOperation db
-             * @property {Uint8Array|null} ["in"] SetGenesisEpochOperation in
-             * @property {Uint8Array|null} [is] SetGenesisEpochOperation is
+             * @interface IConsensusControlOperation
+             * @property {Uint8Array|null} [tx] ConsensusControlOperation tx
+             * @property {Uint8Array|null} [txv] ConsensusControlOperation txv
+             * @property {common.consensus.IConsensusConfig|null} [cc] ConsensusControlOperation cc
+             * @property {Uint8Array|null} ["in"] ConsensusControlOperation in
+             * @property {Uint8Array|null} [is] ConsensusControlOperation is
              */
 
             /**
-             * Constructs a new SetGenesisEpochOperation.
+             * Constructs a new ConsensusControlOperation.
              * @memberof apply.operations
-             * @classdesc Represents a SetGenesisEpochOperation.
-             * @implements ISetGenesisEpochOperation
+             * @classdesc Represents a ConsensusControlOperation.
+             * @implements IConsensusControlOperation
              * @constructor
-             * @param {apply.operations.ISetGenesisEpochOperation=} [properties] Properties to set
+             * @param {apply.operations.IConsensusControlOperation=} [properties] Properties to set
              */
-            function SetGenesisEpochOperation(properties) {
+            function ConsensusControlOperation(properties) {
                 if (properties)
                     for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
                         if (properties[keys[i]] != null)
@@ -4034,449 +3998,75 @@ $root.apply = (function() {
             }
 
             /**
-             * SetGenesisEpochOperation tx.
+             * ConsensusControlOperation tx.
              * @member {Uint8Array} tx
-             * @memberof apply.operations.SetGenesisEpochOperation
+             * @memberof apply.operations.ConsensusControlOperation
              * @instance
              */
-            SetGenesisEpochOperation.prototype.tx = $util.newBuffer([]);
+            ConsensusControlOperation.prototype.tx = $util.newBuffer([]);
 
             /**
-             * SetGenesisEpochOperation txv.
+             * ConsensusControlOperation txv.
              * @member {Uint8Array} txv
-             * @memberof apply.operations.SetGenesisEpochOperation
+             * @memberof apply.operations.ConsensusControlOperation
              * @instance
              */
-            SetGenesisEpochOperation.prototype.txv = $util.newBuffer([]);
+            ConsensusControlOperation.prototype.txv = $util.newBuffer([]);
 
             /**
-             * SetGenesisEpochOperation df.
-             * @member {Uint8Array} df
-             * @memberof apply.operations.SetGenesisEpochOperation
+             * ConsensusControlOperation cc.
+             * @member {common.consensus.IConsensusConfig|null|undefined} cc
+             * @memberof apply.operations.ConsensusControlOperation
              * @instance
              */
-            SetGenesisEpochOperation.prototype.df = $util.newBuffer([]);
+            ConsensusControlOperation.prototype.cc = null;
 
             /**
-             * SetGenesisEpochOperation db.
-             * @member {Uint8Array} db
-             * @memberof apply.operations.SetGenesisEpochOperation
-             * @instance
-             */
-            SetGenesisEpochOperation.prototype.db = $util.newBuffer([]);
-
-            /**
-             * SetGenesisEpochOperation in.
+             * ConsensusControlOperation in.
              * @member {Uint8Array} in
-             * @memberof apply.operations.SetGenesisEpochOperation
+             * @memberof apply.operations.ConsensusControlOperation
              * @instance
              */
-            SetGenesisEpochOperation.prototype["in"] = $util.newBuffer([]);
+            ConsensusControlOperation.prototype["in"] = $util.newBuffer([]);
 
             /**
-             * SetGenesisEpochOperation is.
+             * ConsensusControlOperation is.
              * @member {Uint8Array} is
-             * @memberof apply.operations.SetGenesisEpochOperation
+             * @memberof apply.operations.ConsensusControlOperation
              * @instance
              */
-            SetGenesisEpochOperation.prototype.is = $util.newBuffer([]);
+            ConsensusControlOperation.prototype.is = $util.newBuffer([]);
 
             /**
-             * Creates a new SetGenesisEpochOperation instance using the specified properties.
+             * Creates a new ConsensusControlOperation instance using the specified properties.
              * @function create
-             * @memberof apply.operations.SetGenesisEpochOperation
+             * @memberof apply.operations.ConsensusControlOperation
              * @static
-             * @param {apply.operations.ISetGenesisEpochOperation=} [properties] Properties to set
-             * @returns {apply.operations.SetGenesisEpochOperation} SetGenesisEpochOperation instance
+             * @param {apply.operations.IConsensusControlOperation=} [properties] Properties to set
+             * @returns {apply.operations.ConsensusControlOperation} ConsensusControlOperation instance
              */
-            SetGenesisEpochOperation.create = function create(properties) {
-                return new SetGenesisEpochOperation(properties);
+            ConsensusControlOperation.create = function create(properties) {
+                return new ConsensusControlOperation(properties);
             };
 
             /**
-             * Encodes the specified SetGenesisEpochOperation message. Does not implicitly {@link apply.operations.SetGenesisEpochOperation.verify|verify} messages.
+             * Encodes the specified ConsensusControlOperation message. Does not implicitly {@link apply.operations.ConsensusControlOperation.verify|verify} messages.
              * @function encode
-             * @memberof apply.operations.SetGenesisEpochOperation
+             * @memberof apply.operations.ConsensusControlOperation
              * @static
-             * @param {apply.operations.ISetGenesisEpochOperation} message SetGenesisEpochOperation message or plain object to encode
+             * @param {apply.operations.IConsensusControlOperation} message ConsensusControlOperation message or plain object to encode
              * @param {$protobuf.Writer} [writer] Writer to encode to
              * @returns {$protobuf.Writer} Writer
              */
-            SetGenesisEpochOperation.encode = function encode(message, writer) {
+            ConsensusControlOperation.encode = function encode(message, writer) {
                 if (!writer)
                     writer = $Writer.create();
                 if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
                     writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.tx);
                 if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
                     writer.uint32(/* id 2, wireType 2 =*/18).bytes(message.txv);
-                if (message.df != null && Object.hasOwnProperty.call(message, "df"))
-                    writer.uint32(/* id 3, wireType 2 =*/26).bytes(message.df);
-                if (message.db != null && Object.hasOwnProperty.call(message, "db"))
-                    writer.uint32(/* id 4, wireType 2 =*/34).bytes(message.db);
-                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
-                    writer.uint32(/* id 5, wireType 2 =*/42).bytes(message["in"]);
-                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
-                    writer.uint32(/* id 6, wireType 2 =*/50).bytes(message.is);
-                return writer;
-            };
-
-            /**
-             * Encodes the specified SetGenesisEpochOperation message, length delimited. Does not implicitly {@link apply.operations.SetGenesisEpochOperation.verify|verify} messages.
-             * @function encodeDelimited
-             * @memberof apply.operations.SetGenesisEpochOperation
-             * @static
-             * @param {apply.operations.ISetGenesisEpochOperation} message SetGenesisEpochOperation message or plain object to encode
-             * @param {$protobuf.Writer} [writer] Writer to encode to
-             * @returns {$protobuf.Writer} Writer
-             */
-            SetGenesisEpochOperation.encodeDelimited = function encodeDelimited(message, writer) {
-                return this.encode(message, writer).ldelim();
-            };
-
-            /**
-             * Decodes a SetGenesisEpochOperation message from the specified reader or buffer.
-             * @function decode
-             * @memberof apply.operations.SetGenesisEpochOperation
-             * @static
-             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
-             * @param {number} [length] Message length if known beforehand
-             * @returns {apply.operations.SetGenesisEpochOperation} SetGenesisEpochOperation
-             * @throws {Error} If the payload is not a reader or valid buffer
-             * @throws {$protobuf.util.ProtocolError} If required fields are missing
-             */
-            SetGenesisEpochOperation.decode = function decode(reader, length, error) {
-                if (!(reader instanceof $Reader))
-                    reader = $Reader.create(reader);
-                var end = length === undefined ? reader.len : reader.pos + length, message = new $root.apply.operations.SetGenesisEpochOperation();
-                while (reader.pos < end) {
-                    var tag = reader.uint32();
-                    if (tag === error)
-                        break;
-                    switch (tag >>> 3) {
-                    case 1: {
-                            message.tx = reader.bytes();
-                            break;
-                        }
-                    case 2: {
-                            message.txv = reader.bytes();
-                            break;
-                        }
-                    case 3: {
-                            message.df = reader.bytes();
-                            break;
-                        }
-                    case 4: {
-                            message.db = reader.bytes();
-                            break;
-                        }
-                    case 5: {
-                            message["in"] = reader.bytes();
-                            break;
-                        }
-                    case 6: {
-                            message.is = reader.bytes();
-                            break;
-                        }
-                    default:
-                        reader.skipType(tag & 7);
-                        break;
-                    }
-                }
-                return message;
-            };
-
-            /**
-             * Decodes a SetGenesisEpochOperation message from the specified reader or buffer, length delimited.
-             * @function decodeDelimited
-             * @memberof apply.operations.SetGenesisEpochOperation
-             * @static
-             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
-             * @returns {apply.operations.SetGenesisEpochOperation} SetGenesisEpochOperation
-             * @throws {Error} If the payload is not a reader or valid buffer
-             * @throws {$protobuf.util.ProtocolError} If required fields are missing
-             */
-            SetGenesisEpochOperation.decodeDelimited = function decodeDelimited(reader) {
-                if (!(reader instanceof $Reader))
-                    reader = new $Reader(reader);
-                return this.decode(reader, reader.uint32());
-            };
-
-            /**
-             * Verifies a SetGenesisEpochOperation message.
-             * @function verify
-             * @memberof apply.operations.SetGenesisEpochOperation
-             * @static
-             * @param {Object.<string,*>} message Plain object to verify
-             * @returns {string|null} `null` if valid, otherwise the reason why it is not
-             */
-            SetGenesisEpochOperation.verify = function verify(message) {
-                if (typeof message !== "object" || message === null)
-                    return "object expected";
-                if (message.tx != null && message.hasOwnProperty("tx"))
-                    if (!(message.tx && typeof message.tx.length === "number" || $util.isString(message.tx)))
-                        return "tx: buffer expected";
-                if (message.txv != null && message.hasOwnProperty("txv"))
-                    if (!(message.txv && typeof message.txv.length === "number" || $util.isString(message.txv)))
-                        return "txv: buffer expected";
-                if (message.df != null && message.hasOwnProperty("df"))
-                    if (!(message.df && typeof message.df.length === "number" || $util.isString(message.df)))
-                        return "df: buffer expected";
-                if (message.db != null && message.hasOwnProperty("db"))
-                    if (!(message.db && typeof message.db.length === "number" || $util.isString(message.db)))
-                        return "db: buffer expected";
-                if (message["in"] != null && message.hasOwnProperty("in"))
-                    if (!(message["in"] && typeof message["in"].length === "number" || $util.isString(message["in"])))
-                        return "in: buffer expected";
-                if (message.is != null && message.hasOwnProperty("is"))
-                    if (!(message.is && typeof message.is.length === "number" || $util.isString(message.is)))
-                        return "is: buffer expected";
-                return null;
-            };
-
-            /**
-             * Creates a SetGenesisEpochOperation message from a plain object. Also converts values to their respective internal types.
-             * @function fromObject
-             * @memberof apply.operations.SetGenesisEpochOperation
-             * @static
-             * @param {Object.<string,*>} object Plain object
-             * @returns {apply.operations.SetGenesisEpochOperation} SetGenesisEpochOperation
-             */
-            SetGenesisEpochOperation.fromObject = function fromObject(object) {
-                if (object instanceof $root.apply.operations.SetGenesisEpochOperation)
-                    return object;
-                var message = new $root.apply.operations.SetGenesisEpochOperation();
-                if (object.tx != null)
-                    if (typeof object.tx === "string")
-                        $util.base64.decode(object.tx, message.tx = $util.newBuffer($util.base64.length(object.tx)), 0);
-                    else if (object.tx.length >= 0)
-                        message.tx = object.tx;
-                if (object.txv != null)
-                    if (typeof object.txv === "string")
-                        $util.base64.decode(object.txv, message.txv = $util.newBuffer($util.base64.length(object.txv)), 0);
-                    else if (object.txv.length >= 0)
-                        message.txv = object.txv;
-                if (object.df != null)
-                    if (typeof object.df === "string")
-                        $util.base64.decode(object.df, message.df = $util.newBuffer($util.base64.length(object.df)), 0);
-                    else if (object.df.length >= 0)
-                        message.df = object.df;
-                if (object.db != null)
-                    if (typeof object.db === "string")
-                        $util.base64.decode(object.db, message.db = $util.newBuffer($util.base64.length(object.db)), 0);
-                    else if (object.db.length >= 0)
-                        message.db = object.db;
-                if (object["in"] != null)
-                    if (typeof object["in"] === "string")
-                        $util.base64.decode(object["in"], message["in"] = $util.newBuffer($util.base64.length(object["in"])), 0);
-                    else if (object["in"].length >= 0)
-                        message["in"] = object["in"];
-                if (object.is != null)
-                    if (typeof object.is === "string")
-                        $util.base64.decode(object.is, message.is = $util.newBuffer($util.base64.length(object.is)), 0);
-                    else if (object.is.length >= 0)
-                        message.is = object.is;
-                return message;
-            };
-
-            /**
-             * Creates a plain object from a SetGenesisEpochOperation message. Also converts values to other types if specified.
-             * @function toObject
-             * @memberof apply.operations.SetGenesisEpochOperation
-             * @static
-             * @param {apply.operations.SetGenesisEpochOperation} message SetGenesisEpochOperation
-             * @param {$protobuf.IConversionOptions} [options] Conversion options
-             * @returns {Object.<string,*>} Plain object
-             */
-            SetGenesisEpochOperation.toObject = function toObject(message, options) {
-                if (!options)
-                    options = {};
-                var object = {};
-                if (options.defaults) {
-                    if (options.bytes === String)
-                        object.tx = "";
-                    else {
-                        object.tx = [];
-                        if (options.bytes !== Array)
-                            object.tx = $util.newBuffer(object.tx);
-                    }
-                    if (options.bytes === String)
-                        object.txv = "";
-                    else {
-                        object.txv = [];
-                        if (options.bytes !== Array)
-                            object.txv = $util.newBuffer(object.txv);
-                    }
-                    if (options.bytes === String)
-                        object.df = "";
-                    else {
-                        object.df = [];
-                        if (options.bytes !== Array)
-                            object.df = $util.newBuffer(object.df);
-                    }
-                    if (options.bytes === String)
-                        object.db = "";
-                    else {
-                        object.db = [];
-                        if (options.bytes !== Array)
-                            object.db = $util.newBuffer(object.db);
-                    }
-                    if (options.bytes === String)
-                        object["in"] = "";
-                    else {
-                        object["in"] = [];
-                        if (options.bytes !== Array)
-                            object["in"] = $util.newBuffer(object["in"]);
-                    }
-                    if (options.bytes === String)
-                        object.is = "";
-                    else {
-                        object.is = [];
-                        if (options.bytes !== Array)
-                            object.is = $util.newBuffer(object.is);
-                    }
-                }
-                if (message.tx != null && message.hasOwnProperty("tx"))
-                    object.tx = options.bytes === String ? $util.base64.encode(message.tx, 0, message.tx.length) : options.bytes === Array ? Array.prototype.slice.call(message.tx) : message.tx;
-                if (message.txv != null && message.hasOwnProperty("txv"))
-                    object.txv = options.bytes === String ? $util.base64.encode(message.txv, 0, message.txv.length) : options.bytes === Array ? Array.prototype.slice.call(message.txv) : message.txv;
-                if (message.df != null && message.hasOwnProperty("df"))
-                    object.df = options.bytes === String ? $util.base64.encode(message.df, 0, message.df.length) : options.bytes === Array ? Array.prototype.slice.call(message.df) : message.df;
-                if (message.db != null && message.hasOwnProperty("db"))
-                    object.db = options.bytes === String ? $util.base64.encode(message.db, 0, message.db.length) : options.bytes === Array ? Array.prototype.slice.call(message.db) : message.db;
-                if (message["in"] != null && message.hasOwnProperty("in"))
-                    object["in"] = options.bytes === String ? $util.base64.encode(message["in"], 0, message["in"].length) : options.bytes === Array ? Array.prototype.slice.call(message["in"]) : message["in"];
-                if (message.is != null && message.hasOwnProperty("is"))
-                    object.is = options.bytes === String ? $util.base64.encode(message.is, 0, message.is.length) : options.bytes === Array ? Array.prototype.slice.call(message.is) : message.is;
-                return object;
-            };
-
-            /**
-             * Converts this SetGenesisEpochOperation to JSON.
-             * @function toJSON
-             * @memberof apply.operations.SetGenesisEpochOperation
-             * @instance
-             * @returns {Object.<string,*>} JSON object
-             */
-            SetGenesisEpochOperation.prototype.toJSON = function toJSON() {
-                return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
-            };
-
-            /**
-             * Gets the default type url for SetGenesisEpochOperation
-             * @function getTypeUrl
-             * @memberof apply.operations.SetGenesisEpochOperation
-             * @static
-             * @param {string} [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
-             * @returns {string} The default type url
-             */
-            SetGenesisEpochOperation.getTypeUrl = function getTypeUrl(typeUrlPrefix) {
-                if (typeUrlPrefix === undefined) {
-                    typeUrlPrefix = "type.googleapis.com";
-                }
-                return typeUrlPrefix + "/apply.operations.SetGenesisEpochOperation";
-            };
-
-            return SetGenesisEpochOperation;
-        })();
-
-        operations.SetVdfParamsOperation = (function() {
-
-            /**
-             * Properties of a SetVdfParamsOperation.
-             * @memberof apply.operations
-             * @interface ISetVdfParamsOperation
-             * @property {Uint8Array|null} [tx] SetVdfParamsOperation tx
-             * @property {Uint8Array|null} [txv] SetVdfParamsOperation txv
-             * @property {Uint8Array|null} [df] SetVdfParamsOperation df
-             * @property {Uint8Array|null} ["in"] SetVdfParamsOperation in
-             * @property {Uint8Array|null} [is] SetVdfParamsOperation is
-             */
-
-            /**
-             * Constructs a new SetVdfParamsOperation.
-             * @memberof apply.operations
-             * @classdesc Represents a SetVdfParamsOperation.
-             * @implements ISetVdfParamsOperation
-             * @constructor
-             * @param {apply.operations.ISetVdfParamsOperation=} [properties] Properties to set
-             */
-            function SetVdfParamsOperation(properties) {
-                if (properties)
-                    for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
-                        if (properties[keys[i]] != null)
-                            this[keys[i]] = properties[keys[i]];
-            }
-
-            /**
-             * SetVdfParamsOperation tx.
-             * @member {Uint8Array} tx
-             * @memberof apply.operations.SetVdfParamsOperation
-             * @instance
-             */
-            SetVdfParamsOperation.prototype.tx = $util.newBuffer([]);
-
-            /**
-             * SetVdfParamsOperation txv.
-             * @member {Uint8Array} txv
-             * @memberof apply.operations.SetVdfParamsOperation
-             * @instance
-             */
-            SetVdfParamsOperation.prototype.txv = $util.newBuffer([]);
-
-            /**
-             * SetVdfParamsOperation df.
-             * @member {Uint8Array} df
-             * @memberof apply.operations.SetVdfParamsOperation
-             * @instance
-             */
-            SetVdfParamsOperation.prototype.df = $util.newBuffer([]);
-
-            /**
-             * SetVdfParamsOperation in.
-             * @member {Uint8Array} in
-             * @memberof apply.operations.SetVdfParamsOperation
-             * @instance
-             */
-            SetVdfParamsOperation.prototype["in"] = $util.newBuffer([]);
-
-            /**
-             * SetVdfParamsOperation is.
-             * @member {Uint8Array} is
-             * @memberof apply.operations.SetVdfParamsOperation
-             * @instance
-             */
-            SetVdfParamsOperation.prototype.is = $util.newBuffer([]);
-
-            /**
-             * Creates a new SetVdfParamsOperation instance using the specified properties.
-             * @function create
-             * @memberof apply.operations.SetVdfParamsOperation
-             * @static
-             * @param {apply.operations.ISetVdfParamsOperation=} [properties] Properties to set
-             * @returns {apply.operations.SetVdfParamsOperation} SetVdfParamsOperation instance
-             */
-            SetVdfParamsOperation.create = function create(properties) {
-                return new SetVdfParamsOperation(properties);
-            };
-
-            /**
-             * Encodes the specified SetVdfParamsOperation message. Does not implicitly {@link apply.operations.SetVdfParamsOperation.verify|verify} messages.
-             * @function encode
-             * @memberof apply.operations.SetVdfParamsOperation
-             * @static
-             * @param {apply.operations.ISetVdfParamsOperation} message SetVdfParamsOperation message or plain object to encode
-             * @param {$protobuf.Writer} [writer] Writer to encode to
-             * @returns {$protobuf.Writer} Writer
-             */
-            SetVdfParamsOperation.encode = function encode(message, writer) {
-                if (!writer)
-                    writer = $Writer.create();
-                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
-                    writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.tx);
-                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
-                    writer.uint32(/* id 2, wireType 2 =*/18).bytes(message.txv);
-                if (message.df != null && Object.hasOwnProperty.call(message, "df"))
-                    writer.uint32(/* id 3, wireType 2 =*/26).bytes(message.df);
+                if (message.cc != null && Object.hasOwnProperty.call(message, "cc"))
+                    $root.common.consensus.ConsensusConfig.encode(message.cc, writer.uint32(/* id 3, wireType 2 =*/26).fork()).ldelim();
                 if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
                     writer.uint32(/* id 4, wireType 2 =*/34).bytes(message["in"]);
                 if (message.is != null && Object.hasOwnProperty.call(message, "is"))
@@ -4485,33 +4075,33 @@ $root.apply = (function() {
             };
 
             /**
-             * Encodes the specified SetVdfParamsOperation message, length delimited. Does not implicitly {@link apply.operations.SetVdfParamsOperation.verify|verify} messages.
+             * Encodes the specified ConsensusControlOperation message, length delimited. Does not implicitly {@link apply.operations.ConsensusControlOperation.verify|verify} messages.
              * @function encodeDelimited
-             * @memberof apply.operations.SetVdfParamsOperation
+             * @memberof apply.operations.ConsensusControlOperation
              * @static
-             * @param {apply.operations.ISetVdfParamsOperation} message SetVdfParamsOperation message or plain object to encode
+             * @param {apply.operations.IConsensusControlOperation} message ConsensusControlOperation message or plain object to encode
              * @param {$protobuf.Writer} [writer] Writer to encode to
              * @returns {$protobuf.Writer} Writer
              */
-            SetVdfParamsOperation.encodeDelimited = function encodeDelimited(message, writer) {
+            ConsensusControlOperation.encodeDelimited = function encodeDelimited(message, writer) {
                 return this.encode(message, writer).ldelim();
             };
 
             /**
-             * Decodes a SetVdfParamsOperation message from the specified reader or buffer.
+             * Decodes a ConsensusControlOperation message from the specified reader or buffer.
              * @function decode
-             * @memberof apply.operations.SetVdfParamsOperation
+             * @memberof apply.operations.ConsensusControlOperation
              * @static
              * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
              * @param {number} [length] Message length if known beforehand
-             * @returns {apply.operations.SetVdfParamsOperation} SetVdfParamsOperation
+             * @returns {apply.operations.ConsensusControlOperation} ConsensusControlOperation
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
-            SetVdfParamsOperation.decode = function decode(reader, length, error) {
+            ConsensusControlOperation.decode = function decode(reader, length, error) {
                 if (!(reader instanceof $Reader))
                     reader = $Reader.create(reader);
-                var end = length === undefined ? reader.len : reader.pos + length, message = new $root.apply.operations.SetVdfParamsOperation();
+                var end = length === undefined ? reader.len : reader.pos + length, message = new $root.apply.operations.ConsensusControlOperation();
                 while (reader.pos < end) {
                     var tag = reader.uint32();
                     if (tag === error)
@@ -4526,7 +4116,7 @@ $root.apply = (function() {
                             break;
                         }
                     case 3: {
-                            message.df = reader.bytes();
+                            message.cc = $root.common.consensus.ConsensusConfig.decode(reader, reader.uint32());
                             break;
                         }
                     case 4: {
@@ -4546,30 +4136,30 @@ $root.apply = (function() {
             };
 
             /**
-             * Decodes a SetVdfParamsOperation message from the specified reader or buffer, length delimited.
+             * Decodes a ConsensusControlOperation message from the specified reader or buffer, length delimited.
              * @function decodeDelimited
-             * @memberof apply.operations.SetVdfParamsOperation
+             * @memberof apply.operations.ConsensusControlOperation
              * @static
              * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
-             * @returns {apply.operations.SetVdfParamsOperation} SetVdfParamsOperation
+             * @returns {apply.operations.ConsensusControlOperation} ConsensusControlOperation
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
-            SetVdfParamsOperation.decodeDelimited = function decodeDelimited(reader) {
+            ConsensusControlOperation.decodeDelimited = function decodeDelimited(reader) {
                 if (!(reader instanceof $Reader))
                     reader = new $Reader(reader);
                 return this.decode(reader, reader.uint32());
             };
 
             /**
-             * Verifies a SetVdfParamsOperation message.
+             * Verifies a ConsensusControlOperation message.
              * @function verify
-             * @memberof apply.operations.SetVdfParamsOperation
+             * @memberof apply.operations.ConsensusControlOperation
              * @static
              * @param {Object.<string,*>} message Plain object to verify
              * @returns {string|null} `null` if valid, otherwise the reason why it is not
              */
-            SetVdfParamsOperation.verify = function verify(message) {
+            ConsensusControlOperation.verify = function verify(message) {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
                 if (message.tx != null && message.hasOwnProperty("tx"))
@@ -4578,9 +4168,11 @@ $root.apply = (function() {
                 if (message.txv != null && message.hasOwnProperty("txv"))
                     if (!(message.txv && typeof message.txv.length === "number" || $util.isString(message.txv)))
                         return "txv: buffer expected";
-                if (message.df != null && message.hasOwnProperty("df"))
-                    if (!(message.df && typeof message.df.length === "number" || $util.isString(message.df)))
-                        return "df: buffer expected";
+                if (message.cc != null && message.hasOwnProperty("cc")) {
+                    var error = $root.common.consensus.ConsensusConfig.verify(message.cc);
+                    if (error)
+                        return "cc." + error;
+                }
                 if (message["in"] != null && message.hasOwnProperty("in"))
                     if (!(message["in"] && typeof message["in"].length === "number" || $util.isString(message["in"])))
                         return "in: buffer expected";
@@ -4591,17 +4183,17 @@ $root.apply = (function() {
             };
 
             /**
-             * Creates a SetVdfParamsOperation message from a plain object. Also converts values to their respective internal types.
+             * Creates a ConsensusControlOperation message from a plain object. Also converts values to their respective internal types.
              * @function fromObject
-             * @memberof apply.operations.SetVdfParamsOperation
+             * @memberof apply.operations.ConsensusControlOperation
              * @static
              * @param {Object.<string,*>} object Plain object
-             * @returns {apply.operations.SetVdfParamsOperation} SetVdfParamsOperation
+             * @returns {apply.operations.ConsensusControlOperation} ConsensusControlOperation
              */
-            SetVdfParamsOperation.fromObject = function fromObject(object) {
-                if (object instanceof $root.apply.operations.SetVdfParamsOperation)
+            ConsensusControlOperation.fromObject = function fromObject(object) {
+                if (object instanceof $root.apply.operations.ConsensusControlOperation)
                     return object;
-                var message = new $root.apply.operations.SetVdfParamsOperation();
+                var message = new $root.apply.operations.ConsensusControlOperation();
                 if (object.tx != null)
                     if (typeof object.tx === "string")
                         $util.base64.decode(object.tx, message.tx = $util.newBuffer($util.base64.length(object.tx)), 0);
@@ -4612,11 +4204,11 @@ $root.apply = (function() {
                         $util.base64.decode(object.txv, message.txv = $util.newBuffer($util.base64.length(object.txv)), 0);
                     else if (object.txv.length >= 0)
                         message.txv = object.txv;
-                if (object.df != null)
-                    if (typeof object.df === "string")
-                        $util.base64.decode(object.df, message.df = $util.newBuffer($util.base64.length(object.df)), 0);
-                    else if (object.df.length >= 0)
-                        message.df = object.df;
+                if (object.cc != null) {
+                    if (typeof object.cc !== "object")
+                        throw TypeError(".apply.operations.ConsensusControlOperation.cc: object expected");
+                    message.cc = $root.common.consensus.ConsensusConfig.fromObject(object.cc);
+                }
                 if (object["in"] != null)
                     if (typeof object["in"] === "string")
                         $util.base64.decode(object["in"], message["in"] = $util.newBuffer($util.base64.length(object["in"])), 0);
@@ -4631,15 +4223,15 @@ $root.apply = (function() {
             };
 
             /**
-             * Creates a plain object from a SetVdfParamsOperation message. Also converts values to other types if specified.
+             * Creates a plain object from a ConsensusControlOperation message. Also converts values to other types if specified.
              * @function toObject
-             * @memberof apply.operations.SetVdfParamsOperation
+             * @memberof apply.operations.ConsensusControlOperation
              * @static
-             * @param {apply.operations.SetVdfParamsOperation} message SetVdfParamsOperation
+             * @param {apply.operations.ConsensusControlOperation} message ConsensusControlOperation
              * @param {$protobuf.IConversionOptions} [options] Conversion options
              * @returns {Object.<string,*>} Plain object
              */
-            SetVdfParamsOperation.toObject = function toObject(message, options) {
+            ConsensusControlOperation.toObject = function toObject(message, options) {
                 if (!options)
                     options = {};
                 var object = {};
@@ -4658,13 +4250,7 @@ $root.apply = (function() {
                         if (options.bytes !== Array)
                             object.txv = $util.newBuffer(object.txv);
                     }
-                    if (options.bytes === String)
-                        object.df = "";
-                    else {
-                        object.df = [];
-                        if (options.bytes !== Array)
-                            object.df = $util.newBuffer(object.df);
-                    }
+                    object.cc = null;
                     if (options.bytes === String)
                         object["in"] = "";
                     else {
@@ -4684,8 +4270,8 @@ $root.apply = (function() {
                     object.tx = options.bytes === String ? $util.base64.encode(message.tx, 0, message.tx.length) : options.bytes === Array ? Array.prototype.slice.call(message.tx) : message.tx;
                 if (message.txv != null && message.hasOwnProperty("txv"))
                     object.txv = options.bytes === String ? $util.base64.encode(message.txv, 0, message.txv.length) : options.bytes === Array ? Array.prototype.slice.call(message.txv) : message.txv;
-                if (message.df != null && message.hasOwnProperty("df"))
-                    object.df = options.bytes === String ? $util.base64.encode(message.df, 0, message.df.length) : options.bytes === Array ? Array.prototype.slice.call(message.df) : message.df;
+                if (message.cc != null && message.hasOwnProperty("cc"))
+                    object.cc = $root.common.consensus.ConsensusConfig.toObject(message.cc, options);
                 if (message["in"] != null && message.hasOwnProperty("in"))
                     object["in"] = options.bytes === String ? $util.base64.encode(message["in"], 0, message["in"].length) : options.bytes === Array ? Array.prototype.slice.call(message["in"]) : message["in"];
                 if (message.is != null && message.hasOwnProperty("is"))
@@ -4694,38 +4280,309 @@ $root.apply = (function() {
             };
 
             /**
-             * Converts this SetVdfParamsOperation to JSON.
+             * Converts this ConsensusControlOperation to JSON.
              * @function toJSON
-             * @memberof apply.operations.SetVdfParamsOperation
+             * @memberof apply.operations.ConsensusControlOperation
              * @instance
              * @returns {Object.<string,*>} JSON object
              */
-            SetVdfParamsOperation.prototype.toJSON = function toJSON() {
+            ConsensusControlOperation.prototype.toJSON = function toJSON() {
                 return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
             };
 
             /**
-             * Gets the default type url for SetVdfParamsOperation
+             * Gets the default type url for ConsensusControlOperation
              * @function getTypeUrl
-             * @memberof apply.operations.SetVdfParamsOperation
+             * @memberof apply.operations.ConsensusControlOperation
              * @static
              * @param {string} [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
              * @returns {string} The default type url
              */
-            SetVdfParamsOperation.getTypeUrl = function getTypeUrl(typeUrlPrefix) {
+            ConsensusControlOperation.getTypeUrl = function getTypeUrl(typeUrlPrefix) {
                 if (typeUrlPrefix === undefined) {
                     typeUrlPrefix = "type.googleapis.com";
                 }
-                return typeUrlPrefix + "/apply.operations.SetVdfParamsOperation";
+                return typeUrlPrefix + "/apply.operations.ConsensusControlOperation";
             };
 
-            return SetVdfParamsOperation;
+            return ConsensusControlOperation;
         })();
 
         return operations;
     })();
 
     return apply;
+})();
+
+$root.common = (function() {
+
+    /**
+     * Namespace common.
+     * @exports common
+     * @namespace
+     */
+    var common = {};
+
+    common.consensus = (function() {
+
+        /**
+         * Namespace consensus.
+         * @memberof common
+         * @namespace
+         */
+        var consensus = {};
+
+        consensus.ConsensusConfig = (function() {
+
+            /**
+             * Properties of a ConsensusConfig.
+             * @memberof common.consensus
+             * @interface IConsensusConfig
+             * @property {Uint8Array|null} [sv] ConsensusConfig sv
+             * @property {Uint8Array|null} [cd] ConsensusConfig cd
+             */
+
+            /**
+             * Constructs a new ConsensusConfig.
+             * @memberof common.consensus
+             * @classdesc Represents a ConsensusConfig.
+             * @implements IConsensusConfig
+             * @constructor
+             * @param {common.consensus.IConsensusConfig=} [properties] Properties to set
+             */
+            function ConsensusConfig(properties) {
+                if (properties)
+                    for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
+                        if (properties[keys[i]] != null)
+                            this[keys[i]] = properties[keys[i]];
+            }
+
+            /**
+             * ConsensusConfig sv.
+             * @member {Uint8Array} sv
+             * @memberof common.consensus.ConsensusConfig
+             * @instance
+             */
+            ConsensusConfig.prototype.sv = $util.newBuffer([]);
+
+            /**
+             * ConsensusConfig cd.
+             * @member {Uint8Array} cd
+             * @memberof common.consensus.ConsensusConfig
+             * @instance
+             */
+            ConsensusConfig.prototype.cd = $util.newBuffer([]);
+
+            /**
+             * Creates a new ConsensusConfig instance using the specified properties.
+             * @function create
+             * @memberof common.consensus.ConsensusConfig
+             * @static
+             * @param {common.consensus.IConsensusConfig=} [properties] Properties to set
+             * @returns {common.consensus.ConsensusConfig} ConsensusConfig instance
+             */
+            ConsensusConfig.create = function create(properties) {
+                return new ConsensusConfig(properties);
+            };
+
+            /**
+             * Encodes the specified ConsensusConfig message. Does not implicitly {@link common.consensus.ConsensusConfig.verify|verify} messages.
+             * @function encode
+             * @memberof common.consensus.ConsensusConfig
+             * @static
+             * @param {common.consensus.IConsensusConfig} message ConsensusConfig message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            ConsensusConfig.encode = function encode(message, writer) {
+                if (!writer)
+                    writer = $Writer.create();
+                if (message.sv != null && Object.hasOwnProperty.call(message, "sv"))
+                    writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.sv);
+                if (message.cd != null && Object.hasOwnProperty.call(message, "cd"))
+                    writer.uint32(/* id 2, wireType 2 =*/18).bytes(message.cd);
+                return writer;
+            };
+
+            /**
+             * Encodes the specified ConsensusConfig message, length delimited. Does not implicitly {@link common.consensus.ConsensusConfig.verify|verify} messages.
+             * @function encodeDelimited
+             * @memberof common.consensus.ConsensusConfig
+             * @static
+             * @param {common.consensus.IConsensusConfig} message ConsensusConfig message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            ConsensusConfig.encodeDelimited = function encodeDelimited(message, writer) {
+                return this.encode(message, writer).ldelim();
+            };
+
+            /**
+             * Decodes a ConsensusConfig message from the specified reader or buffer.
+             * @function decode
+             * @memberof common.consensus.ConsensusConfig
+             * @static
+             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {number} [length] Message length if known beforehand
+             * @returns {common.consensus.ConsensusConfig} ConsensusConfig
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            ConsensusConfig.decode = function decode(reader, length, error) {
+                if (!(reader instanceof $Reader))
+                    reader = $Reader.create(reader);
+                var end = length === undefined ? reader.len : reader.pos + length, message = new $root.common.consensus.ConsensusConfig();
+                while (reader.pos < end) {
+                    var tag = reader.uint32();
+                    if (tag === error)
+                        break;
+                    switch (tag >>> 3) {
+                    case 1: {
+                            message.sv = reader.bytes();
+                            break;
+                        }
+                    case 2: {
+                            message.cd = reader.bytes();
+                            break;
+                        }
+                    default:
+                        reader.skipType(tag & 7);
+                        break;
+                    }
+                }
+                return message;
+            };
+
+            /**
+             * Decodes a ConsensusConfig message from the specified reader or buffer, length delimited.
+             * @function decodeDelimited
+             * @memberof common.consensus.ConsensusConfig
+             * @static
+             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @returns {common.consensus.ConsensusConfig} ConsensusConfig
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            ConsensusConfig.decodeDelimited = function decodeDelimited(reader) {
+                if (!(reader instanceof $Reader))
+                    reader = new $Reader(reader);
+                return this.decode(reader, reader.uint32());
+            };
+
+            /**
+             * Verifies a ConsensusConfig message.
+             * @function verify
+             * @memberof common.consensus.ConsensusConfig
+             * @static
+             * @param {Object.<string,*>} message Plain object to verify
+             * @returns {string|null} `null` if valid, otherwise the reason why it is not
+             */
+            ConsensusConfig.verify = function verify(message) {
+                if (typeof message !== "object" || message === null)
+                    return "object expected";
+                if (message.sv != null && message.hasOwnProperty("sv"))
+                    if (!(message.sv && typeof message.sv.length === "number" || $util.isString(message.sv)))
+                        return "sv: buffer expected";
+                if (message.cd != null && message.hasOwnProperty("cd"))
+                    if (!(message.cd && typeof message.cd.length === "number" || $util.isString(message.cd)))
+                        return "cd: buffer expected";
+                return null;
+            };
+
+            /**
+             * Creates a ConsensusConfig message from a plain object. Also converts values to their respective internal types.
+             * @function fromObject
+             * @memberof common.consensus.ConsensusConfig
+             * @static
+             * @param {Object.<string,*>} object Plain object
+             * @returns {common.consensus.ConsensusConfig} ConsensusConfig
+             */
+            ConsensusConfig.fromObject = function fromObject(object) {
+                if (object instanceof $root.common.consensus.ConsensusConfig)
+                    return object;
+                var message = new $root.common.consensus.ConsensusConfig();
+                if (object.sv != null)
+                    if (typeof object.sv === "string")
+                        $util.base64.decode(object.sv, message.sv = $util.newBuffer($util.base64.length(object.sv)), 0);
+                    else if (object.sv.length >= 0)
+                        message.sv = object.sv;
+                if (object.cd != null)
+                    if (typeof object.cd === "string")
+                        $util.base64.decode(object.cd, message.cd = $util.newBuffer($util.base64.length(object.cd)), 0);
+                    else if (object.cd.length >= 0)
+                        message.cd = object.cd;
+                return message;
+            };
+
+            /**
+             * Creates a plain object from a ConsensusConfig message. Also converts values to other types if specified.
+             * @function toObject
+             * @memberof common.consensus.ConsensusConfig
+             * @static
+             * @param {common.consensus.ConsensusConfig} message ConsensusConfig
+             * @param {$protobuf.IConversionOptions} [options] Conversion options
+             * @returns {Object.<string,*>} Plain object
+             */
+            ConsensusConfig.toObject = function toObject(message, options) {
+                if (!options)
+                    options = {};
+                var object = {};
+                if (options.defaults) {
+                    if (options.bytes === String)
+                        object.sv = "";
+                    else {
+                        object.sv = [];
+                        if (options.bytes !== Array)
+                            object.sv = $util.newBuffer(object.sv);
+                    }
+                    if (options.bytes === String)
+                        object.cd = "";
+                    else {
+                        object.cd = [];
+                        if (options.bytes !== Array)
+                            object.cd = $util.newBuffer(object.cd);
+                    }
+                }
+                if (message.sv != null && message.hasOwnProperty("sv"))
+                    object.sv = options.bytes === String ? $util.base64.encode(message.sv, 0, message.sv.length) : options.bytes === Array ? Array.prototype.slice.call(message.sv) : message.sv;
+                if (message.cd != null && message.hasOwnProperty("cd"))
+                    object.cd = options.bytes === String ? $util.base64.encode(message.cd, 0, message.cd.length) : options.bytes === Array ? Array.prototype.slice.call(message.cd) : message.cd;
+                return object;
+            };
+
+            /**
+             * Converts this ConsensusConfig to JSON.
+             * @function toJSON
+             * @memberof common.consensus.ConsensusConfig
+             * @instance
+             * @returns {Object.<string,*>} JSON object
+             */
+            ConsensusConfig.prototype.toJSON = function toJSON() {
+                return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
+            };
+
+            /**
+             * Gets the default type url for ConsensusConfig
+             * @function getTypeUrl
+             * @memberof common.consensus.ConsensusConfig
+             * @static
+             * @param {string} [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
+             * @returns {string} The default type url
+             */
+            ConsensusConfig.getTypeUrl = function getTypeUrl(typeUrlPrefix) {
+                if (typeUrlPrefix === undefined) {
+                    typeUrlPrefix = "type.googleapis.com";
+                }
+                return typeUrlPrefix + "/common.consensus.ConsensusConfig";
+            };
+
+            return ConsensusConfig;
+        })();
+
+        return consensus;
+    })();
+
+    return common;
 })();
 
 module.exports = $root;
