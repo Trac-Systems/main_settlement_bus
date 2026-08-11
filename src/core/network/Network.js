@@ -157,7 +157,7 @@ class Network extends ReadyResource {
 
     async _close() {
         this.#logger.info('Network: closing gracefully...');
-        await this.#epochCoordinatorService.stop();
+        await this.#epochCoordinatorService.close();
         await this.transactionPoolService.stop();
         await sleep(100);
         await this.#validatorObserverService.stop();
