@@ -47,7 +47,8 @@ function createState({
     currentEpochHash = defaultPreviousEpochRecordHash,
     vdfDifficulty = TEST_VDF_PARAMS.vdfDifficulty,
     vdfDiscriminantSize = TEST_VDF_PARAMS.vdfDiscriminantSize,
-    isIndexer = true
+    isIndexer = true,
+    localIsIndexer = true
 } = {}) {
     return {
         requireCurrentEpoch: async () => currentEpoch,
@@ -59,7 +60,8 @@ function createState({
                 discriminantBitSize: vdfDiscriminantSize
             }
         }),
-        isIndexerAddress: async () => isIndexer
+        isIndexerAddress: async () => isIndexer,
+        isIndexer: () => localIsIndexer
     };
 }
 
@@ -203,6 +205,19 @@ test('V1EpochProofProposalRequest rejects proposer that is not an indexer', asyn
         async () => validator.validate(payload, {remotePublicKey: wallet.publicKey}),
         ConsensusResultCode.INDEXER_ROLE_INVALID,
         'Incoming address is not an indexer.'
+    );
+});
+
+test('V1EpochProofProposalRequest rejects when the local node is not an indexer', async t => {
+    const wallet = await createWallet();
+    const validator = new V1EpochProofProposalRequest(config, createState({localIsIndexer: false}));
+    const payload = await buildProofProposalPayload(wallet);
+
+    await assertProtocolError(
+        t,
+        async () => validator.validate(payload, {remotePublicKey: wallet.publicKey}),
+        ConsensusResultCode.INDEXER_ROLE_INVALID,
+        'Local node is not an indexer and cannot approve proposals.'
     );
 });
 
