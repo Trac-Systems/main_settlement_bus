@@ -310,9 +310,9 @@ class EpochCoordinatorService extends SchedulableService {
         })
         toClean.push(cleanProposal)
 
-        const cleanEpochCreated = listenTo(this.#state, CustomEventType.EPOCH_CREATED, () => {
+        const cleanEpochCreated = listenTo(this.#state, CustomEventType.EPOCH_CREATED, async () => {
             if (stateMachine.state !== EPOCH_STATES.APPEND_SET_EPOCH) {
-                await machine.close()
+                await stateMachine.close()
                 stateMachine.context.next(this.#intervalMs);
             }
         })

@@ -502,7 +502,7 @@ if (isBareRuntime) {
 
     // --- append / re-check-before-append flow ---
 
-    test('TARGET_EPOCH_ALREADY_SIGNED reloads the signed context and restarts from INITIALIZE_VDF without appending', async t => {
+    test('TARGET_EPOCH_ALREADY_SIGNED ends the current cycle without appending', async t => {
         const getCurrentEpoch = sinon.stub();
         getCurrentEpoch.onCall(0).resolves(5n); // #shouldRun() guard
         getCurrentEpoch.onCall(1).resolves(5n); // seed for this cycle (context.currentEpoch)
@@ -514,14 +514,13 @@ if (isBareRuntime) {
         });
         t.teardown(() => service.close());
 
-        await service.worker(sinon.stub(), sinon.stub());
+        const next = sinon.stub();
+        await service.worker(next, sinon.stub());
 
-        // First pass builds a payload for the stale target, discovers it's already signed via
-        // TARGET_EPOCH_ALREADY_SIGNED, and reloads instead of appending; the retried pass (against
-        // the now-current epoch) builds again and this time appends exactly once.
-        t.is(mockOps.buildSetEpochPayload.callCount, 2, 'built once for the stale target, once after reload');
-        t.is(mockOps.appendSetEpoch.callCount, 1, 'only the reloaded pass actually appends');
-        t.is(mockOps.calculateVDF.callCount, 2, 'restarted from INITIALIZE_VDF against the reloaded epoch');
+        t.is(mockOps.buildSetEpochPayload.callCount, 1, 'the stale target is built once');
+        t.is(mockOps.appendSetEpoch.callCount, 0, 'an already-signed target is not appended');
+        t.is(mockOps.calculateVDF.callCount, 1, 'the next scheduler cycle performs any retry');
+        t.ok(next.calledOnceWith(CONFIG.epochInterval), 'the next cycle is scheduled');
     });
 
     test('APPEND_FAILED backs off, and the next cycle rebuilds the proof and retries the append', async t => {
@@ -572,7 +571,7 @@ if (isBareRuntime) {
         t.ok(next.calledOnce, 'EPOCH_CREATED for our own proposal reached the terminal SEND_APPEND_SIGNAL state');
     });
 
-    test('EPOCH_CREATED from another proposer for the target epoch reloads instead of accepting our own append', async t => {
+    test('EPOCH_CREATED from another proposer for the target epoch schedules a fresh cycle', async t => {
         const getCurrentEpoch = sinon.stub();
         getCurrentEpoch.onCall(0).resolves(5n); // #shouldRun() guard
         getCurrentEpoch.onCall(1).resolves(5n); // seed for this cycle (context.currentEpoch)
@@ -584,18 +583,18 @@ if (isBareRuntime) {
         });
         t.teardown(() => service.close());
 
-        await service.worker(sinon.stub(), sinon.stub());
+        const next = sinon.stub();
+        await service.worker(next, sinon.stub());
         await drainMicrotasks();
         t.is(mockOps.appendSetEpoch.callCount, 1);
 
         await state.emit(EPOCH_CREATED, { epoch: 6n, proposerAddress: 'trac1someone-else' });
-        // The EPOCH_CREATED listener fires the state machine's send() fire-and-forget (an event
-        // emitter can't await its listener's downstream effects), and the reload -> re-append
-        // chain has several hops - a real timer tick lets it fully settle, drainMicrotasks() does not.
+        // The listener sends the reload event fire-and-forget; a real timer tick lets it settle.
         await flush();
 
-        t.is(mockOps.calculateVDF.callCount, 2, 'restarted from INITIALIZE_VDF against the reloaded epoch');
-        t.is(mockOps.appendSetEpoch.callCount, 2, 'the reloaded pass appends again for the new target epoch');
+        t.is(mockOps.calculateVDF.callCount, 1, 'the current cycle does not recompute the VDF');
+        t.is(mockOps.appendSetEpoch.callCount, 1, 'the current cycle does not append again');
+        t.ok(next.calledOnceWith(CONFIG.epochInterval), 'the next scheduler cycle is scheduled');
     });
 
     test('EPOCH_CREATED for an unrelated epoch is ignored while waiting in APPEND_SET_EPOCH', async t => {
