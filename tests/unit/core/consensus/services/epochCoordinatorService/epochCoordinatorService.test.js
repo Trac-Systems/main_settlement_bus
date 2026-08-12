@@ -45,13 +45,13 @@ function makeState(overrides = {}) {
         indexerCount: sinon.stub().resolves(1),
         getCurrentEpoch: sinon.stub().resolves(5n),
         getEpoch: sinon.stub().resolves(b4a.alloc(32, 0xaa)),
-        getSignedVDFParams: sinon.stub().resolves({ vdfDifficulty: 100, vdfDiscriminantSize: 2048 }),
+        getSignedConsensusConfig: sinon.stub().resolves({ schemaVersion: 1, configData: { difficulty: 100, discriminantBitSize: 2048 } }),
         ...overrides,
     };
 
     // Mirrors State's real requireX()-wraps-getX()-and-throws-on-null semantics, so overriding
-    // getCurrentEpoch/getEpoch/getSignedVDFParams above also drives these consistently instead
-    // of needing every test to stub both the plain and throwing variants separately.
+    // getCurrentEpoch/getEpoch/getSignedConsensusConfig above also drives these consistently
+    // instead of needing every test to stub both the plain and throwing variants separately.
     state.requireCurrentEpoch = async () => {
         const epoch = await state.getCurrentEpoch();
         if (epoch === null || epoch === undefined) {
@@ -66,12 +66,12 @@ function makeState(overrides = {}) {
         }
         return epochHash;
     };
-    state.requireSignedVDFParams = async () => {
-        const params = await state.getSignedVDFParams();
-        if (params === null || params === undefined) {
-            throw new Error('VDF parameters are not initialized.');
+    state.requireSignedConsensusConfig = async () => {
+        const consensusConfig = await state.getSignedConsensusConfig();
+        if (consensusConfig === null || consensusConfig === undefined) {
+            throw new Error('Consensus config is not initialized.');
         }
-        return params;
+        return consensusConfig;
     };
 
     return state;
