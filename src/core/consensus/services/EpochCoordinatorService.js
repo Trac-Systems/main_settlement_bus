@@ -98,7 +98,12 @@ class EpochCoordinatorService extends SchedulableService {
         // "snapshot"
         const currentEpoch = await this.#state.requireCurrentEpoch();
         const currentEpochHash = await this.#state.requireEpoch(currentEpoch);
-        const { vdfDifficulty, vdfDiscriminantSize } = await this.#state.requireSignedVDFParams();
+        const { 
+            configData: {
+                difficulty: vdfDifficulty,
+                discriminantBitSize: vdfDiscriminantSize,
+            } 
+        } = await this.#state.requireSignedConsensusConfig();
         const quorum = await this.#getQuorum();
 
         machine.appendContext({ currentEpoch, currentEpochHash, vdfDifficulty, vdfDiscriminantSize, quorum });
