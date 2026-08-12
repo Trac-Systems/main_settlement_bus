@@ -26,8 +26,9 @@ async function resolveBareBinaryPath() {
             const nodeModulesUrl = typeof globalThis.Pear !== 'undefined'
                 ? `file://${globalThis.Pear.config.dir}/node_modules/`
                 : new URL('../../../../node_modules/', import.meta.url).href;
+            
             const binaryPath = fileURLToPath(
-                new URL(`./bare-runtime-${Bare.platform}-${Bare.arch}/bin/bare`, nodeModulesUrl)
+                new URL(`./bare-runtime-${Bare.platform}-${Bare.arch}/bin/bare`, nodeModulesUrl) // eslint-disable-line no-undef
             );
 
             // npm doesn't reliably preserve the executable bit on this binary across installs.
