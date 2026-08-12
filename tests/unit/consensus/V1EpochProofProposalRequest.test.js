@@ -79,15 +79,6 @@ async function buildGenesisEpochHash(wallet, vdfParams = TEST_VDF_PARAMS) {
     return await tracCryptoApi.hash.blake3(genesisEpoch);
 }
 
-async function buildVdfParametersHash(vdfParams = TEST_VDF_PARAMS) {
-    const message = createMessage(
-        uint32ToBuffer(vdfParams.vdfDifficulty),
-        uint16ToBuffer(vdfParams.vdfDiscriminantSize)
-    );
-
-    return await tracCryptoApi.hash.blake3(message);
-}
-
 async function buildVdfProof(challengeData, vdfParams = TEST_VDF_PARAMS) {
     const cacheKey = [
         vdfParams.vdfDifficulty,
@@ -116,14 +107,16 @@ async function buildProofProposalPayload(wallet, {
     const networkId = uint16ToBuffer(config.networkId);
     const epochBuffer = uint64ToBuffer(epoch);
     const proposer = addressToBuffer(wallet.address, config.addressPrefix);
-    const vdfParametersHash = await buildVdfParametersHash(vdfParams);
+    const difficulty = uint32ToBuffer(vdfParams.vdfDifficulty);
+    const discriminantBitSize = uint16ToBuffer(vdfParams.vdfDiscriminantSize);
     const challengeData = createMessage(
         protocolVersion,
         networkId,
         epochBuffer,
         previousEpochRecordHash,
         proposer,
-        vdfParametersHash
+        difficulty,
+        discriminantBitSize
     );
     const vdfProof = await buildVdfProof(challengeData, vdfParams);
 
@@ -136,8 +129,9 @@ async function buildProofProposalPayload(wallet, {
         .setEpoch(epoch)
         .setPreviousEpochRecordHash(previousEpochRecordHash)
         .setProposer(wallet.address)
-        .setVdfParametersHash(vdfParametersHash)
-        .setVdfProof(vdfProof)
+        .setDifficulty(difficulty)
+        .setDiscriminantBitSize(discriminantBitSize)
+        .setProof(vdfProof)
         .buildPayload();
 
     return builder.getResult();
@@ -187,7 +181,7 @@ test('V1EpochProofProposalRequest validates proof proposal signature', async t =
         previousEpochRecordHash: genesisEpochHash
     });
 
-    t.is(payload.proof_proposal.vdf_proof.length, VDF_BLOB_PROOF_SIZE);
+    t.is(payload.proof_proposal.proof.length, VDF_BLOB_PROOF_SIZE);
     await validator.validate(payload, {remotePublicKey: wallet.publicKey});
 
     t.is(currentEpochReads, 1);
@@ -241,32 +235,39 @@ test('V1EpochProofProposalRequest rejects unsupported proof proposal protocol ve
     );
 });
 
-test('V1EpochProofProposalRequest rejects invalid VDF parameters hash', async t => {
+test('V1EpochProofProposalRequest rejects consensus config mismatch', async t => {
     const wallet = await createWallet();
     const validator = new V1EpochProofProposalRequest(config, createState());
     const payload = await buildProofProposalPayload(wallet);
-    const fakeProofProposal = {
-        ...payload.proof_proposal,
-        vdf_parameters_hash: b4a.alloc(32, 9)
-    };
-    const challengeData = validator.buildProofProposalChallengeData(fakeProofProposal);
-    const signatureMessage = createMessage(challengeData, fakeProofProposal.vdf_proof);
-    const signatureHash = await tracCryptoApi.hash.blake3(signatureMessage);
-    fakeProofProposal.signature = wallet.sign(signatureHash);
-    const fakePayload = {
-        ...payload,
-        proof_proposal: fakeProofProposal
-    };
+    const mismatchedConfigs = [
+        {difficulty: uint32ToBuffer(TEST_VDF_PARAMS.vdfDifficulty + 1)},
+        {discriminant_bit_size: uint16ToBuffer(TEST_VDF_PARAMS.vdfDiscriminantSize + 1)}
+    ];
 
-    await assertProtocolError(
-        t,
-        async () => validator.validate(fakePayload, {remotePublicKey: wallet.publicKey}),
-        ConsensusResultCode.VDF_PARAMETERS_HASH_INVALID,
-        'VDF parameters hash is invalid'
-    );
+    for (const configOverride of mismatchedConfigs) {
+        const fakeProofProposal = {
+            ...payload.proof_proposal,
+            ...configOverride
+        };
+        const challengeData = validator.buildProofProposalChallengeData(fakeProofProposal);
+        const signatureMessage = createMessage(challengeData, fakeProofProposal.proof);
+        const signatureHash = await tracCryptoApi.hash.blake3(signatureMessage);
+        fakeProofProposal.signature = wallet.sign(signatureHash);
+        const fakePayload = {
+            ...payload,
+            proof_proposal: fakeProofProposal
+        };
+
+        await assertProtocolError(
+            t,
+            async () => validator.validate(fakePayload, {remotePublicKey: wallet.publicKey}),
+            ConsensusResultCode.CONSENSUS_CONFIG_MISMATCH,
+            'Proof proposal does not match the current consensus configuration.'
+        );
+    }
 });
 
-test('V1EpochProofProposalRequest builds proof proposal challenge data from fields one through six', async t => {
+test('V1EpochProofProposalRequest builds proof proposal challenge data from fields one through seven', async t => {
     const wallet = await createWallet();
     const validator = new V1EpochProofProposalRequest(config, createState());
     const payload = await buildProofProposalPayload(wallet);
@@ -278,9 +279,10 @@ test('V1EpochProofProposalRequest builds proof proposal challenge data from fiel
         proofProposal.epoch,
         proofProposal.previous_epoch_record_hash,
         proofProposal.proposer,
-        proofProposal.vdf_parameters_hash
+        proofProposal.difficulty,
+        proofProposal.discriminant_bit_size
     );
-    const signatureMessage = createMessage(expectedChallengeData, proofProposal.vdf_proof);
+    const signatureMessage = createMessage(expectedChallengeData, proofProposal.proof);
 
     t.ok(b4a.equals(challengeData, expectedChallengeData));
     t.not(b4a.equals(challengeData, signatureMessage));
@@ -312,10 +314,10 @@ test('V1EpochProofProposalRequest rejects invalid VDF proof', async t => {
     const payload = await buildProofProposalPayload(wallet);
     const fakeProofProposal = {
         ...payload.proof_proposal,
-        vdf_proof: b4a.alloc(VDF_BLOB_PROOF_SIZE, 4)
+        proof: b4a.alloc(VDF_BLOB_PROOF_SIZE, 4)
     };
     const challengeData = validator.buildProofProposalChallengeData(fakeProofProposal);
-    const signatureMessage = createMessage(challengeData, fakeProofProposal.vdf_proof);
+    const signatureMessage = createMessage(challengeData, fakeProofProposal.proof);
     const signatureHash = await tracCryptoApi.hash.blake3(signatureMessage);
     fakeProofProposal.signature = wallet.sign(signatureHash);
 

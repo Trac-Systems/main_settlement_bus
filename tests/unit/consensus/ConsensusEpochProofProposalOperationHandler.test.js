@@ -122,8 +122,9 @@ async function verifyProofProposalApprovalSignature(proofProposal, approval, pub
         proofProposal.epoch,
         proofProposal.previous_epoch_record_hash,
         proofProposal.proposer,
-        proofProposal.vdf_parameters_hash,
-        proofProposal.vdf_proof,
+        proofProposal.difficulty,
+        proofProposal.discriminant_bit_size,
+        proofProposal.proof,
         approval.approver,
         proofProposal.signature
     );

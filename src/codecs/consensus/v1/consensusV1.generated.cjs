@@ -1427,7 +1427,7 @@ $root.consensus = (function() {
                 case 102:
                     message.result = 102;
                     break;
-                case "RESULT_CODE_CONSENSUS_VDF_PARAMETERS_HASH_INVALID":
+                case "RESULT_CODE_CONSENSUS_CONFIG_MISMATCH":
                 case 103:
                     message.result = 103;
                     break;
@@ -1891,7 +1891,7 @@ $root.common = (function() {
          * @property {number} RESULT_CODE_CONSENSUS_SCHEMA_VALIDATION_FAILED=100 RESULT_CODE_CONSENSUS_SCHEMA_VALIDATION_FAILED value
          * @property {number} RESULT_CODE_CONSENSUS_BAD_PROTOCOL_VERSION=101 RESULT_CODE_CONSENSUS_BAD_PROTOCOL_VERSION value
          * @property {number} RESULT_CODE_CONSENSUS_WRONG_NETWORK_ID=102 RESULT_CODE_CONSENSUS_WRONG_NETWORK_ID value
-         * @property {number} RESULT_CODE_CONSENSUS_VDF_PARAMETERS_HASH_INVALID=103 RESULT_CODE_CONSENSUS_VDF_PARAMETERS_HASH_INVALID value
+         * @property {number} RESULT_CODE_CONSENSUS_CONFIG_MISMATCH=103 RESULT_CODE_CONSENSUS_CONFIG_MISMATCH value
          * @property {number} RESULT_CODE_CONSENSUS_VDF_PROOF_INVALID=104 RESULT_CODE_CONSENSUS_VDF_PROOF_INVALID value
          * @property {number} RESULT_CODE_CONSENSUS_ADDRESS_INVALID=105 RESULT_CODE_CONSENSUS_ADDRESS_INVALID value
          * @property {number} RESULT_CODE_CONSENSUS_PUBLIC_KEY_MISMATCH=106 RESULT_CODE_CONSENSUS_PUBLIC_KEY_MISMATCH value
@@ -1971,7 +1971,7 @@ $root.common = (function() {
             values[valuesById[100] = "RESULT_CODE_CONSENSUS_SCHEMA_VALIDATION_FAILED"] = 100;
             values[valuesById[101] = "RESULT_CODE_CONSENSUS_BAD_PROTOCOL_VERSION"] = 101;
             values[valuesById[102] = "RESULT_CODE_CONSENSUS_WRONG_NETWORK_ID"] = 102;
-            values[valuesById[103] = "RESULT_CODE_CONSENSUS_VDF_PARAMETERS_HASH_INVALID"] = 103;
+            values[valuesById[103] = "RESULT_CODE_CONSENSUS_CONFIG_MISMATCH"] = 103;
             values[valuesById[104] = "RESULT_CODE_CONSENSUS_VDF_PROOF_INVALID"] = 104;
             values[valuesById[105] = "RESULT_CODE_CONSENSUS_ADDRESS_INVALID"] = 105;
             values[valuesById[106] = "RESULT_CODE_CONSENSUS_PUBLIC_KEY_MISMATCH"] = 106;

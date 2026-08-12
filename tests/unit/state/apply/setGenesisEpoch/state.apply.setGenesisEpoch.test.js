@@ -23,7 +23,6 @@ import {
     applyWithConsensusConfigEncodingFailure,
     applyWithEntryOverrides,
     applyWithGenesisEpochEncodingFailure,
-    applyWithGenesisProofHashFailure,
     applyWithMessageConstructionFailure,
     assertGenesisInitialized,
     assertGenesisUninitialized,
@@ -486,20 +485,6 @@ for (const [label, overridesFactory] of [
         );
     });
 }
-
-// genesisEpoch === null
-test('State.apply SET_GENESIS_EPOCH fails without partial writes when proof creation fails', async t => {
-    const context = await setupSetGenesisEpochScenario(t);
-    const payload = await buildSetGenesisEpochPayload(context);
-    const { logs, result } = captureApplyErrors(() =>
-        applyWithGenesisProofHashFailure(context, payload)
-    );
-    const injected = await result;
-
-    t.ok(injected, 'genesis proof hash failure was injected');
-    await assertSetGenesisEpochFailureState(t, context, payload, { skipSync: true });
-    assertLog(t, logs, 'Could not initialize genesis epoch');
-});
 
 test('State.apply SET_GENESIS_EPOCH fails when final epoch proof encoding fails', async t => {
     const context = await setupSetGenesisEpochScenario(t);
