@@ -241,6 +241,7 @@ class EpochCoordinatorService extends SchedulableService {
     }
 
     async #handleRefreshSignedState(context, machine) {
+        await this.#state.refresh()
         const latestEpoch = await this.#state.getCurrentEpoch();
         if (latestEpoch > context.currentEpoch) {
             await machine.send(EPOCH_EVENTS.NEW_EPOCH_DISCOVERED);
@@ -251,30 +252,13 @@ class EpochCoordinatorService extends SchedulableService {
         }
     }
 
-    async #handleBackoff(context, _machine) {
-        context.next(this.#intervalMs);
+    async #handleBackoff(context, machine) {
+        await machine.send(EPOCH_EVENTS.BACKOFF_ELAPSED);
     }
 
-    async #handleReloadSignedContext(_context, machine) {
-        const currentEpoch = await this.#state.requireCurrentEpoch();
-        const currentEpochHash = await this.#state.requireEpoch(currentEpoch);
-        const { vdfDifficulty, vdfDiscriminantSize } = await this.#state.requireSignedVDFParams();
-        const quorum = await this.#getQuorum();
-        machine.appendContext({
-            currentEpoch,
-            currentEpochHash,
-            vdfDifficulty,
-            vdfDiscriminantSize,
-            quorum,
-            vdf: undefined,
-            proofProposalMessage: undefined,
-            proofProposal: undefined,
-            proposals: undefined,
-            setEpochPayload: undefined,
-            latestEpochBeforeAppend: undefined,
-            remoteProposalReceived: undefined,
-        });
-        await machine.send(EPOCH_EVENTS.CONTEXT_RELOADED);
+    async #handleReloadSignedContext(context, machine) {
+        await machine.close()
+        context.next(this.#intervalMs);
     }
 
     /** Any handler error ends the cycle via next() instead of leaving the machine stuck open. */
@@ -284,6 +268,7 @@ class EpochCoordinatorService extends SchedulableService {
                 await handler(context, machine);
             } catch (err) {
                 this.#logger.error(`[EpochCoordinatorService] handler failed: ${err.message}`);
+                await machine.close()
                 context.next(this.#intervalMs);
             }
         };
@@ -327,6 +312,7 @@ class EpochCoordinatorService extends SchedulableService {
 
         const cleanEpochCreated = listenTo(this.#state, CustomEventType.EPOCH_CREATED, () => {
             if (stateMachine.state !== EPOCH_STATES.APPEND_SET_EPOCH) {
+                await machine.close()
                 stateMachine.context.next(this.#intervalMs);
             }
         })

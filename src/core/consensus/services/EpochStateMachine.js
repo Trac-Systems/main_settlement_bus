@@ -86,11 +86,6 @@ const TRANSITIONS = {
     [EPOCH_STATES.BACKOFF]: Object.freeze({
         [EPOCH_EVENTS.BACKOFF_ELAPSED]: EPOCH_STATES.REFRESH_SIGNED_STATE,
     }),
-    [EPOCH_STATES.RELOAD_SIGNED_CONTEXT]: Object.freeze({
-        // Hard reset is mandatory here: the VDF challenge is derived from currentEpoch/currentEpochHash,
-        // which just changed, so the old proof is not reusable.
-        [EPOCH_EVENTS.CONTEXT_RELOADED]: EPOCH_STATES.INITIALIZE_VDF,
-    }),
 };
 
 export class EpochStateMachine extends StateMachine {

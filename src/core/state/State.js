@@ -411,7 +411,7 @@ class State extends ReadyResource {
 
         // sometimes autobase swaps _applyState while performing a bump which will generate the system to be "empty" (it is just a proxy getter to applyState with a null check).
         // since this thing is responsible for permissions, it was opted out to perform a realignment check prior instead of safe navigating to respond the query (especially given that there is a cache in place).
-        await this.#base.update()
+        await this.refresh()
 
         for await (const { key, value } of this.#base.system.list()) {
             if (!key || !value || value.isRemoved) continue;
@@ -433,6 +433,10 @@ class State extends ReadyResource {
         const count = activeAddresses.size;
         this.#activeWriterCountCache.set(excludeAdmin, { systemLength, value: count });
         return count;
+    }
+
+    async refresh() {
+        return await this.#base.update()
     }
 
     async isWkInIndexersEntry(wk) {
