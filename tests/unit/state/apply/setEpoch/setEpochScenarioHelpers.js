@@ -8,8 +8,10 @@ import { applyStateMessageFactory } from '../../../../../src/messages/state/appl
 import { consensusMessageFactory } from '../../../../../src/messages/consensus/v1/consensusMessageFactory.js';
 import {
     unsafeDecodeApplyOperation,
-    encodeApplyOperation
+    encodeApplyOperation,
+    encodeConsensusConfig
 } from '../../../../../src/codecs/apply/applyOperationCodec.js';
+import { encodeVdfConfig } from '../../../../../src/codecs/consensus/v1/vdfConfigCodec.js';
 import {
     encodeProofProposal,
     encodeProofProposalApproval
@@ -70,12 +72,19 @@ export async function setupSetEpochScenario(t) {
 async function initializeGenesisEpoch(context) {
     const adminNode = context.adminBootstrap;
     const txValidity = await deriveIndexerSequenceState(adminNode.base);
+    const configData = encodeVdfConfig({
+        difficulty: uint32ToBuffer(VDF_DIFFICULTY),
+        discriminantBitSize: uint16ToBuffer(VDF_DISCRIMINANT_SIZE)
+    });
+    const encodedConsensusConfig = encodeConsensusConfig({
+        sv: uint8ToBuffer(1),
+        cd: configData
+    });
     const payload = await applyStateMessageFactory(adminNode.wallet, config)
         .buildCompleteSetGenesisEpochMessage(
             adminNode.wallet.address,
             txValidity,
-            uint32ToBuffer(VDF_DIFFICULTY),
-            uint16ToBuffer(VDF_DISCRIMINANT_SIZE)
+            encodedConsensusConfig
         );
     await appendAndUpdate(adminNode.base, encodeApplyOperation(payload));
 }

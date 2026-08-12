@@ -62,7 +62,7 @@ import deploymentEntryUtils from './utils/deploymentEntry.js';
 import { Status } from './utils/transaction.js';
 import remote from 'hypercore/lib/fully-remote-proof.js'
 import PQueue from 'p-queue';
-import { createGenesisEpochProof } from './utils/epochProof.js';
+import { createGenesisEpochProof, encodeVdfParameters } from './utils/epochProof.js';
 import {
     decodeVdfConfig,
     safeDecodeVdfConfig,
@@ -3560,13 +3560,35 @@ class State extends ReadyResource {
             return Status.FAILURE;
         }
 
-        const vdfParamsBuffer = await this.#getEntryApply(EntryType.VDF_PARAMS, batch);
-        if (vdfParamsBuffer === null) {
-            this.#safeLogApply(OperationType.SET_EPOCH, "VDF params are not initialized.", node.from.key)
+        const currentConsensusConfigBuffer = await this.#getEntryApply(EntryType.CONSENSUS_CONFIG_CURRENT, batch);
+        if (currentConsensusConfigBuffer === null) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Consensus config is not initialized.", node.from.key)
             return Status.FAILURE;
         }
 
-        const decodedVdfParams = decodeVdfParameters(vdfParamsBuffer);
+        const currentConsensusConfigIndex = safeReadUint32BE(currentConsensusConfigBuffer);
+        if (currentConsensusConfigIndex === null) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Failed to read current consensus config index from buffer", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const consensusConfigBuffer = await this.#getEntryApply(
+            EntryType.CONSENSUS_CONFIG_RECORD + currentConsensusConfigIndex,
+            batch
+        );
+        if (consensusConfigBuffer === null) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Consensus config record does not exist.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const consensusConfig = decodeConsensusConfig(consensusConfigBuffer);
+        const schemaVersion = safeReadUint8(consensusConfig.sv);
+        if (schemaVersion !== 1) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Unsupported consensus config schema version.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const decodedVdfParams = safeDecodeVdfConfig(consensusConfig.cd);
         if (decodedVdfParams === null) {
             this.#safeLogApply(OperationType.SET_EPOCH, "Invalid VDF params value.", node.from.key)
             return Status.FAILURE;
