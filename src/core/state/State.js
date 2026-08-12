@@ -27,7 +27,6 @@ import {
     decodeConsensusConfig,
     safeDecodeApplyOperation,
     safeEncodeConsensusConfig,
-    safeDecodeProofProposalApproval,
     safeEncodeEpochProof
 } from '../../codecs/apply/applyOperationCodec.js';
 import {
