@@ -2,6 +2,7 @@ import { test } from 'brittle';
 import sinon from 'sinon';
 import b4a from 'b4a';
 import EventEmitter from 'bare-events';
+import tracCryptoApi from 'trac-crypto-api';
 import { CONNECTION_STATUS, CustomEventType } from '../../../src/utils/constants.js';
 
 const isBareRuntime = typeof globalThis.Bare !== 'undefined';
@@ -29,10 +30,12 @@ function createMockConnection(publicKeyHex, { withProtocolSession = true, withCo
     };
 }
 
-async function loadNetwork() {
+async function loadNetwork({ isIndexer = false, currentEpoch = null, indexerCount = 0, walletAddress = 'trac_test' } = {}) {
     const { default: esmock } = await import('esmock');
     let swarmInstance = null;
     let validatorConnectionManagerInstance = null;
+    let indexerConnectionManagerInstance = null;
+    let epochCoordinatorServiceInstance = null;
 
     class HyperswarmMock extends EventEmitter {
         constructor() {
@@ -131,9 +134,36 @@ async function loadNetwork() {
     }
 
     class EpochCoordinatorServiceMock {
+        constructor() {
+            epochCoordinatorServiceInstance = this;
+            this.start = sinon.stub();
+            this.stop = sinon.stub();
+        }
+
         async ready() {}
-        start() {}
-        async stop() {}
+        async close() {}
+    }
+
+    class IndexerConnectionManagerMock {
+        constructor() {
+            indexerConnectionManagerInstance = this;
+            this.indexers = new Set();
+            this.add = sinon.stub().callsFake(publicKey => {
+                this.indexers.add(normalizePublicKey(publicKey));
+            });
+            this.remove = sinon.stub();
+            this.setMax = sinon.stub();
+        }
+
+        exists(publicKey) {
+            return this.indexers.has(normalizePublicKey(publicKey));
+        }
+
+        connected(publicKey) {
+            return this.exists(publicKey);
+        }
+
+        async ready() {}
         async close() {}
     }
 
@@ -193,6 +223,7 @@ async function loadNetwork() {
         '../../../src/core/network/services/TransactionCommitService.js': { default: TransactionCommitServiceMock },
         '../../../src/core/network/services/ValidatorHealthCheckService.js': { default: ValidatorHealthCheckServiceMock },
         '../../../src/core/consensus/services/EpochCoordinatorService.js': { default: EpochCoordinatorServiceMock },
+        '../../../src/core/consensus/services/IndexerConnectionManager.js': { default: IndexerConnectionManagerMock },
         '../../../src/core/network/protocols/NetworkMessages.js': { default: NetworkMessagesMock },
         '../../../src/core/consensus/protocols/ConsensusMessages.js': { default: ConsensusMessagesMock },
         'protomux-wakeup': { default: WakeupMock },
@@ -217,19 +248,28 @@ async function loadNetwork() {
     const wallet = {
         publicKey: b4a.alloc(32, 2),
         secretKey: b4a.alloc(64, 3),
-        address: 'trac_test',
+        address: walletAddress,
     };
 
     const store = new CorestoreMock();
     const state = new EventEmitter();
     state.isAdmin = async () => false;
-    state.isIndexer = () => false;
-    state.indexerCount = async () => 0;
+    state.isIndexer = () => isIndexer;
+    state.indexerCount = async () => indexerCount;
+    state.getCurrentEpoch = async () => currentEpoch;
     state.isAdminAddress = async () => false;
     const network = new Network(state, store, config, wallet);
     await network.ready()
 
-    return { network, store, swarmInstance, validatorConnectionManagerInstance, state };
+    return {
+        network,
+        store,
+        swarmInstance,
+        validatorConnectionManagerInstance,
+        indexerConnectionManagerInstance,
+        epochCoordinatorServiceInstance,
+        state
+    };
 }
 
 if (isBareRuntime) {
@@ -237,6 +277,68 @@ if (isBareRuntime) {
         t.pass('skipped in Bare because esmock depends on node:module');
     });
 } else {
+    test('Network does not start the epoch coordinator before genesis initialization', async t => {
+        const { network, epochCoordinatorServiceInstance } = await loadNetwork({
+            isIndexer: true,
+            currentEpoch: null
+        });
+
+        t.absent(epochCoordinatorServiceInstance.start.called);
+        await network.close();
+    });
+
+    test('Network starts the epoch coordinator for an initialized indexer', async t => {
+        const { network, epochCoordinatorServiceInstance } = await loadNetwork({
+            isIndexer: true,
+            currentEpoch: 0n
+        });
+
+        t.is(epochCoordinatorServiceInstance.start.callCount, 1);
+        await network.close();
+    });
+
+    test('Network starts the epoch coordinator when the genesis-epoch event is emitted on an indexer', async t => {
+        const { network, epochCoordinatorServiceInstance, state } = await loadNetwork({
+            isIndexer: true,
+            currentEpoch: null
+        });
+
+        state.emit(CustomEventType.GENESIS_EPOCH_CREATED, { epoch: 0n });
+
+        t.is(epochCoordinatorServiceInstance.start.callCount, 1);
+        await network.close();
+    });
+
+    test('Network ignores genesis-epoch events when this node is not an indexer', async t => {
+        const { network, epochCoordinatorServiceInstance, state } = await loadNetwork({
+            isIndexer: false,
+            currentEpoch: null
+        });
+
+        state.emit(CustomEventType.GENESIS_EPOCH_CREATED, { epoch: 0n });
+
+        t.absent(epochCoordinatorServiceInstance.start.called);
+        await network.close();
+    });
+
+    test('Network stops the epoch coordinator without refreshing indexer capacity when the local node is demoted', async t => {
+        const publicKey = b4a.alloc(32, 2);
+        const walletAddress = tracCryptoApi.address.encode('trac', publicKey);
+        const { network, epochCoordinatorServiceInstance, indexerConnectionManagerInstance, state } = await loadNetwork({
+            isIndexer: true,
+            currentEpoch: 0n,
+            indexerCount: 3,
+            walletAddress
+        });
+
+        state.emit(CustomEventType.IS_NON_INDEXER, publicKey);
+        await Promise.resolve();
+
+        t.is(epochCoordinatorServiceInstance.stop.callCount, 1, 'local indexer demotion stops the coordinator');
+        t.absent(indexerConnectionManagerInstance.setMax.called, 'local indexer demotion does not refresh connection capacity');
+        await network.close();
+    });
+
     test('Network#disconnectValidatorPeer clears pending validator attempts', async t => {
         const publicKey = 'a'.repeat(64);
         const { network, swarmInstance } = await loadNetwork();
@@ -303,7 +405,7 @@ if (isBareRuntime) {
 
     test('Network#tryConnect returns CONNECTED and promotes into the network-owned indexer manager', async t => {
         const publicKey = 'f'.repeat(64);
-        const { network, swarmInstance } = await loadNetwork();
+        const { network, swarmInstance, indexerConnectionManagerInstance } = await loadNetwork();
 
         const publicKeyBuffer = b4a.from(publicKey, 'hex');
         const connection = createMockConnection(publicKey);
@@ -312,11 +414,9 @@ if (isBareRuntime) {
 
         // Indexer connections are promoted into the single indexer manager Network
         // owns for its lifetime (network.indexerConnectionManager), not a per-call one.
-        const addSpy = sinon.spy(network.indexerConnectionManager, 'add');
-
         const status = await network.tryConnect(publicKey, 'indexer');
         t.is(status, CONNECTION_STATUS.CONNECTED, 'returns CONNECTED for ready indexer peer');
-        t.ok(addSpy.calledWith(publicKeyBuffer, connection), 'connection was promoted into the network-owned indexer manager');
+        t.ok(indexerConnectionManagerInstance.add.calledWith(publicKeyBuffer, connection), 'connection was promoted into the network-owned indexer manager');
         t.absent(network.isConnectionPending(publicKey), 'pending indexer connection was cleared');
         t.teardown(async () => await network.close());
     });
@@ -353,7 +453,13 @@ if (isBareRuntime) {
     test('Network disconnects validator peers when state role events invalidate them', async t => {
         const publicKey = 'd'.repeat(64);
         const publicKeyBuffer = b4a.from(publicKey, 'hex');
-        const { network, swarmInstance, validatorConnectionManagerInstance, state } = await loadNetwork();
+        const {
+            network,
+            swarmInstance,
+            validatorConnectionManagerInstance,
+            indexerConnectionManagerInstance,
+            state
+        } = await loadNetwork({ indexerCount: 3 });
 
         validatorConnectionManagerInstance.add(publicKey);
         swarmInstance.peers.set(publicKey, { publicKey: publicKeyBuffer });
@@ -366,11 +472,17 @@ if (isBareRuntime) {
         swarmInstance.peers.set(publicKey, { publicKey: publicKeyBuffer });
 
         state.emit(CustomEventType.IS_INDEXER, publicKeyBuffer);
-        await Promise.resolve(); // IS_INDEXER handler is async (awaits indexerCount), must yield
+        await Promise.resolve(); // IS_INDEXER handler awaits indexerCount.
         t.absent(validatorConnectionManagerInstance.exists(publicKey), 'promoted indexer should be removed from validator pool');
+        t.ok(indexerConnectionManagerInstance.setMax.calledWith(2), 'promoted indexer excludes itself from the indexer connection limit');
         // Promotion keeps the underlying connection alive (endConnection: false) so it can be
         // reused for the indexer role, so it must NOT leave the peer - unlike a hard disconnect.
         t.is(swarmInstance.leavePeer.callCount, 1, 'promoted indexer should not leave the peer, connection is reused');
+
+        state.emit(CustomEventType.IS_NON_INDEXER, publicKeyBuffer);
+        await Promise.resolve(); // IS_NON_INDEXER handler awaits indexerCount for remote peers.
+        t.ok(indexerConnectionManagerInstance.remove.calledWith(publicKeyBuffer), 'demoted remote indexer is removed before connection capacity is refreshed');
+        t.is(indexerConnectionManagerInstance.setMax.callCount, 2, 'demoted remote indexer refreshes the indexer connection limit');
         t.teardown(async () => await network.close());
     });
 

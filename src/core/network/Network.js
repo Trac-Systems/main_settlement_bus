@@ -151,7 +151,9 @@ class Network extends ReadyResource {
         this.validatorObserverService.start();
 
         if (this.#state.isIndexer()) {
-            this.#epochCoordinatorService.start();
+            if (await this.#state.getCurrentEpoch() !== null) {
+                this.#epochCoordinatorService.start();
+            }
         }
     }
 
@@ -178,19 +180,40 @@ class Network extends ReadyResource {
     }
 
     #listerners() {
-        this.#state.on(CustomEventType.IS_INDEXER, (publicKey) => {
+        this.#state.on(CustomEventType.IS_INDEXER, async (publicKey) => {
             const publicKeyHex = this.#normalizePublicKey(publicKey);
             this.#validatorConnectionManager.remove(publicKeyHex);
+            const indexerCount = await this.#state.indexerCount();
+            this.#indexerConnectionManager.setMax(indexerCount - 1);
         });
 
         this.#state.on(CustomEventType.UNWRITABLE, (publicKey) => {
             this.disconnectValidatorPeer(publicKey, 'peer became unwritable');
         });
 
-        this.#state.on(CustomEventType.IS_NON_INDEXER, (bufferAddress) => {
+        this.#state.on(CustomEventType.IS_INDEXER, async bufferAddress => {
+            const address = tracCryptoApi.address.encode(this.#config.addressPrefix, bufferAddress);
+            if (address === this.#wallet.address) {
+                if (await this.#state.getCurrentEpoch() !== null) {
+                    this.#epochCoordinatorService.start();
+                }
+            }
+        });
+
+        this.#state.on(CustomEventType.IS_NON_INDEXER, async (bufferAddress) => {
             const address = tracCryptoApi.address.encode(this.#config.addressPrefix, bufferAddress);
             if (address === this.#wallet.address) {
                 this.#epochCoordinatorService.stop();
+            } else {
+                this.#indexerConnectionManager.remove(bufferAddress);
+                const indexerCount = await this.#state.indexerCount();
+                this.#indexerConnectionManager.setMax(indexerCount - 1);
+            }
+        });
+
+        this.#state.on(CustomEventType.GENESIS_EPOCH_CREATED, () => {
+            if (this.#state.isIndexer()) {
+                this.#epochCoordinatorService.start();
             }
         });
 

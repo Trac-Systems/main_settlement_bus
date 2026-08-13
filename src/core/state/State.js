@@ -4582,6 +4582,7 @@ class State extends ReadyResource {
             console.info(`Genesis Epoch initialized addr:wk:tx - ${requesterAddressString}:${decodedAdminEntry.wk.toString('hex')}:${txHashHexString}`);
         }
 
+        this.emit(CustomEventType.GENESIS_EPOCH_CREATED, { epoch: 0n, proposerAddress: requesterAddressString });
         return Status.SUCCESS;
     }
 
