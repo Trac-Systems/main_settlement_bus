@@ -26,12 +26,16 @@ function createSubject(overrides = {}) {
         ...overrides.msb
     };
 
-    const handler = new CommandHandler({
+    const commandHandler = new CommandHandler({
         config: {},
         msb,
         handleClose: async () => {},
         wallet: undefined
     });
+    const context = { pending: null };
+    const handler = {
+        handle: input => commandHandler.handle(input, context)
+    };
 
     return { handler, msb, preparedTransfer };
 }

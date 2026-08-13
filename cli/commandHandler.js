@@ -53,10 +53,6 @@ export class CommandHandler {
     #closeCli;
     #wallet;
     #handlers;
-    #pendingConfirmation = null;
-    #pendingGenesisInitialization = null;
-    #pendingSetConsensusConfig = null;
-    #pendingSetVdfParams = null;
 
     constructor({ config, msb, handleClose, wallet }) {
         this.#msb = msb;
@@ -65,35 +61,35 @@ export class CommandHandler {
         this.#handlers = new Handlers(msb, config);
     }
 
-    async handle(input) {
-        if (this.#pendingConfirmation !== null) {
-            return this.#handlePendingConfirmation(input);
-        }
-
-        if (this.#pendingGenesisInitialization !== null) {
-            return this.#handlePendingGenesisInitialization(input);
-        }
-
-        if (this.#pendingSetConsensusConfig !== null) {
-            return this.#handlePendingSetConsensusConfig(input);
-        }
-
-        if (this.#pendingSetVdfParams !== null) {
-            return this.#handlePendingSetVdfParams(input);
-        }
-
+    async handle(input, context) {
         const [command, ...parts] = input.split(" ");
-        const context = { command, input, parts };
+        const handlerContext = { command, input, parts, context };
         const handlers = this.#getHandlers();
-        const handler = handlers.find(({ evaluate }) => evaluate(context));
+        const handler = handlers.find(({ evaluate }) => evaluate(handlerContext));
 
         if (handler) {
-            return handler.process(context);
+            return handler.process(handlerContext);
         }
     }
 
     #getHandlers() {
         return [
+            {
+                evaluate: ({ context }) => context.pending?.op === "confirmation",
+                process: async ({ input, context }) => this.#handlePendingConfirmation(input, context)
+            },
+            {
+                evaluate: ({ context }) => context.pending?.op.startsWith("genesis-"),
+                process: async ({ input, context }) => this.#handlePendingGenesisInitialization(input, context)
+            },
+            {
+                evaluate: ({ context }) => context.pending?.op === "consensus-config",
+                process: async ({ input, context }) => this.#handlePendingSetConsensusConfig(input, context)
+            },
+            {
+                evaluate: ({ context }) => context.pending?.op.startsWith("vdf-"),
+                process: async ({ input, context }) => this.#handlePendingSetVdfParams(input, context)
+            },
             {
                 evaluate: ({ command }) => command === COMMANDS.HELP,
                 process: async () => {
@@ -195,7 +191,7 @@ export class CommandHandler {
             },
             {
                 evaluate: ({ input }) => input.startsWith(COMMANDS.TRANSFER),
-                process: async ({ parts }) => this.#queueTransferConfirmation(parts[0], parts[1])
+                process: async ({ parts, context }) => this.#queueTransferConfirmation(parts[0], parts[1], context)
             },
             {
                 evaluate: ({ input }) => input.startsWith(COMMANDS.GET_BALANCE),
@@ -246,25 +242,25 @@ export class CommandHandler {
             },
             {
                 evaluate: ({ input }) => input.startsWith(COMMANDS.EPOCH_GENESIS_INITIALIZATION),
-                process: async () => this.#queueEpochGenesisInitialization()
+                process: async ({ context }) => this.#queueEpochGenesisInitialization(context)
             },
             {
                 evaluate: ({ command }) => command === COMMANDS.SET_CONSENSUS_CONFIG,
-                process: async () => this.#queueSetConsensusConfig()
+                process: async ({ context }) => this.#queueSetConsensusConfig(context)
             },
             {
                 evaluate: ({ command }) => command === COMMANDS.SET_VDF_PARAMS,
-                process: async () => this.#queueSetVdfParams()
+                process: async ({ context }) => this.#queueSetVdfParams(context)
             }
         ];
     }
 
-    async #handlePendingConfirmation(input) {
+    async #handlePendingConfirmation(input, context) {
         const normalizedInput = input.trim().toLowerCase();
-        const pendingConfirmation = this.#pendingConfirmation;
+        const pendingConfirmation = context.pending;
 
         if (normalizedInput === "y" || normalizedInput === "yes") {
-            this.#pendingConfirmation = null;
+            context.pending = null;
 
             try {
                 return await pendingConfirmation.onConfirm();
@@ -281,7 +277,7 @@ export class CommandHandler {
         }
 
         if (normalizedInput === "n" || normalizedInput === "no") {
-            this.#pendingConfirmation = null;
+            context.pending = null;
             return pendingConfirmation.onDecline();
         }
 
@@ -289,7 +285,7 @@ export class CommandHandler {
         console.log(pendingConfirmation.prompt);
     }
 
-    async #queueTransferConfirmation(recipientAddress, amount) {
+    async #queueTransferConfirmation(recipientAddress, amount, context) {
         const preparedTransfer = await this.#msb.prepareTransferOperation(recipientAddress, amount);
 
         console.info("Transfer Details:");
@@ -302,27 +298,28 @@ export class CommandHandler {
         console.info(`Current balance: ${bigIntToDecimalString(preparedTransfer.senderBalance)}`);
         console.info(`Balance after transaction: ${bigIntToDecimalString(preparedTransfer.expectedNewBalance)}`);
 
-        this.#pendingConfirmation = {
+        context.pending = {
+            op: "confirmation",
             prompt: "Do you want to proceed? (y/n)",
             onConfirm: async () => this.#msb.submitPreparedTransferOperation(preparedTransfer),
             onDecline: async () => this.#msb.printHelp()
         };
 
-        console.log(this.#pendingConfirmation.prompt);
+        console.log(context.pending.prompt);
     }
 
-    #queueEpochGenesisInitialization() {
-        this.#pendingGenesisInitialization = {
-            step: "difficulty"
+    #queueEpochGenesisInitialization(context) {
+        context.pending = {
+            op: "genesis-difficulty"
         };
 
         console.log(this.#getGenesisDifficultyPrompt());
     }
 
-    #handlePendingGenesisInitialization(input) {
-        const pendingGenesisInitialization = this.#pendingGenesisInitialization;
+    #handlePendingGenesisInitialization(input, context) {
+        const pendingGenesisInitialization = context.pending;
 
-        if (pendingGenesisInitialization.step === "difficulty") {
+        if (pendingGenesisInitialization.op === "genesis-difficulty") {
             const difficulty = this.#parsePositiveInteger(input, BigInt(MAX_VDF_DIFFICULTY));
             if (!difficulty) {
                 console.log("Invalid difficulty. Please enter a positive integer (example 55_000_000).");
@@ -331,7 +328,7 @@ export class CommandHandler {
             }
 
             pendingGenesisInitialization.difficulty = difficulty;
-            pendingGenesisInitialization.step = "discriminantBitSize";
+            pendingGenesisInitialization.op = "genesis-discriminant-bit-size";
             console.log(this.#getGenesisDiscriminantBitSizePrompt());
             return;
         }
@@ -344,15 +341,15 @@ export class CommandHandler {
         }
 
         const difficulty = pendingGenesisInitialization.difficulty;
-        this.#pendingGenesisInitialization = null;
+        context.pending = null;
 
         return this.#queueEpochGenesisConfirmation({
             difficulty,
             discriminantBitSize
-        });
+        }, context);
     }
 
-    #queueEpochGenesisConfirmation({ difficulty, discriminantBitSize }) {
+    #queueEpochGenesisConfirmation({ difficulty, discriminantBitSize }, context) {
         const consensusConfig = {
             schemaVersion: 1,
             configData: {
@@ -365,7 +362,8 @@ export class CommandHandler {
         console.info(`VDF difficulty: ${difficulty.display}`);
         console.info(`VDF discriminant bit size: ${discriminantBitSize.display}`);
 
-        this.#pendingConfirmation = {
+        context.pending = {
+            op: "confirmation",
             prompt: "Do you want to proceed? (yes/no)",
             invalidMessage: 'Invalid input. Please answer "yes" or "no".',
             failureMessage: "Genesis epoch initialization failed",
@@ -373,18 +371,18 @@ export class CommandHandler {
             onDecline: async () => console.log("Genesis epoch initialization cancelled.")
         };
 
-        console.log(this.#pendingConfirmation.prompt);
+        console.log(context.pending.prompt);
     }
 
-    #queueSetConsensusConfig() {
-        this.#pendingSetConsensusConfig = {};
+    #queueSetConsensusConfig(context) {
+        context.pending = { op: "consensus-config" };
 
         console.log(this.#getSetConsensusConfigPrompt());
     }
 
-    #handlePendingSetConsensusConfig(input) {
+    #handlePendingSetConsensusConfig(input, context) {
         if (input.trim().toLowerCase() === "/cancel") {
-            this.#pendingSetConsensusConfig = null;
+            context.pending = null;
             console.log("Consensus config update cancelled.");
             return;
         }
@@ -398,15 +396,16 @@ export class CommandHandler {
             return;
         }
 
-        this.#pendingSetConsensusConfig = null;
-        return this.#queueSetConsensusConfigConfirmation(consensusConfig);
+        context.pending = null;
+        return this.#queueSetConsensusConfigConfirmation(consensusConfig, context);
     }
 
-    #queueSetConsensusConfigConfirmation(consensusConfig) {
+    #queueSetConsensusConfigConfirmation(consensusConfig, context) {
         console.info("Consensus Config Update:");
         console.info(JSON.stringify(consensusConfig, null, 2));
 
-        this.#pendingConfirmation = {
+        context.pending = {
+            op: "confirmation",
             prompt: "Do you want to proceed? (yes/no)",
             invalidMessage: 'Invalid input. Please answer "yes" or "no".',
             failureMessage: "Consensus config update failed",
@@ -414,27 +413,27 @@ export class CommandHandler {
             onDecline: async () => console.log("Consensus config update cancelled.")
         };
 
-        console.log(this.#pendingConfirmation.prompt);
+        console.log(context.pending.prompt);
     }
 
-    #queueSetVdfParams() {
-        this.#pendingSetVdfParams = {
-            step: "difficulty"
+    #queueSetVdfParams(context) {
+        context.pending = {
+            op: "vdf-difficulty"
         };
 
         console.log(this.#getSetVdfParamsDifficultyPrompt());
     }
 
-    #handlePendingSetVdfParams(input) {
+    #handlePendingSetVdfParams(input, context) {
         if (input.trim().toLowerCase() === "/cancel") {
-            this.#pendingSetVdfParams = null;
+            context.pending = null;
             console.log("VDF params update cancelled.");
             return;
         }
 
-        const pendingSetVdfParams = this.#pendingSetVdfParams;
+        const pendingSetVdfParams = context.pending;
 
-        if (pendingSetVdfParams.step === "difficulty") {
+        if (pendingSetVdfParams.op === "vdf-difficulty") {
             const difficulty = this.#parsePositiveInteger(input, BigInt(MAX_VDF_DIFFICULTY));
             if (!difficulty) {
                 console.log(
@@ -445,7 +444,7 @@ export class CommandHandler {
             }
 
             pendingSetVdfParams.difficulty = difficulty;
-            pendingSetVdfParams.step = "discriminantBitSize";
+            pendingSetVdfParams.op = "vdf-discriminant-bit-size";
             console.log(this.#getSetVdfParamsDiscriminantBitSizePrompt());
             return;
         }
@@ -460,14 +459,14 @@ export class CommandHandler {
         }
 
         const difficulty = pendingSetVdfParams.difficulty;
-        this.#pendingSetVdfParams = null;
+        context.pending = null;
         return this.#queueSetVdfParamsConfirmation({
             difficulty,
             discriminantBitSize
-        });
+        }, context);
     }
 
-    #queueSetVdfParamsConfirmation({ difficulty, discriminantBitSize }) {
+    #queueSetVdfParamsConfirmation({ difficulty, discriminantBitSize }, context) {
         const consensusConfig = {
             schemaVersion: 1,
             configData: {
@@ -480,7 +479,8 @@ export class CommandHandler {
         console.info(`VDF difficulty: ${difficulty.display}`);
         console.info(`VDF discriminant bit size: ${discriminantBitSize.display}`);
 
-        this.#pendingConfirmation = {
+        context.pending = {
+            op: "confirmation",
             prompt: "Do you want to proceed? (yes/no)",
             invalidMessage: 'Invalid input. Please answer "yes" or "no".',
             failureMessage: "VDF params update failed",
@@ -488,7 +488,7 @@ export class CommandHandler {
             onDecline: async () => console.log("VDF params update cancelled.")
         };
 
-        console.log(this.#pendingConfirmation.prompt);
+        console.log(context.pending.prompt);
     }
 
     #parseConsensusConfig(input) {

@@ -59,6 +59,7 @@ class Cli extends ReadyResource {
 
     startInteractiveMode() {
         console.log('RPC server will not be started.');
+        const context = { pending: null };
 
         this.#commandHandlers = new CommandHandler({
             config: this.#config,
@@ -71,7 +72,7 @@ class Cli extends ReadyResource {
 
         this.#readlineInstance.on("line", async (input) => {
             try {
-                await this.#handleCommand(input.trim());
+                await this.#handleCommand(input.trim(), context);
             } catch (err) {
                 console.error(`${err}`);
             }
@@ -81,8 +82,8 @@ class Cli extends ReadyResource {
         this.#readlineInstance.prompt();
     }
 
-    async #handleCommand(input) {
-        return this.#commandHandlers.handle(input);
+    async #handleCommand(input, context) {
+        return this.#commandHandlers.handle(input, context);
     }
 
     #completeCommand(line) {
