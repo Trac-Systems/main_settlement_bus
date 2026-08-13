@@ -35,6 +35,8 @@ class LegacyProtocol extends ProtocolInterface {
             onclose() { }
         });
 
+        if (!this.#channel) return; // connection already destroyed before protocol setup completed
+
         this.#channel.open();
 
         // Todo: Abstract in a separate function
@@ -65,11 +67,11 @@ class LegacyProtocol extends ProtocolInterface {
     }
 
     sendAndForget(message) {
-        this.#session.send(message);
+        this.#session?.send(message);
     }
 
     close() {
-        this.#channel.close();
+        this.#channel?.close();
     }
 
 }

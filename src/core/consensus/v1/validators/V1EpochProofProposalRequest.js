@@ -44,6 +44,7 @@ class V1EpochProofProposalRequest extends V1BaseConsensusOperation {
             );
             await this.validateSignature(payload, connection.remotePublicKey, undefined, ConsensusResultCode.PROPOSAL_SIGNATURE_INVALID);
             await this.validateAddressIsIndexer(connection.remotePublicKey);
+            this.validateLocalNodeIsIndexer();
             const currentEpoch = await this._state.requireCurrentEpoch();
             this.validateIncomingEpoch(payload.proof_proposal, currentEpoch);
             await this.validatePreviousEpochRecordHash(payload.proof_proposal, currentEpoch);

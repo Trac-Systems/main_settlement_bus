@@ -329,6 +329,23 @@ class V1BaseConsensusOperation {
             )
         }
     }
+
+    /**
+     * Validates that this node is still an indexer before it acts on an indexer-only
+     * operation (e.g. signing a proposal approval). A node that lost its indexer role
+     * must not approve or sign anything on the indexer's behalf.
+     *
+     * @returns {void}
+     * @throws {V1ConsensusProtocolError} When the local node is not an indexer.
+     */
+    validateLocalNodeIsIndexer() {
+        if (!this._state.isIndexer()) {
+            throw new V1ConsensusProtocolError(
+                ConsensusResultCode.INDEXER_ROLE_INVALID,
+                'Local node is not an indexer and cannot approve proposals.'
+            )
+        }
+    }
 }
 
 

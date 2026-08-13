@@ -15,17 +15,17 @@ class LegacyGetRequestHandler {
         return this.#state;
     }
 
-    async handle(message, connection, channelString) {
+    async handle(message, connection, protocolSession, channelString) {
         switch (message) {
             case NETWORK_MESSAGE_TYPES.GET.VALIDATOR:
-                await this.handleGetValidatorResponse(connection, channelString);
+                await this.handleGetValidatorResponse(connection, protocolSession, channelString);
                 break;
             default:
                 throw new Error(`Unhandled GET type: ${message}`);
         }
     }
 
-    async handleGetValidatorResponse(connection, channelString) {
+    async handleGetValidatorResponse(connection, protocolSession, channelString) {
         const nonce = b4a.toString(tracCryptoApi.nonce.generate(), 'hex');
         const payload = {
             op: 'validatorResponse',
@@ -46,7 +46,7 @@ class LegacyGetRequestHandler {
             ...payload,
             sig: sig.toString('hex'),
         };
-        connection.protocolSession.sendAndForget(responseMessage)
+        protocolSession.sendAndForget(responseMessage)
     }
 }
 

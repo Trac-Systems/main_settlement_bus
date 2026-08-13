@@ -9,8 +9,10 @@ import { NETWORK_MESSAGE_TYPES } from '../../../src/utils/constants.js';
 
 const makeConnection = (sandbox) => ({
     remotePublicKey: b4a.alloc(32, 0x01),
-    protocolSession: {
-        setLegacyAsPreferredProtocol: sandbox.stub()
+    protocolSessions: {
+        validator: {
+            setLegacyAsPreferredProtocol: sandbox.stub()
+        }
     },
     end: sandbox.stub()
 });
@@ -34,7 +36,7 @@ test('LegacyNetworkMessageRouter', async (t) => {
 
         await router.route(message, connection);
 
-        t.ok(connection.protocolSession.setLegacyAsPreferredProtocol.calledOnce, 'should prefer legacy protocol');
+        t.ok(connection.protocolSessions.validator.setLegacyAsPreferredProtocol.calledOnce, 'should prefer legacy protocol');
         t.ok(getHandler.calledOnce, 'should route GET message');
         t.ok(responseHandler.notCalled, 'should not route response handler');
         t.is(getHandler.firstCall.args[0], message, 'passes GET message through to handler');
@@ -46,7 +48,7 @@ test('LegacyNetworkMessageRouter', async (t) => {
 
         await router.route(message, connection);
 
-        t.ok(connection.protocolSession.setLegacyAsPreferredProtocol.calledOnce, 'should prefer legacy protocol');
+        t.ok(connection.protocolSessions.validator.setLegacyAsPreferredProtocol.calledOnce, 'should prefer legacy protocol');
         t.ok(responseHandler.calledOnce, 'should route response message');
         t.ok(getHandler.notCalled, 'should not route GET handler');
         t.is(responseHandler.firstCall.args[0], message, 'passes response message through to handler');

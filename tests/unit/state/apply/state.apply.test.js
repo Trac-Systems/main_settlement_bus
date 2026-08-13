@@ -20,6 +20,7 @@ async function runStateTests() {
     await import('./adminRecovery/state.apply.adminRecovery.test.js');
     await import('./setGenesisEpoch/state.apply.setGenesisEpoch.test.js');
     await import('./setConsensusConfig/state.apply.setConsensusConfig.test.js');
+    await import('./setEpoch/state.apply.setEpoch.test.js');
     test.resume();
 }
 

@@ -25,6 +25,8 @@ async function createWallet(mnemonic) {
     return await new WalletProvider(config).fromMnemonic({ mnemonic, derivationPath: config.derivationPath })
 }
 
+await tracCryptoApi.hash.blake3(b4a.from('warmup'));
+
 function expectBufferField(t, value, bytes, label) {
     t.ok(b4a.isBuffer(value), `${label} type`);
     t.is(value.length, bytes, `${label} length`);

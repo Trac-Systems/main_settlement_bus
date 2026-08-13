@@ -13,19 +13,18 @@ export class VDFService extends ReadyResource {
     }
     
     async calculateVDF(challenge, difficulty, discriminantSizeBits) {
-        const result = this.#queue.then(() => this.#calculate(challenge, difficulty, discriminantSizeBits));
-        this.#queue = result.catch(() => {});
-        return result;
+        const response = this.#queue.then(() => this.#calculate(challenge, difficulty, discriminantSizeBits));
+        this.#queue = response.catch(() => {});
+        return response;
     }
 
     async #calculate(challenge, difficulty, discriminantSizeBits) {
         await this.#port.write({ challenge, difficulty, discriminantSizeBits });
         try {
             const response = await this.#port.read();
-            if (response.error) return null;
-            return response.result;
-        } catch {
-            return null;
+            return response;
+        } catch (error) {
+            return {error};
         }
     }
 }

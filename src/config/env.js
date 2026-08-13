@@ -59,7 +59,9 @@ const configData = {
         txPoolSize: 1000, // size of transaction pool
         validatorHealthCheckInterval: 5 * 60 * 1000, // How often to check validator health (ms)
         epochInterval: 3 * 60 * 1000, // How often to trigger epoch proof proposal (ms)
-        epochThreshold: 2, // Minimum number of validator confirmations required to append a new epoch
+        epochSignatureTimeout: 20_000, // Max time delay an indexer have to sign a proposal
+        epochAppendTimeout: 2_000, // Max time a proposer has to append the new epoch in the log
+        epochRemoteProposalTimeout: 20_000, // Max time to wait for a competing proposal to land before broadcasting our own
         storesDirectory: 'stores/',
         storeName: 'testnet',
     },
@@ -112,7 +114,9 @@ const configData = {
         txPoolSize: 1000, // size of transaction pool
         validatorHealthCheckInterval: 5 * 60 * 1000, // How often to check validator health (ms)
         epochInterval: 3 * 60 * 1000, // How often to trigger epoch proof proposal (ms)
-        epochThreshold: 2, // Minimum number of validator confirmations required to append a new epoch
+        epochSignatureTimeout: 20_000, // Max time delay an indexer have to sign a proposal
+        epochAppendTimeout: 2_000, // Max time a proposer has to append the new epoch in the log
+        epochRemoteProposalTimeout: 20_000, // Max time to wait for a competing proposal to land before broadcasting our own
         storesDirectory: 'stores/',
         storeName: 'mainnet',
     },
@@ -164,8 +168,10 @@ const configData = {
         txCommitTimeout: 2200,
         txPoolSize: 1000, // size of transaction pool
         validatorHealthCheckInterval: 1_000, // How often to check validator health (ms)
-        epochInterval: 3 * 60 * 1000, // How often to trigger epoch proof proposal (ms)
-        epochThreshold: 2, // Minimum number of validator confirmations required to append a new epoch
+        epochInterval: 30 * 1000, // How often to trigger epoch proof proposal (ms)
+        epochSignatureTimeout: 40_000, // Max time delay an indexer have to sign a proposal
+        epochAppendTimeout: 10_000, // Max time a proposer has to append the new epoch in the log
+        epochRemoteProposalTimeout: 40_000, // Max time to wait for a competing proposal to land before broadcasting our own
         storesDirectory: 'stores/',
         storeName: 'development',
     }

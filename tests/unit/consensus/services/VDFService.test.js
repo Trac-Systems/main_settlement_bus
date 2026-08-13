@@ -44,28 +44,34 @@ test('calculateVDF returns result field from port.read response', async t => {
     await service.ready();
     t.teardown(() => service.close());
 
-    const result = await service.calculateVDF(Buffer.alloc(32), 500, 1024);
+    const { result, error } = await service.calculateVDF(Buffer.alloc(32), 500, 1024);
     t.alike(result, expectedResult);
+    t.absent(error);
 });
 
-test('calculateVDF returns null when response contains error', async t => {
+test('calculateVDF returns error field when response contains error', async t => {
     const portMock = makePortMock();
     portMock.read.resolves({ error: 'VDF computation failed' });
     const service = makeService(portMock);
     await service.ready();
     t.teardown(() => service.close());
 
-    t.is(await service.calculateVDF(Buffer.alloc(32), 100, 512), null);
+    const { result, error } = await service.calculateVDF(Buffer.alloc(32), 100, 512);
+    t.absent(result);
+    t.is(error, 'VDF computation failed');
 });
 
-test('calculateVDF returns null when port.read throws', async t => {
+test('calculateVDF returns error field when port.read throws', async t => {
     const portMock = makePortMock();
     portMock.read.rejects(new Error('port closed unexpectedly'));
     const service = makeService(portMock);
     await service.ready();
     t.teardown(() => service.close());
 
-    t.is(await service.calculateVDF(Buffer.alloc(32), 100, 512), null);
+    const { result, error } = await service.calculateVDF(Buffer.alloc(32), 100, 512);
+    t.absent(result);
+    t.ok(error instanceof Error);
+    t.is(error.message, 'port closed unexpectedly');
 });
 
 test('concurrent calculateVDF calls are serialized', async t => {
@@ -89,11 +95,11 @@ test('concurrent calculateVDF calls are serialized', async t => {
     const [resA, resB] = await Promise.all([callA, callB]);
 
     t.is(portMock.write.callCount, 2);
-    t.is(resA, 'result-A');
-    t.is(resB, 'result-B');
+    t.alike(resA, { result: 'result-A' });
+    t.alike(resB, { result: 'result-B' });
 });
 
-test('queue continues after call returns null (error response)', async t => {
+test('queue continues after call returns an error response', async t => {
     const portMock = makePortMock();
     portMock.read
         .onFirstCall().resolves({ error: 'failed' })
@@ -105,8 +111,8 @@ test('queue continues after call returns null (error response)', async t => {
     const resA = await service.calculateVDF(Buffer.alloc(32, 1), 100, 512);
     const resB = await service.calculateVDF(Buffer.alloc(32, 2), 100, 512);
 
-    t.is(resA, null);
-    t.is(resB, 'ok');
+    t.alike(resA, { error: 'failed' });
+    t.alike(resB, { result: 'ok' });
 });
 
 test('queue continues after port.read throws', async t => {
@@ -121,77 +127,20 @@ test('queue continues after port.read throws', async t => {
     const resA = await service.calculateVDF(Buffer.alloc(32, 1), 100, 512);
     const resB = await service.calculateVDF(Buffer.alloc(32, 2), 100, 512);
 
-    t.is(resA, null);
-    t.is(resB, 'ok');
+    t.ok(resA.error instanceof Error);
+    t.is(resA.error.message, 'port error');
+    t.alike(resB, { result: 'ok' });
 });
 
 // ---- Bare-only tests ----
 
 if (isBare) {
-    const { default: Channel } = await import('bare-channel');
     const { VDFBare } = await import('../../../../src/core/consensus/services/VDFBare.js');
 
-    function makeThreadMock() {
-        return {
-            terminate: sinon.stub().resolves(),
-            join: sinon.stub().resolves(),
-        };
-    }
-
-    function setupBare(portMock, threadMock) {
-        const savedBare = globalThis.Bare;
-        sinon.stub(Channel.prototype, 'connect').returns(portMock);
-        globalThis.Bare = { Thread: sinon.stub().returns(threadMock) };
-        return () => {
-            sinon.restore();
-            globalThis.Bare = savedBare;
-        };
-    }
-
-    test('VDFBare._open creates a Thread with correct worker path and channel handle', async t => {
-        const portMock = makePortMock();
-        const threadMock = makeThreadMock();
-        const teardown = setupBare(portMock, threadMock);
-        t.teardown(teardown);
-
-        const ThreadStub = globalThis.Bare.Thread;
-        const service = new VDFBare();
-        await service.ready();
-        t.teardown(() => service.close());
-
-        t.ok(ThreadStub.calledOnce);
-        t.ok(ThreadStub.firstCall.args[0] instanceof URL);
-        t.ok(ThreadStub.firstCall.args[0].href.endsWith('vdf-worker.js'));
-        t.is(typeof ThreadStub.firstCall.args[1].data, 'object');
-    });
-
-    test('VDFBare._close terminates thread, joins it, and closes port', async t => {
-        const portMock = makePortMock();
-        const threadMock = makeThreadMock();
-        const teardown = setupBare(portMock, threadMock);
-        t.teardown(teardown);
-
-        const service = new VDFBare();
-        await service.ready();
-        await service.close();
-
-        t.ok(threadMock.terminate.calledOnce);
-        t.ok(threadMock.join.calledOnce);
-        t.ok(portMock.close.calledOnce);
-    });
-
-    test('VDFBare._close calls terminate before join', async t => {
-        const portMock = makePortMock();
-        const threadMock = makeThreadMock();
-        const teardown = setupBare(portMock, threadMock);
-        t.teardown(teardown);
-
-        const service = new VDFBare();
-        await service.ready();
-        await service.close();
-
-        t.ok(threadMock.terminate.calledBefore(threadMock.join));
-    });
+    // Each computation runs in its own disposable OS subprocess (see VDFBare.js for why:
+    // a real solveWesolowski() call leaves native/WASM state that crashes Bare.Thread's
+    // teardown). There's no persistent thread/channel to mock - the "[bare] real VDF" tests
+    // below exercise _open/calculateVDF/close through the real subprocess path instead.
 
     test('[bare] real VDF: returns valid computation result', { timeout: 30000 }, async t => {
         const service = new VDFBare();
@@ -199,9 +148,9 @@ if (isBare) {
         t.teardown(() => service.close());
 
         const challenge = Buffer.alloc(32, 1);
-        const result = await service.calculateVDF(challenge, DIFFICULTY, DISCRIMINANT_BITS);
+        const { result, error } = await service.calculateVDF(challenge, DIFFICULTY, DISCRIMINANT_BITS);
 
-        t.ok(result !== null, 'null means @tracsystems/trac-vdf is missing or dist/ was not built');
+        t.absent(error, 'an error means @tracsystems/trac-vdf is missing or dist/ was not built');
         t.alike(result.challenge, challenge);
         t.is(result.difficulty, DIFFICULTY);
         t.is(result.discriminantSizeBits, DISCRIMINANT_BITS);
@@ -216,8 +165,8 @@ if (isBare) {
 
         for (const fill of [1, 2, 3]) {
             const challenge = Buffer.alloc(32, fill);
-            const result = await service.calculateVDF(challenge, DIFFICULTY, DISCRIMINANT_BITS);
-            t.ok(result !== null, `request ${fill} returned null — lib broken or missing`);
+            const { result, error } = await service.calculateVDF(challenge, DIFFICULTY, DISCRIMINANT_BITS);
+            t.absent(error, `request ${fill} returned an error — lib broken or missing`);
             t.alike(result.challenge, challenge);
         }
     });
@@ -229,17 +178,41 @@ if (isBare) {
         await service.ready();
         t.teardown(() => service.close());
 
-        const result = await service.calculateVDF(Buffer.alloc(32, 5), DIFFICULTY, DISCRIMINANT_BITS);
-        t.ok(result !== null, 'null means @tracsystems/trac-vdf is missing or dist/ was not built');
+        const { result, error } = await service.calculateVDF(Buffer.alloc(32, 5), DIFFICULTY, DISCRIMINANT_BITS);
+        t.absent(error, 'an error means @tracsystems/trac-vdf is missing or dist/ was not built');
+        t.ok(result);
     });
 
-    test('[bare] real VDF: invalid discriminantSizeBits causes worker to return null', { timeout: 10000 }, async t => {
+    test('[bare] real VDF: invalid discriminantSizeBits causes worker to return an error', { timeout: 10000 }, async t => {
         const service = new VDFBare();
         await service.ready();
         t.teardown(() => service.close());
 
-        const result = await service.calculateVDF(Buffer.alloc(32, 1), DIFFICULTY, 1);
-        t.is(result, null);
+        const { result, error } = await service.calculateVDF(Buffer.alloc(32, 1), DIFFICULTY, -1);
+        t.absent(result);
+        t.ok(error);
+    });
+
+    test('[bare] calculateVDF returns an error when worker exits unexpectedly', { timeout: 10000 }, async t => {
+        const crashWorkerURL = new URL('./fixtures/crash-worker-bare.js', import.meta.url);
+        const service = new VDFBare(crashWorkerURL);
+        await service.ready();
+        t.teardown(() => service.close());
+
+        const { result, error } = await service.calculateVDF(Buffer.alloc(32, 1), DIFFICULTY, DISCRIMINANT_BITS);
+        t.absent(result);
+        t.ok(error);
+    });
+
+    test('[bare] calculateVDF returns an error instead of crashing when worker writes a non-JSON response', { timeout: 10000 }, async t => {
+        const garbageWorkerURL = new URL('./fixtures/garbage-worker-bare.js', import.meta.url);
+        const service = new VDFBare(garbageWorkerURL);
+        await service.ready();
+        t.teardown(() => service.close());
+
+        const { result, error } = await service.calculateVDF(Buffer.alloc(32, 1), DIFFICULTY, DISCRIMINANT_BITS);
+        t.absent(result);
+        t.ok(error);
     });
 }
 
@@ -254,9 +227,9 @@ if (!isBare) {
         t.teardown(() => service.close());
 
         const challenge = Buffer.alloc(32, 1);
-        const result = await service.calculateVDF(challenge, DIFFICULTY, DISCRIMINANT_BITS);
+        const { result, error } = await service.calculateVDF(challenge, DIFFICULTY, DISCRIMINANT_BITS);
 
-        t.ok(result !== null, 'null means @tracsystems/trac-vdf is missing or dist/ was not built');
+        t.absent(error, 'an error means @tracsystems/trac-vdf is missing or dist/ was not built');
         t.ok(result.challenge instanceof Uint8Array);
         t.is(result.difficulty, DIFFICULTY);
         t.is(result.discriminantSizeBits, DISCRIMINANT_BITS);
@@ -264,12 +237,14 @@ if (!isBare) {
         t.ok(result.solution.length > 0);
     });
 
-    test('[node] real VDF: invalid args cause worker to return null', { timeout: 10000 }, async t => {
+    test('[node] real VDF: invalid args cause worker to return an error', { timeout: 10000 }, async t => {
         const service = new VDFNode();
         await service.ready();
         t.teardown(() => service.close());
 
-        t.is(await service.calculateVDF(Buffer.alloc(32, 1), DIFFICULTY, -1), null);
+        const { result, error } = await service.calculateVDF(Buffer.alloc(32, 1), DIFFICULTY, -1);
+        t.absent(result);
+        t.ok(error);
     });
 
     test('[node] real VDF: multiple sequential requests all succeed', { timeout: 60000 }, async t => {
@@ -279,18 +254,19 @@ if (!isBare) {
 
         for (const fill of [1, 2, 3]) {
             const challenge = Buffer.alloc(32, fill);
-            const result = await service.calculateVDF(challenge, DIFFICULTY, DISCRIMINANT_BITS);
-            t.ok(result !== null, `request ${fill} returned null — lib broken or missing`);
+            const { result, error } = await service.calculateVDF(challenge, DIFFICULTY, DISCRIMINANT_BITS);
+            t.absent(error, `request ${fill} returned an error — lib broken or missing`);
             t.ok(result.solution instanceof Uint8Array);
         }
     });
 
-    test('[node] calculateVDF returns null when worker exits unexpectedly', { timeout: 5000 }, async t => {
+    test('[node] calculateVDF returns an error when worker exits unexpectedly', { timeout: 5000 }, async t => {
         const crashWorkerURL = new URL('./fixtures/crash-worker.js', import.meta.url);
         const service = new VDFNode(crashWorkerURL);
         await service.ready();
 
-        const result = await service.calculateVDF(Buffer.alloc(32, 1), 100, 512);
-        t.is(result, null);
+        const { result, error } = await service.calculateVDF(Buffer.alloc(32, 1), 100, 512);
+        t.absent(result);
+        t.ok(error);
     });
 }

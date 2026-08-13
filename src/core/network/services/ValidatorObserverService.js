@@ -69,7 +69,7 @@ class ValidatorObserverService extends SchedulableService {
         const target = Math.min(networkSize, this.#config.maxValidators);
         
         const isSelfAdmin = this.#address === adminEntry?.address;
-        const totalConnected = manager.connectedValidators().length;
+        const totalConnected = manager.connectionCount();
 
         const available = writers.filter((w) => {
             if (w.address === this.#address) return false;

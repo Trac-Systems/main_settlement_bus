@@ -11,8 +11,8 @@ export default class ConnectionOperationHandler {
         return this.#config;
     }
 
-    async sendResponseAndMaybeClose(connection, response, endConnection = true) {
-        connection.protocolSession.sendAndForget(response);
+    async sendResponseAndMaybeClose(protocolSession, connection, response, endConnection = true) {
+        protocolSession.sendAndForget(response);
         if (!endConnection) return;
 
         await connection.flush();

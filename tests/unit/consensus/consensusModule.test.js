@@ -9,6 +9,9 @@ async function runConsensusModuleTests() {
     await import('../consensus/ConsensusRouter.test.js');
     await import('./services/IndexerConnectionManager.test.js');
     await import('./services/IndexerPendingRequestService.test.js');
+    await import('./services/VDFService.test.js');
+    await import('../core/consensus/services/epochCoordinatorService/epochCoordinatorService.test.js');
+    await import('../core/consensus/services/epochCoordinatorOperations/epochCoordinatorOperations.test.js');
     test.resume();
 }
 
