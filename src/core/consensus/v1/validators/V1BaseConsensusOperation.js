@@ -91,10 +91,10 @@ class V1BaseConsensusOperation {
     }
 
     /**
-     * Builds canonical VDF challenge data from proof proposal fields 1 through 6.
+     * Builds canonical VDF challenge data from proof proposal fields 1 through 7.
      *
      * The message contains protocol version, network id, epoch, previous epoch
-     * record hash, proposer address, and VDF parameters hash in protocol order.
+     * record hash, proposer address, difficulty, and discriminant bit size in protocol order.
      *
      * @param {object} proofProposal Decoded proof proposal.
      * @returns {Buffer} Canonically encoded challenge data.
