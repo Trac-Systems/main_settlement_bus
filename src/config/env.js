@@ -32,6 +32,7 @@ const configData = {
         maxWritersForAdminIndexerConnection: 10, // Connectivity constants
         disableRateLimit: false,
         enableErrorApplyLogs: true,
+        enableLogTimestamp: false,
         enableInteractiveMode: true,
         enableRoleRequester: false,
         enableTxApplyLogs: true,
@@ -87,6 +88,7 @@ const configData = {
         maxWritersForAdminIndexerConnection: 10, // Connectivity constants
         disableRateLimit: false,
         enableErrorApplyLogs: false,
+        enableLogTimestamp: false,
         enableInteractiveMode: true,
         enableRoleRequester: false,
         enableTxApplyLogs: false,
@@ -142,6 +144,7 @@ const configData = {
         maxWritersForAdminIndexerConnection: 10, // Connectivity constants
         disableRateLimit: false,
         enableErrorApplyLogs: true,
+        enableLogTimestamp: true,
         enableInteractiveMode: true,
         enableRoleRequester: false,
         enableTxApplyLogs: true,
