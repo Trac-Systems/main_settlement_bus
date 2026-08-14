@@ -15,6 +15,7 @@ import {
     TRAC_NAMESPACE,
     EventType,
     CustomEventType,
+    ConsensusConfigSchemaVersion,
     UINT32_MAX,
     ConsensusProtocolVersion,
     HASH_BYTE_LENGTH,
@@ -24,7 +25,6 @@ import tracCryptoApi from 'trac-crypto-api';
 import { verifyWesolowski } from '@tracsystems/trac-vdf';
 import StateValidationSchema from './validators/StateValidationSchema.js';
 import {
-    decodeConsensusConfig,
     safeDecodeApplyOperation,
     safeEncodeConsensusConfig,
     safeEncodeEpochProof
@@ -63,8 +63,8 @@ import { Status } from './utils/transaction.js';
 import remote from 'hypercore/lib/fully-remote-proof.js'
 import PQueue from 'p-queue';
 import { createGenesisEpochProof } from './utils/epochProof.js';
+import { decodeVersionedConsensusConfig } from './utils/consensusConfig.js';
 import {
-    decodeVdfConfig,
     safeDecodeVdfConfig,
 } from '../../codecs/consensus/v1/vdfConfigCodec.js';
 import _ from 'lodash';
@@ -656,22 +656,7 @@ class State extends ReadyResource {
             throw new Error(`Consensus config record ${currentConfigIndex} does not exist.`);
         }
 
-        const consensusConfig = decodeConsensusConfig(encodedConsensusConfig);
-        const schemaVersion = consensusConfig.sv.readUInt8(0);
-        switch (schemaVersion) {
-            case 1: {
-                const decodedVdfConfig = decodeVdfConfig(consensusConfig.cd);
-                return {
-                    schemaVersion,
-                    configData: {
-                        difficulty: decodedVdfConfig.difficulty.readUInt32BE(0),
-                        discriminantBitSize: decodedVdfConfig.discriminantBitSize.readUInt16BE(0),
-                    }
-                };
-            }
-            default:
-                throw new Error(`Unsupported consensus config schema version: ${schemaVersion}.`);
-        }
+        return decodeVersionedConsensusConfig(encodedConsensusConfig);
     }
 
     async requireSignedConsensusConfig() {
@@ -4731,7 +4716,7 @@ class State extends ReadyResource {
         }
 
         switch (schemaVersion) {
-            case 1: {
+            case ConsensusConfigSchemaVersion.VDF_V1: {
                 const configData = safeDecodeVdfConfig(consensusConfig.cd);
                 const discriminantBitSize = configData?.discriminantBitSize.readUInt16BE(0);
                 if (

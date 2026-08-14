@@ -232,6 +232,10 @@ export const VDF_PROOF_BYTE_LENGTHS = Object.freeze({
     4096: 1028
 });
 
+export const ConsensusConfigSchemaVersion = Object.freeze({
+    VDF_V1: 1,
+});
+
 export const LICENSE_BYTE_LENGTH = 4;
 
 // index.js

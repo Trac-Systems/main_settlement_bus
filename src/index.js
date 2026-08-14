@@ -14,6 +14,7 @@ import {
     BALANCE_MIGRATION_SLEEP_INTERVAL,
     WHITELIST_MIGRATION_DIR,
     OperationType,
+    ConsensusConfigSchemaVersion,
     MAX_VDF_DIFFICULTY,
     VDF_PROOF_BYTE_LENGTHS
 } from "./utils/constants.js";
@@ -1155,8 +1156,8 @@ export class MainSettlementBus extends ReadyResource {
 
         let encodedConfigData;
         switch (schemaVersion) {
-            case 1:
-                encodedConfigData = this.#encodeConfigDataV1(configData);
+            case ConsensusConfigSchemaVersion.VDF_V1:
+                encodedConfigData = this.#encodeVdfV1ConfigData(configData);
                 break;
             default:
                 throw new Error(
@@ -1171,7 +1172,7 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     // TODO: REFACTOR - In the future, this function should be extracted into another module.
-    #encodeConfigDataV1(configData) {
+    #encodeVdfV1ConfigData(configData) {
         if (!this.#hasExactKeys(configData, ["difficulty", "discriminantBitSize"])) {
             throw new Error(
                 "Consensus config schema version 1 configData must contain only difficulty and discriminantBitSize."
