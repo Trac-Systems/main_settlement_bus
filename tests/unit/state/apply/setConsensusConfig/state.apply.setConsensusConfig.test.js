@@ -159,6 +159,12 @@ registerRejectedConfigCase({
 });
 
 registerRejectedConfigCase({
+    title: 'State.apply SET_CONSENSUS_CONFIG rejects unsupported VDF discriminant bit size',
+    buildOptions: { discriminantBitSize: 3072 },
+    expectedLog: 'Consensus config validation failed.'
+});
+
+registerRejectedConfigCase({
     title: 'State.apply SET_CONSENSUS_CONFIG rejects an all-zero VDF config',
     buildOptions: { difficulty: 0, discriminantBitSize: 0 },
     expectedLog: 'Consensus config validation failed.'
@@ -435,24 +441,24 @@ test('State.apply SET_CONSENSUS_CONFIG advances config sequence across consecuti
     const context = await setupSetConsensusConfigScenario(t);
     const firstPayload = await buildSetConsensusConfigPayload(context, {
         difficulty: 1,
-        discriminantBitSize: 1
+        discriminantBitSize: 1024
     });
 
     await appendAndUpdate(context.adminBootstrap.base, firstPayload);
 
     await assertCurrentConfigId(t, context.adminBootstrap.base, 1);
-    await assertVdfConfigRecord(t, context.adminBootstrap.base, 1, 1, 1);
+    await assertVdfConfigRecord(t, context.adminBootstrap.base, 1, 1, 1024);
     await assertConfigRecordMissing(t, context.adminBootstrap.base, 2);
 
     const secondPayload = await buildSetConsensusConfigPayload(context, {
         difficulty: 0xffffffff,
-        discriminantBitSize: 0xffff
+        discriminantBitSize: 4096
     });
     await appendAndUpdate(context.adminBootstrap.base, secondPayload);
 
     await assertCurrentConfigId(t, context.adminBootstrap.base, 2);
-    await assertVdfConfigRecord(t, context.adminBootstrap.base, 1, 1, 1);
-    await assertVdfConfigRecord(t, context.adminBootstrap.base, 2, 0xffffffff, 0xffff);
+    await assertVdfConfigRecord(t, context.adminBootstrap.base, 1, 1, 1024);
+    await assertVdfConfigRecord(t, context.adminBootstrap.base, 2, 0xffffffff, 4096);
     await assertConfigRecordMissing(t, context.adminBootstrap.base, 3);
     await assertOperationRecorded(t, context.adminBootstrap.base, firstPayload, true);
     await assertOperationRecorded(t, context.adminBootstrap.base, secondPayload, true);
@@ -462,11 +468,11 @@ test('State.apply SET_CONSENSUS_CONFIG applies two distinct updates atomically i
     const context = await setupSetConsensusConfigScenario(t);
     const minimumPayload = await buildSetConsensusConfigPayload(context, {
         difficulty: 1,
-        discriminantBitSize: 1
+        discriminantBitSize: 1024
     });
     const maximumPayload = await buildSetConsensusConfigPayload(context, {
         difficulty: 0xffffffff,
-        discriminantBitSize: 0xffff
+        discriminantBitSize: 4096
     });
 
     await appendBatchAndUpdate(
@@ -482,8 +488,8 @@ test('State.apply SET_CONSENSUS_CONFIG applies two distinct updates atomically i
         GENESIS_DIFFICULTY,
         GENESIS_DISCRIMINANT_BIT_SIZE
     );
-    await assertVdfConfigRecord(t, context.adminBootstrap.base, 1, 1, 1);
-    await assertVdfConfigRecord(t, context.adminBootstrap.base, 2, 0xffffffff, 0xffff);
+    await assertVdfConfigRecord(t, context.adminBootstrap.base, 1, 1, 1024);
+    await assertVdfConfigRecord(t, context.adminBootstrap.base, 2, 0xffffffff, 4096);
     await assertConfigRecordMissing(t, context.adminBootstrap.base, 3);
     await assertOperationRecorded(t, context.adminBootstrap.base, minimumPayload, true);
     await assertOperationRecorded(t, context.adminBootstrap.base, maximumPayload, true);

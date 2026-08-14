@@ -8,9 +8,8 @@ import {
     ConsensusProtocolVersion,
     ConsensusResultCode,
     NetworkResultCode,
-    VDF_BLOB_PROOF_SIZE,
     VDF_DIFFICULTY_SIZE,
-    VDF_DISCRIMINANT_SIZE
+    VDF_PROOF_BYTE_LENGTHS
 } from '../../../src/utils/constants.js';
 import {uint8ToBuffer, uint16ToBuffer, uint64ToBuffer} from '../../../src/utils/buffer.js';
 import {config} from '../../helpers/config.js';
@@ -26,8 +25,8 @@ const makeProofProposalPayload = (epoch, proofProposalOverrides = {}) => ({
         previous_epoch_record_hash: b4a.alloc(32, 1),
         proposer: b4a.alloc(config.addressLength, 2),
         difficulty: b4a.alloc(VDF_DIFFICULTY_SIZE, 3),
-        discriminant_bit_size: b4a.alloc(VDF_DISCRIMINANT_SIZE, 4),
-        proof: b4a.alloc(VDF_BLOB_PROOF_SIZE, 4),
+        discriminant_bit_size: uint16ToBuffer(2048),
+        proof: b4a.alloc(VDF_PROOF_BYTE_LENGTHS[2048], 4),
         signature: b4a.alloc(64, 5),
         ...proofProposalOverrides
     },
@@ -77,6 +76,45 @@ test('ConsensusValidationSchema accepts fixed-length proof proposal byte fields'
     t.is(schema.validateConsensusV1ProofProposal(makeProofProposalPayload(b4a.alloc(7, 1))), false);
     t.is(schema.validateConsensusV1ProofProposal(makeProofProposalPayload(b4a.alloc(9, 1))), false);
     t.is(schema.validateConsensusV1ProofProposal(makeProofProposalPayload('not-a-buffer')), false);
+});
+
+test('ConsensusValidationSchema matches proof length to discriminant bit size', t => {
+    const schema = new ConsensusValidationSchema(config);
+
+    for (const [discriminantBitSize, proofLength] of Object.entries(VDF_PROOF_BYTE_LENGTHS)) {
+        const overrides = {
+            discriminant_bit_size: uint16ToBuffer(Number(discriminantBitSize)),
+            proof: b4a.alloc(proofLength, 4)
+        };
+
+        t.is(
+            schema.validateConsensusV1ProofProposal(
+                makeProofProposalPayload(uint64ToBuffer(1), overrides)
+            ),
+            true,
+            `${discriminantBitSize}-bit discriminant accepts a ${proofLength}-byte proof`
+        );
+        t.is(
+            schema.validateConsensusV1ProofProposal(
+                makeProofProposalPayload(uint64ToBuffer(1), {
+                    ...overrides,
+                    proof: b4a.alloc(proofLength + 1, 4)
+                })
+            ),
+            false,
+            `${discriminantBitSize}-bit discriminant rejects a proof with the wrong length`
+        );
+    }
+
+    t.is(
+        schema.validateConsensusV1ProofProposal(
+            makeProofProposalPayload(uint64ToBuffer(1), {
+                discriminant_bit_size: uint16ToBuffer(3072)
+            })
+        ),
+        false,
+        'unsupported discriminant bit size is rejected'
+    );
 });
 
 test('ConsensusValidationSchema requires approval only for OK proof proposal responses', t => {

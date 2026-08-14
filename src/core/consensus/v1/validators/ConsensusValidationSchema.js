@@ -5,10 +5,12 @@ import {
     ConsensusOperationType,
     SIGNATURE_BYTE_LENGTH,
     ConsensusResultCode,
-    VDF_BLOB_PROOF_SIZE,
+    VDF_PROOF_BYTE_LENGTHS,
     PROTOCOL_VERSION_BYTE_LENGTH,
     NETWORK_ID_BYTE_LENGTH,
-    EPOCH_BYTE_LENGTH, VDF_DIFFICULTY_SIZE, VDF_DISCRIMINANT_SIZE
+    EPOCH_BYTE_LENGTH,
+    VDF_DIFFICULTY_SIZE,
+    VDF_DISCRIMINANT_SIZE
 } from '../../../../utils/constants.js';
 import { V1ConsensusProtocolError } from '../V1ConsensusProtocolError.js';
 
@@ -104,8 +106,45 @@ class ConsensusValidationSchema {
                     proposer: { type: 'buffer', length: this.#config.addressLength, required: true },
                     difficulty: { type: 'buffer', length: VDF_DIFFICULTY_SIZE, required: true },
                     discriminant_bit_size: { type: 'buffer', length: VDF_DISCRIMINANT_SIZE, required: true },
-                    proof: { type: 'buffer', length: VDF_BLOB_PROOF_SIZE, required: true },
+                    proof: { type: 'buffer', required: true },
                     signature: { type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true },
+                },
+                custom: (proofProposal, errors) => {
+                    const discriminant = proofProposal?.discriminant_bit_size;
+                    const proof = proofProposal?.proof;
+
+                    if (
+                        !b4a.isBuffer(discriminant) ||
+                        discriminant.length !== VDF_DISCRIMINANT_SIZE
+                    ) {
+                        return proofProposal;
+                    }
+
+                    const discriminantBitSize = discriminant.readUInt16BE(0);
+                    const expectedProofLength = VDF_PROOF_BYTE_LENGTHS[discriminantBitSize];
+
+                    if (!Number.isInteger(expectedProofLength)) {
+                        errors.push({
+                            type: 'unsupportedDiscriminantBitSize',
+                            field: 'proof_proposal.discriminant_bit_size',
+                            actual: discriminantBitSize,
+                            expected: Object.keys(VDF_PROOF_BYTE_LENGTHS).map(Number),
+                            message: 'Discriminant bit size must be one of: 1024, 2048, 4096.'
+                        });
+                        return proofProposal;
+                    }
+
+                    if (b4a.isBuffer(proof) && proof.length !== expectedProofLength) {
+                        errors.push({
+                            type: 'bufferLength',
+                            field: 'proof_proposal.proof',
+                            actual: proof.length,
+                            expected: expectedProofLength,
+                            message: `Proof must be a Buffer with length ${expectedProofLength}.`
+                        });
+                    }
+
+                    return proofProposal;
                 }
             },
         };

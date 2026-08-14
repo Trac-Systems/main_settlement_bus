@@ -25,7 +25,7 @@ import {
     EntryType,
     HASH_BYTE_LENGTH,
     SIGNATURE_BYTE_LENGTH,
-    VDF_BLOB_PROOF_SIZE
+    VDF_PROOF_BYTE_LENGTHS
 } from '../../../../../src/utils/constants.js';
 import {
     safeReadUint32BE,
@@ -235,7 +235,10 @@ export async function assertGenesisInitialized(
         'genesis proof stores the configured VDF discriminant bit size'
     );
     t.ok(
-        b4a.equals(proofProposal.proof, b4a.alloc(VDF_BLOB_PROOF_SIZE)),
+        b4a.equals(
+            proofProposal.proof,
+            b4a.alloc(VDF_PROOF_BYTE_LENGTHS[discriminantBitSize])
+        ),
         'genesis proof starts with an empty VDF proof'
     );
     t.ok(

@@ -10,9 +10,8 @@ import {
     ConsensusResultCode,
     HASH_BYTE_LENGTH,
     SIGNATURE_BYTE_LENGTH,
-    VDF_BLOB_PROOF_SIZE,
     VDF_DIFFICULTY_SIZE,
-    VDF_DISCRIMINANT_SIZE,
+    VDF_PROOF_BYTE_LENGTHS,
 } from '../../src/utils/constants.js';
 
 const { MessageType } = consensusV1Generated.consensus.v1;
@@ -29,8 +28,8 @@ const proofProposal = Object.freeze({
         config.addressPrefix
     ),
     difficulty: bytes(3, VDF_DIFFICULTY_SIZE),
-    discriminant_bit_size: bytes(4, VDF_DISCRIMINANT_SIZE),
-    proof: bytes(67, VDF_BLOB_PROOF_SIZE),
+    discriminant_bit_size: uint16ToBuffer(2048),
+    proof: bytes(67, VDF_PROOF_BYTE_LENGTHS[2048]),
     signature: bytes(67, SIGNATURE_BYTE_LENGTH)
 });
 

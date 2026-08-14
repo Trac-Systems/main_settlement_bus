@@ -1,7 +1,7 @@
 import b4a from 'b4a'
 import {
     HASH_BYTE_LENGTH,
-    VDF_BLOB_PROOF_SIZE,
+    VDF_PROOF_BYTE_LENGTHS,
     SIGNATURE_BYTE_LENGTH,
     ConsensusProtocolVersion
 } from '../../../utils/constants.js'
@@ -41,6 +41,11 @@ export async function createGenesisEpochProof(config, proposerAddress, encodedCo
         return null;
     }
     const epoch = b4a.alloc(8, 0); // Epoch Zero
+    const discriminantBitSize = vdfConfig.discriminantBitSize.readUInt16BE(0);
+    const proofByteLength = VDF_PROOF_BYTE_LENGTHS[discriminantBitSize];
+    if (!Number.isInteger(proofByteLength)) {
+        return null;
+    }
 
     const proofData = {
         protocol_version: protocolVersion,
@@ -50,7 +55,7 @@ export async function createGenesisEpochProof(config, proposerAddress, encodedCo
         proposer,
         difficulty: vdfConfig.difficulty,
         discriminant_bit_size: vdfConfig.discriminantBitSize,
-        proof: b4a.alloc(VDF_BLOB_PROOF_SIZE).fill(0),
+        proof: b4a.alloc(proofByteLength).fill(0),
         signature: b4a.alloc(SIGNATURE_BYTE_LENGTH).fill(0),
     }
 

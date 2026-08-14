@@ -62,7 +62,7 @@ import deploymentEntryUtils from './utils/deploymentEntry.js';
 import { Status } from './utils/transaction.js';
 import remote from 'hypercore/lib/fully-remote-proof.js'
 import PQueue from 'p-queue';
-import { createGenesisEpochProof, encodeVdfParameters } from './utils/epochProof.js';
+import { createGenesisEpochProof } from './utils/epochProof.js';
 import {
     decodeVdfConfig,
     safeDecodeVdfConfig,
@@ -4733,10 +4733,11 @@ class State extends ReadyResource {
         switch (schemaVersion) {
             case 1: {
                 const configData = safeDecodeVdfConfig(consensusConfig.cd);
+                const discriminantBitSize = configData?.discriminantBitSize.readUInt16BE(0);
                 if (
                     configData !== null &&
                     !isZeroBuffer(configData.difficulty) &&
-                    !isZeroBuffer(configData.discriminantBitSize)
+                    Object.hasOwn(VDF_PROOF_BYTE_LENGTHS, discriminantBitSize)
                 ) {
                     isValid = true;
                 }

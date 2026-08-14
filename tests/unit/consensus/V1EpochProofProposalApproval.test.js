@@ -12,18 +12,17 @@ import {
     ConsensusOperationType,
     ConsensusProtocolVersion,
     ConsensusResultCode,
-    VDF_BLOB_PROOF_SIZE,
     VDF_DIFFICULTY_SIZE,
-    VDF_DISCRIMINANT_SIZE
+    VDF_PROOF_BYTE_LENGTHS
 } from '../../../src/utils/constants.js';
 import {config} from '../../helpers/config.js';
 import {testKeyPair1, testKeyPair2, testKeyPair3} from '../../fixtures/apply.fixtures.js';
-import {createMessage, uint32ToBuffer} from '../../../src/utils/buffer.js';
+import {createMessage, uint16ToBuffer, uint32ToBuffer} from '../../../src/utils/buffer.js';
 
 const previousEpochRecordHash = b4a.alloc(32, 1);
 const difficulty = b4a.alloc(VDF_DIFFICULTY_SIZE, 2);
-const discriminantBitSize = b4a.alloc(VDF_DISCRIMINANT_SIZE, 3);
-const proof = b4a.alloc(VDF_BLOB_PROOF_SIZE, 4);
+const discriminantBitSize = uint16ToBuffer(2048);
+const proof = b4a.alloc(VDF_PROOF_BYTE_LENGTHS[2048], 4);
 const state = {
     isIndexerAddress: async () => true
 };

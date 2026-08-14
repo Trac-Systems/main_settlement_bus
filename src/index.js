@@ -15,7 +15,7 @@ import {
     WHITELIST_MIGRATION_DIR,
     OperationType,
     MAX_VDF_DIFFICULTY,
-    MAX_VDF_DISCRIMINANT_BIT_SIZE
+    VDF_PROOF_BYTE_LENGTHS
 } from "./utils/constants.js";
 import { decimalStringToBigInt, bigIntTo16ByteBuffer, bufferToBigInt, bigIntToDecimalString } from "./utils/amountSerialization.js"
 import {
@@ -1190,11 +1190,10 @@ export class MainSettlementBus extends ReadyResource {
 
         if (
             !Number.isInteger(configData.discriminantBitSize) ||
-            configData.discriminantBitSize <= 0 ||
-            configData.discriminantBitSize > MAX_VDF_DISCRIMINANT_BIT_SIZE
+            !Object.hasOwn(VDF_PROOF_BYTE_LENGTHS, configData.discriminantBitSize)
         ) {
             throw new Error(
-                "VDF discriminant bit size must be a positive unsigned 16-bit integer."
+                "VDF discriminant bit size must be one of: 1024, 2048, 4096."
             );
         }
 

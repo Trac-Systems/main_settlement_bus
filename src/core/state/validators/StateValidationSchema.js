@@ -13,7 +13,9 @@ import {
     PROTOCOL_VERSION_BYTE_LENGTH,
     NETWORK_ID_BYTE_LENGTH,
     EPOCH_BYTE_LENGTH,
-    VDF_BLOB_PROOF_SIZE,
+    VDF_DIFFICULTY_SIZE,
+    VDF_DISCRIMINANT_SIZE,
+    VDF_PROOF_BYTE_LENGTHS,
     CONSENSUS_CONFIG_SCHEMA_VERSION_BYTE_LENGTH,
     CONSENSUS_CONFIG_DATA_MAX_SIZE,
 } from '../../../utils/constants.js';
@@ -50,8 +52,8 @@ class StateValidationSchema {
             {name: 'epoch', length: EPOCH_BYTE_LENGTH},
             {name: 'previous_epoch_record_hash', length: HASH_BYTE_LENGTH},
             {name: 'proposer', length: this.#config.addressLength},
-            {name: 'vdf_parameters_hash', length: HASH_BYTE_LENGTH},
-            {name: 'vdf_proof', length: VDF_BLOB_PROOF_SIZE},
+            {name: 'difficulty', length: VDF_DIFFICULTY_SIZE},
+            {name: 'discriminant_bit_size', length: VDF_DISCRIMINANT_SIZE},
             {name: 'signature', length: SIGNATURE_BYTE_LENGTH}
         ]);
         this.#validator = new Validator({
@@ -73,6 +75,7 @@ class StateValidationSchema {
         const decodeProofData = decodeProofProposal;
         const encodeProofData = encodeProofProposal;
         const proofDataFields = this.#proofDataFields;
+        const proofByteLengths = VDF_PROOF_BYTE_LENGTHS;
         const addressLength = this.#config.addressLength;
         this.#validator.add("buffer", function ({schema, messages}, _path, _context) {
             return {
@@ -150,7 +153,8 @@ class StateValidationSchema {
                 encodeProofData,
                 equals,
                 isBuffer,
-                fields: proofDataFields
+                fields: proofDataFields,
+                proofByteLengths
             };
 
             return {
@@ -194,6 +198,34 @@ class StateValidationSchema {
                             reencodedProofDataInput[field.name] = fieldValue;
                         }
 
+                        const discriminantBitSize = proofData.discriminant_bit_size.readUInt16BE(0);
+                        const expectedProofLength = proofDataRule.proofByteLengths[discriminantBitSize];
+                        const proof = proofData.proof;
+
+                        if (
+                            !Number.isInteger(expectedProofLength) ||
+                            !proofDataRule.isBuffer(proof) ||
+                            proof.length !== expectedProofLength
+                        ) {
+                            ${this.makeError({type: "proofData", actual: "value", messages})}
+                            return value;
+                        }
+
+                        let proofIsZeroFilled = true;
+                        for (let i = 0; i < proof.length; i++) {
+                            if (proof[i] !== 0) {
+                                proofIsZeroFilled = false;
+                                break;
+                            }
+                        }
+
+                        if (proofIsZeroFilled) {
+                            ${this.makeError({type: "proofData", actual: "value", messages})}
+                            return value;
+                        }
+
+                        reencodedProofDataInput.proof = proof;
+
                         const reencodedProofData = proofDataRule.encodeProofData(reencodedProofDataInput);
                         if (!proofDataRule.equals(value, reencodedProofData)) {
                             ${this.makeError({type: "proofData", actual: "value", messages})}
@@ -203,6 +235,7 @@ class StateValidationSchema {
                     `
             };
         });
+
         // index is a number assigned by fastest-validator to this compiled rule.
         // Use it as a key for helpers needed by the generated validator function.
         // Example: index = 6 -> _context.customs[6] stores decodeApproval.

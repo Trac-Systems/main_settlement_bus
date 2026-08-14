@@ -5,7 +5,7 @@ import { isHexString } from "../src/utils/helpers.js";
 import { bigIntToDecimalString } from "../src/utils/amountSerialization.js";
 import {
     MAX_VDF_DIFFICULTY,
-    MAX_VDF_DISCRIMINANT_BIT_SIZE
+    VDF_PROOF_BYTE_LENGTHS
 } from "../src/utils/constants.js";
 
 export const COMMANDS = {
@@ -336,9 +336,9 @@ export class CommandHandler {
             return;
         }
 
-        const discriminantBitSize = this.#parsePositiveInteger(input, BigInt(MAX_VDF_DISCRIMINANT_BIT_SIZE));
+        const discriminantBitSize = this.#parseVdfDiscriminantBitSize(input);
         if (!discriminantBitSize) {
-            console.log("Invalid discriminant bit size. Please enter a positive integer (example 2048).");
+            console.log("Invalid discriminant bit size. Please enter one of: 1024, 2048, 4096.");
             console.log(this.#getGenesisDiscriminantBitSizePrompt());
             return;
         }
@@ -450,10 +450,10 @@ export class CommandHandler {
             return;
         }
 
-        const discriminantBitSize = this.#parsePositiveInteger(input, BigInt(MAX_VDF_DISCRIMINANT_BIT_SIZE));
+        const discriminantBitSize = this.#parseVdfDiscriminantBitSize(input);
         if (!discriminantBitSize) {
             console.log(
-                "Invalid discriminant bit size. Please enter an integer between 1 and 65_535."
+                "Invalid discriminant bit size. Please enter one of: 1024, 2048, 4096."
             );
             console.log(this.#getSetVdfParamsDiscriminantBitSizePrompt());
             return;
@@ -522,6 +522,18 @@ export class CommandHandler {
         }
 
         return { display, value };
+    }
+
+    #parseVdfDiscriminantBitSize(input) {
+        const parsed = this.#parsePositiveInteger(input);
+        if (
+            parsed === null ||
+            !Object.hasOwn(VDF_PROOF_BYTE_LENGTHS, Number(parsed.value))
+        ) {
+            return null;
+        }
+
+        return parsed;
     }
 
     #getGenesisDifficultyPrompt() {

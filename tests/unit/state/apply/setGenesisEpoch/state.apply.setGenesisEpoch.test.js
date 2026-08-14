@@ -225,6 +225,12 @@ registerRejectedConfigCase({
 });
 
 registerRejectedConfigCase({
+    title: 'State.apply SET_GENESIS_EPOCH rejects unsupported VDF discriminant bit size',
+    buildOptions: { discriminantBitSize: 3072 },
+    expectedLog: 'Consensus config validation failed.'
+});
+
+registerRejectedConfigCase({
     title: 'State.apply SET_GENESIS_EPOCH rejects an all-zero VDF config',
     buildOptions: { difficulty: 0, discriminantBitSize: 0 },
     expectedLog: 'Consensus config validation failed.'
@@ -514,9 +520,9 @@ test('State.apply SET_GENESIS_EPOCH initializes and replicates the complete gene
 });
 
 for (const [label, difficulty, discriminantBitSize] of [
-    ['minimum', 1, 1],
-    ['non-zero values containing zero bytes', 0x00010000, 0x0100],
-    ['maximum', 0xffffffff, 0xffff]
+    ['1024-bit discriminant', 1, 1024],
+    ['2048-bit discriminant and difficulty containing zero bytes', 0x00010000, 2048],
+    ['4096-bit discriminant and maximum difficulty', 0xffffffff, 4096]
 ]) {
     test(`State.apply SET_GENESIS_EPOCH accepts ${label} valid VDF parameters`, async t => {
         const context = await setupSetGenesisEpochScenario(t);

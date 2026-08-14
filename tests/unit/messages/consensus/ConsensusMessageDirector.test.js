@@ -18,7 +18,7 @@ import {
     ConsensusOperationType,
     ConsensusProtocolVersion,
     ConsensusResultCode,
-    VDF_BLOB_PROOF_SIZE
+    VDF_PROOF_BYTE_LENGTHS
 } from '../../../../src/utils/constants.js';
 import {
     decodeConsensusMessage,
@@ -44,8 +44,8 @@ test('ConsensusMessageDirector builds proof proposal and verifies signature', as
     const epochBuffer = uint64ToBuffer(epoch);
     const previousEpochRecordHash = b4a.alloc(32, 1);
     const difficulty = b4a.alloc(4, 0xff);
-    const discriminantBitSize = b4a.alloc(2, 0xff);
-    const proof = b4a.alloc(VDF_BLOB_PROOF_SIZE, 3);
+    const discriminantBitSize = uint16ToBuffer(2048);
+    const proof = b4a.alloc(VDF_PROOF_BYTE_LENGTHS[2048], 3);
 
     const payload = await director.buildProofProposal(
         sessionId,
@@ -99,8 +99,8 @@ test('ConsensusMessageDirector builds proof proposal response and verifies signa
     const epochBuffer = uint64ToBuffer(epoch);
     const previousEpochRecordHash = b4a.alloc(32, 1);
     const difficulty = b4a.alloc(4, 0xff);
-    const discriminantBitSize = b4a.alloc(2, 0xff);
-    const proof = b4a.alloc(VDF_BLOB_PROOF_SIZE, 3);
+    const discriminantBitSize = uint16ToBuffer(2048);
+    const proof = b4a.alloc(VDF_PROOF_BYTE_LENGTHS[2048], 3);
     const requesterProofSignature = b4a.alloc(64, 4);
 
     const payload = await director.buildProofProposalResponse(

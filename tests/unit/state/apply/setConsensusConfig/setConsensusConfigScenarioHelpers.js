@@ -32,7 +32,7 @@ import { buildAddAdminRequesterPayload } from '../addAdmin/addAdminScenarioHelpe
 export const GENESIS_DIFFICULTY = 55_000_000;
 export const GENESIS_DISCRIMINANT_BIT_SIZE = 2048;
 export const UPDATED_DIFFICULTY = 60_000_000;
-export const UPDATED_DISCRIMINANT_BIT_SIZE = 3072;
+export const UPDATED_DISCRIMINANT_BIT_SIZE = 4096;
 
 export async function setupSetConsensusConfigScenario(
     t,

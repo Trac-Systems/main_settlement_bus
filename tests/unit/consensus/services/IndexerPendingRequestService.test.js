@@ -7,10 +7,10 @@ import {
     ConsensusOperationType,
     ConsensusProtocolVersion,
     ConsensusResultCode,
-    VDF_BLOB_PROOF_SIZE,
     VDF_DIFFICULTY_SIZE,
-    VDF_DISCRIMINANT_SIZE
+    VDF_PROOF_BYTE_LENGTHS
 } from '../../../../src/utils/constants.js';
+import { uint16ToBuffer } from '../../../../src/utils/buffer.js';
 import { config } from '../../../helpers/config.js';
 import { testKeyPair1, testKeyPair2 } from '../../../fixtures/apply.fixtures.js';
 import { WalletProvider } from 'trac-wallet';
@@ -44,8 +44,8 @@ async function buildProofProposal({ sessionId = uuidv7() } = {}) {
         .setPreviousEpochRecordHash(b4a.alloc(32))
         .setProposer(wallet.address)
         .setDifficulty(b4a.alloc(VDF_DIFFICULTY_SIZE))
-        .setDiscriminantBitSize(b4a.alloc(VDF_DISCRIMINANT_SIZE))
-        .setProof(b4a.alloc(VDF_BLOB_PROOF_SIZE))
+        .setDiscriminantBitSize(uint16ToBuffer(2048))
+        .setProof(b4a.alloc(VDF_PROOF_BYTE_LENGTHS[2048]))
         .buildPayload();
     return builder.getResult();
 }
