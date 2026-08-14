@@ -8,6 +8,17 @@ import {
     MAX_VDF_DISCRIMINANT_BIT_SIZE
 } from "../src/utils/constants.js";
 
+const OPERATIONS = {
+    CONFIRMATION: "confirmation",
+    GENESIS_DIFFICULTY: "genesis-difficulty",
+    GENESIS_DISCRIMINANT_BIT_SIZE: "genesis-discriminant-bit-size",
+    CONSENSUS_CONFIG: "consensus-config",
+    VDF_DIFFICULTY: "vdf-difficulty",
+    VDF_DISCRIMINANT_BIT_SIZE: "vdf-discriminant-bit-size",
+    GENESIS_PREFIX: "genesis-",
+    VDF_PREFIX: "vdf-"
+};
+
 export const COMMANDS = {
     HELP: "/help",
     EXIT: "/exit",
@@ -75,19 +86,19 @@ export class CommandHandler {
     #getHandlers() {
         return [
             {
-                evaluate: ({ context }) => context.pending?.op === "confirmation",
+                evaluate: ({ context }) => context.pending?.op === OPERATIONS.CONFIRMATION,
                 process: async ({ input, context }) => this.#handlePendingConfirmation(input, context)
             },
             {
-                evaluate: ({ context }) => context.pending?.op.startsWith("genesis-"),
+                evaluate: ({ context }) => context.pending?.op.startsWith(OPERATIONS.GENESIS_PREFIX),
                 process: async ({ input, context }) => this.#handlePendingGenesisInitialization(input, context)
             },
             {
-                evaluate: ({ context }) => context.pending?.op === "consensus-config",
+                evaluate: ({ context }) => context.pending?.op === OPERATIONS.CONSENSUS_CONFIG,
                 process: async ({ input, context }) => this.#handlePendingSetConsensusConfig(input, context)
             },
             {
-                evaluate: ({ context }) => context.pending?.op.startsWith("vdf-"),
+                evaluate: ({ context }) => context.pending?.op.startsWith(OPERATIONS.VDF_PREFIX),
                 process: async ({ input, context }) => this.#handlePendingSetVdfParams(input, context)
             },
             {
@@ -299,7 +310,7 @@ export class CommandHandler {
         console.info(`Balance after transaction: ${bigIntToDecimalString(preparedTransfer.expectedNewBalance)}`);
 
         context.pending = {
-            op: "confirmation",
+            op: OPERATIONS.CONFIRMATION,
             prompt: "Do you want to proceed? (y/n)",
             onConfirm: async () => this.#msb.submitPreparedTransferOperation(preparedTransfer),
             onDecline: async () => this.#msb.printHelp()
@@ -310,7 +321,7 @@ export class CommandHandler {
 
     #queueEpochGenesisInitialization(context) {
         context.pending = {
-            op: "genesis-difficulty"
+            op: OPERATIONS.GENESIS_DIFFICULTY
         };
 
         console.log(this.#getGenesisDifficultyPrompt());
@@ -319,7 +330,7 @@ export class CommandHandler {
     #handlePendingGenesisInitialization(input, context) {
         const pendingGenesisInitialization = context.pending;
 
-        if (pendingGenesisInitialization.op === "genesis-difficulty") {
+        if (pendingGenesisInitialization.op === OPERATIONS.GENESIS_DIFFICULTY) {
             const difficulty = this.#parsePositiveInteger(input, BigInt(MAX_VDF_DIFFICULTY));
             if (!difficulty) {
                 console.log("Invalid difficulty. Please enter a positive integer (example 55_000_000).");
@@ -328,7 +339,7 @@ export class CommandHandler {
             }
 
             pendingGenesisInitialization.difficulty = difficulty;
-            pendingGenesisInitialization.op = "genesis-discriminant-bit-size";
+            pendingGenesisInitialization.op = OPERATIONS.GENESIS_DISCRIMINANT_BIT_SIZE;
             console.log(this.#getGenesisDiscriminantBitSizePrompt());
             return;
         }
@@ -363,7 +374,7 @@ export class CommandHandler {
         console.info(`VDF discriminant bit size: ${discriminantBitSize.display}`);
 
         context.pending = {
-            op: "confirmation",
+            op: OPERATIONS.CONFIRMATION,
             prompt: "Do you want to proceed? (yes/no)",
             invalidMessage: 'Invalid input. Please answer "yes" or "no".',
             failureMessage: "Genesis epoch initialization failed",
@@ -375,7 +386,7 @@ export class CommandHandler {
     }
 
     #queueSetConsensusConfig(context) {
-        context.pending = { op: "consensus-config" };
+        context.pending = { op: OPERATIONS.CONSENSUS_CONFIG };
 
         console.log(this.#getSetConsensusConfigPrompt());
     }
@@ -405,7 +416,7 @@ export class CommandHandler {
         console.info(JSON.stringify(consensusConfig, null, 2));
 
         context.pending = {
-            op: "confirmation",
+            op: OPERATIONS.CONFIRMATION,
             prompt: "Do you want to proceed? (yes/no)",
             invalidMessage: 'Invalid input. Please answer "yes" or "no".',
             failureMessage: "Consensus config update failed",
@@ -418,7 +429,7 @@ export class CommandHandler {
 
     #queueSetVdfParams(context) {
         context.pending = {
-            op: "vdf-difficulty"
+            op: OPERATIONS.VDF_DIFFICULTY
         };
 
         console.log(this.#getSetVdfParamsDifficultyPrompt());
@@ -433,7 +444,7 @@ export class CommandHandler {
 
         const pendingSetVdfParams = context.pending;
 
-        if (pendingSetVdfParams.op === "vdf-difficulty") {
+        if (pendingSetVdfParams.op === OPERATIONS.VDF_DIFFICULTY) {
             const difficulty = this.#parsePositiveInteger(input, BigInt(MAX_VDF_DIFFICULTY));
             if (!difficulty) {
                 console.log(
@@ -444,7 +455,7 @@ export class CommandHandler {
             }
 
             pendingSetVdfParams.difficulty = difficulty;
-            pendingSetVdfParams.op = "vdf-discriminant-bit-size";
+            pendingSetVdfParams.op = OPERATIONS.VDF_DISCRIMINANT_BIT_SIZE;
             console.log(this.#getSetVdfParamsDiscriminantBitSizePrompt());
             return;
         }
@@ -480,7 +491,7 @@ export class CommandHandler {
         console.info(`VDF discriminant bit size: ${discriminantBitSize.display}`);
 
         context.pending = {
-            op: "confirmation",
+            op: OPERATIONS.CONFIRMATION,
             prompt: "Do you want to proceed? (yes/no)",
             invalidMessage: 'Invalid input. Please answer "yes" or "no".',
             failureMessage: "VDF params update failed",

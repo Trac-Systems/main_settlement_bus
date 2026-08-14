@@ -144,7 +144,7 @@ class Network extends ReadyResource {
         await this.#epochCoordinatorService.ready();
 
         this.#logger.info(`Channel: ${b4a.toString(this.#config.channel)}`);
-        this.#listerners();
+        this.#listeners();
 
         this.#swarm.join(this.#config.channel, { server: true, client: true });
         this.#swarm.flush();
@@ -179,7 +179,7 @@ class Network extends ReadyResource {
         wakeup.addStream(stream);
     }
 
-    #listerners() {
+    #listeners() {
         this.#state.on(CustomEventType.IS_INDEXER, async (publicKey) => {
             const publicKeyHex = this.#normalizePublicKey(publicKey);
             this.#validatorConnectionManager.remove(publicKeyHex);
