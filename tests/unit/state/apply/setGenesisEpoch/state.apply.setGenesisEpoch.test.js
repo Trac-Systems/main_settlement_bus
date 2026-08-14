@@ -17,6 +17,7 @@ import InvalidMessageComponentValidationScenario, {
 } from '../common/invalidMessageComponentValidationScenario.js';
 import IndexerSequenceStateInvalidScenario from '../common/indexer/indexerSequenceStateInvalidScenario.js';
 import TransactionValidityMismatchScenario from '../common/transactionValidityMismatchScenario.js';
+import { registerConsensusControlPayloadValidationSuite } from '../common/consensusControlPayloadValidationSuite.js';
 import {
     appendAndUpdate,
     appendBatchAndUpdate,
@@ -537,6 +538,50 @@ for (const [label, difficulty, discriminantBitSize] of [
             discriminantBitSize
         });
     });
+}
+
+registerConsensusControlPayloadValidationSuite({
+    operationName: 'SET_GENESIS_EPOCH',
+    setupScenario: setupSetGenesisEpochScenario,
+    buildValidPayload: buildSetGenesisEpochPayload,
+    buildSemanticAttackPayloads: buildGenesisSemanticAttackPayloads,
+    appendAndUpdate,
+    appendBatchAndUpdate,
+    assertStateBeforeOperation: (t, context, payload) =>
+        assertSetGenesisEpochFailureState(t, context, payload, { skipSync: true }),
+    assertAppliedAndReplicated: async (t, context, payload) => {
+        await assertGenesisInitialized(t, context.adminBootstrap.base, payload);
+        await context.sync();
+        for (const reader of context.peers.slice(1)) {
+            await assertGenesisInitialized(t, reader.base, payload);
+        }
+    }
+});
+
+async function buildGenesisSemanticAttackPayloads(context) {
+    const buildOptions = [
+        {schemaVersion: 2, configData: b4a.from([1])},
+        {
+            schemaVersion: 255,
+            configData: b4a.alloc(CONSENSUS_CONFIG_DATA_MAX_SIZE, 0xff)
+        },
+        {configData: b4a.from([1])},
+        {configData: b4a.alloc(CONSENSUS_CONFIG_DATA_MAX_SIZE, 0xff)},
+        {difficulty: 0, discriminantBitSize: 1024},
+        {difficulty: 1, discriminantBitSize: 1},
+        {difficulty: 1, discriminantBitSize: 1023},
+        {difficulty: 1, discriminantBitSize: 1025},
+        {difficulty: 1, discriminantBitSize: 2047},
+        {difficulty: 1, discriminantBitSize: 2049},
+        {difficulty: 1, discriminantBitSize: 3072},
+        {difficulty: 1, discriminantBitSize: 4095},
+        {difficulty: 1, discriminantBitSize: 4097},
+        {difficulty: 0xffffffff, discriminantBitSize: 0xffff}
+    ];
+
+    return Promise.all(
+        buildOptions.map(options => buildSetGenesisEpochPayload(context, options))
+    );
 }
 
 function registerRejectedConfigCase({ title, buildOptions, expectedLog }) {

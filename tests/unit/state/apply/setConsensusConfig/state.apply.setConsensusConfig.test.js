@@ -17,6 +17,7 @@ import InvalidMessageComponentValidationScenario, {
 } from '../common/invalidMessageComponentValidationScenario.js';
 import IndexerSequenceStateInvalidScenario from '../common/indexer/indexerSequenceStateInvalidScenario.js';
 import TransactionValidityMismatchScenario from '../common/transactionValidityMismatchScenario.js';
+import { registerConsensusControlPayloadValidationSuite } from '../common/consensusControlPayloadValidationSuite.js';
 import {
     GENESIS_DIFFICULTY,
     GENESIS_DISCRIMINANT_BIT_SIZE,
@@ -39,6 +40,7 @@ import {
     setupSetConsensusConfigScenario
 } from './setConsensusConfigScenarioHelpers.js';
 import { safeDecodeApplyOperation } from '../../../../../src/codecs/apply/applyOperationCodec.js';
+import { CONSENSUS_CONFIG_DATA_MAX_SIZE } from '../../../../../src/utils/constants.js';
 import { config as stateConfig } from '../../../../helpers/config.js';
 
 const assertRejected = (t, context, validPayload, invalidPayload) =>
@@ -495,6 +497,35 @@ test('State.apply SET_CONSENSUS_CONFIG applies two distinct updates atomically i
     await assertOperationRecorded(t, context.adminBootstrap.base, maximumPayload, true);
 });
 
+test('State.apply SET_CONSENSUS_CONFIG accepts every supported discriminant size in one batch', async t => {
+    const context = await setupSetConsensusConfigScenario(t);
+    const payloads = await Promise.all([
+        buildSetConsensusConfigPayload(context, {
+            difficulty: 1,
+            discriminantBitSize: 1024
+        }),
+        buildSetConsensusConfigPayload(context, {
+            difficulty: 0x00010000,
+            discriminantBitSize: 2048
+        }),
+        buildSetConsensusConfigPayload(context, {
+            difficulty: 0xffffffff,
+            discriminantBitSize: 4096
+        })
+    ]);
+
+    await appendBatchAndUpdate(context.adminBootstrap.base, payloads);
+
+    await assertCurrentConfigId(t, context.adminBootstrap.base, 3);
+    await assertVdfConfigRecord(t, context.adminBootstrap.base, 1, 1, 1024);
+    await assertVdfConfigRecord(t, context.adminBootstrap.base, 2, 0x00010000, 2048);
+    await assertVdfConfigRecord(t, context.adminBootstrap.base, 3, 0xffffffff, 4096);
+    await assertConfigRecordMissing(t, context.adminBootstrap.base, 4);
+    for (const payload of payloads) {
+        await assertOperationRecorded(t, context.adminBootstrap.base, payload, true);
+    }
+});
+
 test('State.apply SET_CONSENSUS_CONFIG records repeated values as distinct signed history entries', async t => {
     const context = await setupSetConsensusConfigScenario(t);
     const firstPayload = await buildSetConsensusConfigPayload(context);
@@ -528,6 +559,72 @@ test('State.apply SET_CONSENSUS_CONFIG records repeated values as distinct signe
     await assertOperationRecorded(t, context.adminBootstrap.base, firstPayload, true);
     await assertOperationRecorded(t, context.adminBootstrap.base, secondPayload, true);
 });
+
+registerConsensusControlPayloadValidationSuite({
+    operationName: 'SET_CONSENSUS_CONFIG',
+    setupScenario: setupSetConsensusConfigScenario,
+    buildValidPayload: buildSetConsensusConfigPayload,
+    buildSemanticAttackPayloads: buildConfigSemanticAttackPayloads,
+    appendAndUpdate,
+    appendBatchAndUpdate,
+    assertStateBeforeOperation: (t, context, payload) =>
+        assertSetConsensusConfigFailureState(t, context, payload, { skipSync: true }),
+    assertAppliedAndReplicated: assertConfigUpdateAppliedAndReplicated
+});
+
+async function buildConfigSemanticAttackPayloads(context) {
+    const buildOptions = [
+        {schemaVersion: 2, configData: b4a.from([1])},
+        {
+            schemaVersion: 255,
+            configData: b4a.alloc(CONSENSUS_CONFIG_DATA_MAX_SIZE, 0xff)
+        },
+        {configData: b4a.from([1])},
+        {configData: b4a.alloc(CONSENSUS_CONFIG_DATA_MAX_SIZE, 0xff)},
+        {difficulty: 0, discriminantBitSize: 1024},
+        {difficulty: 1, discriminantBitSize: 1},
+        {difficulty: 1, discriminantBitSize: 1023},
+        {difficulty: 1, discriminantBitSize: 1025},
+        {difficulty: 1, discriminantBitSize: 2047},
+        {difficulty: 1, discriminantBitSize: 2049},
+        {difficulty: 1, discriminantBitSize: 3072},
+        {difficulty: 1, discriminantBitSize: 4095},
+        {difficulty: 1, discriminantBitSize: 4097},
+        {difficulty: 0xffffffff, discriminantBitSize: 0xffff}
+    ];
+
+    return Promise.all(
+        buildOptions.map(options => buildSetConsensusConfigPayload(context, options))
+    );
+}
+
+async function assertConfigUpdateAppliedAndReplicated(t, context, payload) {
+    await assertConfigUpdateApplied(t, context.adminBootstrap.base, payload);
+    await context.sync();
+    for (const reader of context.peers.slice(1)) {
+        await assertConfigUpdateApplied(t, reader.base, payload);
+    }
+}
+
+async function assertConfigUpdateApplied(t, base, payload) {
+    await assertCurrentConfigId(t, base, 1);
+    await assertVdfConfigRecord(
+        t,
+        base,
+        0,
+        GENESIS_DIFFICULTY,
+        GENESIS_DISCRIMINANT_BIT_SIZE
+    );
+    await assertVdfConfigRecord(
+        t,
+        base,
+        1,
+        UPDATED_DIFFICULTY,
+        UPDATED_DISCRIMINANT_BIT_SIZE
+    );
+    await assertConfigRecordMissing(t, base, 2);
+    await assertOperationRecorded(t, base, payload, true);
+}
 
 function registerRejectedConfigCase({ title, buildOptions, expectedLog }) {
     test(title, async t => {
