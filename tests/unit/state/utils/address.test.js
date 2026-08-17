@@ -61,3 +61,25 @@ test('bufferToAddress returns null for buffer with invalid chars', t => {
     buf[5] = 0x41; // 'A' (not bech32)
     t.is(addressUtils.bufferToAddress(buf, hrp), null);
 });
+
+test('address buffer rejects high-bit ASCII aliases', t => {
+    const hrp = 'test';
+    const address = randomAddress(hrp);
+    const canonical = b4a.from(address, 'ascii');
+    const aliased = b4a.from(canonical);
+    aliased[0] |= 0x80;
+
+    t.absent(
+        b4a.equals(aliased, canonical),
+        'high-bit mutation changes the raw address bytes'
+    );
+    t.absent(
+        addressUtils.isAddressValid(aliased, hrp),
+        'non-canonical address bytes are invalid'
+    );
+    t.is(
+        addressUtils.bufferToAddress(aliased, hrp),
+        null,
+        'non-canonical address bytes cannot be normalized into a valid address'
+    );
+});
