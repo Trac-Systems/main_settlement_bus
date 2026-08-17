@@ -60,6 +60,11 @@ export class Config {
         return !!this.#config.enableErrorApplyLogs
     }
 
+    get enableLogTimestamp() {
+        if (this.#isOverriden('enableLogTimestamp')) return !!this.#options.enableLogTimestamp
+        return !!this.#config.enableLogTimestamp
+    }
+
     get enableInteractiveMode() {
         if (this.#isOverriden('enableInteractiveMode')) return this.#options.enableInteractiveMode !== false
         return !!this.#config.enableInteractiveMode

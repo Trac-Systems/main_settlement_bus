@@ -16,6 +16,13 @@ test('Config: shipped presets still construct successfully', t => {
     }
 });
 
+test('Config: log timestamp can be enabled or disabled', t => {
+    t.is(createConfig(ENV.MAINNET, {}).enableLogTimestamp, false);
+    t.ok(createConfig(ENV.DEVELOPMENT, {}).enableLogTimestamp);
+    t.is(createConfig(ENV.MAINNET, { enableLogTimestamp: false }).enableLogTimestamp, false);
+    t.is(createConfig(ENV.MAINNET, { enableLogTimestamp: true }).enableLogTimestamp, true);
+});
+
 test('Config: valid overrideable startup fields remain usable after validation', t => {
     const config = createConfig(ENV.MAINNET, {
         bootstrap: 'ab'.repeat(32),
