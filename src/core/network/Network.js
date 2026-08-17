@@ -203,7 +203,7 @@ class Network extends ReadyResource {
         this.#state.on(CustomEventType.IS_NON_INDEXER, async (bufferAddress) => {
             const address = tracCryptoApi.address.encode(this.#config.addressPrefix, bufferAddress);
             if (address === this.#wallet.address) {
-                this.#epochCoordinatorService.stop();
+                await this.#epochCoordinatorService.stop();
             } else {
                 this.#indexerConnectionManager.remove(bufferAddress);
                 const indexerCount = await this.#state.indexerCount();

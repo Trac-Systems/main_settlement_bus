@@ -321,6 +321,33 @@ if (isBareRuntime) {
         await network.close();
     });
 
+    test('Network does not start the epoch coordinator for a non-indexer with an existing genesis epoch', async t => {
+        const { network, epochCoordinatorServiceInstance } = await loadNetwork({
+            isIndexer: false,
+            currentEpoch: 0n
+        });
+
+        t.absent(epochCoordinatorServiceInstance.start.called);
+        await network.close();
+    });
+
+    test('Network starts the epoch coordinator when the local node is promoted to indexer with an existing genesis epoch', async t => {
+        const publicKey = b4a.alloc(32, 2);
+        const walletAddress = tracCryptoApi.address.encode('trac', publicKey);
+        const { network, epochCoordinatorServiceInstance, state } = await loadNetwork({
+            isIndexer: false,
+            currentEpoch: 0n,
+            indexerCount: 1,
+            walletAddress
+        });
+
+        state.emit(CustomEventType.IS_INDEXER, publicKey);
+        await Promise.resolve(); // IS_INDEXER handlers await indexerCount / getCurrentEpoch.
+
+        t.is(epochCoordinatorServiceInstance.start.callCount, 1, 'local indexer promotion starts the coordinator');
+        await network.close();
+    });
+
     test('Network stops the epoch coordinator without refreshing indexer capacity when the local node is demoted', async t => {
         const publicKey = b4a.alloc(32, 2);
         const walletAddress = tracCryptoApi.address.encode('trac', publicKey);
