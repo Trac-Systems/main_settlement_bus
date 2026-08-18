@@ -18,7 +18,7 @@ class V1BroadcastTransactionRequest extends V1BaseOperation {
     isDataPropertySizeValid(payload) {
         if (b4a.byteLength(payload.broadcast_transaction_request.data) > MAX_PARTIAL_TX_PAYLOAD_BYTE_SIZE) {
             throw new V1ProtocolError(
-                ResultCode.INVALID_PAYLOAD,
+                ResultCode.SCHEMA_VALIDATION_FAILED,
                 `The 'data' field exceeds the maximum allowed byte size of ${MAX_PARTIAL_TX_PAYLOAD_BYTE_SIZE}. Actual size: ${b4a.byteLength(payload.broadcast_transaction_request.data)}`);
         }
     }

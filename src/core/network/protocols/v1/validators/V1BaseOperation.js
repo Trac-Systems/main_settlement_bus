@@ -33,7 +33,7 @@ class V1BaseOperation {
         const selectedValidator = this.#selectCheckSchemaValidator(payload.type);
         const isPayloadValid = selectedValidator(payload);
         if (!isPayloadValid) {
-            throw new V1ProtocolError(ResultCode.INVALID_PAYLOAD, 'Payload is invalid.');
+            throw new V1ProtocolError(ResultCode.SCHEMA_VALIDATION_FAILED, 'Payload is invalid.');
         }
     }
 
@@ -48,14 +48,18 @@ class V1BaseOperation {
             if (error instanceof V1ProtocolError) {
                 throw error;
             }
-            throw new V1ProtocolError(ResultCode.INVALID_PAYLOAD, `Failed to build signature message: ${error.message}`);
+            throw new V1ProtocolError(ResultCode.UNEXPECTED_ERROR, `Failed to build signature message: ${error.message}`);
+        }
+
+        if (!remotePublicKey) {
+            throw new V1ProtocolError(ResultCode.UNEXPECTED_ERROR, 'Remote public key is missing.');
         }
 
         let hash;
         try {
             hash = await tracCryptoApi.hash.blake3(message);
         } catch {
-            throw new V1ProtocolError(ResultCode.INVALID_PAYLOAD, 'Failed to hash signature message.');
+            throw new V1ProtocolError(ResultCode.UNEXPECTED_ERROR, 'Failed to hash signature message.');
         }
 
         let verified = false;
@@ -71,10 +75,10 @@ class V1BaseOperation {
 
     #buildSignatureMessage(payload) {
         if (!Number.isInteger(payload.type)) {
-            throw new V1ProtocolError(ResultCode.INVALID_PAYLOAD, 'Operation type must be an integer.');
+            throw new V1ProtocolError(ResultCode.OPERATION_TYPE_UNKNOWN, 'Operation type must be an integer.');
         }
         if (payload.type === 0) {
-            throw new V1ProtocolError(ResultCode.INVALID_PAYLOAD, 'Operation type is unspecified.');
+            throw new V1ProtocolError(ResultCode.OPERATION_TYPE_UNKNOWN, 'Operation type is unspecified.');
         }
 
         const idBuf = idToBuffer(payload.id);
@@ -147,16 +151,16 @@ class V1BaseOperation {
                 return {signature, message};
             }
             default:
-                throw new V1ProtocolError(ResultCode.UNEXPECTED_ERROR, `Unknown operation type: ${payload.type}`);
+                throw new V1ProtocolError(ResultCode.OPERATION_TYPE_UNKNOWN, `Unknown operation type: ${payload.type}`);
         }
     }
 
     #selectCheckSchemaValidator(type) {
         if (!Number.isInteger(type)) {
-            throw new V1ProtocolError(ResultCode.INVALID_PAYLOAD, 'Operation type must be an integer.');
+            throw new V1ProtocolError(ResultCode.OPERATION_TYPE_UNKNOWN, 'Operation type must be an integer.');
         }
         if (type === 0) {
-            throw new V1ProtocolError(ResultCode.INVALID_PAYLOAD, 'Operation type is unspecified.');
+            throw new V1ProtocolError(ResultCode.OPERATION_TYPE_UNKNOWN, 'Operation type is unspecified.');
         }
 
         switch (type) {
@@ -169,7 +173,7 @@ class V1BaseOperation {
             case NetworkOperationType.BROADCAST_TRANSACTION_RESPONSE:
                 return this.#v1ValidationSchema.validateV1BroadcastTransactionResponse.bind(this.#v1ValidationSchema);
             default:
-                throw new V1ProtocolError(ResultCode.UNEXPECTED_ERROR, `Unknown operation type: ${type}`);
+                throw new V1ProtocolError(ResultCode.OPERATION_TYPE_UNKNOWN, `Unknown operation type: ${type}`);
         }
     }
 
