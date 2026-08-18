@@ -3608,6 +3608,20 @@ class State extends ReadyResource {
             return Status.FAILURE;
         }
 
+        const indexerAddresses = new Set();
+        for (const indexer of Object.values(base.system.indexers)) {
+            const indexerAddressBuffer = await this.#getRegisteredWriterKeyApply(batch, indexer.key.toString('hex'));
+            if (!indexerAddressBuffer) continue;
+            const indexerAddress = addressUtils.bufferToAddress(indexerAddressBuffer, this.#config.addressPrefix);
+            if (indexerAddress) indexerAddresses.add(indexerAddress);
+        }
+
+        const proposerAddress = addressUtils.bufferToAddress(proofProposal.proposer, this.#config.addressPrefix);
+        if (!proposerAddress || !indexerAddresses.has(proposerAddress)) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Proposer is not a registered indexer.", node.from.key)
+            return Status.FAILURE;
+        }
+
         const challengeData = createMessage(
             proofProposal.protocol_version,
             proofProposal.network_id,
@@ -3632,20 +3646,6 @@ class State extends ReadyResource {
         }
         if (!vdfProofVerified) {
             this.#safeLogApply(OperationType.SET_EPOCH, "VDF proof is invalid.", node.from.key)
-            return Status.FAILURE;
-        }
-
-        const indexerAddresses = new Set();
-        for (const indexer of Object.values(base.system.indexers)) {
-            const indexerAddressBuffer = await this.#getRegisteredWriterKeyApply(batch, indexer.key.toString('hex'));
-            if (!indexerAddressBuffer) continue;
-            const indexerAddress = addressUtils.bufferToAddress(indexerAddressBuffer, this.#config.addressPrefix);
-            if (indexerAddress) indexerAddresses.add(indexerAddress);
-        }
-
-        const proposerAddress = addressUtils.bufferToAddress(proofProposal.proposer, this.#config.addressPrefix);
-        if (!proposerAddress || !indexerAddresses.has(proposerAddress)) {
-            this.#safeLogApply(OperationType.SET_EPOCH, "Proposer is not a registered indexer.", node.from.key)
             return Status.FAILURE;
         }
 
