@@ -1,4 +1,4 @@
-import SchedulableService from "../../../utils/scheduler/SchedulableService.js";
+import SchedulableService, { SCHEDULABLE_SERVICE_EVENTS } from "../../../utils/scheduler/SchedulableService.js";
 import { EPOCH_EVENTS, EPOCH_STATES, EpochStateMachine } from "./EpochStateMachine.js";
 import { ConsensusProtocolVersion, CustomEventType } from "../../../utils/constants.js";
 import { Logger } from "../../../utils/logger.js";
@@ -309,6 +309,11 @@ class EpochCoordinatorService extends SchedulableService {
         const toClean = []
 
         // External events
+
+        const cleanStop = listenTo(this, SCHEDULABLE_SERVICE_EVENTS.STOP, () => {
+            stateMachine.close();
+        });
+        toClean.push(cleanStop)
 
         const cleanProposal = listenTo(this.#state, CustomEventType.EPOCH_PROPOSAL_VALIDATION_SUCCESS, () => {
             stateMachine.appendContext({ remoteProposalReceived: true })

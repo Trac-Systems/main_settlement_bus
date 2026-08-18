@@ -42,6 +42,7 @@ import {
 } from '../../../../../src/codecs/apply/applyOperationCodec.js';
 import {
     CONSENSUS_CONFIG_DATA_MAX_SIZE,
+    CustomEventType,
     EntryType,
     HASH_BYTE_LENGTH,
     NONCE_BYTE_LENGTH,
@@ -518,9 +519,12 @@ test('State.apply SET_GENESIS_EPOCH fails when final epoch proof encoding fails'
 test('State.apply SET_GENESIS_EPOCH initializes and replicates the complete genesis state', async t => {
     const context = await setupSetGenesisEpochScenario(t, { nodes: 3 });
     const payload = await buildSetGenesisEpochPayload(context);
+    let epochCreated;
+    context.adminBootstrap.state.once(CustomEventType.GENESIS_EPOCH_CREATED, event => { epochCreated = event; });
 
     await appendAndUpdate(context.adminBootstrap.base, payload);
     await assertGenesisInitialized(t, context.adminBootstrap.base, payload);
+    t.alike(epochCreated, { epoch: 0n, proposerAddress: context.adminBootstrap.wallet.address }, 'genesis emits GENESIS_EPOCH_CREATED');
 
     await context.sync();
     for (const reader of context.peers.slice(1)) {

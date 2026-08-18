@@ -232,12 +232,11 @@ if (isBareRuntime) {
 
     // --- _close() lifecycle ---
 
-    // EPOCH_CREATED handling is not implemented in EpochCoordinatorService yet - skipped until it lands.
-    test.skip('_close() removes the EPOCH_CREATED listener from an in-flight cycle', async t => {
+    test('_close() removes the EPOCH_CREATED listener from an in-flight cycle', async t => {
         const { service, state } = await setup();
         await service.worker(sinon.stub(), sinon.stub());
         await service.close();
-        t.ok(state.removeListener.calledWith(EPOCH_CREATED, sinon.match.func));
+        t.ok(state.off.calledWith(EPOCH_CREATED, sinon.match.func));
     });
 
     test('_close() cancels a pending COLLECT_APPROVALS timeout so it never fires', async t => {
