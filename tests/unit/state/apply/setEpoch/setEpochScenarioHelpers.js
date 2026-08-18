@@ -1,6 +1,5 @@
 
 import b4a from 'b4a';
-import tracCryptoApi from 'trac-crypto-api';
 import { v7 as uuidv7 } from 'uuid';
 import { setupAdminNetwork } from '../common/commonScenarioHelper.js';
 import { deriveIndexerSequenceState, eventFlush } from '../../../../helpers/autobaseTestHelpers.js';
@@ -16,7 +15,6 @@ import {
     encodeProofProposal,
     encodeProofProposalApproval
 } from '../../../../../src/codecs/consensus/v1/consensusV1OperationCodec.js';
-import { encodeVdfParameters } from '../../../../../src/core/state/utils/epochProof.js';
 import { addressToBuffer } from '../../../../../src/core/state/utils/address.js';
 import { EntryType, ConsensusResultCode, ConsensusProtocolVersion } from '../../../../../src/utils/constants.js';
 import { uint16ToBuffer, uint32ToBuffer, uint64ToBuffer, uint8ToBuffer, createMessage } from '../../../../../src/utils/buffer.js';
@@ -130,11 +128,12 @@ export async function buildSetEpochPayload(context, {
         throw new Error('buildSetEpochPayload requires an initialized previous epoch hash.');
     }
 
-    const vdfParamsData = encodeVdfParameters(uint32ToBuffer(vdfDifficulty), uint16ToBuffer(vdfDiscriminantSize));
-    const vdfParametersHash = await tracCryptoApi.hash.blake3(vdfParamsData);
+    const difficulty = uint32ToBuffer(vdfDifficulty);
+    const discriminantBitSize = uint16ToBuffer(vdfDiscriminantSize);
 
-    // Must match the 6-field challenge State#handleApplySetEpochOperation reconstructs
-    // (protocol_version, network_id, epoch, previous_epoch_record_hash, proposer, vdf_parameters_hash)
+    // Must match the 7-field challenge State#handleApplySetEpochOperation reconstructs
+    // (protocol_version, network_id, epoch, previous_epoch_record_hash, proposer,
+    // difficulty, discriminant_bit_size)
     // - the VDF proof is only valid against this exact canonical challenge, not the raw previous hash alone.
     const challengeData = createMessage(
         uint8ToBuffer(ConsensusProtocolVersion.V1),
@@ -142,7 +141,8 @@ export async function buildSetEpochPayload(context, {
         uint64ToBuffer(epoch),
         prevHash,
         addressToBuffer(proposerNode.wallet.address, config.addressPrefix),
-        vdfParametersHash
+        difficulty,
+        discriminantBitSize
     );
 
     const challenge = challengeOverride ?? challengeData;
@@ -155,7 +155,8 @@ export async function buildSetEpochPayload(context, {
             epoch,
             prevHash,
             proposerNode.wallet.address,
-            vdfParametersHash,
+            difficulty,
+            discriminantBitSize,
             vdfSolution
         );
     const proofProposal = { ...proposalMessage.proof_proposal };
@@ -172,7 +173,8 @@ export async function buildSetEpochPayload(context, {
                 epoch,
                 prevHash,
                 proposerNode.wallet.address,
-                vdfParametersHash,
+                difficulty,
+                discriminantBitSize,
                 vdfSolution,
                 proofProposal.signature,
                 ConsensusResultCode.OK,

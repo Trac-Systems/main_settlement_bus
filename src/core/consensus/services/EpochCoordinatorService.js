@@ -4,10 +4,8 @@ import { ConsensusProtocolVersion, CustomEventType } from "../../../utils/consta
 import { Logger } from "../../../utils/logger.js";
 import { createVDFService } from "./createVDFService.js";
 import { EpochCoordinatorOperations } from './EpochCoordinatorOperations.js';
-import { blake3 } from "trac-crypto-api/modules/hash.js"
-import { createMessage, uint16ToBuffer, uint64ToBuffer, uint8ToBuffer } from "../../../utils/buffer.js";
+import { createMessage, uint16ToBuffer, uint32ToBuffer, uint64ToBuffer, uint8ToBuffer } from "../../../utils/buffer.js";
 import { addressToBuffer } from "../../state/utils/address.js"
-import { vdfParamsToEntry } from "../../state/utils/epochProof.js"
 import { sleep } from "../../../utils/helpers.js"
 
 const listenTo = (eventEmitter, event, handler) => {
@@ -114,8 +112,6 @@ class EpochCoordinatorService extends SchedulableService {
     
     async #handleInitializeVdf(context, machine) {
         const { currentEpochHash, vdfDifficulty, vdfDiscriminantSize, currentEpoch } = context;
-        const encodedVdfParamsEntry = vdfParamsToEntry({vdfDifficulty, vdfDiscriminantSize});
-        const vdfHash = await blake3(encodedVdfParamsEntry);
 
         const challenge = createMessage(
             uint8ToBuffer(ConsensusProtocolVersion.V1), 
@@ -123,7 +119,8 @@ class EpochCoordinatorService extends SchedulableService {
             uint64ToBuffer(currentEpoch + 1n),
             currentEpochHash,
             addressToBuffer(this.#wallet.address, this.#config.addressPrefix),
-            vdfHash
+            uint32ToBuffer(vdfDifficulty),
+            uint16ToBuffer(vdfDiscriminantSize)
         );
 
         try {

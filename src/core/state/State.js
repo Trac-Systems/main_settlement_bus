@@ -18,13 +18,14 @@ import {
     ConsensusConfigSchemaVersion,
     UINT32_MAX,
     ConsensusProtocolVersion,
-    HASH_BYTE_LENGTH,
+    VDF_PROOF_BYTE_LENGTHS,
 } from '../../utils/constants.js';
 import { isHexString, sleep, isTransactionRecordPut } from '../../utils/helpers.js';
 import tracCryptoApi from 'trac-crypto-api';
 import { verifyWesolowski } from '@tracsystems/trac-vdf';
 import StateValidationSchema from './validators/StateValidationSchema.js';
 import {
+    decodeConsensusConfig,
     safeDecodeApplyOperation,
     safeEncodeConsensusConfig,
     safeEncodeEpochProof
@@ -38,8 +39,7 @@ import {
     safeReadUint32BE,
     deepCopyBuffer,
     safeReadUint8,
-    uint16ToBuffer,
-    isBufferValid
+    uint16ToBuffer
 } from '../../utils/buffer.js';
 import { safeDecodeProofProposal, safeDecodeProofProposalApproval } from '../../codecs/consensus/v1/consensusV1OperationCodec.js';
 import addressUtils from './utils/address.js';
@@ -63,8 +63,8 @@ import { Status } from './utils/transaction.js';
 import remote from 'hypercore/lib/fully-remote-proof.js'
 import PQueue from 'p-queue';
 import { createGenesisEpochProof } from './utils/epochProof.js';
-import { decodeVersionedConsensusConfig } from './utils/consensusConfig.js';
 import {
+    decodeVdfConfig,
     safeDecodeVdfConfig,
 } from '../../codecs/consensus/v1/vdfConfigCodec.js';
 import _ from 'lodash';
@@ -656,7 +656,22 @@ class State extends ReadyResource {
             throw new Error(`Consensus config record ${currentConfigIndex} does not exist.`);
         }
 
-        return decodeVersionedConsensusConfig(encodedConsensusConfig);
+        const consensusConfig = decodeConsensusConfig(encodedConsensusConfig);
+        const schemaVersion = consensusConfig.sv.readUInt8(0);
+        switch (schemaVersion) {
+            case ConsensusConfigSchemaVersion.VDF_V1: {
+                const decodedVdfConfig = decodeVdfConfig(consensusConfig.cd);
+                return {
+                    schemaVersion,
+                    configData: {
+                        difficulty: decodedVdfConfig.difficulty.readUInt32BE(0),
+                        discriminantBitSize: decodedVdfConfig.discriminantBitSize.readUInt16BE(0),
+                    }
+                };
+            }
+            default:
+                throw new Error(`Unsupported consensus config schema version: ${schemaVersion}.`);
+        }
     }
 
     async requireSignedConsensusConfig() {
@@ -3572,7 +3587,7 @@ class State extends ReadyResource {
 
         const consensusConfig = decodeConsensusConfig(consensusConfigBuffer);
         const schemaVersion = safeReadUint8(consensusConfig.sv);
-        if (schemaVersion !== 1) {
+        if (schemaVersion !== ConsensusConfigSchemaVersion.VDF_V1) {
             this.#safeLogApply(OperationType.SET_EPOCH, "Unsupported consensus config schema version.", node.from.key)
             return Status.FAILURE;
         }
@@ -3584,9 +3599,11 @@ class State extends ReadyResource {
         }
 
         const { difficulty, discriminantBitSize } = decodedVdfParams;
-        const expectedVdfParametersHash = await tracCryptoApi.hash.blake3Safe(encodeVdfParameters(difficulty, discriminantBitSize));
-        if (!isBufferValid(expectedVdfParametersHash, HASH_BYTE_LENGTH) || !b4a.equals(expectedVdfParametersHash, proofProposal.vdf_parameters_hash)) {
-            this.#safeLogApply(OperationType.SET_EPOCH, "VDF parameters hash is invalid.", node.from.key)
+        if (
+            !b4a.equals(difficulty, proofProposal.difficulty) ||
+            !b4a.equals(discriminantBitSize, proofProposal.discriminant_bit_size)
+        ) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "VDF parameters do not match the current consensus config.", node.from.key)
             return Status.FAILURE;
         }
 
@@ -3596,15 +3613,17 @@ class State extends ReadyResource {
             proofProposal.epoch,
             proofProposal.previous_epoch_record_hash,
             proofProposal.proposer,
-            proofProposal.vdf_parameters_hash
+            proofProposal.difficulty,
+            proofProposal.discriminant_bit_size
         );
 
         let vdfProofVerified = false;
         try {
+            //TODO: Implement safe version
             vdfProofVerified = await verifyWesolowski(
                 challengeData,
                 difficulty.readUInt32BE(0),
-                proofProposal.vdf_proof,
+                proofProposal.proof,
                 discriminantBitSize.readUInt16BE(0)
             );
         } catch (error) {
@@ -3632,7 +3651,7 @@ class State extends ReadyResource {
         const proposerPublicKey = tracCryptoApi.address.decodeSafe(proposerAddress);
         let proposalSignatureVerified = false;
         if (!b4a.equals(proposerPublicKey, NULL_BUFFER)) {
-            const proposalMessage = createMessage(challengeData, proofProposal.vdf_proof);
+            const proposalMessage = createMessage(challengeData, proofProposal.proof);
             try {
                 const proposalHash = await tracCryptoApi.hash.blake3(proposalMessage);
                 proposalSignatureVerified = tracCryptoApi.signature.verify(proofProposal.signature, proposalHash, proposerPublicKey);
@@ -3656,7 +3675,7 @@ class State extends ReadyResource {
             const approverPublicKey = tracCryptoApi.address.decodeSafe(approverAddress);
             if (b4a.equals(approverPublicKey, NULL_BUFFER)) continue;
 
-            const approvalMessage = createMessage(challengeData, proofProposal.vdf_proof, approval.approver, proofProposal.signature);
+            const approvalMessage = createMessage(challengeData, proofProposal.proof, approval.approver, proofProposal.signature);
             let approvalVerified = false;
             try {
                 const approvalHash = await tracCryptoApi.hash.blake3(approvalMessage);

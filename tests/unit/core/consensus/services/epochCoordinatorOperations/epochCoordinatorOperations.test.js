@@ -95,9 +95,11 @@ nodeOnlyTest('createProofProposal targets epoch = prevEpochId + 1n and forwards 
     const result = await make().createProofProposal(4n, prevEpochHash, vdf);
 
     t.ok(result);
-    const [, , epoch, hash, , , solution] = buildProofProposal.firstCall.args;
+    const [, , epoch, hash, , difficulty, discriminantBitSize, solution] = buildProofProposal.firstCall.args;
     t.is(epoch, 5n);
     t.ok(b4a.equals(hash, prevEpochHash));
+    t.is(difficulty.readUInt32BE(0), vdf.difficulty);
+    t.is(discriminantBitSize.readUInt16BE(0), vdf.discriminantSizeBits);
     t.ok(b4a.equals(solution, vdf.solution));
 });
 
@@ -228,7 +230,7 @@ nodeOnlyTest('buildSetEpochPayload encodes proof + approvals into the applied pa
             encodeProofProposalApproval: sinon.stub().returns(b4a.alloc(1)),
         },
     });
-    const proofProposal = { protocol_version: 1, network_id: 1, epoch: 2, previous_epoch_record_hash: b4a.alloc(32), vdf_parameters_hash: b4a.alloc(258), vdf_proof: b4a.alloc(258), signature: b4a.alloc(64) };
+    const proofProposal = { protocol_version: 1, network_id: 1, epoch: 2, previous_epoch_record_hash: b4a.alloc(32), difficulty: b4a.alloc(4), discriminant_bit_size: b4a.alloc(2), proof: b4a.alloc(516), signature: b4a.alloc(64) };
     const signatures = [{ signature: b4a.alloc(64), approver: b4a.alloc(21) }];
 
     const payload = await make().buildSetEpochPayload(proofProposal, signatures);
@@ -247,7 +249,7 @@ nodeOnlyTest('buildSetEpochPayload does not append to state', async t => {
             encodeProofProposalApproval: sinon.stub().returns(b4a.alloc(1)),
         },
     });
-    const proofProposal = { protocol_version: 1, network_id: 1, epoch: 2, previous_epoch_record_hash: b4a.alloc(32), vdf_parameters_hash: b4a.alloc(258), vdf_proof: b4a.alloc(258), signature: b4a.alloc(64) };
+    const proofProposal = { protocol_version: 1, network_id: 1, epoch: 2, previous_epoch_record_hash: b4a.alloc(32), difficulty: b4a.alloc(4), discriminant_bit_size: b4a.alloc(2), proof: b4a.alloc(516), signature: b4a.alloc(64) };
 
     await make({ state }).buildSetEpochPayload(proofProposal, []);
 
