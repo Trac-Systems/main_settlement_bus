@@ -153,7 +153,7 @@ class V1BaseConsensusOperation {
      * @param {object} payload Decoded proof proposal request or approval payload.
      * @param {Buffer} remotePublicKey Public key received from the peer connection.
      * @param {object} [proofProposal] Original proof proposal required for approval verification.
-     * @param invalidSignatureResultCode
+     * @param {number} [invalidSignatureResultCode] ConsensusResultCode to use when the signature is invalid.
      * @returns {Promise<void>}
      * @throws {V1ConsensusProtocolError} When message construction, hashing, or signature verification fails.
      */

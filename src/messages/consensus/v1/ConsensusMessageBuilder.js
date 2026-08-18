@@ -193,7 +193,7 @@ class ConsensusMessageBuilder {
             proposer: this.#validateBuffer(this.#proposer, 'Proposer'),
             difficulty: this.#validateBuffer(this.#difficulty, 'Difficulty'),
             discriminant_bit_size: this.#validateBuffer(this.#discriminant_bit_size, 'Discriminant bit size'),
-            proof: this.#validateBuffer(this.#proof, 'VDF proof')
+            proof: this.#validateBuffer(this.#proof, 'Proof')
         };
     }
 
