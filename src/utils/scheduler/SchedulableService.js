@@ -1,6 +1,10 @@
 import ReadyResource from 'ready-resource';
 import Scheduler from './Scheduler.js';
 
+export const SCHEDULABLE_SERVICE_EVENTS = Object.freeze({
+    STOP: 'schedulable-service-stop',
+});
+
 /**
  * Base class for services that execute recurring work through the shared scheduler.
  *
@@ -79,6 +83,7 @@ class SchedulableService extends ReadyResource {
      * @returns {Promise<boolean>}
      */
     async stop(waitForCurrent = true) {
+        this.emit(SCHEDULABLE_SERVICE_EVENTS.STOP);
         if (!this.isSchedulerRunning) return false;
 
         this.#isInterrupted = true;
