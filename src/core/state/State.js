@@ -26,6 +26,7 @@ import { verifyWesolowski } from '@tracsystems/trac-vdf';
 import StateValidationSchema from './validators/StateValidationSchema.js';
 import {
     decodeConsensusConfig,
+    safeDecodeConsensusConfig,
     safeDecodeApplyOperation,
     safeEncodeConsensusConfig,
     safeEncodeEpochProof
@@ -3528,8 +3529,8 @@ class State extends ReadyResource {
         }
 
         const currentEpochBuffer = await this.#getEntryApply(EntryType.EPOCH_CURRENT, batch);
-        if (currentEpochBuffer === null) {
-            this.#safeLogApply(OperationType.SET_EPOCH, "Current epoch is not initialized. Genesis epoch has not been set.", node.from.key)
+        if (!isBufferValid(currentEpochBuffer, EPOCH_BYTE_LENGTH)) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Current epoch is not initialized or invalid.", node.from.key)
             return Status.FAILURE;
         }
 
@@ -3570,11 +3571,11 @@ class State extends ReadyResource {
             return Status.FAILURE;
         }
 
-        const currentConsensusConfigIndex = safeReadUint32BE(currentConsensusConfigIndexBuffer);
-        if (currentConsensusConfigIndex === null) {
+        if (!isBufferValid(currentConsensusConfigIndexBuffer, UINT32_BYTE_LENGTH)) {
             this.#safeLogApply(OperationType.SET_EPOCH, "Failed to read current consensus config index from buffer", node.from.key)
             return Status.FAILURE;
         }
+        const currentConsensusConfigIndex = safeReadUint32BE(currentConsensusConfigIndexBuffer);
 
         const consensusConfigBuffer = await this.#getEntryApply(
             EntryType.CONSENSUS_CONFIG_RECORD + currentConsensusConfigIndex,
@@ -3586,7 +3587,11 @@ class State extends ReadyResource {
         }
 
         // TODO: Change how this is being handled. The apply function should not branch on schemaVersion directly
-        const consensusConfig = decodeConsensusConfig(consensusConfigBuffer);
+        const consensusConfig = safeDecodeConsensusConfig(consensusConfigBuffer);
+        if (consensusConfig === null) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Failed to decode consensus config.", node.from.key)
+            return Status.FAILURE;
+        }
         const schemaVersion = safeReadUint8(consensusConfig.sv);
         if (schemaVersion !== ConsensusConfigSchemaVersion.VDF_V1) {
             this.#safeLogApply(OperationType.SET_EPOCH, "Unsupported consensus config schema version.", node.from.key)
