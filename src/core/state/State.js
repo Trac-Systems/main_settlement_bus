@@ -3622,6 +3622,15 @@ class State extends ReadyResource {
             return Status.FAILURE;
         }
 
+        const indexerCount = Object.values(base.system.indexers).length;
+        const quorumThreshold = indexerCount <= 2 ? 1 : Math.floor(indexerCount / 2) + 1;
+        const totalValidSigners = 1 + op.seo.app.length; // proposer's own verified signature counts as one signer
+
+        if (totalValidSigners < quorumThreshold) {
+            this.#safeLogApply(OperationType.SET_EPOCH, `Insufficient valid approvals for quorum. Required ${quorumThreshold}, got ${totalValidSigners}.`, node.from.key)
+            return Status.FAILURE;
+        }
+
         const challengeData = createMessage(
             proofProposal.protocol_version,
             proofProposal.network_id,
@@ -3631,23 +3640,6 @@ class State extends ReadyResource {
             proofProposal.difficulty,
             proofProposal.discriminant_bit_size
         );
-
-        let vdfProofVerified = false;
-        try {
-            //TODO: Implement safe version
-            vdfProofVerified = await verifyWesolowski(
-                challengeData,
-                difficulty.readUInt32BE(0),
-                proofProposal.proof,
-                discriminantBitSize.readUInt16BE(0)
-            );
-        } catch (error) {
-            console.error(error);
-        }
-        if (!vdfProofVerified) {
-            this.#safeLogApply(OperationType.SET_EPOCH, "VDF proof is invalid.", node.from.key)
-            return Status.FAILURE;
-        }
 
         const proposerPublicKey = tracCryptoApi.address.decodeSafe(proposerAddress);
         let proposalSignatureVerified = false;
@@ -3677,12 +3669,19 @@ class State extends ReadyResource {
             return Status.FAILURE;
         }
 
-        const indexerCount = Object.values(base.system.indexers).length;
-        const quorumThreshold = indexerCount <= 2 ? 1 : Math.floor(indexerCount / 2) + 1;
-        const totalValidSigners = 1 + op.seo.app.length; // proposer's own verified signature counts as one signer
-
-        if (totalValidSigners < quorumThreshold) {
-            this.#safeLogApply(OperationType.SET_EPOCH, `Insufficient valid approvals for quorum. Required ${quorumThreshold}, got ${totalValidSigners}.`, node.from.key)
+        let vdfProofVerified = false;
+        try {
+            vdfProofVerified = await verifyWesolowski(
+                challengeData,
+                difficulty.readUInt32BE(0),
+                proofProposal.proof,
+                discriminantBitSize.readUInt16BE(0)
+            );
+        } catch (error) {
+            console.error(error);
+        }
+        if (!vdfProofVerified) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "VDF proof is invalid.", node.from.key)
             return Status.FAILURE;
         }
 
