@@ -3693,6 +3693,11 @@ class State extends ReadyResource {
         }
 
         const epochProofHash = await tracCryptoApi.hash.blake3Safe(encodedEpochProof);
+        if (!isBufferValid(epochProofHash, HASH_BYTE_LENGTH)) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Failed to hash epoch proof.", node.from.key)
+            return Status.FAILURE;
+        }
+
         const nextEpochBuffer = b4a.alloc(8);
         nextEpochBuffer.writeBigUInt64BE(nextEpoch);
 
