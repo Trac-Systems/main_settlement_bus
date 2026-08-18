@@ -3564,13 +3564,13 @@ class State extends ReadyResource {
             return Status.FAILURE;
         }
 
-        const currentConsensusConfigBuffer = await this.#getEntryApply(EntryType.CONSENSUS_CONFIG_CURRENT, batch);
-        if (currentConsensusConfigBuffer === null) {
+        const currentConsensusConfigIndexBuffer = await this.#getEntryApply(EntryType.CONSENSUS_CONFIG_CURRENT, batch);
+        if (currentConsensusConfigIndexBuffer === null) {
             this.#safeLogApply(OperationType.SET_EPOCH, "Consensus config is not initialized.", node.from.key)
             return Status.FAILURE;
         }
 
-        const currentConsensusConfigIndex = safeReadUint32BE(currentConsensusConfigBuffer);
+        const currentConsensusConfigIndex = safeReadUint32BE(currentConsensusConfigIndexBuffer);
         if (currentConsensusConfigIndex === null) {
             this.#safeLogApply(OperationType.SET_EPOCH, "Failed to read current consensus config index from buffer", node.from.key)
             return Status.FAILURE;
@@ -3585,6 +3585,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         }
 
+        // TODO: Change how this is being handled. The apply function should not branch on schemaVersion directly
         const consensusConfig = decodeConsensusConfig(consensusConfigBuffer);
         const schemaVersion = safeReadUint8(consensusConfig.sv);
         if (schemaVersion !== ConsensusConfigSchemaVersion.VDF_V1) {
