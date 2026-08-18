@@ -3664,31 +3664,21 @@ class State extends ReadyResource {
             return Status.FAILURE;
         }
 
-        const validApprovers = new Set();
-        for (const encodedApproval of op.seo.app) {
-            const approval = safeDecodeProofProposalApproval(encodedApproval);
-            if (approval === null) continue;
-
-            const approverAddress = addressUtils.bufferToAddress(approval.approver, this.#config.addressPrefix);
-            if (!approverAddress || approverAddress === proposerAddress || !indexerAddresses.has(approverAddress)) continue;
-
-            const approverPublicKey = tracCryptoApi.address.decodeSafe(approverAddress);
-            if (b4a.equals(approverPublicKey, NULL_BUFFER)) continue;
-
-            const approvalMessage = createMessage(challengeData, proofProposal.proof, approval.approver, proofProposal.signature);
-            let approvalVerified = false;
-            try {
-                const approvalHash = await tracCryptoApi.hash.blake3(approvalMessage);
-                approvalVerified = tracCryptoApi.signature.verify(approval.approval_sig, approvalHash, approverPublicKey);
-            } catch {
-                approvalVerified = false;
-            }
-            if (approvalVerified) validApprovers.add(approverAddress);
+        const approvalErrorMessage = await this.#validateEpochApprovals(
+            op.seo.app,
+            indexerAddresses,
+            proposerAddress,
+            challengeData,
+            proofProposal
+        );
+        if (approvalErrorMessage) {
+            this.#safeLogApply(OperationType.SET_EPOCH, approvalErrorMessage, node.from.key)
+            return Status.FAILURE;
         }
 
         const indexerCount = Object.values(base.system.indexers).length;
         const quorumThreshold = indexerCount <= 2 ? 1 : Math.floor(indexerCount / 2) + 1;
-        const totalValidSigners = 1 + validApprovers.size; // proposer's own verified signature counts as one signer
+        const totalValidSigners = 1 + op.seo.app.length; // proposer's own verified signature counts as one signer
 
         if (totalValidSigners < quorumThreshold) {
             this.#safeLogApply(OperationType.SET_EPOCH, `Insufficient valid approvals for quorum. Required ${quorumThreshold}, got ${totalValidSigners}.`, node.from.key)
@@ -3710,11 +3700,52 @@ class State extends ReadyResource {
         await batch.put(EntryType.EPOCH_HASH + epochProofHash.toString('hex'), encodedEpochProof);
 
         if (this.#config.enableTxApplyLogs) {
-            console.info(`Epoch ${nextEpoch} committed. proposer:approvals - ${proposerAddress}:${validApprovers.size}`);
+            console.info(`Epoch ${nextEpoch} committed. proposer:approvals - ${proposerAddress}:${op.seo.app.length}`);
         }
 
         this.emit(CustomEventType.EPOCH_CREATED, { epoch: nextEpoch, proposerAddress }); // notify epoch committed
         return Status.SUCCESS;
+    }
+
+    async #validateEpochApprovals(encodedApprovals, indexerAddresses, proposerAddress, challengeData, proofProposal) {
+        const approverIdentities = new Set();
+
+        for (const encodedApproval of encodedApprovals) {
+            const approval = safeDecodeProofProposalApproval(encodedApproval);
+            if (approval === null) return 'Failed to decode epoch approval.';
+
+            const approverAddress = addressUtils.bufferToAddress(approval.approver, this.#config.addressPrefix);
+            if (!approverAddress) return 'Epoch approval contains an invalid approver.';
+            if (approverAddress === proposerAddress) return 'Proposer cannot approve its own epoch proposal.';
+            if (!indexerAddresses.has(approverAddress)) return 'Epoch approver is not a registered indexer.';
+            if (approverIdentities.has(approverAddress)) return 'Epoch approval contains a duplicate approver.';
+
+            const approverPublicKey = tracCryptoApi.address.decodeSafe(approverAddress);
+            if (b4a.equals(approverPublicKey, NULL_BUFFER)) return 'Failed to decode epoch approver public key.';
+
+            const approvalMessage = createMessage(
+                challengeData,
+                proofProposal.vdf_proof,
+                approval.approver,
+                proofProposal.signature
+            );
+            let approvalVerified = false;
+            try {
+                const approvalHash = await tracCryptoApi.hash.blake3(approvalMessage);
+                approvalVerified = tracCryptoApi.signature.verify(
+                    approval.approval_sig,
+                    approvalHash,
+                    approverPublicKey
+                );
+            } catch {
+                approvalVerified = false;
+            }
+            if (!approvalVerified) return 'Failed to verify epoch approval signature.';
+
+            approverIdentities.add(approverAddress);
+        }
+
+        return null;
     }
 
     async #transfer(senderAddressString, recipientAddressString, validatorAddressString, validatorEntryBuffer, transferAmountBuffer, feeAmountBuffer, isSelfTransfer, isRecipientValidator, batch, node) {
