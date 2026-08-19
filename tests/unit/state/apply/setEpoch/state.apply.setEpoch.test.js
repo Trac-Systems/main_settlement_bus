@@ -101,6 +101,31 @@ test('State.apply SET_EPOCH: ignores a stale epoch proposal without disturbing t
     t.is(await getCurrentEpoch(adminNode.base), 1n, 'stale re-proposal for epoch 1 is ignored, epoch stays at 1');
 });
 
+test('State.apply SET_EPOCH: ignores stale proposals without certificate or VDF verification', async t => {
+    const context = await setupSetEpochScenario(t);
+    const adminNode = context.adminBootstrap;
+
+    const firstPayload = await buildSetEpochPayload(context, { epoch: 1n, approverNodes: [] });
+    await appendAndUpdate(adminNode.base, firstPayload);
+
+    let epochCreatedEmitted = false;
+    const onEpochCreated = () => { epochCreatedEmitted = true; };
+    adminNode.state.once(CustomEventType.EPOCH_CREATED, onEpochCreated);
+
+    const stalePayload = await buildSetEpochPayload(context, {
+        epoch: 1n,
+        approverNodes: [],
+        previousEpochHash: await getEpochHash(adminNode.base, 0n),
+        challengeOverride: b4a.alloc(32, 0xff),
+        proposalSignatureOverride: b4a.alloc(64, 0x11)
+    });
+    await appendAndUpdate(adminNode.base, stalePayload);
+    adminNode.state.off(CustomEventType.EPOCH_CREATED, onEpochCreated);
+
+    t.is(await getCurrentEpoch(adminNode.base), 1n, 'stale proposal does not change the committed epoch');
+    t.absent(epochCreatedEmitted, 'stale proposal does not emit EPOCH_CREATED');
+});
+
 test('State.apply SET_EPOCH: rejects a proposal that skips ahead of the next expected epoch', async t => {
     const context = await setupSetEpochScenario(t);
     const adminNode = context.adminBootstrap;
