@@ -3528,6 +3528,11 @@ class State extends ReadyResource {
             return Status.FAILURE;
         }
 
+        if (!b4a.equals(op.address, proofProposal.proposer)) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Operation address does not match the proof proposer.", node.from.key)
+            return Status.FAILURE;
+        }
+
         const currentEpochBuffer = await this.#getEntryApply(EntryType.EPOCH_CURRENT, batch);
         if (!isBufferValid(currentEpochBuffer, EPOCH_BYTE_LENGTH)) {
             this.#safeLogApply(OperationType.SET_EPOCH, "Current epoch is not initialized or invalid.", node.from.key)
