@@ -3516,7 +3516,7 @@ class State extends ReadyResource {
         return Status.SUCCESS;
     }
 
-    async #handleApplySetEpochOperation(op, view, base, node, batch) {
+    async #handleApplySetEpochOperation(op, _view, base, node, batch) {
         if (!this.#stateValidationSchema.validateSetEpochOperation(op)) {
             this.#safeLogApply(OperationType.SET_EPOCH, "Contract schema validation failed.", node.from.key)
             return Status.FAILURE;
@@ -3618,8 +3618,9 @@ class State extends ReadyResource {
             return Status.FAILURE;
         }
 
+        const indexers = Object.values(base.system.indexers);
         const indexerAddresses = new Set();
-        for (const indexer of Object.values(base.system.indexers)) {
+        for (const indexer of indexers) {
             const indexerAddressBuffer = await this.#getRegisteredWriterKeyApply(batch, indexer.key.toString('hex'));
             if (!indexerAddressBuffer) continue;
             const indexerAddress = addressUtils.bufferToAddress(indexerAddressBuffer, this.#config.addressPrefix);
@@ -3632,12 +3633,12 @@ class State extends ReadyResource {
             return Status.FAILURE;
         }
 
-        const indexerCount = Object.values(base.system.indexers).length;
+        const indexerCount = indexers.length;
         const quorumThreshold = indexerCount <= 2 ? 1 : Math.floor(indexerCount / 2) + 1;
-        const totalValidSigners = 1 + op.seo.app.length; // proposer's own verified signature counts as one signer
+        const approvalCount = 1 + op.seo.app.length; // proposer plus submitted approvals (proposer's own verified signature counts as one approval)
 
-        if (totalValidSigners < quorumThreshold) {
-            this.#safeLogApply(OperationType.SET_EPOCH, `Insufficient valid approvals for quorum. Required ${quorumThreshold}, got ${totalValidSigners}.`, node.from.key)
+        if (approvalCount < quorumThreshold) {
+            this.#safeLogApply(OperationType.SET_EPOCH, `Insufficient submitted approvals for quorum. Required ${quorumThreshold}, got ${approvalCount}.`, node.from.key)
             return Status.FAILURE;
         }
 
