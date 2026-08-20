@@ -12,6 +12,9 @@ import "applyOperations/messages/bootstrap_deployment_operation.proto";
 import "applyOperations/messages/tx_operation.proto";
 import "applyOperations/messages/set_epoch_operation.proto";
 import "applyOperations/messages/consensus_control_operation.proto";
+import "applyOperations/messages/htlc_lock_operation.proto";
+import "applyOperations/messages/htlc_claim_operation.proto";
+import "applyOperations/messages/htlc_refund_operation.proto";
 
 // Main structure for the operations where messages are
 message Operation {
@@ -28,5 +31,8 @@ message Operation {
         TxOperation                       txo  = 9;
         SetEpochOperation                 seo  = 10;
         ConsensusControlOperation         cco  = 11;
+        HtlcLockOperation                 hlo  = 12;
+        HtlcClaimOperation                hco  = 13;
+        HtlcRefundOperation               hro  = 14;
     }
 }
