@@ -8,6 +8,7 @@ import { isAddressValid } from "../../core/state/utils/address.js";
 import {
     isAdminControl,
     isBalanceInitialization,
+    isHtlc,
     isBootstrapDeployment,
     isConsensusControl,
     isCoreAdmin,
@@ -300,7 +301,8 @@ class ApplyStateMessageBuilder {
 
     async #buildPartialBody() {
         if (!isRoleAccess(this.#operationType) && !isTransaction(this.#operationType) &&
-            !isBootstrapDeployment(this.#operationType) && !isTransfer(this.#operationType)) {
+            !isBootstrapDeployment(this.#operationType) && !isTransfer(this.#operationType) &&
+            !isHtlc(this.#operationType)) {
             throw new Error(`Operation type ${this.#operationType} is not supported for partial build.`);
         }
 
@@ -308,6 +310,10 @@ class ApplyStateMessageBuilder {
         let msg;
 
         switch (this.#operationType) {
+            case OperationType.HTLC_LOCK:
+            case OperationType.HTLC_CLAIM:
+            case OperationType.HTLC_REFUND:
+                return {};
             case OperationType.ADD_WRITER:
             case OperationType.REMOVE_WRITER:
             case OperationType.ADMIN_RECOVERY:
