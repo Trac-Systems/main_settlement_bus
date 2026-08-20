@@ -28,7 +28,11 @@ const isBare = typeof globalThis.Bare !== 'undefined';
 export const VDF_DIFFICULTY = 100;
 export const VDF_DISCRIMINANT_SIZE = 2048;
 
-export async function computeRealVdfSolution(challenge) {
+export async function computeRealVdfSolution(
+    challenge,
+    difficulty = VDF_DIFFICULTY,
+    discriminantBitSize = VDF_DISCRIMINANT_SIZE
+) {
     const Service = isBare
         ? (await import('../../../../../src/core/consensus/services/VDFBare.js')).VDFBare
         : (await import('../../../../../src/core/consensus/services/VDFNode.js')).VDFNode;
@@ -36,7 +40,11 @@ export async function computeRealVdfSolution(challenge) {
     const service = new Service();
     await service.ready();
     try {
-        const { result, error } = await service.calculateVDF(challenge, VDF_DIFFICULTY, VDF_DISCRIMINANT_SIZE);
+        const { result, error } = await service.calculateVDF(
+            challenge,
+            difficulty,
+            discriminantBitSize
+        );
         if (error) {
             throw new Error(`VDF computation failed in test helper (is @tracsystems/trac-vdf built?): ${error}`);
         }
@@ -146,7 +154,11 @@ export async function buildSetEpochPayload(context, {
     );
 
     const challenge = challengeOverride ?? challengeData;
-    const vdfSolution = await computeRealVdfSolution(challenge);
+    const vdfSolution = await computeRealVdfSolution(
+        challenge,
+        vdfDifficulty,
+        vdfDiscriminantSize
+    );
 
     const proposalMessage = await consensusMessageFactory(proposerNode.wallet, config)
         .buildProofProposal(
