@@ -46,6 +46,9 @@ export const OperationType = Object.freeze({
     SET_EPOCH: ApplyOperationType.SET_EPOCH,
     SET_GENESIS_EPOCH: ApplyOperationType.SET_GENESIS_EPOCH,
     SET_CONSENSUS_CONFIG: ApplyOperationType.SET_CONSENSUS_CONFIG,
+    HTLC_LOCK: ApplyOperationType.HTLC_LOCK,
+    HTLC_CLAIM: ApplyOperationType.HTLC_CLAIM,
+    HTLC_REFUND: ApplyOperationType.HTLC_REFUND,
 });
 
 export const NetworkOperationType = Object.freeze({
