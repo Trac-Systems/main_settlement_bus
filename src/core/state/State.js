@@ -3534,8 +3534,8 @@ class State extends ReadyResource {
         }
 
         const currentEpochBuffer = await this.#getEntryApply(EntryType.EPOCH_CURRENT, batch);
-        if (!isBufferValid(currentEpochBuffer, EPOCH_BYTE_LENGTH)) {
-            this.#safeLogApply(OperationType.SET_EPOCH, "Current epoch is not initialized or invalid.", node.from.key)
+        if (currentEpochBuffer === null) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Current epoch is not initialized. Genesis epoch has not been set.", node.from.key)
             return Status.FAILURE;
         }
 
@@ -3591,7 +3591,6 @@ class State extends ReadyResource {
             return Status.FAILURE;
         }
 
-        // TODO: Change how this is being handled. The apply function should not branch on schemaVersion directly
         const consensusConfig = safeDecodeConsensusConfig(consensusConfigBuffer);
         if (consensusConfig === null) {
             this.#safeLogApply(OperationType.SET_EPOCH, "Failed to decode consensus config.", node.from.key)
