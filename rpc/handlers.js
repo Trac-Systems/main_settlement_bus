@@ -46,6 +46,25 @@ export async function handleBalance({ req, respond, msbInstance }) {
     respond(200, { address, balance });
 }
 
+export async function handleHtlcLock({ msbInstance, respond }) {
+    await msbInstance.htlcLock();
+    respond(200, {});
+}
+
+export async function handleHtlcClaim({ msbInstance, respond }) {
+    await msbInstance.htlcClaim();
+    respond(200, {});
+}
+
+export async function handleHtlcRefund({ msbInstance, respond }) {
+    await msbInstance.htlcRefund();
+    respond(200, {});
+}
+
+export async function handleHtlc({ msbInstance, respond }) {
+    await msbInstance.getHtlc();
+    respond(200, {});
+}
 export async function handleTxv({ msbInstance, respond }) {
     const txv = await msbInstance.getTxv();
     respond(200, { txv });
