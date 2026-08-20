@@ -62,8 +62,8 @@ export async function handleHtlcRefund({ msbInstance, respond }) {
 }
 
 export async function handleHtlc({ msbInstance, respond }) {
-    await msbInstance.getHtlc();
-    respond(200, {});
+    const htlc = await msbInstance.getHtlc();
+    respond(200, { htlc });
 }
 export async function handleTxv({ msbInstance, respond }) {
     const txv = await msbInstance.getTxv();
