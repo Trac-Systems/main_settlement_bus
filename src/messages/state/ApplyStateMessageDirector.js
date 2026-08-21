@@ -604,5 +604,38 @@ class ApplyStateMessageDirector {
             .build();
         return this.#builder.getPayload();
     }
+
+    async buildCompleteHtlcLockOperationMessage(invokerAddress) {
+        if (!this.#builder) throw new Error('Builder has not been set.');
+        await this.#builder
+            .setPhase('complete')
+            .setOutput('buffer')
+            .setOperationType(OperationType.HTLC_LOCK)
+            .setAddress(invokerAddress)
+            .build();
+        return this.#builder.getPayload();
+    }
+
+    async buildCompleteHtlcClaimOperationMessage(invokerAddress) {
+        if (!this.#builder) throw new Error('Builder has not been set.');
+        await this.#builder
+            .setPhase('complete')
+            .setOutput('buffer')
+            .setOperationType(OperationType.HTLC_CLAIM)
+            .setAddress(invokerAddress)
+            .build();
+        return this.#builder.getPayload();
+    }
+
+    async buildCompleteHtlcRefundOperationMessage(invokerAddress) {
+        if (!this.#builder) throw new Error('Builder has not been set.');
+        await this.#builder
+            .setPhase('complete')
+            .setOutput('buffer')
+            .setOperationType(OperationType.HTLC_REFUND)
+            .setAddress(invokerAddress)
+            .build();
+        return this.#builder.getPayload();
+    }
 }
 export default ApplyStateMessageDirector;

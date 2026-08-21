@@ -16,6 +16,7 @@ import PartialRoleAccessValidator from "../../shared/validators/PartialRoleAcces
 import PartialBootstrapDeploymentValidator from "../../shared/validators/PartialBootstrapDeploymentValidator.js";
 import PartialTransactionValidator from "../../shared/validators/PartialTransactionValidator.js";
 import PartialTransferValidator from "../../shared/validators/PartialTransferValidator.js";
+import PartialHtlcValidator from '../../shared/validators/PartialHtlcValidator.js';
 import {applyStateMessageFactory} from "../../../../../messages/state/applyStateMessageFactory.js";
 import V1BroadcastTransactionResponse from "../validators/V1BroadcastTransactionResponse.js";
 import V1BaseOperationHandler from "./V1BaseOperationHandler.js";
@@ -47,6 +48,7 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
     #partialTransferValidator;
     #transactionCommitService;
     #operationStrategies;
+    #partialHtlcValidator;
 
     constructor(state, wallet, rateLimiterService, txPoolService, pendingRequestService, transactionCommitService, config) {
         super(rateLimiterService, pendingRequestService, config);
@@ -58,6 +60,7 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
         this.#partialBootstrapDeploymentValidator = new PartialBootstrapDeploymentValidator(state, this.#wallet.address, config);
         this.#partialTransactionValidator = new PartialTransactionValidator(state, this.#wallet.address, config);
         this.#partialTransferValidator = new PartialTransferValidator(state, this.#wallet.address, config);
+        this.#partialHtlcValidator = new PartialHtlcValidator(state, this.#wallet.address, config);
         this.#broadcastTransactionResponseValidator = new V1BroadcastTransactionResponse(state, config);
         this.#transactionCommitService = transactionCommitService;
         this.#operationStrategies = createBroadcastTransactionOperationStrategies({
@@ -65,6 +68,7 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
             partialBootstrapDeploymentValidator: this.#partialBootstrapDeploymentValidator,
             partialTransactionValidator: this.#partialTransactionValidator,
             partialTransferValidator: this.#partialTransferValidator,
+            partialHtlcValidator: this.#partialHtlcValidator,
             createApplyStateMessageFactory: () => applyStateMessageFactory(this.#wallet, this.config)
         });
     }

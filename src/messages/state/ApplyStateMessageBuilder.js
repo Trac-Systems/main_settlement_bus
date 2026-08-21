@@ -447,6 +447,10 @@ class ApplyStateMessageBuilder {
         let msg;
 
         switch (this.#operationType) {
+            case OperationType.HTLC_LOCK:
+            case OperationType.HTLC_CLAIM:
+            case OperationType.HTLC_REFUND:
+                return {};
             case OperationType.ADD_ADMIN:
             case OperationType.DISABLE_INITIALIZATION:
                 this.#requireFields([
