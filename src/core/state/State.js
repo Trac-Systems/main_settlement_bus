@@ -3576,11 +3576,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         }
 
-        if (!isBufferValid(currentConsensusConfigIndexBuffer, UINT32_BYTE_LENGTH)) {
-            this.#safeLogApply(OperationType.SET_EPOCH, "Failed to read current consensus config index from buffer", node.from.key)
-            return Status.FAILURE;
-        }
-        const currentConsensusConfigIndex = safeReadUint32BE(currentConsensusConfigIndexBuffer);
+        const currentConsensusConfigIndex = currentConsensusConfigIndexBuffer.readUInt32BE(0);
 
         const consensusConfigBuffer = await this.#getEntryApply(
             EntryType.CONSENSUS_CONFIG_RECORD + currentConsensusConfigIndex,
