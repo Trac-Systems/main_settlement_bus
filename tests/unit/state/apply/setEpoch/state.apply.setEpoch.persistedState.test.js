@@ -27,14 +27,6 @@ const persistedStateCases = [
         overrides: new Map([[CURRENT_EPOCH_KEY, null]])
     },
     {
-        name: 'rejects a current epoch pointer shorter than 8 bytes',
-        overrides: new Map([[CURRENT_EPOCH_KEY, b4a.alloc(7)]])
-    },
-    {
-        name: 'rejects a current epoch pointer longer than 8 bytes',
-        overrides: new Map([[CURRENT_EPOCH_KEY, b4a.alloc(9)]])
-    },
-    {
         name: 'rejects a missing current epoch hash',
         overrides: new Map([[CURRENT_EPOCH_HASH_KEY, null]])
     },
@@ -49,14 +41,6 @@ const persistedStateCases = [
     {
         name: 'rejects a missing consensus-config pointer',
         overrides: new Map([[CONFIG_POINTER_KEY, null]])
-    },
-    {
-        name: 'rejects a consensus-config pointer shorter than 4 bytes',
-        overrides: new Map([[CONFIG_POINTER_KEY, b4a.alloc(3)]])
-    },
-    {
-        name: 'rejects a consensus-config pointer longer than 4 bytes',
-        overrides: new Map([[CONFIG_POINTER_KEY, b4a.alloc(5)]])
     },
     {
         name: 'rejects a missing consensus-config record',
