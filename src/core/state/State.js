@@ -4593,6 +4593,12 @@ class State extends ReadyResource {
             return Status.FAILURE;
         }
 
+        const epochProofHash = await tracCryptoApi.hash.blake3Safe(genesisEpoch);
+        if (!isBufferValid(epochProofHash, HASH_BYTE_LENGTH)) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Failed to hash genesis epoch proof.", node.from.key)
+            return Status.FAILURE;
+        }
+
         // initialize CurrentEpoch field
         const zeroAsUint64Buffer = b4a.alloc(8, 0);
         await batch.put(
@@ -4601,7 +4607,6 @@ class State extends ReadyResource {
         );
         
         // initialize Epoch Field
-        const epochProofHash = await tracCryptoApi.hash.blake3Safe(genesisEpoch);
         await batch.put(
             epochZero,
             epochProofHash
