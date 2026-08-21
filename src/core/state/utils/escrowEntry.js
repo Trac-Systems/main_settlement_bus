@@ -72,8 +72,8 @@ function makeSettlement(escrowEntry, publicKeyOffset, status) {
         const amount = b4a.alloc(BALANCE_BYTE_LENGTH);
         const publicKey = b4a.alloc(TRAC_PUB_KEY_SIZE);
 
-        b4a.copy(escrowEntry.subarray(0, BALANCE_BYTE_LENGTH), amount);
-        b4a.copy(escrowEntry.subarray(publicKeyOffset, publicKeyOffset + TRAC_PUB_KEY_SIZE), publicKey);
+        b4a.copy(escrowEntry, amount, 0, 0, BALANCE_BYTE_LENGTH);
+        b4a.copy(escrowEntry, publicKey, 0, publicKeyOffset, publicKeyOffset + TRAC_PUB_KEY_SIZE);
 
         b4a.fill(escrowEntry, 0, 0, BALANCE_BYTE_LENGTH);
         escrowEntry[STATUS_OFFSET] = status;
