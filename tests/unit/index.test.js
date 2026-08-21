@@ -358,7 +358,7 @@ if (isBareRuntime) {
         await msb.close();
     });
 
-    test('MainSettlementBus rejects genesis epoch initialization when VDF discriminant bit size is not positive', async t => {
+    test('MainSettlementBus rejects genesis epoch initialization with an unsupported VDF discriminant bit size', async t => {
         const consoleLog = sinon.stub(console, 'log');
         t.teardown(() => consoleLog.restore());
 
@@ -374,7 +374,7 @@ if (isBareRuntime) {
 
         await t.exception(
             () => msb.handleEpochGenesisInitialization(validGenesisConsensusConfig({discriminantBitSize: 0})),
-            errorMessageIncludes('VDF discriminant bit size must be a positive unsigned 16-bit integer.')
+            errorMessageIncludes('VDF discriminant bit size must be one of: 1024, 2048, 4096.')
         );
 
         t.ok(loaded.state.getIndexerSequenceState.notCalled);
@@ -628,6 +628,7 @@ if (isBareRuntime) {
             { difficulty: 60_000_000, discriminantBitSize: 1.5 },
             { difficulty: 60_000_000, discriminantBitSize: 0 },
             { difficulty: 60_000_000, discriminantBitSize: -1 },
+            { difficulty: 60_000_000, discriminantBitSize: 1025 },
             { difficulty: 60_000_000, discriminantBitSize: 0x10000 },
         ];
 

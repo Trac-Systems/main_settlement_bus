@@ -18,7 +18,7 @@ import {
     ConsensusOperationType,
     ConsensusProtocolVersion,
     ConsensusResultCode,
-    VDF_BLOB_PROOF_SIZE
+    VDF_PROOF_BYTE_LENGTHS
 } from '../../../../src/utils/constants.js';
 import {
     decodeConsensusMessage,
@@ -43,8 +43,9 @@ test('ConsensusMessageDirector builds proof proposal and verifies signature', as
     const networkIdBuffer = uint16ToBuffer(networkId);
     const epochBuffer = uint64ToBuffer(epoch);
     const previousEpochRecordHash = b4a.alloc(32, 1);
-    const vdfParametersHash = b4a.alloc(32, 2);
-    const vdfProof = b4a.alloc(VDF_BLOB_PROOF_SIZE, 3);
+    const difficulty = b4a.alloc(4, 0xff);
+    const discriminantBitSize = uint16ToBuffer(2048);
+    const proof = b4a.alloc(VDF_PROOF_BYTE_LENGTHS[2048], 3);
 
     const payload = await director.buildProofProposal(
         sessionId,
@@ -52,8 +53,9 @@ test('ConsensusMessageDirector builds proof proposal and verifies signature', as
         epoch,
         previousEpochRecordHash,
         wallet.address,
-        vdfParametersHash,
-        vdfProof
+        difficulty,
+        discriminantBitSize,
+        proof
     );
 
     t.is(payload.type, ConsensusOperationType.PROOF_PROPOSAL);
@@ -66,8 +68,9 @@ test('ConsensusMessageDirector builds proof proposal and verifies signature', as
     t.alike(proofProposal.epoch, epochBuffer);
     t.alike(proofProposal.previous_epoch_record_hash, previousEpochRecordHash);
     t.alike(proofProposal.proposer, addressToBuffer(wallet.address, config.addressPrefix));
-    t.alike(proofProposal.vdf_parameters_hash, vdfParametersHash);
-    t.alike(proofProposal.vdf_proof, vdfProof);
+    t.alike(proofProposal.difficulty, difficulty);
+    t.alike(proofProposal.discriminant_bit_size, discriminantBitSize);
+    t.alike(proofProposal.proof, proof);
     t.ok(b4a.isBuffer(proofProposal.signature));
 
     const message = createMessage(
@@ -76,8 +79,9 @@ test('ConsensusMessageDirector builds proof proposal and verifies signature', as
         proofProposal.epoch,
         proofProposal.previous_epoch_record_hash,
         proofProposal.proposer,
-        proofProposal.vdf_parameters_hash,
-        proofProposal.vdf_proof
+        proofProposal.difficulty,
+        proofProposal.discriminant_bit_size,
+        proofProposal.proof
     );
     const hash = await tracCryptoApi.hash.blake3(message);
     t.ok(wallet.verify(proofProposal.signature, hash, wallet.publicKey));
@@ -94,8 +98,9 @@ test('ConsensusMessageDirector builds proof proposal response and verifies signa
     const networkIdBuffer = uint16ToBuffer(networkId);
     const epochBuffer = uint64ToBuffer(epoch);
     const previousEpochRecordHash = b4a.alloc(32, 1);
-    const vdfParametersHash = b4a.alloc(32, 2);
-    const vdfProof = b4a.alloc(VDF_BLOB_PROOF_SIZE, 3);
+    const difficulty = b4a.alloc(4, 0xff);
+    const discriminantBitSize = uint16ToBuffer(2048);
+    const proof = b4a.alloc(VDF_PROOF_BYTE_LENGTHS[2048], 3);
     const requesterProofSignature = b4a.alloc(64, 4);
 
     const payload = await director.buildProofProposalResponse(
@@ -104,8 +109,9 @@ test('ConsensusMessageDirector builds proof proposal response and verifies signa
         epoch,
         previousEpochRecordHash,
         wallet.address,
-        vdfParametersHash,
-        vdfProof,
+        difficulty,
+        discriminantBitSize,
+        proof,
         requesterProofSignature,
         ConsensusResultCode.OK,
         wallet.address
@@ -127,8 +133,9 @@ test('ConsensusMessageDirector builds proof proposal response and verifies signa
         epochBuffer,
         previousEpochRecordHash,
         addressToBuffer(wallet.address, config.addressPrefix),
-        vdfParametersHash,
-        vdfProof,
+        difficulty,
+        discriminantBitSize,
+        proof,
         proofProposalResponse.approval.approver,
         requesterProofSignature
     );

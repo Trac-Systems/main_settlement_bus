@@ -21,8 +21,9 @@ class ConsensusMessageDirector {
      * @param {number} epoch
      * @param {Buffer} previousEpochRecordHash
      * @param {string} proposer
-     * @param {Buffer} vdfParametersHash
-     * @param {Buffer} vdfProof
+     * @param {Buffer} difficulty
+     * @param {Buffer} discriminantBitSize
+     * @param {Buffer} proof
      * @returns {Promise<object>}
      */
     async buildProofProposal(
@@ -31,8 +32,9 @@ class ConsensusMessageDirector {
         epoch,
         previousEpochRecordHash,
         proposer,
-        vdfParametersHash,
-        vdfProof
+        difficulty,
+        discriminantBitSize,
+        proof
     ) {
         await this.#builder
             .setType(ConsensusOperationType.PROOF_PROPOSAL)
@@ -43,8 +45,9 @@ class ConsensusMessageDirector {
             .setEpoch(epoch)
             .setPreviousEpochRecordHash(previousEpochRecordHash)
             .setProposer(proposer)
-            .setVdfParametersHash(vdfParametersHash)
-            .setVdfProof(vdfProof)
+            .setDifficulty(difficulty)
+            .setDiscriminantBitSize(discriminantBitSize)
+            .setProof(proof)
             .buildPayload();
 
         return this.#builder.getResult();
@@ -57,8 +60,9 @@ class ConsensusMessageDirector {
      * @param {number} epoch
      * @param {Buffer} previousEpochRecordHash
      * @param {string} proposer
-     * @param {Buffer} vdfParametersHash
-     * @param {Buffer} vdfProof
+     * @param {Buffer} difficulty
+     * @param {Buffer} discriminantBitSize
+     * @param {Buffer} proof
      * @param {Buffer} requesterProofSignature
      * @param {number} consensusResultCode
      * @param {string} approver
@@ -70,8 +74,9 @@ class ConsensusMessageDirector {
         epoch,
         previousEpochRecordHash,
         proposer,
-        vdfParametersHash,
-        vdfProof,
+        difficulty,
+        discriminantBitSize,
+        proof,
         requesterProofSignature,
         consensusResultCode,
         approver
@@ -85,8 +90,9 @@ class ConsensusMessageDirector {
             .setEpoch(epoch)
             .setPreviousEpochRecordHash(previousEpochRecordHash)
             .setProposer(proposer)
-            .setVdfParametersHash(vdfParametersHash)
-            .setVdfProof(vdfProof)
+            .setDifficulty(difficulty)
+            .setDiscriminantBitSize(discriminantBitSize)
+            .setProof(proof)
             .setRequesterProofSignature(requesterProofSignature)
             .setResultCode(consensusResultCode)
             .setApprover(approver)

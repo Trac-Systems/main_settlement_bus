@@ -148,8 +148,9 @@ class ConsensusEpochProofProposalOperationHandler extends ConnectionOperationHan
             proofProposal.epoch.readBigUInt64BE(0),
             proofProposal.previous_epoch_record_hash,
             proposer,
-            proofProposal.vdf_parameters_hash,
-            proofProposal.vdf_proof,
+            proofProposal.difficulty,
+            proofProposal.discriminant_bit_size,
+            proofProposal.proof,
             proofProposal.signature,
             resultCode,
             this.#wallet.address

@@ -22,7 +22,6 @@ export const EntryType = Object.freeze({
     EPOCH_CURRENT: '/epoch/current',
     EPOCH: `/epoch/`,              // Epoch hashes are stored under `/epoch/<n>`
     EPOCH_HASH: `/epochHash/`,     // Epoch proof payloads are stored under `/epochHash/<epochHashHex>`
-    VDF_PARAMS: '/parameters/vdf', // TODO: DELETE
     CONSENSUS_CONFIG_CURRENT: '/consensus/config/current',
     CONSENSUS_CONFIG_RECORD: '/consensus/config/record/',
 
@@ -73,7 +72,7 @@ export const ConsensusResultCode = Object.freeze({
     SCHEMA_VALIDATION_FAILED: SharedResultCode.RESULT_CODE_CONSENSUS_SCHEMA_VALIDATION_FAILED,
     BAD_PROTOCOL_VERSION: SharedResultCode.RESULT_CODE_CONSENSUS_BAD_PROTOCOL_VERSION,
     WRONG_NETWORK_ID: SharedResultCode.RESULT_CODE_CONSENSUS_WRONG_NETWORK_ID,
-    VDF_PARAMETERS_HASH_INVALID: SharedResultCode.RESULT_CODE_CONSENSUS_VDF_PARAMETERS_HASH_INVALID,
+    CONSENSUS_CONFIG_MISMATCH: SharedResultCode.RESULT_CODE_CONSENSUS_CONFIG_MISMATCH,
     VDF_PROOF_INVALID: SharedResultCode.RESULT_CODE_CONSENSUS_VDF_PROOF_INVALID,
     ADDRESS_INVALID: SharedResultCode.RESULT_CODE_CONSENSUS_ADDRESS_INVALID,
     PUBLIC_KEY_MISMATCH: SharedResultCode.RESULT_CODE_CONSENSUS_PUBLIC_KEY_MISMATCH,
@@ -222,13 +221,20 @@ export const UINT32_MAX = 0xFFFFFFFF;
 export const PROTOCOL_VERSION_BYTE_LENGTH = 1; // 1 BYTE 0-255
 export const NETWORK_ID_BYTE_LENGTH = 2; // 2 BYTES - UINT16
 export const EPOCH_BYTE_LENGTH = 8; // 8 BYTES - UINT64
-export const VDF_BLOB_PROOF_SIZE = 516;
 export const VDF_DIFFICULTY_SIZE = 4; // 4 BYTES - UINT32
 export const VDF_DISCRIMINANT_SIZE = 2; // 2 BYTES - UINT16
 export const MAX_VDF_DIFFICULTY = UINT32_MAX;
-export const MAX_VDF_DISCRIMINANT_BIT_SIZE = UINT16_MAX;
 export const CONSENSUS_CONFIG_SCHEMA_VERSION_BYTE_LENGTH = 1;
 export const CONSENSUS_CONFIG_DATA_MAX_SIZE = 3072; // 3 KiB
+export const VDF_PROOF_BYTE_LENGTHS = Object.freeze({
+    1024: 260,
+    2048: 516,
+    4096: 1028
+});
+
+export const ConsensusConfigSchemaVersion = Object.freeze({
+    VDF_V1: 1,
+});
 
 export const LICENSE_BYTE_LENGTH = 4;
 

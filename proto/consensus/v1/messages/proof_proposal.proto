@@ -2,15 +2,16 @@ syntax = "proto3";
 
 package consensus.v1;
 
-// Challenge data are from 1 to 6.
-// Proof data are from 7 to 8.
+// Challenge data are from fields 1 to 7.
+// Proof data are in field 8.
 message ProofProposal {
   bytes protocol_version = 1; // 0x01
   bytes network_id = 2;
   bytes epoch = 3; // epoch number (for what epoch the proof is for current_epoch + 1)
   bytes previous_epoch_record_hash = 4; // BLAKE3 hash of the encoded previous epoch record
   bytes proposer = 5; // TRAC address of the proposer
-  bytes vdf_parameters_hash = 6; // BLAKE3(uint32_be difficulty || uint16_be discriminant_bit_size)
-  bytes vdf_proof = 7; // bytes blob  that is actually y || pi
-  bytes signature = 8; // SIG(challenge_data + vdf_proof)
+  bytes difficulty = 6; // uint32_be difficulty
+  bytes discriminant_bit_size = 7; // uint16_be discriminant_bit_size
+  bytes proof = 8; // bytes blob  that is actually y || pi
+  bytes signature = 9; // SIG(challenge_data + proof)
 }

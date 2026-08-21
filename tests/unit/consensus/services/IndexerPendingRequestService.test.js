@@ -3,7 +3,14 @@ import b4a from 'b4a';
 import { v7 as uuidv7 } from 'uuid';
 import IndexerPendingRequestService, { IndexerPendingRequestServiceTimeoutError } from '../../../../src/core/consensus/services/IndexerPendingRequestService.js';
 import ConsensusMessageBuilder from '../../../../src/messages/consensus/v1/ConsensusMessageBuilder.js';
-import { ConsensusOperationType, ConsensusProtocolVersion, ConsensusResultCode } from '../../../../src/utils/constants.js';
+import {
+    ConsensusOperationType,
+    ConsensusProtocolVersion,
+    ConsensusResultCode,
+    VDF_DIFFICULTY_SIZE,
+    VDF_PROOF_BYTE_LENGTHS
+} from '../../../../src/utils/constants.js';
+import { uint16ToBuffer } from '../../../../src/utils/buffer.js';
 import { config } from '../../../helpers/config.js';
 import { testKeyPair1, testKeyPair2 } from '../../../fixtures/apply.fixtures.js';
 import { WalletProvider } from 'trac-wallet';
@@ -36,8 +43,9 @@ async function buildProofProposal({ sessionId = uuidv7() } = {}) {
         .setEpoch(1n)
         .setPreviousEpochRecordHash(b4a.alloc(32))
         .setProposer(wallet.address)
-        .setVdfParametersHash(b4a.alloc(32))
-        .setVdfProof(b4a.alloc(64))
+        .setDifficulty(b4a.alloc(VDF_DIFFICULTY_SIZE))
+        .setDiscriminantBitSize(uint16ToBuffer(2048))
+        .setProof(b4a.alloc(VDF_PROOF_BYTE_LENGTHS[2048]))
         .buildPayload();
     return builder.getResult();
 }

@@ -14,8 +14,9 @@ import {
     BALANCE_MIGRATION_SLEEP_INTERVAL,
     WHITELIST_MIGRATION_DIR,
     OperationType,
+    ConsensusConfigSchemaVersion,
     MAX_VDF_DIFFICULTY,
-    MAX_VDF_DISCRIMINANT_BIT_SIZE
+    VDF_PROOF_BYTE_LENGTHS
 } from "./utils/constants.js";
 import { decimalStringToBigInt, bigIntTo16ByteBuffer, bufferToBigInt, bigIntToDecimalString } from "./utils/amountSerialization.js"
 import {
@@ -1155,8 +1156,8 @@ export class MainSettlementBus extends ReadyResource {
 
         let encodedConfigData;
         switch (schemaVersion) {
-            case 1:
-                encodedConfigData = this.#encodeConfigDataV1(configData);
+            case ConsensusConfigSchemaVersion.VDF_V1:
+                encodedConfigData = this.#encodeVdfV1ConfigData(configData);
                 break;
             default:
                 throw new Error(
@@ -1171,7 +1172,7 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     // TODO: REFACTOR - In the future, this function should be extracted into another module.
-    #encodeConfigDataV1(configData) {
+    #encodeVdfV1ConfigData(configData) {
         if (!this.#hasExactKeys(configData, ["difficulty", "discriminantBitSize"])) {
             throw new Error(
                 "Consensus config schema version 1 configData must contain only difficulty and discriminantBitSize."
@@ -1190,11 +1191,10 @@ export class MainSettlementBus extends ReadyResource {
 
         if (
             !Number.isInteger(configData.discriminantBitSize) ||
-            configData.discriminantBitSize <= 0 ||
-            configData.discriminantBitSize > MAX_VDF_DISCRIMINANT_BIT_SIZE
+            !Object.hasOwn(VDF_PROOF_BYTE_LENGTHS, configData.discriminantBitSize)
         ) {
             throw new Error(
-                "VDF discriminant bit size must be a positive unsigned 16-bit integer."
+                "VDF discriminant bit size must be one of: 1024, 2048, 4096."
             );
         }
 

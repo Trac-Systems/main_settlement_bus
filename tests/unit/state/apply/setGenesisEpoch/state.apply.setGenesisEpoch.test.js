@@ -17,13 +17,13 @@ import InvalidMessageComponentValidationScenario, {
 } from '../common/invalidMessageComponentValidationScenario.js';
 import IndexerSequenceStateInvalidScenario from '../common/indexer/indexerSequenceStateInvalidScenario.js';
 import TransactionValidityMismatchScenario from '../common/transactionValidityMismatchScenario.js';
+import { registerConsensusControlPayloadValidationSuite } from '../common/consensusControlPayloadValidationSuite.js';
 import {
     appendAndUpdate,
     appendBatchAndUpdate,
     applyWithConsensusConfigEncodingFailure,
     applyWithEntryOverrides,
     applyWithGenesisEpochEncodingFailure,
-    applyWithGenesisProofHashFailure,
     applyWithMessageConstructionFailure,
     assertGenesisInitialized,
     assertGenesisUninitialized,
@@ -223,6 +223,12 @@ registerRejectedConfigCase({
 registerRejectedConfigCase({
     title: 'State.apply SET_GENESIS_EPOCH rejects zero VDF discriminant bit size',
     buildOptions: { discriminantBitSize: 0 },
+    expectedLog: 'Consensus config validation failed.'
+});
+
+registerRejectedConfigCase({
+    title: 'State.apply SET_GENESIS_EPOCH rejects unsupported VDF discriminant bit size',
+    buildOptions: { discriminantBitSize: 3072 },
     expectedLog: 'Consensus config validation failed.'
 });
 
@@ -488,20 +494,6 @@ for (const [label, overridesFactory] of [
     });
 }
 
-// genesisEpoch === null
-test('State.apply SET_GENESIS_EPOCH fails without partial writes when proof creation fails', async t => {
-    const context = await setupSetGenesisEpochScenario(t);
-    const payload = await buildSetGenesisEpochPayload(context);
-    const { logs, result } = captureApplyErrors(() =>
-        applyWithGenesisProofHashFailure(context, payload)
-    );
-    const injected = await result;
-
-    t.ok(injected, 'genesis proof hash failure was injected');
-    await assertSetGenesisEpochFailureState(t, context, payload, { skipSync: true });
-    assertLog(t, logs, 'Could not initialize genesis epoch');
-});
-
 test('State.apply SET_GENESIS_EPOCH fails when final epoch proof encoding fails', async t => {
     const context = await setupSetGenesisEpochScenario(t);
     const payload = await buildSetGenesisEpochPayload(context);
@@ -533,9 +525,9 @@ test('State.apply SET_GENESIS_EPOCH initializes and replicates the complete gene
 });
 
 for (const [label, difficulty, discriminantBitSize] of [
-    ['minimum', 1, 1],
-    ['non-zero values containing zero bytes', 0x00010000, 0x0100],
-    ['maximum', 0xffffffff, 0xffff]
+    ['1024-bit discriminant', 1, 1024],
+    ['2048-bit discriminant and difficulty containing zero bytes', 0x00010000, 2048],
+    ['4096-bit discriminant and maximum difficulty', 0xffffffff, 4096]
 ]) {
     test(`State.apply SET_GENESIS_EPOCH accepts ${label} valid VDF parameters`, async t => {
         const context = await setupSetGenesisEpochScenario(t);
@@ -550,6 +542,50 @@ for (const [label, difficulty, discriminantBitSize] of [
             discriminantBitSize
         });
     });
+}
+
+registerConsensusControlPayloadValidationSuite({
+    operationName: 'SET_GENESIS_EPOCH',
+    setupScenario: setupSetGenesisEpochScenario,
+    buildValidPayload: buildSetGenesisEpochPayload,
+    buildSemanticAttackPayloads: buildGenesisSemanticAttackPayloads,
+    appendAndUpdate,
+    appendBatchAndUpdate,
+    assertStateBeforeOperation: (t, context, payload) =>
+        assertSetGenesisEpochFailureState(t, context, payload, { skipSync: true }),
+    assertAppliedAndReplicated: async (t, context, payload) => {
+        await assertGenesisInitialized(t, context.adminBootstrap.base, payload);
+        await context.sync();
+        for (const reader of context.peers.slice(1)) {
+            await assertGenesisInitialized(t, reader.base, payload);
+        }
+    }
+});
+
+async function buildGenesisSemanticAttackPayloads(context) {
+    const buildOptions = [
+        {schemaVersion: 2, configData: b4a.from([1])},
+        {
+            schemaVersion: 255,
+            configData: b4a.alloc(CONSENSUS_CONFIG_DATA_MAX_SIZE, 0xff)
+        },
+        {configData: b4a.from([1])},
+        {configData: b4a.alloc(CONSENSUS_CONFIG_DATA_MAX_SIZE, 0xff)},
+        {difficulty: 0, discriminantBitSize: 1024},
+        {difficulty: 1, discriminantBitSize: 1},
+        {difficulty: 1, discriminantBitSize: 1023},
+        {difficulty: 1, discriminantBitSize: 1025},
+        {difficulty: 1, discriminantBitSize: 2047},
+        {difficulty: 1, discriminantBitSize: 2049},
+        {difficulty: 1, discriminantBitSize: 3072},
+        {difficulty: 1, discriminantBitSize: 4095},
+        {difficulty: 1, discriminantBitSize: 4097},
+        {difficulty: 0xffffffff, discriminantBitSize: 0xffff}
+    ];
+
+    return Promise.all(
+        buildOptions.map(options => buildSetGenesisEpochPayload(context, options))
+    );
 }
 
 function registerRejectedConfigCase({ title, buildOptions, expectedLog }) {

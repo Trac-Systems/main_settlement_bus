@@ -25,7 +25,7 @@ import {
     EntryType,
     HASH_BYTE_LENGTH,
     SIGNATURE_BYTE_LENGTH,
-    VDF_BLOB_PROOF_SIZE
+    VDF_PROOF_BYTE_LENGTHS
 } from '../../../../../src/utils/constants.js';
 import {
     safeReadUint32BE,
@@ -226,15 +226,19 @@ export async function assertGenesisInitialized(
         'genesis proof proposer is the requesting admin'
     );
 
-    const expectedVdfParametersHash = await tracCryptoApi.hash.blake3Safe(
-        encodedConsensusConfig
+    t.ok(
+        b4a.equals(proofProposal.difficulty, operation.cco.cc.cd.subarray(0, 4)),
+        'genesis proof stores the configured VDF difficulty'
     );
     t.ok(
-        b4a.equals(proofProposal.vdf_parameters_hash, expectedVdfParametersHash),
-        'genesis proof binds the canonical consensus config'
+        b4a.equals(proofProposal.discriminant_bit_size, operation.cco.cc.cd.subarray(4)),
+        'genesis proof stores the configured VDF discriminant bit size'
     );
     t.ok(
-        b4a.equals(proofProposal.vdf_proof, b4a.alloc(VDF_BLOB_PROOF_SIZE)),
+        b4a.equals(
+            proofProposal.proof,
+            b4a.alloc(VDF_PROOF_BYTE_LENGTHS[discriminantBitSize])
+        ),
         'genesis proof starts with an empty VDF proof'
     );
     t.ok(
@@ -389,29 +393,6 @@ export async function applyWithMessageConstructionFailure(context, payload) {
         await appendAndUpdate(context.adminBootstrap.base, payload);
     } finally {
         b4a.concat = originalConcat;
-    }
-
-    return injected;
-}
-
-export async function applyWithGenesisProofHashFailure(context, payload) {
-    const operation = safeDecodeApplyOperation(payload);
-    const encodedConsensusConfig = safeEncodeConsensusConfig(operation?.cco?.cc);
-    const originalHash = tracCryptoApi.hash.blake3Safe;
-    let injected = false;
-
-    tracCryptoApi.hash.blake3Safe = async value => {
-        if (!injected && buffersHaveSameBytes(value, encodedConsensusConfig)) {
-            injected = true;
-            return b4a.alloc(0);
-        }
-        return originalHash(value);
-    };
-
-    try {
-        await appendAndUpdate(context.adminBootstrap.base, payload);
-    } finally {
-        tracCryptoApi.hash.blake3Safe = originalHash;
     }
 
     return injected;

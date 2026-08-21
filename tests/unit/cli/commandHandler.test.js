@@ -170,7 +170,7 @@ test("CommandHandler re-prompts invalid genesis epoch params and cancels on no",
     await handler.handle("55_000_000");
     await handler.handle("0");
 
-    t.ok(console.log.calledWith("Invalid discriminant bit size. Please enter a positive integer (example 2048)."));
+    t.ok(console.log.calledWith("Invalid discriminant bit size. Please enter one of: 1024, 2048, 4096."));
 
     await handler.handle("2048");
     await handler.handle("no");
@@ -191,19 +191,19 @@ test("CommandHandler enforces genesis config bounds", async (t) => {
     t.ok(!console.log.calledWith("Set VDF discriminant bit size (example 2048):"));
 
     await handler.handle("4_294_967_295");
-    await handler.handle("65_536");
+    await handler.handle("3072");
 
-    t.ok(console.log.calledWith("Invalid discriminant bit size. Please enter a positive integer (example 2048)."));
+    t.ok(console.log.calledWith("Invalid discriminant bit size. Please enter one of: 1024, 2048, 4096."));
     t.ok(msb.handleEpochGenesisInitialization.notCalled);
 
-    await handler.handle("65_535");
+    await handler.handle("4096");
     await handler.handle("yes");
 
     t.ok(msb.handleEpochGenesisInitialization.calledOnceWithExactly({
         schemaVersion: 1,
         configData: {
             difficulty: 0xFFFFFFFF,
-            discriminantBitSize: 0xFFFF
+            discriminantBitSize: 4096
         }
     }));
 });
@@ -377,10 +377,10 @@ test("CommandHandler re-prompts invalid VDF discriminant bit size and retains di
     await handler.handle("55_000_000");
     await handler.handle("abc");
     await handler.handle("0");
-    await handler.handle("65_536");
+    await handler.handle("3072");
 
     t.ok(console.log.calledWith(
-        "Invalid discriminant bit size. Please enter an integer between 1 and 65_535."
+        "Invalid discriminant bit size. Please enter one of: 1024, 2048, 4096."
     ));
     t.ok(console.log.calledWith("Set new VDF discriminant bit size (example 2048):"));
     t.ok(msb.handleSetConsensusConfig.notCalled);
@@ -397,21 +397,21 @@ test("CommandHandler re-prompts invalid VDF discriminant bit size and retains di
     }));
 });
 
-test("CommandHandler accepts maximum VDF parameter values", async (t) => {
+test("CommandHandler accepts maximum VDF difficulty and supported discriminant size", async (t) => {
     stubConsole(t);
 
     const { handler, msb } = createSubject();
 
     await handler.handle("/set_vdf_params");
     await handler.handle("4_294_967_295");
-    await handler.handle("65_535");
+    await handler.handle("4096");
     await handler.handle("yes");
 
     t.ok(msb.handleSetConsensusConfig.calledOnceWithExactly({
         schemaVersion: 1,
         configData: {
             difficulty: 0xFFFFFFFF,
-            discriminantBitSize: 0xFFFF
+            discriminantBitSize: 4096
         }
     }));
 });

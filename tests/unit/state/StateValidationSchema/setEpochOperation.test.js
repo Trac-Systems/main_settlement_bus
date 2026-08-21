@@ -12,8 +12,11 @@ import {
     NETWORK_ID_BYTE_LENGTH,
     PROTOCOL_VERSION_BYTE_LENGTH,
     SIGNATURE_BYTE_LENGTH,
-    VDF_BLOB_PROOF_SIZE
+    VDF_DIFFICULTY_SIZE,
+    VDF_DISCRIMINANT_SIZE,
+    VDF_PROOF_BYTE_LENGTHS
 } from '../../../../src/utils/constants.js';
+import {uint16ToBuffer} from '../../../../src/utils/buffer.js';
 import { SEO, not_allowed_data_types } from '../../../fixtures/check.fixtures.js';
 import { topLevelValidationTests, valueLevelValidationTest, addressBufferLengthTest } from './common.test.js';
 import { config } from '../../../helpers/config.js';
@@ -28,8 +31,9 @@ const PROOF_DATA_FIELD_RULES = Object.freeze([
     {name: 'epoch', length: EPOCH_BYTE_LENGTH},
     {name: 'previous_epoch_record_hash', length: HASH_BYTE_LENGTH},
     {name: 'proposer', length: config.addressLength},
-    {name: 'vdf_parameters_hash', length: HASH_BYTE_LENGTH},
-    {name: 'vdf_proof', length: VDF_BLOB_PROOF_SIZE},
+    {name: 'difficulty', length: VDF_DIFFICULTY_SIZE},
+    {name: 'discriminant_bit_size', length: VDF_DISCRIMINANT_SIZE},
+    {name: 'proof', length: VDF_PROOF_BYTE_LENGTHS[2048]},
     {name: 'signature', length: SIGNATURE_BYTE_LENGTH}
 ]);
 
@@ -214,6 +218,42 @@ test('validateSetEpochOperation - proof data validation (seo.pd)', t => {
             `proof data with zero-filled ${name} should fail`
         );
     }
+});
+
+test('validateSetEpochOperation - proof length depends on discriminant bit size', t => {
+    for (const [discriminantBitSize, proofLength] of Object.entries(VDF_PROOF_BYTE_LENGTHS)) {
+        const overrides = {
+            discriminant_bit_size: uint16ToBuffer(Number(discriminantBitSize)),
+            proof: b4a.alloc(proofLength, 0x15)
+        };
+
+        t.ok(
+            stateValidationSchema.validateSetEpochOperation(
+                withSetEpochProofData(encodedProofData(overrides))
+            ),
+            `${discriminantBitSize}-bit discriminant should accept a ${proofLength}-byte proof`
+        );
+
+        t.absent(
+            stateValidationSchema.validateSetEpochOperation(
+                withSetEpochProofData(encodedProofData({
+                    ...overrides,
+                    proof: b4a.alloc(proofLength + 1, 0x15)
+                }))
+            ),
+            `${discriminantBitSize}-bit discriminant should reject a proof with the wrong length`
+        );
+    }
+
+    t.absent(
+        stateValidationSchema.validateSetEpochOperation(
+            withSetEpochProofData(encodedProofData({
+                discriminant_bit_size: uint16ToBuffer(3072),
+                proof: b4a.alloc(VDF_PROOF_BYTE_LENGTHS[2048], 0x15)
+            }))
+        ),
+        'unsupported discriminant bit size should fail'
+    );
 });
 
 test('validateSetEpochOperation - approvals validation (seo.app)', t => {

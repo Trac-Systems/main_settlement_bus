@@ -1,8 +1,7 @@
 import V1BaseConsensusOperation from "./V1BaseConsensusOperation.js";
 import { V1ConsensusProtocolError } from "../V1ConsensusProtocolError.js";
 import { ConsensusProtocolVersion, ConsensusResultCode } from "../../../../utils/constants.js";
-import { createMessage, uint16ToBuffer, uint32ToBuffer } from "../../../../utils/buffer.js";
-import tracCryptoApi from "trac-crypto-api";
+import { uint16ToBuffer } from "../../../../utils/buffer.js";
 import b4a from "b4a";
 import { verifyWesolowski } from '@tracsystems/trac-vdf';
 
@@ -26,7 +25,7 @@ class V1EpochProofProposalRequest extends V1BaseConsensusOperation {
      *
      * Checks the payload schema, protocol version, network id, proposer identity,
      * proposal signature, proposer indexer membership, next epoch number,
-     * previous epoch record hash, VDF parameters hash, and VDF proof.
+     * previous epoch record hash, consensus configuration, and VDF proof.
      *
      * @param {object} payload Decoded proof proposal request payload.
      * @param {object} connection Peer connection containing `remotePublicKey`.
@@ -48,13 +47,8 @@ class V1EpochProofProposalRequest extends V1BaseConsensusOperation {
             const currentEpoch = await this._state.requireCurrentEpoch();
             this.validateIncomingEpoch(payload.proof_proposal, currentEpoch);
             await this.validatePreviousEpochRecordHash(payload.proof_proposal, currentEpoch);
-            const consensusConfig = await this._state.requireSignedConsensusConfig();
-            const vdfParams = {
-                vdfDifficulty: consensusConfig.configData.difficulty,
-                vdfDiscriminantSize: consensusConfig.configData.discriminantBitSize
-            };
-            await this.validateProofProposalVdfParametersHash(payload.proof_proposal, vdfParams);
-            await this.validateProofProposalVdfProof(payload.proof_proposal, vdfParams);
+            await this.validateProofProposalConfig(payload.proof_proposal);
+            await this.validateProofProposalVdfProof(payload.proof_proposal);
             return true;
         });
     }
@@ -83,36 +77,26 @@ class V1EpochProofProposalRequest extends V1BaseConsensusOperation {
     }
 
     /**
-     * Validates that the proof proposal VDF parameters hash matches signed state.
-     *
-     * Reconstructs the signed difficulty and discriminant-size message,
-     * hashes it with BLAKE3, and compares it with `vdf_parameters_hash`.
+     * Validates that the proof proposal VDF parameters match signed consensus state.
      *
      * @param {object} proofProposal Decoded proof proposal.
-     * @param {object} vdfParams Signed VDF parameters read from ledger state.
      * @returns {Promise<void>}
-     * @throws {V1ConsensusProtocolError} When hashing fails or the hash does not match.
+     * @throws {V1ConsensusProtocolError} When the proposal parameters do not match consensus state.
      */
-    async validateProofProposalVdfParametersHash(proofProposal, vdfParams) {
-        const message = createMessage(
-            uint32ToBuffer(vdfParams.vdfDifficulty),
-            uint16ToBuffer(vdfParams.vdfDiscriminantSize)
-        );
+    async validateProofProposalConfig(proofProposal) {
+        const consensusConfig = await this._state.requireSignedConsensusConfig();
 
-        let expectedHash;
-        try {
-            expectedHash = await tracCryptoApi.hash.blake3(message);
-        } catch {
-            throw new V1ConsensusProtocolError(
-                ConsensusResultCode.UNEXPECTED_ERROR,
-                'Failed to hash VDF parameters.'
-            );
-        }
+        const difficulty = proofProposal.difficulty.readUInt32BE(0);
+        const discriminantBitSize =
+            proofProposal.discriminant_bit_size.readUInt16BE(0);
 
-        if (!b4a.equals(proofProposal.vdf_parameters_hash, expectedHash)) {
+        if (
+            difficulty !== consensusConfig.configData.difficulty ||
+            discriminantBitSize !== consensusConfig.configData.discriminantBitSize
+        ) {
             throw new V1ConsensusProtocolError(
-                ConsensusResultCode.VDF_PARAMETERS_HASH_INVALID,
-                'VDF parameters hash is invalid.'
+                ConsensusResultCode.CONSENSUS_CONFIG_MISMATCH,
+                'Proof proposal does not match the current consensus configuration.'
             );
         }
     }
@@ -124,20 +108,21 @@ class V1EpochProofProposalRequest extends V1BaseConsensusOperation {
      * discriminant size for Wesolowski proof verification.
      *
      * @param {object} proofProposal Decoded proof proposal.
-     * @param {object} vdfParams Signed VDF parameters read from ledger state.
      * @returns {Promise<void>}
      * @throws {V1ConsensusProtocolError} When VDF verification fails or returns false.
      */
-    async validateProofProposalVdfProof(proofProposal, vdfParams) {
+    async validateProofProposalVdfProof(proofProposal) {
         const challengeData = this.buildProofProposalChallengeData(proofProposal);
+        const difficulty = proofProposal.difficulty.readUInt32BE(0);
+        const discriminantBitSize = proofProposal.discriminant_bit_size.readUInt16BE(0);
 
         let verified = false;
         try {
             verified = await verifyWesolowski(
                 challengeData,
-                vdfParams.vdfDifficulty,
-                proofProposal.vdf_proof,
-                vdfParams.vdfDiscriminantSize
+                difficulty,
+                proofProposal.proof,
+                discriminantBitSize
             );
         } catch {
             verified = false;

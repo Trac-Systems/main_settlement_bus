@@ -1,5 +1,5 @@
 import V1BaseConsensusOperation from "./V1BaseConsensusOperation.js";
-import {ConsensusResultCode} from "../../../../utils/constants.js";
+import { ConsensusResultCode } from "../../../../utils/constants.js";
 import {createMessage , uint32ToBuffer} from "../../../../utils/buffer.js";
 import {encodeProofProposalApproval} from "../../../../codecs/consensus/v1/consensusV1OperationCodec.js";
 import tracCryptoApi from "trac-crypto-api";

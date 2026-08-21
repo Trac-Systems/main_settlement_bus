@@ -91,10 +91,10 @@ class V1BaseConsensusOperation {
     }
 
     /**
-     * Builds canonical VDF challenge data from proof proposal fields 1 through 6.
+     * Builds canonical VDF challenge data from proof proposal fields 1 through 7.
      *
      * The message contains protocol version, network id, epoch, previous epoch
-     * record hash, proposer address, and VDF parameters hash in protocol order.
+     * record hash, proposer address, difficulty, and discriminant bit size in protocol order.
      *
      * @param {object} proofProposal Decoded proof proposal.
      * @returns {Buffer} Canonically encoded challenge data.
@@ -106,7 +106,8 @@ class V1BaseConsensusOperation {
             proofProposal.epoch,
             proofProposal.previous_epoch_record_hash,
             proofProposal.proposer,
-            proofProposal.vdf_parameters_hash
+            proofProposal.difficulty,
+            proofProposal.discriminant_bit_size
         );
     }
 
@@ -152,6 +153,7 @@ class V1BaseConsensusOperation {
      * @param {object} payload Decoded proof proposal request or approval payload.
      * @param {Buffer} remotePublicKey Public key received from the peer connection.
      * @param {object} [proofProposal] Original proof proposal required for approval verification.
+     * @param {number} [invalidSignatureResultCode] ConsensusResultCode to use when the signature is invalid.
      * @returns {Promise<void>}
      * @throws {V1ConsensusProtocolError} When message construction, hashing, or signature verification fails.
      */
@@ -236,7 +238,7 @@ class V1BaseConsensusOperation {
             case ConsensusOperationType.PROOF_PROPOSAL: {
                 const proofProposal = payload.proof_proposal;
                 const challengeData = this.buildProofProposalChallengeData(proofProposal);
-                const message = createMessage(challengeData, proofProposal.vdf_proof);
+                const message = createMessage(challengeData, proofProposal.proof);
 
                 return {signature: proofProposal.signature, message};
             }
@@ -247,7 +249,7 @@ class V1BaseConsensusOperation {
 
                 const message = createMessage(
                     challengeData,
-                    proofProposal.vdf_proof,
+                    proofProposal.proof,
                     approval.approver,
                     proofProposal.signature
                 );

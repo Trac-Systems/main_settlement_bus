@@ -13,7 +13,11 @@ import _ from 'lodash'
  */
 export function isAddressValid(address, hrp) {
     if (b4a.isBuffer(address)) {
-        address = address.toString('ascii');
+        const decodedAddress = address.toString('ascii');
+        if (!b4a.equals(address, b4a.from(decodedAddress, 'ascii'))) {
+            return false;
+        }
+        address = decodedAddress;
     }
 
     const res = _.attempt(() => 
@@ -52,7 +56,9 @@ export function addressToBuffer(bech32mAddress, hrp) {
 // TODO: Do we really need to try-catch here? Maybe we should only validate the input buffer.
 export function bufferToAddress(dataBuffer, hrp) {
     try {
+        if (!b4a.isBuffer(dataBuffer)) return null;
         const address = dataBuffer.toString('ascii');
+        if (!b4a.equals(dataBuffer, b4a.from(address, 'ascii'))) return null;
         if (!isAddressValid(address, hrp)) return null;
         return address;
     } catch (error) {

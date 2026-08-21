@@ -7,8 +7,6 @@ import { encodeProofProposal, encodeProofProposalApproval } from '../../../codec
 import { applyStateMessageFactory } from '../../../messages/state/applyStateMessageFactory.js';
 import { uint16ToBuffer, uint32ToBuffer } from '../../../utils/buffer.js';
 import { encodeApplyOperation } from '../../../codecs/apply/applyOperationCodec.js';
-import { encodeVdfParameters } from '../../state/utils/epochProof.js';
-import { blake3 } from 'trac-crypto-api/modules/hash.js';
 import { ConsensusResultCode } from '../../../utils/constants.js';
 
 /** connectionManager is passed per call, not stored on the instance. */
@@ -40,8 +38,6 @@ export class EpochCoordinatorOperations {
         const epoch = prevEpochId + 1n;
         const difficulty = uint32ToBuffer(vdf.difficulty)
         const discriminantSizeBits = uint16ToBuffer(vdf.discriminantSizeBits)
-        const vdfData = encodeVdfParameters(difficulty, discriminantSizeBits)
-        const vdfParamsHash = await blake3(vdfData)
         return consensusMessageFactory(this.#wallet, this.#config)
             .buildProofProposal(
                 generateUUID(),
@@ -49,7 +45,8 @@ export class EpochCoordinatorOperations {
                 epoch,
                 prevEpochHash,
                 this.#wallet.address,
-                vdfParamsHash,
+                difficulty,
+                discriminantSizeBits,
                 vdf.solution
             );
     }
@@ -102,8 +99,9 @@ export class EpochCoordinatorOperations {
             epoch: proofProposal.epoch,
             previous_epoch_record_hash: proofProposal.previous_epoch_record_hash,
             proposer: proofProposal.proposer,
-            vdf_parameters_hash: proofProposal.vdf_parameters_hash,
-            vdf_proof: proofProposal.vdf_proof,
+            difficulty: proofProposal.difficulty,
+            discriminant_bit_size: proofProposal.discriminant_bit_size,
+            proof: proofProposal.proof,
             signature: proofProposal.signature,
         });
         const approvals = signatures.map(({ signature, approver }) =>
