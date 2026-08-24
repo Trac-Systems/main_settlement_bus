@@ -1,11 +1,10 @@
 class PartialHtlcValidator {
-    #config;
 
-    constructor(_state, _selfAddress, config) {
-        this.#config = config;
+    constructor(_state, _selfAddress, _config) {
+
     }
 
-    async validate(payload) {
+    async validate(_payload) {
         return true;
     }
 }
