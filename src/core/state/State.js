@@ -4793,6 +4793,7 @@ class State extends ReadyResource {
             console.info(`VDF params updated addr:wk:tx - ${requesterAddressString}:${decodedAdminEntry.wk.toString('hex')}:${txHashHexString}`);
         }
 
+        this.emit(CustomEventType.CONSENSUS_CONFIG_CHANGED);
         return Status.SUCCESS;
     }
 
