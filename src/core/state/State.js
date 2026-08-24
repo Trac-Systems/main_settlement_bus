@@ -3533,18 +3533,13 @@ class State extends ReadyResource {
             return Status.FAILURE;
         }
 
-        if (!b4a.equals(op.address, proofProposal.proposer)) {
-            this.#safeLogApply(OperationType.SET_EPOCH, "Operation address does not match the proof proposer.", node.from.key)
-            return Status.FAILURE;
-        }
-
         const currentEpochBuffer = await this.#getEntryApply(EntryType.EPOCH_CURRENT, batch);
         if (currentEpochBuffer === null) {
             this.#safeLogApply(OperationType.SET_EPOCH, "Current epoch is not initialized. Genesis epoch has not been set.", node.from.key)
             return Status.FAILURE;
         }
         
-        const nextEpochBuffer = incrementBuffer(currentEpochBuf, EPOCH_BYTE_LENGTH);
+        const nextEpochBuffer = incrementBuffer(currentEpochBuffer, EPOCH_BYTE_LENGTH);
         if (nextEpochBuffer === null) {
             this.#safeLogApply(OperationType.SET_EPOCH, "Current epoch index value is invalid or corrupted", node.from.key)
             return Status.FAILURE;
@@ -3752,7 +3747,7 @@ class State extends ReadyResource {
 
             const approvalMessage = createMessage(
                 challengeData,
-                proofProposal.vdf_proof,
+                proofProposal.proof,
                 approval.approver,
                 proofProposal.signature
             );

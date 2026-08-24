@@ -343,27 +343,27 @@ class EpochCoordinatorService extends SchedulableService {
                 appendTimer = setTimeout(() => stateMachine.send(EPOCH_EVENTS.APPEND_FAILED), this.#config.epochAppendTimeout);
 
                 const targetEpoch = stateMachine.context.currentEpoch + 1n;
-                stopAppendListener = listenTo(this.#state, CustomEventType.EPOCH_CREATED, ({ epochStr, proposerAddress }) => {
+                stopAppendListener = listenTo(this.#state, CustomEventType.EPOCH_CREATED, ({ epoch, proposerAddress }) => {
                     if (
-                        typeof epochStr !== 'string' ||
-                        epochStr.length === 0 ||
-                        epochStr.length > 20 ||
-                        !/^\d+$/.test(epochStr)
+                        typeof epoch !== 'string' ||
+                        epoch.length === 0 ||
+                        epoch.length > 20 ||
+                        !/^\d+$/.test(epoch)
                     ) {
                         this.#logger.error(
-                            '[EpochCoordinatorService] Ignoring EPOCH_CREATED: epochStr must be a decimal uint64 string.'
+                            '[EpochCoordinatorService] Ignoring EPOCH_CREATED: epoch must be a decimal uint64 string.'
                         );
                         return;
                     }
 
-                    const epoch = BigInt(epochStr);
-                    if (epoch > 0xFFFFFFFFFFFFFFFFn) {
+                    const epochUInt = BigInt(epoch);
+                    if (epochUInt > 0xFFFFFFFFFFFFFFFFn) {
                         this.#logger.error(
-                            '[EpochCoordinatorService] Ignoring EPOCH_CREATED: epochStr exceeds the uint64 range.'
+                            '[EpochCoordinatorService] Ignoring EPOCH_CREATED: epoch exceeds the uint64 range.'
                         );
                         return;
                     }
-                    if (epoch !== targetEpoch) return;
+                    if (epochUInt !== targetEpoch) return;
                     stateMachine.send(
                         proposerAddress === this.#wallet.address
                             ? EPOCH_EVENTS.APPEND_ACCEPTED
