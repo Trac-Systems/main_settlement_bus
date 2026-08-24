@@ -18,6 +18,7 @@ import {
     safeDecodeEpochProof,
     safeEncodeEpochProof
 } from '../../../../../src/codecs/apply/applyOperationCodec.js';
+import { safeDecodeProofProposal } from '../../../../../src/codecs/consensus/v1/consensusV1OperationCodec.js';
 import { EntryType } from '../../../../../src/utils/constants.js';
 
 test('State.apply SET_EPOCH approvals: accepts exact quorum from five indexers', async t => {
@@ -38,6 +39,8 @@ test('State.apply SET_EPOCH approvals: accepts exact quorum from five indexers',
     const proof = safeDecodeEpochProof(stored?.value);
     t.ok(proof, 'exact-quorum approvals store a decodable epoch proof');
     t.is(proof?.app.length, 2, 'stored proof contains exactly the two required external approvals');
+    const proofProposal = safeDecodeProofProposal(proof?.pd);
+    t.ok(proofProposal?.proof.length > 0, 'the accepted approvals are bound to the stored VDF proof');
 });
 
 test('State.apply SET_EPOCH approvals: rejects insufficient approvals from three indexers', async t => {

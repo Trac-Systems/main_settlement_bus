@@ -420,6 +420,27 @@ export async function applyWithGenesisEpochEncodingFailure(context, payload) {
     return injected;
 }
 
+export async function applyWithGenesisEpochHashFailure(context, payload) {
+    const originalBlake3Safe = tracCryptoApi.hash.blake3Safe;
+    let injected = false;
+
+    tracCryptoApi.hash.blake3Safe = async (value, ...args) => {
+        if (!injected && isEncodedGenesisEpochProof(value)) {
+            injected = true;
+            return b4a.alloc(0);
+        }
+        return originalBlake3Safe(value, ...args);
+    };
+
+    try {
+        await appendAndUpdate(context.adminBootstrap.base, payload);
+    } finally {
+        tracCryptoApi.hash.blake3Safe = originalBlake3Safe;
+    }
+
+    return injected;
+}
+
 function patchEntriesForNextApply(base, overrides) {
     const originalApply = base._handlers.apply;
     let shouldPatchNextApply = true;

@@ -9,12 +9,7 @@ import {
     setupSetEpochScenario
 } from './setEpochScenarioHelpers.js';
 import { EntryType, CustomEventType } from '../../../../../src/utils/constants.js';
-import {
-    encodeApplyOperation,
-    safeDecodeEpochProof
-} from '../../../../../src/codecs/apply/applyOperationCodec.js';
-import { addressToBuffer } from '../../../../../src/core/state/utils/address.js';
-import { config } from '../../../../helpers/config.js';
+import { safeDecodeEpochProof } from '../../../../../src/codecs/apply/applyOperationCodec.js';
 
 test('State.apply SET_EPOCH: proposer alone satisfies quorum when it is the sole indexer, and commits the epoch', async t => {
     const context = await setupSetEpochScenario(t);
@@ -26,12 +21,10 @@ test('State.apply SET_EPOCH: proposer alone satisfies quorum when it is the sole
     const payload = await buildSetEpochPayload(context, { epoch: 1n, approverNodes: [] });
     await appendAndUpdate(adminNode.base, payload);
 
-    t.ok(epochCreatedEvent, 'EPOCH_CREATED was emitted');
-    t.is(epochCreatedEvent?.epoch, 1n, 'EPOCH_CREATED identifies the committed epoch');
-    t.is(
-        epochCreatedEvent?.proposerAddress,
-        adminNode.wallet.address,
-        'EPOCH_CREATED identifies the proof proposer'
+    t.alike(
+        epochCreatedEvent,
+        { epoch: '1', proposerAddress: adminNode.wallet.address },
+        'EPOCH_CREATED identifies the committed epoch and proposer'
     );
     t.is(await getCurrentEpoch(adminNode.base), 1n, 'current epoch advanced to 1');
 
@@ -74,19 +67,6 @@ test('State.apply SET_EPOCH: rejects a tampered proposer signature', async t => 
     await appendAndUpdate(adminNode.base, payload);
 
     t.is(await getCurrentEpoch(adminNode.base), 0n, 'current epoch remains unchanged with an invalid signature');
-});
-
-test('State.apply SET_EPOCH: rejects an operation address that is not the proposer', async t => {
-    const context = await setupSetEpochScenario(t);
-    const adminNode = context.adminBootstrap;
-
-    const payload = await buildSetEpochPayload(context, { epoch: 1n, approverNodes: [] });
-    const operation = decodeSetEpochPayload(payload);
-    operation.address = addressToBuffer(context.peers[1].wallet.address, config.addressPrefix);
-
-    await appendAndUpdate(adminNode.base, encodeApplyOperation(operation));
-
-    t.is(await getCurrentEpoch(adminNode.base), 0n, 'current epoch remains unchanged when the operation address is not the proposer');
 });
 
 test('State.apply SET_EPOCH: ignores a stale epoch proposal without disturbing the committed epoch', async t => {

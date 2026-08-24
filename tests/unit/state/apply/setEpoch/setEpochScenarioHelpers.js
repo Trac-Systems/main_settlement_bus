@@ -22,9 +22,9 @@ import { config } from '../../../../helpers/config.js';
 
 const isBare = typeof globalThis.Bare !== 'undefined';
 
-// Difficulty is kept tiny so real VDF computation stays fast in tests, but the discriminant
-// size must be 2048 bits: that's the only size whose solution matches the protocol's fixed
-// 516-byte VDF_BLOB_PROOF_SIZE wire format (verified empirically: 512->132B, 1024->260B, 2048->516B).
+// Difficulty is kept tiny so real VDF computation stays fast. The representative fixture uses
+// a 2048-bit discriminant and its corresponding 516-byte proof; the protocol also supports the
+// configured proof sizes for 1024- and 4096-bit discriminants.
 export const VDF_DIFFICULTY = 100;
 export const VDF_DISCRIMINANT_SIZE = 2048;
 

@@ -496,10 +496,24 @@ test('incrementBuffer - increments fixed-width big-endian buffers', t => {
         '00000000000000000000000000000100',
         'supports buffers longer than eight bytes'
     );
+    t.is(
+        incrementBuffer(b4a.from('0000000000000001', 'hex'), 8).toString('hex'),
+        '0000000000000002',
+        'increments an exact enforced width'
+    );
+    t.is(
+        incrementBuffer(b4a.from('fffffffffffffffe', 'hex'), 8).toString('hex'),
+        'ffffffffffffffff',
+        'increments the maximum uint64 predecessor'
+    );
 });
 
 test('incrementBuffer - returns null for invalid input or overflow', t => {
     t.is(incrementBuffer(b4a.from('ffffff', 'hex')), null, 'returns null on overflow');
+    t.is(incrementBuffer(b4a.alloc(2), 8), null, 'rejects an enforced-width mismatch');
+    t.is(incrementBuffer(b4a.alloc(7), 8), null, 'rejects an input shorter than the enforced width');
+    t.is(incrementBuffer(b4a.alloc(9), 8), null, 'rejects an input longer than the enforced width');
+    t.is(incrementBuffer(b4a.alloc(8, 0xff), 8), null, 'returns null on uint64 overflow');
     t.is(incrementBuffer(b4a.alloc(0)), null, 'rejects an empty buffer');
     t.is(incrementBuffer(b4a.alloc(17)), null, 'rejects buffers longer than 16 bytes');
     t.is(incrementBuffer(null), null, 'rejects non-buffer input');
@@ -509,6 +523,11 @@ test('toUIntString - converts big-endian buffers to decimal strings', t => {
     t.is(toUIntString(b4a.from('00', 'hex')), '0', 'converts zero');
     t.is(toUIntString(b4a.from('000001', 'hex')), '1', 'removes leading zeroes');
     t.is(toUIntString(b4a.from('0100', 'hex')), '256', 'converts multiple bytes');
+    t.is(
+        toUIntString(b4a.from('ffffffffffffffff', 'hex')),
+        '18446744073709551615',
+        'converts the maximum uint64 without precision loss'
+    );
     t.is(
         toUIntString(b4a.from('ffffffffffffffffffffffffffffffff', 'hex')),
         '340282366920938463463374607431768211455',

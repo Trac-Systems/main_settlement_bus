@@ -571,7 +571,7 @@ if (isBareRuntime) {
         t.ok(mockOps.appendSetEpoch.calledOnce, 'append was issued');
         t.absent(next.called, 'a stale getCurrentEpoch right after append must not resolve the cycle');
 
-        await state.emit(EPOCH_CREATED, { epochStr: '6', proposerAddress: 'trac1wallet' });
+        await state.emit(EPOCH_CREATED, { epoch: '6', proposerAddress: 'trac1wallet' });
         await drainMicrotasks();
 
         t.ok(next.calledOnce, 'EPOCH_CREATED for our own proposal reached the terminal SEND_APPEND_SIGNAL state');
@@ -594,7 +594,7 @@ if (isBareRuntime) {
         await drainMicrotasks();
         t.is(mockOps.appendSetEpoch.callCount, 1);
 
-        await state.emit(EPOCH_CREATED, { epochStr: '6', proposerAddress: 'trac1someone-else' });
+        await state.emit(EPOCH_CREATED, { epoch: '6', proposerAddress: 'trac1someone-else' });
         // The listener sends the reload event fire-and-forget; a real timer tick lets it settle.
         await flush();
 
@@ -604,7 +604,7 @@ if (isBareRuntime) {
     });
 
     test('EPOCH_CREATED for an unrelated epoch is ignored while waiting in APPEND_SET_EPOCH', async t => {
-        const { service, state, mockOps } = await setup({
+        const { service, state, mockOps, logger } = await setup({
             stateOverrides: { indexerCount: sinon.stub().resolves(1) },
         });
         t.teardown(() => service.close());
@@ -613,11 +613,12 @@ if (isBareRuntime) {
         await service.worker(next, sinon.stub());
         await drainMicrotasks();
 
-        await state.emit(EPOCH_CREATED, { epochStr: '99', proposerAddress: 'trac1wallet' });
+        await state.emit(EPOCH_CREATED, { epoch: '99', proposerAddress: 'trac1wallet' });
         await drainMicrotasks();
 
         t.absent(next.called, 'an EPOCH_CREATED for an unrelated epoch must not resolve this cycle');
         t.is(mockOps.appendSetEpoch.callCount, 1, 'no retry triggered by the unrelated event');
+        t.is(logger.error.callCount, 0, 'a valid unrelated epoch is not treated as malformed');
     });
 
     test('invalid EPOCH_CREATED epoch strings are logged and ignored', async t => {
@@ -630,20 +631,20 @@ if (isBareRuntime) {
         await service.worker(next, sinon.stub());
         await drainMicrotasks();
 
-        await state.emit(EPOCH_CREATED, { epochStr: 'invalid', proposerAddress: 'trac1wallet' });
-        await state.emit(EPOCH_CREATED, { epochStr: '18446744073709551616', proposerAddress: 'trac1wallet' });
+        await state.emit(EPOCH_CREATED, { epoch: 'invalid', proposerAddress: 'trac1wallet' });
+        await state.emit(EPOCH_CREATED, { epoch: '18446744073709551616', proposerAddress: 'trac1wallet' });
         await drainMicrotasks();
 
         t.is(logger.error.callCount, 2, 'logs malformed and overflowing epoch strings');
         t.ok(
             logger.error.firstCall.calledWith(
-                '[EpochCoordinatorService] Ignoring EPOCH_CREATED: epochStr must be a decimal uint64 string.'
+                '[EpochCoordinatorService] Ignoring EPOCH_CREATED: epoch must be a decimal uint64 string.'
             ),
             'logs malformed decimal input'
         );
         t.ok(
             logger.error.secondCall.calledWith(
-                '[EpochCoordinatorService] Ignoring EPOCH_CREATED: epochStr exceeds the uint64 range.'
+                '[EpochCoordinatorService] Ignoring EPOCH_CREATED: epoch exceeds the uint64 range.'
             ),
             'logs uint64 overflow'
         );

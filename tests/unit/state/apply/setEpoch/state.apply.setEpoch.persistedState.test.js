@@ -4,6 +4,7 @@ import { EntryType } from '../../../../../src/utils/constants.js';
 import { uint16ToBuffer, uint8ToBuffer } from '../../../../../src/utils/buffer.js';
 import { config } from '../../../../helpers/config.js';
 import {
+    VDF_DIFFICULTY,
     buildSetEpochPayload,
     setupSetEpochScenario
 } from './setEpochScenarioHelpers.js';
@@ -27,6 +28,18 @@ const persistedStateCases = [
         overrides: new Map([[CURRENT_EPOCH_KEY, null]])
     },
     {
+        name: 'rejects a current epoch pointer shorter than uint64',
+        overrides: new Map([[CURRENT_EPOCH_KEY, b4a.alloc(7)]])
+    },
+    {
+        name: 'rejects a current epoch pointer longer than uint64',
+        overrides: new Map([[CURRENT_EPOCH_KEY, b4a.alloc(9)]])
+    },
+    {
+        name: 'rejects a current epoch pointer that would overflow uint64',
+        overrides: new Map([[CURRENT_EPOCH_KEY, b4a.alloc(8, 0xff)]])
+    },
+    {
         name: 'rejects a missing current epoch hash',
         overrides: new Map([[CURRENT_EPOCH_HASH_KEY, null]])
     },
@@ -41,6 +54,10 @@ const persistedStateCases = [
     {
         name: 'rejects a missing consensus-config pointer',
         overrides: new Map([[CONFIG_POINTER_KEY, null]])
+    },
+    {
+        name: 'rejects a consensus-config pointer shorter than uint32',
+        overrides: new Map([[CONFIG_POINTER_KEY, b4a.alloc(3)]])
     },
     {
         name: 'rejects a missing consensus-config record',
@@ -92,17 +109,20 @@ test('State.apply SET_EPOCH proposal context: rejects a different network id', a
     });
 });
 
-test('State.apply SET_EPOCH proposal context: rejects a VDF parameters hash mismatch', async t => {
+test('State.apply SET_EPOCH proposal context: rejects a VDF difficulty mismatch', async t => {
     await runRejectedSetEpochCase(t, {
-        mutatePayload: payload => mutateProofProposal(payload, proofProposal => {
-            proofProposal.vdf_parameters_hash = b4a.alloc(32, 0xff);
+        buildRejectedPayload: context => buildSetEpochPayload(context, {
+            epoch: 1n,
+            approverNodes: [],
+            vdfDifficulty: VDF_DIFFICULTY + 1
         })
     });
 });
 
 async function runRejectedSetEpochCase(t, {
     overrides = new Map(),
-    mutatePayload = payload => payload
+    mutatePayload = payload => payload,
+    buildRejectedPayload = null
 } = {}) {
     const context = await setupSetEpochScenario(t);
     const base = context.adminBootstrap.base;
@@ -110,7 +130,9 @@ async function runRejectedSetEpochCase(t, {
         epoch: 1n,
         approverNodes: []
     });
-    const rejectedPayload = mutatePayload(validPayload);
+    const rejectedPayload = buildRejectedPayload
+        ? await buildRejectedPayload(context)
+        : mutatePayload(validPayload);
     const before = await captureEpochState(base);
 
     const epochWrites = await applyWithEntryOverridesAndTrackEpochWrites(

@@ -1,19 +1,17 @@
 import { test } from 'brittle';
 import b4a from 'b4a';
 import tracCryptoApi from 'trac-crypto-api';
-import { EntryType } from '../../../../../src/utils/constants.js';
+import { CustomEventType, EntryType } from '../../../../../src/utils/constants.js';
 import {
     encodeApplyOperation,
     safeDecodeEpochProof
 } from '../../../../../src/codecs/apply/applyOperationCodec.js';
 import {
-    encodeProofProposal,
-    safeDecodeProofProposal
-} from '../../../../../src/codecs/consensus/v1/consensusV1OperationCodec.js';
-import {
+    VDF_DIFFICULTY,
     buildSetEpochPayload,
     decodeSetEpochPayload,
     getEpochHash,
+    appendAndUpdate,
     setupSetEpochScenario
 } from './setEpochScenarioHelpers.js';
 import {
@@ -44,20 +42,17 @@ test('State.apply SET_EPOCH rejects malformed nested proof bytes without epoch s
     );
 });
 
-test('State.apply SET_EPOCH rejects a mismatched VDF-parameters hash without epoch side effects', async t => {
+test('State.apply SET_EPOCH rejects mismatched VDF parameters without epoch side effects', async t => {
     const context = await setupSetEpochScenario(t);
-    const payload = await buildSetEpochPayload(context, { approverNodes: [] });
-    const operation = decodeSetEpochPayload(payload);
-    const proofProposal = safeDecodeProofProposal(operation.seo.pd);
-    t.ok(proofProposal, 'proof proposal decodes before mutation');
-
-    proofProposal.vdf_parameters_hash = b4a.alloc(32, 0xee);
-    operation.seo.pd = encodeProofProposal(proofProposal);
+    const payload = await buildSetEpochPayload(context, {
+        approverNodes: [],
+        vdfDifficulty: VDF_DIFFICULTY + 1
+    });
     await applyRejectedEpoch(
         t,
         context,
-        encodeApplyOperation(operation),
-        'mismatched VDF-parameters hash'
+        payload,
+        'mismatched VDF parameters'
     );
 });
 
@@ -113,6 +108,25 @@ test('State.apply SET_EPOCH success changes exactly the pointer, forward hash, a
     t.ok(b4a.equals(decodedStoredProof.pd, submittedOperation.seo.pd), 'stored proof data is byte-exact');
     t.alike(decodedStoredProof.app, submittedOperation.seo.app, 'stored approvals are byte-exact and keep their order');
     t.is(events.length, 1, 'success emits EPOCH_CREATED once');
+});
+
+test('State.apply SET_EPOCH commits when an EPOCH_CREATED listener throws', async t => {
+    const context = await setupSetEpochScenario(t);
+    const base = context.adminBootstrap.base;
+    const payload = await buildSetEpochPayload(context, { approverNodes: [] });
+    const expected = await expectedEpochWrites(payload);
+
+    context.adminBootstrap.state.once(CustomEventType.EPOCH_CREATED, () => {
+        throw new Error('injected EPOCH_CREATED listener failure');
+    });
+    await appendAndUpdate(base, payload);
+
+    const currentEpochEntry = await base.view.get(EntryType.EPOCH_CURRENT);
+    const forwardEntry = await base.view.get(expected.forwardKey);
+    const reverseEntry = await base.view.get(expected.reverseKey);
+    t.ok(b4a.equals(currentEpochEntry?.value, expected.currentEpoch), 'current epoch still commits');
+    t.ok(b4a.equals(forwardEntry?.value, expected.proofHash), 'forward epoch record still commits');
+    t.ok(b4a.equals(reverseEntry?.value, expected.encodedProof), 'reverse epoch proof still commits');
 });
 
 nodeOnlyTest('State.apply SET_EPOCH encoding failure leaves all epoch records atomic and emits no event', async t => {
