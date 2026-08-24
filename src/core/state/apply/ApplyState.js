@@ -1,7 +1,7 @@
 import b4a from 'b4a';
 import tracCryptoApi from 'trac-crypto-api';
 import SafeLogger from './SafeLogger.js';
-import ApplyRepository from './ApplyRepository.js';
+import ApplyOperations from './ApplyOperations.js';
 import BalanceInitializationHandler from './operations/balanceInitializationOperation.js';
 import DisableInitializationHandler from './operations/disableInitializationOperation.js';
 import AddAdminHandler from './operations/addAdminOperation.js';
@@ -52,7 +52,7 @@ class ApplyState {
     #config;
     #stateValidationSchema;
     #state;
-    #repository;
+    #operations;
     #handlers;
     #logger;
 
@@ -61,24 +61,24 @@ class ApplyState {
         this.#stateValidationSchema = stateValidationSchema;
         this.#state = state;
         this.#logger = new SafeLogger(this.#config);
-        this.#repository = new ApplyRepository();
+        this.#operations = new ApplyOperations();
         this.#handlers = [
-            new BalanceInitializationHandler(this.#repository, this.#config, this.#stateValidationSchema, this.#state, this.#logger),
-            new DisableInitializationHandler(this.#repository, this.#config, this.#stateValidationSchema, this.#state, this.#logger),
-            new AddAdminHandler(this.#repository, this.#config, this.#stateValidationSchema, this.#state, this.#logger),
-            new AppendWhitelistHandler(this.#repository, this.#config, this.#stateValidationSchema, this.#state, this.#logger),
-            new AddWriterHandler(this.#repository, this.#config, this.#stateValidationSchema, this.#state, this.#logger),
-            new RemoveWriterHandler(this.#repository, this.#config, this.#stateValidationSchema, this.#state, this.#logger),
-            new AdminRecoveryHandler(this.#repository, this.#config, this.#stateValidationSchema, this.#state, this.#logger),
-            new AddIndexerHandler(this.#repository, this.#config, this.#stateValidationSchema, this.#state, this.#logger),
-            new RemoveIndexerHandler(this.#repository, this.#config, this.#stateValidationSchema, this.#state, this.#logger),
-            new BanValidatorHandler(this.#repository, this.#config, this.#stateValidationSchema, this.#state, this.#logger),
-            new BootstrapDeploymentHandler(this.#repository, this.#config, this.#stateValidationSchema, this.#state, this.#logger),
-            new TxHandler(this.#repository, this.#config, this.#stateValidationSchema, this.#state, this.#logger),
-            new TransferHandler(this.#repository, this.#config, this.#stateValidationSchema, this.#state, this.#logger),
-            new SetEpochHandler(this.#repository, this.#config, this.#stateValidationSchema, this.#state, this.#logger),
-            new SetGenesisEpochHandler(this.#repository, this.#config, this.#stateValidationSchema, this.#state, this.#logger),
-            new SetConsensusConfigHandler(this.#repository, this.#config, this.#stateValidationSchema, this.#state, this.#logger),
+            new BalanceInitializationHandler(this.#operations, this.#config, this.#stateValidationSchema, this.#state, this.#logger),
+            new DisableInitializationHandler(this.#operations, this.#config, this.#stateValidationSchema, this.#state, this.#logger),
+            new AddAdminHandler(this.#operations, this.#config, this.#stateValidationSchema, this.#state, this.#logger),
+            new AppendWhitelistHandler(this.#operations, this.#config, this.#stateValidationSchema, this.#state, this.#logger),
+            new AddWriterHandler(this.#operations, this.#config, this.#stateValidationSchema, this.#state, this.#logger),
+            new RemoveWriterHandler(this.#operations, this.#config, this.#stateValidationSchema, this.#state, this.#logger),
+            new AdminRecoveryHandler(this.#operations, this.#config, this.#stateValidationSchema, this.#state, this.#logger),
+            new AddIndexerHandler(this.#operations, this.#config, this.#stateValidationSchema, this.#state, this.#logger),
+            new RemoveIndexerHandler(this.#operations, this.#config, this.#stateValidationSchema, this.#state, this.#logger),
+            new BanValidatorHandler(this.#operations, this.#config, this.#stateValidationSchema, this.#state, this.#logger),
+            new BootstrapDeploymentHandler(this.#operations, this.#config, this.#stateValidationSchema, this.#state, this.#logger),
+            new TxHandler(this.#operations, this.#config, this.#stateValidationSchema, this.#state, this.#logger),
+            new TransferHandler(this.#operations, this.#config, this.#stateValidationSchema, this.#state, this.#logger),
+            new SetEpochHandler(this.#operations, this.#config, this.#stateValidationSchema, this.#state, this.#logger),
+            new SetGenesisEpochHandler(this.#operations, this.#config, this.#stateValidationSchema, this.#state, this.#logger),
+            new SetConsensusConfigHandler(this.#operations, this.#config, this.#stateValidationSchema, this.#state, this.#logger),
         ];
     }
 
@@ -142,7 +142,7 @@ class ApplyState {
     }
 
     async #validatorPenalty(writingKeyBuffer, batch, base, invalidOperations) {
-        const adminEntryBuffer = await this.#repository.getEntry(EntryType.ADMIN, batch);
+        const adminEntryBuffer = await this.#operations.getEntry(EntryType.ADMIN, batch);
         if (adminEntryBuffer === null) {
             this.#logger.error("ValidatorPenalty", "Admin entry not found", writingKeyBuffer);
             return;
@@ -161,7 +161,7 @@ class ApplyState {
         // In theory, none of the negative cases in the if-statements should occur. They are added only for safety reasons.
         const validatorWk = writingKeyBuffer.toString('hex');
 
-        const validatorAddressBuffer = await this.#repository.getRegisteredWriterKey(batch, validatorWk);
+        const validatorAddressBuffer = await this.#operations.getRegisteredWriterKey(batch, validatorWk);
         if (validatorAddressBuffer === null) {
             this.#logger.error("ValidatorPenalty", `No validator found for writing key: ${validatorWk}`, writingKeyBuffer);
             return;
@@ -179,7 +179,7 @@ class ApplyState {
             return;
         }
 
-        const validatorNodeEntryBuffer = await this.#repository.getEntry(validatorAddressString, batch);
+        const validatorNodeEntryBuffer = await this.#operations.getEntry(validatorAddressString, batch);
         if (validatorNodeEntryBuffer === null) {
             this.#logger.error("ValidatorPenalty", `No node entry found for validator address: ${validatorAddressString}`, writingKeyBuffer);
             return;

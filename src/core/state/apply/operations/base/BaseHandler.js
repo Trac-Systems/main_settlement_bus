@@ -1,9 +1,9 @@
 import b4a from 'b4a';
-import nodeEntryUtils, { NODE_ENTRY_SIZE } from '../../utils/nodeEntry.js';
+import nodeEntryUtils, { NODE_ENTRY_SIZE } from '../../../utils/nodeEntry.js';
 import {
     BALANCE_ZERO,
     toBalance,
-} from '../../utils/balance.js';
+} from '../../../utils/balance.js';
 
 class BaseHandler {
     #state;

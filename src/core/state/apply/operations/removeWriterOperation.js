@@ -1,4 +1,4 @@
-import BaseHandler from './BaseHandler.js';
+import BaseHandler from './base/BaseHandler.js';
 import b4a from 'b4a';
 import {
     OperationType,

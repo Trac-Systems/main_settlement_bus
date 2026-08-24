@@ -18,7 +18,7 @@ import {
     safeDecodeVdfConfig,
 } from '../../../codecs/consensus/v1/vdfConfigCodec.js';
 
-class ApplyRepository {
+class ApplyOperations {
     isAdmin(adminEntry, node) {
         if (!adminEntry || !node) return false;
         return b4a.equals(adminEntry.wk, node.from.key);
@@ -146,4 +146,4 @@ class ApplyRepository {
     }
 }
 
-export default ApplyRepository;
+export default ApplyOperations;
