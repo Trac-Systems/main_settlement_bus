@@ -19,6 +19,8 @@ import {
     UINT32_MAX,
     ConsensusProtocolVersion,
     VDF_PROOF_BYTE_LENGTHS,
+    HASH_BYTE_LENGTH,
+    EPOCH_BYTE_LENGTH
 } from '../../utils/constants.js';
 import { isHexString, sleep, isTransactionRecordPut } from '../../utils/helpers.js';
 import tracCryptoApi from 'trac-crypto-api';
@@ -40,7 +42,10 @@ import {
     safeReadUint32BE,
     deepCopyBuffer,
     safeReadUint8,
-    uint16ToBuffer
+    uint16ToBuffer,
+    isBufferValid,
+    incrementBuffer,
+    toUIntString
 } from '../../utils/buffer.js';
 import { safeDecodeProofProposal, safeDecodeProofProposalApproval } from '../../codecs/consensus/v1/consensusV1OperationCodec.js';
 import addressUtils from './utils/address.js';
@@ -3538,18 +3543,28 @@ class State extends ReadyResource {
             this.#safeLogApply(OperationType.SET_EPOCH, "Current epoch is not initialized. Genesis epoch has not been set.", node.from.key)
             return Status.FAILURE;
         }
+        
+        const nextEpochBuffer = incrementBuffer(currentEpochBuf, EPOCH_BYTE_LENGTH);
+        if (nextEpochBuffer === null) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Current epoch index value is invalid or corrupted", node.from.key)
+            return Status.FAILURE;
+        }
 
-        const currentEpoch = currentEpochBuffer.readBigUInt64BE(0);
-        const nextEpoch = currentEpoch + 1n;
-        const proposedEpoch = proofProposal.epoch.readBigUInt64BE(0);
+        const proposedEpochBuffer = proofProposal.epoch;
+        const epochIndexCompare = b4a.compare(nextEpochBuffer, proposedEpochBuffer)
 
-        if (proposedEpoch < nextEpoch) {
-            this.#safeLogApply(OperationType.SET_EPOCH, `Stale epoch proposal. Epoch ${currentEpoch} is already committed.`, node.from.key)
+        // String helpers
+        const currentEpochStr = toUIntString(currentEpochBuffer);
+        const nextEpochStr = toUIntString(nextEpochBuffer);
+        const proposedEpochStr = toUIntString(proposedEpochBuffer);
+
+        if (epochIndexCompare > 0) { // proposedEpoch < nextEpoch
+            this.#safeLogApply(OperationType.SET_EPOCH, `Stale epoch proposal. Epoch ${currentEpochStr} is already committed.`, node.from.key)
             return Status.IGNORE;
         }
 
-        if (proposedEpoch > nextEpoch) {
-            this.#safeLogApply(OperationType.SET_EPOCH, `Unexpected epoch. Proposal must target epoch ${nextEpoch} but got ${proposedEpoch}.`, node.from.key)
+        if (epochIndexCompare < 0) { // proposedEpoch > nextEpoch
+            this.#safeLogApply(OperationType.SET_EPOCH, `Unexpected epoch. Proposal must target epoch ${nextEpochStr} but got ${proposedEpochStr}.`, node.from.key)
             return Status.FAILURE;
         }
 
@@ -3564,9 +3579,9 @@ class State extends ReadyResource {
             return Status.FAILURE;
         }
 
-        const currentEpochHash = await this.#getEntryApply(EntryType.EPOCH + currentEpoch.toString(), batch);
+        const currentEpochHash = await this.#getEntryApply(EntryType.EPOCH + currentEpochStr, batch);
         if (currentEpochHash === null || !b4a.equals(currentEpochHash, proofProposal.previous_epoch_record_hash)) {
-            this.#safeLogApply(OperationType.SET_EPOCH, `Previous epoch record hash mismatch for epoch ${currentEpoch}.`, node.from.key)
+            this.#safeLogApply(OperationType.SET_EPOCH, `Previous epoch record hash mismatch for epoch ${currentEpochStr}.`, node.from.key)
             return Status.FAILURE;
         }
 
@@ -3707,18 +3722,15 @@ class State extends ReadyResource {
             return Status.FAILURE;
         }
 
-        const nextEpochBuffer = b4a.alloc(8);
-        nextEpochBuffer.writeBigUInt64BE(nextEpoch);
-
         await batch.put(EntryType.EPOCH_CURRENT, nextEpochBuffer);
-        await batch.put(EntryType.EPOCH + nextEpoch.toString(), epochProofHash);
+        await batch.put(EntryType.EPOCH + nextEpochStr, epochProofHash);
         await batch.put(EntryType.EPOCH_HASH + epochProofHash.toString('hex'), encodedEpochProof);
 
         if (this.#config.enableTxApplyLogs) {
-            console.info(`Epoch ${nextEpoch} committed. proposer:approvals - ${proposerAddress}:${op.seo.app.length}`);
+            console.info(`Epoch ${nextEpochStr} committed. proposer:approvals - ${proposerAddress}:${op.seo.app.length}`);
         }
 
-        this.#emitEvent(CustomEventType.EPOCH_CREATED, { epoch: nextEpoch, proposerAddress }); // notify epoch committed
+        this.#emitEvent(CustomEventType.EPOCH_CREATED, { epoch: nextEpochStr, proposerAddress }); // notify epoch committed
         return Status.SUCCESS;
     }
 
