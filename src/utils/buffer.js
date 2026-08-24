@@ -200,3 +200,38 @@ export function isZeroBuffer(buffer) {
     }
     return buffer.every(byte => byte === 0);
 }
+
+// Buffer Arithmetic
+
+/**
+ * Increments a fixed-width big-endian unsigned integer buffer by one.
+ * The input must contain between 1 and 16 bytes and is not mutated.
+ * When enforceLength is provided, the input must contain exactly that
+ * number of bytes. Returns null for invalid input, a length mismatch,
+ * or an increment that would overflow the buffer's fixed width.
+ *
+ * @param {Buffer} buffer - The unsigned integer to increment.
+ * @param {number|null} [enforceLength=null] - Required input length in bytes.
+ * @returns {Buffer|null} A new incremented buffer, or null on failure.
+ */
+export function incrementBuffer(buffer, enforceLength = null) {
+    if (!b4a.isBuffer(buffer) ||
+        (enforceLength !== null && buffer.length !== enforceLength) ||
+        buffer.length === 0 ||
+        buffer.length > 16) {
+        return null;
+    }
+
+    const result = b4a.from(buffer);
+    for (let i = result.length - 1; i >= 0; i--) {
+        if (result[i] === 0xFF) {
+            result[i] = 0;
+            continue;
+        }
+
+        result[i]++;
+        return result;
+    }
+
+    return null;
+}

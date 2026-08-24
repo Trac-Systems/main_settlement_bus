@@ -5,6 +5,7 @@ import {
     isBufferValid,
     safeReadUint16BE,
     safeReadUint32BE,
+    incrementBuffer,
     safeUint8ToBuffer,
     safeUint16ToBuffer,
     safeWriteUInt32BE,
@@ -479,6 +480,28 @@ test('safeReadUint32BE - returns decoded number or null', t => {
     t.is(safeReadUint32BE(b4a.alloc(3)), null, 'returns null for short buffer');
     t.is(safeReadUint32BE(buffer, 9), null, 'returns null for out-of-bounds offset');
     t.is(safeReadUint32BE(null), null, 'returns null for invalid input');
+});
+
+test('incrementBuffer - increments fixed-width big-endian buffers', t => {
+    const input = b4a.from('00ffff', 'hex');
+    const result = incrementBuffer(input);
+
+    t.is(result.toString('hex'), '010000', 'propagates carry across bytes');
+    t.is(result.length, input.length, 'preserves the input width');
+    t.is(input.toString('hex'), '00ffff', 'does not mutate the input');
+    t.is(incrementBuffer(b4a.from('00', 'hex')).toString('hex'), '01', 'increments a one-byte buffer');
+    t.is(
+        incrementBuffer(b4a.from('000000000000000000000000000000ff', 'hex')).toString('hex'),
+        '00000000000000000000000000000100',
+        'supports buffers longer than eight bytes'
+    );
+});
+
+test('incrementBuffer - returns null for invalid input or overflow', t => {
+    t.is(incrementBuffer(b4a.from('ffffff', 'hex')), null, 'returns null on overflow');
+    t.is(incrementBuffer(b4a.alloc(0)), null, 'rejects an empty buffer');
+    t.is(incrementBuffer(b4a.alloc(17)), null, 'rejects buffers longer than 16 bytes');
+    t.is(incrementBuffer(null), null, 'rejects non-buffer input');
 });
 
 test('createMessage ignores invalid values when valid buffers are present', t => {
