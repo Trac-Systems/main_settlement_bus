@@ -13,7 +13,12 @@ import {
 } from '../../../src/codecs/apply/applyOperationCodec.js';
 import fixtures from '../../fixtures/applyOperation.fixtures.js';
 
-const { Operation, SetEpochOperation } = applyOperationsGenerated.apply.operations;
+const {
+    HtlcClaimOperation,
+    Operation,
+    OperationType: ApplyOperationType,
+    SetEpochOperation
+} = applyOperationsGenerated.apply.operations;
 
 const APPLY_TO_OBJECT_OPTIONS = Object.freeze({
     enums: Number,
@@ -23,6 +28,19 @@ const APPLY_TO_OBJECT_OPTIONS = Object.freeze({
     arrays: true,
     oneofs: false
 });
+
+const validHtlcClaimOperation = {
+    type: ApplyOperationType.HTLC_CLAIM,
+    address: b4a.from(fixtures.validTransferOperation.address),
+    hco: {
+        tx: b4a.alloc(32, 0x11),
+        txv: b4a.alloc(32, 0x22),
+        li: b4a.alloc(32, 0x33),
+        pi: b4a.alloc(32, 0x44),
+        in: b4a.alloc(32, 0x55),
+        is: b4a.alloc(64, 0x66)
+    }
+};
 
 const applyPayloads = new Map([
     ['txComplete', fixtures.validTransactionOperation],
@@ -45,9 +63,10 @@ const applyPayloads = new Map([
     ['balanceInitialization', fixtures.validBalanceInitOperation],
     ['disableInitialization', fixtures.validDisableInitialization],
     ['setEpoch', fixtures.validSetEpochOperation],
+    ['htlcClaim', validHtlcClaimOperation],
 ]);
 
-const APPLY_PAYLOAD_KEYS = Object.freeze(['txo', 'tro', 'aco', 'cao', 'rao', 'bdo', 'bio', 'seo']);
+const APPLY_PAYLOAD_KEYS = Object.freeze(['txo', 'tro', 'aco', 'cao', 'rao', 'bdo', 'bio', 'seo', 'hco']);
 
 const formatInvalidPayload = payload => {
     if (typeof payload === 'bigint') return `${payload}n`;
@@ -124,6 +143,36 @@ test('Apply generated codec encodes and decodes operation payloads', t => {
         const decoded = decodeApplyOperation(encoded);
 
         t.alike(decoded, payload, `Payload ${key} encodes and decodes correctly`);
+    }
+});
+
+test('HTLC_CLAIM generated schema exposes the canonical operation fields', t => {
+    t.is(ApplyOperationType.HTLC_CLAIM, 18);
+    t.is(HtlcClaimOperation.verify(validHtlcClaimOperation.hco), null);
+
+    const encoded = b4a.from(HtlcClaimOperation.encode(validHtlcClaimOperation.hco).finish());
+    const decoded = HtlcClaimOperation.toObject(
+        HtlcClaimOperation.decode(encoded),
+        APPLY_TO_OBJECT_OPTIONS
+    );
+
+    t.ok(encoded.length > 0);
+    t.alike(decoded, validHtlcClaimOperation.hco);
+    t.alike(Object.keys(decoded), ['tx', 'txv', 'li', 'pi', 'in', 'is']);
+});
+
+test('HTLC_CLAIM generated schema rejects malformed byte fields', t => {
+    for (const field of ['tx', 'txv', 'li', 'pi', 'in', 'is']) {
+        const malformedPayload = {
+            ...validHtlcClaimOperation,
+            hco: {
+                ...validHtlcClaimOperation.hco,
+                [field]: 1
+            }
+        };
+
+        const error = Operation.verify(malformedPayload);
+        t.ok(error?.includes(`hco.${field}: buffer expected`), `${field} must be bytes`);
     }
 });
 
