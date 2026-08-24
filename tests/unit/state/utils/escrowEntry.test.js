@@ -58,6 +58,6 @@ test('Escrow Entry - makeRefund pays the maker and clears the amount', t => {
 });
 
 test('Escrow Entry - settlement rejects invalid entries', t => {
-    t.ok(b4a.equals(makeClaim(randomBuffer(ESCROW_ENTRY_SIZE - 1)), NULL_BUFFER), 'claim rejects invalid entry');
-    t.ok(b4a.equals(makeRefund(null), NULL_BUFFER), 'refund rejects non-buffer entry');
+    t.is(makeClaim(randomBuffer(ESCROW_ENTRY_SIZE - 1)), null, 'claim rejects invalid entry');
+    t.is(makeRefund(null), null, 'refund rejects non-buffer entry');
 });
