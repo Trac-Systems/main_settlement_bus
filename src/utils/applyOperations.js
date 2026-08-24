@@ -48,6 +48,13 @@ const isBalanceInitialization = type => {
     ].includes(type);
 }
 
+const isHtlc = type => {
+    return [
+        OperationType.HTLC_LOCK,
+        OperationType.HTLC_CLAIM,
+        OperationType.HTLC_REFUND
+    ].includes(type);
+}
 const isSetEpoch = type => {
     return [
         OperationType.SET_EPOCH
@@ -92,6 +99,18 @@ const operationToPayload = type => {
             jsonPath: 'bio'
         },
         {
+            condition: type => type === OperationType.HTLC_LOCK,
+            jsonPath: 'hlo'
+        },
+        {
+            condition: type => type === OperationType.HTLC_CLAIM,
+            jsonPath: 'hco'
+        },
+        {
+            condition: type => type === OperationType.HTLC_REFUND,
+            jsonPath: 'hro'
+        },
+        {
             condition: isSetEpoch,
             jsonPath: 'seo'
         },
@@ -113,6 +132,7 @@ export {
     operationToPayload,
     isTransfer,
     isBalanceInitialization,
+    isHtlc,
     isSetEpoch,
     isConsensusControl
 }

@@ -21,4 +21,7 @@ enum OperationType {
     SET_EPOCH              = 14; // complete
     SET_GENESIS_EPOCH      = 15; // complete
     SET_CONSENSUS_CONFIG         = 16; // complete
+    HTLC_LOCK              = 17; // partial
+    HTLC_CLAIM             = 18; // partial
+    HTLC_REFUND            = 19; // partial
 }
