@@ -9,13 +9,14 @@ import { uint16ToBuffer, uint32ToBuffer } from '../../../utils/buffer.js';
 import { encodeApplyOperation } from '../../../codecs/apply/applyOperationCodec.js';
 import { ConsensusResultCode } from '../../../utils/constants.js';
 
-/** connectionManager is passed per call, not stored on the instance. */
+/** Contains operations used by the epoch coordinator. */
 export class EpochCoordinatorOperations {
     #state;
     #wallet;
     #vdfService;
     #config;
 
+    /** Creates operations which use the provided state, wallet and VDF service. */
     constructor(state, vdfService, wallet, config) {
         this.#state = state;
         this.#vdfService = vdfService;
@@ -23,6 +24,7 @@ export class EpochCoordinatorOperations {
         this.#config = config;
     }
 
+    /** Calculates a VDF proof and returns data used by the round. */
     async calculateVDF(challenge, difficulty, discriminantSizeBits) {
         const { result, error } = await this.#vdfService.calculateVDF(
             challenge,
@@ -34,6 +36,7 @@ export class EpochCoordinatorOperations {
         return { solution: vdf.solution, difficulty, discriminantSizeBits };
     }  
 
+    /** Builds and signs a proof proposal for the next epoch. */
     async createProofProposal(prevEpochId, prevEpochHash, vdf) {
         const epoch = prevEpochId + 1n;
         const difficulty = uint32ToBuffer(vdf.difficulty)
@@ -51,6 +54,7 @@ export class EpochCoordinatorOperations {
             );
     }
 
+    /** Sends one consensus request to a connected indexer. */
     async sendToIndexer(publicKeyHex, request, connectionManager) {
         if (!connectionManager.connected(publicKeyHex)) throw new Error('Indexer not in the manager');
 
@@ -61,7 +65,12 @@ export class EpochCoordinatorOperations {
         };
     }
 
-    async collectSignature(member, {currentEpoch, currentEpochHash, vdf}, connectionManager) {
+    /**
+     * Builds a proposal for one indexer and requests its signature.
+     * It checks approval collection before sending, because the round can be cancelled during
+     * async request preparation.
+     */
+    async collectSignature(member, {currentEpoch, currentEpochHash, vdf}, connectionManager, approvalCollection = null) {
         // Unfortunally we need to generate one payload per request because of the session id.
         // But, we also need a general one (generated previously) because of the signature
         const request = await this.createProofProposal(currentEpoch, currentEpochHash, vdf);
@@ -76,6 +85,8 @@ export class EpochCoordinatorOperations {
         if (!publicKey) throw new Error('Writer public key could not be decoded');
 
         const publicKeyHex = b4a.toString(publicKey, 'hex');
+        if (approvalCollection?.closed) throw new Error('Epoch approval request was cancelled');
+
         const { resultCode, signature: memberSignature } = await this.sendToIndexer(publicKeyHex, request, connectionManager);
 
         if (resultCode !== ConsensusResultCode.OK) {
@@ -92,6 +103,7 @@ export class EpochCoordinatorOperations {
         };
     }
 
+    /** Creates a SET_EPOCH payload from the proof and collected signatures. */
     async buildSetEpochPayload(proofProposal, signatures) {
         const proofData = encodeProofProposal({
             protocol_version: proofProposal.protocol_version,
@@ -115,11 +127,12 @@ export class EpochCoordinatorOperations {
         return encodeApplyOperation(message);
     }
 
+    /** Appends the SET_EPOCH payload to local state. */
     appendSetEpoch(payload) {
         return this.#state.append(payload);
     }
 
-    /** Excludes only self - an admin/indexer counts as a normal approver. */
+    /** Returns all indexers except this node; an admin/indexer still counts as an approver. */
     async approvers() {
         const indexers = await this.#state.getIndexersEntry();
         const writingKey = this.#state.writingKey;
