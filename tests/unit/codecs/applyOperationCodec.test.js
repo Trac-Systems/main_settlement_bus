@@ -29,19 +29,6 @@ const APPLY_TO_OBJECT_OPTIONS = Object.freeze({
     oneofs: false
 });
 
-const validHtlcClaimOperation = {
-    type: ApplyOperationType.HTLC_CLAIM,
-    address: b4a.from(fixtures.validTransferOperation.address),
-    hco: {
-        tx: b4a.alloc(32, 0x11),
-        txv: b4a.alloc(32, 0x22),
-        li: b4a.alloc(32, 0x33),
-        pi: b4a.alloc(32, 0x44),
-        in: b4a.alloc(32, 0x55),
-        is: b4a.alloc(64, 0x66)
-    }
-};
-
 const applyPayloads = new Map([
     ['txComplete', fixtures.validTransactionOperation],
     ['txPartial', fixtures.validPartialTransactionOperation],
@@ -63,7 +50,7 @@ const applyPayloads = new Map([
     ['balanceInitialization', fixtures.validBalanceInitOperation],
     ['disableInitialization', fixtures.validDisableInitialization],
     ['setEpoch', fixtures.validSetEpochOperation],
-    ['htlcClaim', validHtlcClaimOperation],
+    ['htlcClaim', fixtures.validHtlcClaimOperation],
 ]);
 
 const APPLY_PAYLOAD_KEYS = Object.freeze(['txo', 'tro', 'aco', 'cao', 'rao', 'bdo', 'bio', 'seo', 'hco']);
@@ -148,25 +135,25 @@ test('Apply generated codec encodes and decodes operation payloads', t => {
 
 test('HTLC_CLAIM generated schema exposes the canonical operation fields', t => {
     t.is(ApplyOperationType.HTLC_CLAIM, 18);
-    t.is(HtlcClaimOperation.verify(validHtlcClaimOperation.hco), null);
+    t.is(HtlcClaimOperation.verify(fixtures.validHtlcClaimOperation.hco), null);
 
-    const encoded = b4a.from(HtlcClaimOperation.encode(validHtlcClaimOperation.hco).finish());
+    const encoded = b4a.from(HtlcClaimOperation.encode(fixtures.validHtlcClaimOperation.hco).finish());
     const decoded = HtlcClaimOperation.toObject(
         HtlcClaimOperation.decode(encoded),
         APPLY_TO_OBJECT_OPTIONS
     );
 
     t.ok(encoded.length > 0);
-    t.alike(decoded, validHtlcClaimOperation.hco);
+    t.alike(decoded, fixtures.validHtlcClaimOperation.hco);
     t.alike(Object.keys(decoded), ['tx', 'txv', 'li', 'pi', 'in', 'is']);
 });
 
 test('HTLC_CLAIM generated schema rejects malformed byte fields', t => {
     for (const field of ['tx', 'txv', 'li', 'pi', 'in', 'is']) {
         const malformedPayload = {
-            ...validHtlcClaimOperation,
+            ...fixtures.validHtlcClaimOperation,
             hco: {
-                ...validHtlcClaimOperation.hco,
+                ...fixtures.validHtlcClaimOperation.hco,
                 [field]: 1
             }
         };

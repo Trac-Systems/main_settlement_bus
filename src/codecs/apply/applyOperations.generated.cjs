@@ -4617,6 +4617,12 @@ $root.apply = (function() {
              * Properties of a HtlcClaimOperation.
              * @memberof apply.operations
              * @interface IHtlcClaimOperation
+             * @property {Uint8Array|null} [tx] HtlcClaimOperation tx
+             * @property {Uint8Array|null} [txv] HtlcClaimOperation txv
+             * @property {Uint8Array|null} [li] HtlcClaimOperation li
+             * @property {Uint8Array|null} [pi] HtlcClaimOperation pi
+             * @property {Uint8Array|null} ["in"] HtlcClaimOperation in
+             * @property {Uint8Array|null} [is] HtlcClaimOperation is
              */
 
             /**
@@ -4633,6 +4639,54 @@ $root.apply = (function() {
                         if (properties[keys[i]] != null)
                             this[keys[i]] = properties[keys[i]];
             }
+
+            /**
+             * HtlcClaimOperation tx.
+             * @member {Uint8Array} tx
+             * @memberof apply.operations.HtlcClaimOperation
+             * @instance
+             */
+            HtlcClaimOperation.prototype.tx = $util.newBuffer([]);
+
+            /**
+             * HtlcClaimOperation txv.
+             * @member {Uint8Array} txv
+             * @memberof apply.operations.HtlcClaimOperation
+             * @instance
+             */
+            HtlcClaimOperation.prototype.txv = $util.newBuffer([]);
+
+            /**
+             * HtlcClaimOperation li.
+             * @member {Uint8Array} li
+             * @memberof apply.operations.HtlcClaimOperation
+             * @instance
+             */
+            HtlcClaimOperation.prototype.li = $util.newBuffer([]);
+
+            /**
+             * HtlcClaimOperation pi.
+             * @member {Uint8Array} pi
+             * @memberof apply.operations.HtlcClaimOperation
+             * @instance
+             */
+            HtlcClaimOperation.prototype.pi = $util.newBuffer([]);
+
+            /**
+             * HtlcClaimOperation in.
+             * @member {Uint8Array} in
+             * @memberof apply.operations.HtlcClaimOperation
+             * @instance
+             */
+            HtlcClaimOperation.prototype["in"] = $util.newBuffer([]);
+
+            /**
+             * HtlcClaimOperation is.
+             * @member {Uint8Array} is
+             * @memberof apply.operations.HtlcClaimOperation
+             * @instance
+             */
+            HtlcClaimOperation.prototype.is = $util.newBuffer([]);
 
             /**
              * Creates a new HtlcClaimOperation instance using the specified properties.
@@ -4658,6 +4712,18 @@ $root.apply = (function() {
             HtlcClaimOperation.encode = function encode(message, writer) {
                 if (!writer)
                     writer = $Writer.create();
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
+                    writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.tx);
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
+                    writer.uint32(/* id 2, wireType 2 =*/18).bytes(message.txv);
+                if (message.li != null && Object.hasOwnProperty.call(message, "li"))
+                    writer.uint32(/* id 3, wireType 2 =*/26).bytes(message.li);
+                if (message.pi != null && Object.hasOwnProperty.call(message, "pi"))
+                    writer.uint32(/* id 4, wireType 2 =*/34).bytes(message.pi);
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
+                    writer.uint32(/* id 5, wireType 2 =*/42).bytes(message["in"]);
+                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
+                    writer.uint32(/* id 6, wireType 2 =*/50).bytes(message.is);
                 return writer;
             };
 
@@ -4694,6 +4760,30 @@ $root.apply = (function() {
                     if (tag === error)
                         break;
                     switch (tag >>> 3) {
+                    case 1: {
+                            message.tx = reader.bytes();
+                            break;
+                        }
+                    case 2: {
+                            message.txv = reader.bytes();
+                            break;
+                        }
+                    case 3: {
+                            message.li = reader.bytes();
+                            break;
+                        }
+                    case 4: {
+                            message.pi = reader.bytes();
+                            break;
+                        }
+                    case 5: {
+                            message["in"] = reader.bytes();
+                            break;
+                        }
+                    case 6: {
+                            message.is = reader.bytes();
+                            break;
+                        }
                     default:
                         reader.skipType(tag & 7);
                         break;
@@ -4729,6 +4819,24 @@ $root.apply = (function() {
             HtlcClaimOperation.verify = function verify(message) {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
+                if (message.tx != null && message.hasOwnProperty("tx"))
+                    if (!(message.tx && typeof message.tx.length === "number" || $util.isString(message.tx)))
+                        return "tx: buffer expected";
+                if (message.txv != null && message.hasOwnProperty("txv"))
+                    if (!(message.txv && typeof message.txv.length === "number" || $util.isString(message.txv)))
+                        return "txv: buffer expected";
+                if (message.li != null && message.hasOwnProperty("li"))
+                    if (!(message.li && typeof message.li.length === "number" || $util.isString(message.li)))
+                        return "li: buffer expected";
+                if (message.pi != null && message.hasOwnProperty("pi"))
+                    if (!(message.pi && typeof message.pi.length === "number" || $util.isString(message.pi)))
+                        return "pi: buffer expected";
+                if (message["in"] != null && message.hasOwnProperty("in"))
+                    if (!(message["in"] && typeof message["in"].length === "number" || $util.isString(message["in"])))
+                        return "in: buffer expected";
+                if (message.is != null && message.hasOwnProperty("is"))
+                    if (!(message.is && typeof message.is.length === "number" || $util.isString(message.is)))
+                        return "is: buffer expected";
                 return null;
             };
 
@@ -4743,7 +4851,38 @@ $root.apply = (function() {
             HtlcClaimOperation.fromObject = function fromObject(object) {
                 if (object instanceof $root.apply.operations.HtlcClaimOperation)
                     return object;
-                return new $root.apply.operations.HtlcClaimOperation();
+                var message = new $root.apply.operations.HtlcClaimOperation();
+                if (object.tx != null)
+                    if (typeof object.tx === "string")
+                        $util.base64.decode(object.tx, message.tx = $util.newBuffer($util.base64.length(object.tx)), 0);
+                    else if (object.tx.length >= 0)
+                        message.tx = object.tx;
+                if (object.txv != null)
+                    if (typeof object.txv === "string")
+                        $util.base64.decode(object.txv, message.txv = $util.newBuffer($util.base64.length(object.txv)), 0);
+                    else if (object.txv.length >= 0)
+                        message.txv = object.txv;
+                if (object.li != null)
+                    if (typeof object.li === "string")
+                        $util.base64.decode(object.li, message.li = $util.newBuffer($util.base64.length(object.li)), 0);
+                    else if (object.li.length >= 0)
+                        message.li = object.li;
+                if (object.pi != null)
+                    if (typeof object.pi === "string")
+                        $util.base64.decode(object.pi, message.pi = $util.newBuffer($util.base64.length(object.pi)), 0);
+                    else if (object.pi.length >= 0)
+                        message.pi = object.pi;
+                if (object["in"] != null)
+                    if (typeof object["in"] === "string")
+                        $util.base64.decode(object["in"], message["in"] = $util.newBuffer($util.base64.length(object["in"])), 0);
+                    else if (object["in"].length >= 0)
+                        message["in"] = object["in"];
+                if (object.is != null)
+                    if (typeof object.is === "string")
+                        $util.base64.decode(object.is, message.is = $util.newBuffer($util.base64.length(object.is)), 0);
+                    else if (object.is.length >= 0)
+                        message.is = object.is;
+                return message;
             };
 
             /**
@@ -4755,8 +4894,67 @@ $root.apply = (function() {
              * @param {$protobuf.IConversionOptions} [options] Conversion options
              * @returns {Object.<string,*>} Plain object
              */
-            HtlcClaimOperation.toObject = function toObject() {
-                return {};
+            HtlcClaimOperation.toObject = function toObject(message, options) {
+                if (!options)
+                    options = {};
+                var object = {};
+                if (options.defaults) {
+                    if (options.bytes === String)
+                        object.tx = "";
+                    else {
+                        object.tx = [];
+                        if (options.bytes !== Array)
+                            object.tx = $util.newBuffer(object.tx);
+                    }
+                    if (options.bytes === String)
+                        object.txv = "";
+                    else {
+                        object.txv = [];
+                        if (options.bytes !== Array)
+                            object.txv = $util.newBuffer(object.txv);
+                    }
+                    if (options.bytes === String)
+                        object.li = "";
+                    else {
+                        object.li = [];
+                        if (options.bytes !== Array)
+                            object.li = $util.newBuffer(object.li);
+                    }
+                    if (options.bytes === String)
+                        object.pi = "";
+                    else {
+                        object.pi = [];
+                        if (options.bytes !== Array)
+                            object.pi = $util.newBuffer(object.pi);
+                    }
+                    if (options.bytes === String)
+                        object["in"] = "";
+                    else {
+                        object["in"] = [];
+                        if (options.bytes !== Array)
+                            object["in"] = $util.newBuffer(object["in"]);
+                    }
+                    if (options.bytes === String)
+                        object.is = "";
+                    else {
+                        object.is = [];
+                        if (options.bytes !== Array)
+                            object.is = $util.newBuffer(object.is);
+                    }
+                }
+                if (message.tx != null && message.hasOwnProperty("tx"))
+                    object.tx = options.bytes === String ? $util.base64.encode(message.tx, 0, message.tx.length) : options.bytes === Array ? Array.prototype.slice.call(message.tx) : message.tx;
+                if (message.txv != null && message.hasOwnProperty("txv"))
+                    object.txv = options.bytes === String ? $util.base64.encode(message.txv, 0, message.txv.length) : options.bytes === Array ? Array.prototype.slice.call(message.txv) : message.txv;
+                if (message.li != null && message.hasOwnProperty("li"))
+                    object.li = options.bytes === String ? $util.base64.encode(message.li, 0, message.li.length) : options.bytes === Array ? Array.prototype.slice.call(message.li) : message.li;
+                if (message.pi != null && message.hasOwnProperty("pi"))
+                    object.pi = options.bytes === String ? $util.base64.encode(message.pi, 0, message.pi.length) : options.bytes === Array ? Array.prototype.slice.call(message.pi) : message.pi;
+                if (message["in"] != null && message.hasOwnProperty("in"))
+                    object["in"] = options.bytes === String ? $util.base64.encode(message["in"], 0, message["in"].length) : options.bytes === Array ? Array.prototype.slice.call(message["in"]) : message["in"];
+                if (message.is != null && message.hasOwnProperty("is"))
+                    object.is = options.bytes === String ? $util.base64.encode(message.is, 0, message.is.length) : options.bytes === Array ? Array.prototype.slice.call(message.is) : message.is;
+                return object;
             };
 
             /**
