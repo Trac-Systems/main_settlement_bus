@@ -23,6 +23,26 @@ function makeService(portMock) {
     return new TestVDFService();
 }
 
+async function withTimeout(promise, timeoutMs, message) {
+    let timeout;
+    const timeoutPromise = new Promise((_, reject) => {
+        timeout = setTimeout(() => reject(new Error(message)), timeoutMs);
+    });
+
+    try {
+        return await Promise.race([promise, timeoutPromise]);
+    } finally {
+        clearTimeout(timeout);
+    }
+}
+
+async function isSettledWithin(promise, timeoutMs) {
+    return Promise.race([
+        promise.then(() => true, () => true),
+        new Promise(resolve => setTimeout(() => resolve(false), timeoutMs)),
+    ]);
+}
+
 test('calculateVDF writes correct payload to port', async t => {
     const portMock = makePortMock();
     const service = makeService(portMock);
@@ -132,6 +152,26 @@ test('queue continues after port.read throws', async t => {
     t.alike(resB, { result: 'ok' });
 });
 
+test('close cancels the active calculation and prevents queued work from starting', async t => {
+    let finishRead;
+    const portMock = makePortMock();
+    portMock.read.returns(new Promise(resolve => { finishRead = resolve; }));
+    portMock.close.callsFake(async error => finishRead({ error }));
+    const service = makeService(portMock);
+    await service.ready();
+
+    const active = service.calculateVDF(Buffer.alloc(32, 1), 100, 512);
+    const queued = service.calculateVDF(Buffer.alloc(32, 2), 100, 512);
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    await service.close();
+    const [activeResult, queuedResult] = await Promise.all([active, queued]);
+
+    t.ok(activeResult.error);
+    t.ok(queuedResult.error);
+    t.is(portMock.write.callCount, 1);
+});
+
 // ---- Bare-only tests ----
 
 if (isBare) {
@@ -171,16 +211,15 @@ if (isBare) {
         }
     });
 
-    test('[bare] real VDF: service works after close and reopen', { timeout: 30000 }, async t => {
+    test('[bare] a closed service is not reopened through ReadyResource', async t => {
         const service = new VDFBare();
         await service.ready();
         await service.close();
         await service.ready();
-        t.teardown(() => service.close());
 
         const { result, error } = await service.calculateVDF(Buffer.alloc(32, 5), DIFFICULTY, DISCRIMINANT_BITS);
-        t.absent(error, 'an error means @tracsystems/trac-vdf is missing or dist/ was not built');
-        t.ok(result);
+        t.absent(result);
+        t.ok(error, 'a restart requires a fresh VDF service instance');
     });
 
     test('[bare] real VDF: invalid discriminantSizeBits causes worker to return an error', { timeout: 10000 }, async t => {
@@ -213,6 +252,36 @@ if (isBare) {
         const { result, error } = await service.calculateVDF(Buffer.alloc(32, 1), DIFFICULTY, DISCRIMINANT_BITS);
         t.absent(result);
         t.ok(error);
+    });
+
+    test('[bare] replacing the service cancels an active VDF subprocess', { timeout: 10000 }, async t => {
+        const workerURL = new URL('./fixtures/cancellable-worker-bare.js', import.meta.url);
+        const previous = new VDFBare(workerURL);
+        const replacement = new VDFBare(workerURL);
+        await previous.ready();
+        t.teardown(() => Promise.all([previous.close(), replacement.close()]));
+
+        const pendingCalculation = previous.calculateVDF(
+            Buffer.alloc(32, 1),
+            DIFFICULTY,
+            DISCRIMINANT_BITS,
+        );
+        t.is(await isSettledWithin(pendingCalculation, 100), false);
+
+        await replacement.ready();
+        await withTimeout(previous.close(), 2000, 'closing the old VDF subprocess timed out');
+        const cancelled = await withTimeout(pendingCalculation, 2000, 'cancelled VDF remained pending');
+        t.absent(cancelled.result);
+        t.ok(cancelled.error);
+
+        const { result, error } = await replacement.calculateVDF(
+            Buffer.alloc(32, 2),
+            DIFFICULTY,
+            DISCRIMINANT_BITS,
+        );
+        t.absent(error);
+        t.alike(Buffer.from(result.challenge), Buffer.alloc(32, 2));
+        t.alike(result.solution, Buffer.from([2]));
     });
 }
 
@@ -268,5 +337,35 @@ if (!isBare) {
         const { result, error } = await service.calculateVDF(Buffer.alloc(32, 1), 100, 512);
         t.absent(result);
         t.ok(error);
+    });
+
+    test('[node] replacing the service cancels an active VDF worker', { timeout: 10000 }, async t => {
+        const workerURL = new URL('./fixtures/cancellable-worker.js', import.meta.url);
+        const previous = new VDFNode(workerURL);
+        const replacement = new VDFNode(workerURL);
+        await previous.ready();
+        t.teardown(() => Promise.all([previous.close(), replacement.close()]));
+
+        const pendingCalculation = previous.calculateVDF(
+            Buffer.alloc(32, 1),
+            DIFFICULTY,
+            DISCRIMINANT_BITS,
+        );
+        t.is(await isSettledWithin(pendingCalculation, 100), false);
+
+        await replacement.ready();
+        await withTimeout(previous.close(), 2000, 'closing the old VDF worker timed out');
+        const cancelled = await withTimeout(pendingCalculation, 2000, 'cancelled VDF remained pending');
+        t.absent(cancelled.result);
+        t.ok(cancelled.error);
+
+        const { result, error } = await replacement.calculateVDF(
+            Buffer.alloc(32, 2),
+            DIFFICULTY,
+            DISCRIMINANT_BITS,
+        );
+        t.absent(error);
+        t.alike(Buffer.from(result.challenge), Buffer.alloc(32, 2));
+        t.alike(result.solution, new Uint8Array([2]));
     });
 }
