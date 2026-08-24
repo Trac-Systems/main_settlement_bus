@@ -109,6 +109,13 @@ class ApplyRepository {
         return true;
     }
 
+    /**
+     * Retrieves the address assigned to a given writing key from the registry.
+     *
+     * @param {Object} batch - The current Hyperbee batch instance used for reading state.
+     * @param {string} writingKey - The writing key in hex string format.
+     * @returns {Buffer|null} The address buffer assigned to the writing key, or null if not registered.
+     */
     async getRegisteredWriterKey(batch, writingKey) {
         const entry = await batch.get(EntryType.WRITER_ADDRESS + writingKey);
         return deepCopyBuffer(entry?.value)

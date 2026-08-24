@@ -17,7 +17,6 @@ import SetEpochHandler from './operations/setEpochOperation.js';
 import SetGenesisEpochHandler from './operations/setGenesisEpochOperation.js';
 import SetConsensusConfigHandler from './operations/setConsensusConfigOperation.js';
 import {
-    OperationType,
     BATCH_SIZE,
 } from '../../../utils/constants.js';
 import {
@@ -47,41 +46,24 @@ class ApplyState {
         this.#stateValidationSchema = stateValidationSchema;
         this.#state = state;
         this.#repository = new ApplyRepository(this.#config, this.#state);
-        this.#handlers = {
-            [OperationType.BALANCE_INITIALIZATION]: new BalanceInitializationHandler(this.#repository, this.#config, this.#stateValidationSchema),
-            [OperationType.DISABLE_INITIALIZATION]: new DisableInitializationHandler(this.#repository, this.#config, this.#stateValidationSchema),
-            [OperationType.ADD_ADMIN]: new AddAdminHandler(this.#repository, this.#config, this.#stateValidationSchema),
-            [OperationType.APPEND_WHITELIST]: new AppendWhitelistHandler(this.#repository, this.#config, this.#stateValidationSchema),
-            [OperationType.ADD_WRITER]: new AddWriterHandler(this.#repository, this.#config, this.#stateValidationSchema),
-            [OperationType.REMOVE_WRITER]: new RemoveWriterHandler(this.#repository, this.#config, this.#stateValidationSchema),
-            [OperationType.ADMIN_RECOVERY]: new AdminRecoveryHandler(this.#repository, this.#config, this.#stateValidationSchema),
-            [OperationType.ADD_INDEXER]: new AddIndexerHandler(this.#repository, this.#config, this.#stateValidationSchema),
-            [OperationType.REMOVE_INDEXER]: new RemoveIndexerHandler(this.#repository, this.#config, this.#stateValidationSchema),
-            [OperationType.BAN_VALIDATOR]: new BanValidatorHandler(this.#repository, this.#config, this.#stateValidationSchema),
-            [OperationType.BOOTSTRAP_DEPLOYMENT]: new BootstrapDeploymentHandler(this.#repository, this.#config, this.#stateValidationSchema),
-            [OperationType.TX]: new TxHandler(this.#repository, this.#config, this.#stateValidationSchema),
-            [OperationType.TRANSFER]: new TransferHandler(this.#repository, this.#config, this.#stateValidationSchema),
-            [OperationType.SET_EPOCH]: new SetEpochHandler(this.#repository, this.#config, this.#stateValidationSchema),
-            [OperationType.SET_GENESIS_EPOCH]: new SetGenesisEpochHandler(this.#repository, this.#config, this.#stateValidationSchema),
-            [OperationType.SET_CONSENSUS_CONFIG]: new SetConsensusConfigHandler(this.#repository, this.#config, this.#stateValidationSchema),
-        };
-    }
-
-    get config() {
-        return this.#config;
-    }
-
-    get stateValidationSchema() {
-        return this.#stateValidationSchema;
-    }
-
-    get state() {
-        return this.#state;
-    }
-
-    get repository() {
-        return this.#repository;
-    }
+        this.#handlers = [
+            new BalanceInitializationHandler(this.#repository, this.#config, this.#stateValidationSchema),
+            new DisableInitializationHandler(this.#repository, this.#config, this.#stateValidationSchema),
+            new AddAdminHandler(this.#repository, this.#config, this.#stateValidationSchema),
+            new AppendWhitelistHandler(this.#repository, this.#config, this.#stateValidationSchema),
+            new AddWriterHandler(this.#repository, this.#config, this.#stateValidationSchema),
+            new RemoveWriterHandler(this.#repository, this.#config, this.#stateValidationSchema),
+            new AdminRecoveryHandler(this.#repository, this.#config, this.#stateValidationSchema),
+            new AddIndexerHandler(this.#repository, this.#config, this.#stateValidationSchema),
+            new RemoveIndexerHandler(this.#repository, this.#config, this.#stateValidationSchema),
+            new BanValidatorHandler(this.#repository, this.#config, this.#stateValidationSchema),
+            new BootstrapDeploymentHandler(this.#repository, this.#config, this.#stateValidationSchema),
+            new TxHandler(this.#repository, this.#config, this.#stateValidationSchema),
+            new TransferHandler(this.#repository, this.#config, this.#stateValidationSchema),
+            new SetEpochHandler(this.#repository, this.#config, this.#stateValidationSchema),
+            new SetGenesisEpochHandler(this.#repository, this.#config, this.#stateValidationSchema),
+            new SetConsensusConfigHandler(this.#repository, this.#config, this.#stateValidationSchema),
+        ];    }
 
     async apply(nodes, view, base) {
         const batch = view.batch();
@@ -113,19 +95,22 @@ class ApplyState {
                 continue;
             }
 
-            const handler = this.#getApplyOperationHandler(op.type);
-
-            if (handler) {
-                const result = await handler.performOperation(op, view, base, node, batch);
-                if (result === Status.FAILURE) {
-                    invalidOperations++;
-                } else if (result === Status.IGNORE) {
-                    continue;
-                } else if (result !== Status.SUCCESS) {
-                    this.#repository.safeLog(`Unknown operation status: ${result}`, node.from.key);
-                    invalidOperations++;
+            let operationHandled = false;
+            for (const handler of this.#handlers) {
+                if (handler.canHandle(op)) {
+                    operationHandled = true;
+                    const result = await handler.performOperation(op, view, base, node, batch);
+                    if (result === Status.FAILURE) {
+                        invalidOperations++;
+                    } else if (result !== Status.SUCCESS && result !== Status.IGNORE) {
+                        this.#repository.safeLog(`Unknown operation status: ${result}`, node.from.key);
+                        invalidOperations++;
+                    }
+                    break;
                 }
-            } else {
+            }
+
+            if (!operationHandled) {
                 this.#repository.safeLog(`Unknown operation type: ${op.type}`, node.from.key)
                 invalidOperations++;
             }
@@ -139,9 +124,6 @@ class ApplyState {
         await batch.close();
     }
 
-    #getApplyOperationHandler(type) {
-        return this.#handlers[type] || null;
-    }
 
 
 
@@ -167,13 +149,6 @@ class ApplyState {
 
 
 
-    /**
-     * Retrieves the address assigned to a given writing key from the registry.
-     *
-     * @param {Object} batch - The current Hyperbee batch instance used for reading state.
-     * @param {string} writingKey - The writing key in hex string format.
-     * @returns {Buffer|null} The address buffer assigned to the writing key, or null if not registered.
-     */
 
 
 

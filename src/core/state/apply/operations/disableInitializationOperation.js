@@ -30,6 +30,10 @@ class DisableInitializationHandler {
         this.#stateValidationSchema = stateValidationSchema;
     }
 
+    canHandle(operation) {
+        return operation.type === OperationType.DISABLE_INITIALIZATION;
+    }
+
     async performOperation(op, view, base, node, batch) {
         if (!this.#stateValidationSchema.validateCoreAdminOperation(op)) {
             this.#repo.safeLog(OperationType.DISABLE_INITIALIZATION, "Schema validation failed.", node.from.key)

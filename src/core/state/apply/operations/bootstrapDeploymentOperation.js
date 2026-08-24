@@ -33,6 +33,10 @@ class BootstrapDeploymentHandler {
         this.#stateValidationSchema = stateValidationSchema;
     }
 
+    canHandle(operation) {
+        return operation.type === OperationType.BOOTSTRAP_DEPLOYMENT;
+    }
+
     async performOperation(op, view, base, node, batch) {
         if (!this.#stateValidationSchema.validateBootstrapDeploymentOperation(op)) {
             this.#repo.safeLog(OperationType.BOOTSTRAP_DEPLOYMENT, "Contract schema validation failed.", node.from.key)

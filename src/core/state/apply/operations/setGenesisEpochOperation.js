@@ -33,6 +33,10 @@ class SetGenesisEpochHandler {
         this.#stateValidationSchema = stateValidationSchema;
     }
 
+    canHandle(operation) {
+        return operation.type === OperationType.SET_GENESIS_EPOCH;
+    }
+
     async performOperation(op, view, base, node, batch) {
         if (!this.#stateValidationSchema.validateConsensusControlOperation(op)) {
             this.#repo.safeLog(OperationType.SET_GENESIS_EPOCH, "Contract schema validation failed.", node.from.key)

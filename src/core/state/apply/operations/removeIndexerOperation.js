@@ -137,6 +137,10 @@ class RemoveIndexerHandler {
         return Status.SUCCESS;
     }
 
+    canHandle(operation) {
+        return operation.type === OperationType.REMOVE_INDEXER;
+    }
+
     async performOperation(op, view, base, node, batch) {
         if (!this.#stateValidationSchema.validateAdminControlOperation(op)) {
             this.#repo.safeLog(OperationType.REMOVE_INDEXER, "Contract schema validation failed.", node.from.key)

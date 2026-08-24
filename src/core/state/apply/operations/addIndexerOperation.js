@@ -131,6 +131,10 @@ class AddIndexerHandler {
         this.#repo.emitEvent(CustomEventType.IS_INDEXER, tracCryptoApi.address.decodeSafe(pretendingAddressString))
     }
 
+    canHandle(operation) {
+        return operation.type === OperationType.ADD_INDEXER;
+    }
+
     async performOperation(op, view, base, node, batch) {
         if (!this.#stateValidationSchema.validateAdminControlOperation(op)) {
             this.#repo.safeLog(OperationType.ADD_INDEXER, "Contract schema validation failed.", node.from.key)

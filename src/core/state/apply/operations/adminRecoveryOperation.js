@@ -33,6 +33,10 @@ class AdminRecoveryHandler {
         this.#stateValidationSchema = stateValidationSchema;
     }
 
+    canHandle(operation) {
+        return operation.type === OperationType.ADMIN_RECOVERY;
+    }
+
     async performOperation(op, view, base, node, batch) {
         if (!this.#stateValidationSchema.validateRoleAccessOperation(op)) {
             this.#repo.safeLog(OperationType.ADMIN_RECOVERY, "Contract schema validation failed.", node.from.key)

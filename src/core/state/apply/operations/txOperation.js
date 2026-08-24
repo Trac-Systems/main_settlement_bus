@@ -30,6 +30,10 @@ class TxHandler {
         this.#stateValidationSchema = stateValidationSchema;
     }
 
+    canHandle(operation) {
+        return operation.type === OperationType.TX;
+    }
+
     async performOperation(op, view, base, node, batch) {
         // ATTENTION: The sanitization should be done before ANY other check, otherwise we risk crashing
         if (!this.#stateValidationSchema.validateTransactionOperation(op)) {

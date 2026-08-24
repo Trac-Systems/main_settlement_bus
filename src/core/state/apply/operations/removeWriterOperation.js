@@ -148,6 +148,10 @@ class RemoveWriterHandler {
         this.#repo.emitEvent(CustomEventType.UNWRITABLE, tracCryptoApi.address.decodeSafe(requesterAddressString))
     }
 
+    canHandle(operation) {
+        return operation.type === OperationType.REMOVE_WRITER;
+    }
+
     async performOperation(op, view, base, node, batch) {
         if (!this.#stateValidationSchema.validateRoleAccessOperation(op)) {
             this.#repo.safeLog(OperationType.REMOVE_WRITER, "Contract schema validation failed.", node.from.key)

@@ -34,6 +34,10 @@ class AddAdminHandler {
         this.#stateValidationSchema = stateValidationSchema;
     }
 
+    canHandle(operation) {
+        return operation.type === OperationType.ADD_ADMIN;
+    }
+
     async performOperation(op, view, base, node, batch) {
         /*
             ADD ADMIN OPERATION INITIALIZES THE NETWORK. THIS OPERATION CAN BE PERFORMED ONLY ONCE, AND THE NETWORK CREATOR

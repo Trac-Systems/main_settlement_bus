@@ -185,6 +185,10 @@ class AddWriterHandler {
         }
     }
 
+    canHandle(operation) {
+        return operation.type === OperationType.ADD_WRITER;
+    }
+
     async performOperation(op, view, base, node, batch) {
         if (!this.#stateValidationSchema.validateRoleAccessOperation(op)) {
             this.#repo.safeLog(OperationType.ADD_WRITER, "Contract schema validation failed.", node.from.key)

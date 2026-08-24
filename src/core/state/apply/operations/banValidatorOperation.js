@@ -34,6 +34,10 @@ class BanValidatorHandler {
         this.#stateValidationSchema = stateValidationSchema;
     }
 
+    canHandle(operation) {
+        return operation.type === OperationType.BAN_VALIDATOR;
+    }
+
     async performOperation(op, view, base, node, batch) {
         if (!this.#stateValidationSchema.validateAdminControlOperation(op)) {
             this.#repo.safeLog(OperationType.BAN_VALIDATOR, "Contract schema validation failed.", node.from.key)

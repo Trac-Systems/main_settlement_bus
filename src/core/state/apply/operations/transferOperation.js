@@ -184,6 +184,10 @@ class TransferHandler {
         return result;
     }
 
+    canHandle(operation) {
+        return operation.type === OperationType.TRANSFER;
+    }
+
     async performOperation(op, view, base, node, batch) {
         if (!this.#stateValidationSchema.validateTransferOperation(op)) {
             this.#repo.safeLog(OperationType.TRANSFER, "Contract schema validation failed.", node.from.key)

@@ -33,6 +33,10 @@ class SetConsensusConfigHandler {
         this.#stateValidationSchema = stateValidationSchema;
     }
 
+    canHandle(operation) {
+        return operation.type === OperationType.SET_CONSENSUS_CONFIG;
+    }
+
     async performOperation(op, view, base, node, batch) {
         if (!this.#stateValidationSchema.validateConsensusControlOperation(op)) {
             this.#repo.safeLog(OperationType.SET_CONSENSUS_CONFIG, "Contract schema validation failed.", node.from.key)

@@ -39,6 +39,10 @@ class SetEpochHandler {
         this.#stateValidationSchema = stateValidationSchema;
     }
 
+    canHandle(operation) {
+        return operation.type === OperationType.SET_EPOCH;
+    }
+
     async performOperation(op, view, base, node, batch) {
         if (!this.#stateValidationSchema.validateSetEpochOperation(op)) {
             this.#repo.safeLog(OperationType.SET_EPOCH, "Contract schema validation failed.", node.from.key)

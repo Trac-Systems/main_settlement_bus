@@ -34,6 +34,10 @@ class AppendWhitelistHandler {
         this.#stateValidationSchema = stateValidationSchema;
     }
 
+    canHandle(operation) {
+        return operation.type === OperationType.APPEND_WHITELIST;
+    }
+
     async performOperation(op, view, base, node, batch) {
         if (!this.#stateValidationSchema.validateAdminControlOperation(op)) {
             this.#repo.safeLog(OperationType.APPEND_WHITELIST, "Contract schema validation failed.", node.from.key)

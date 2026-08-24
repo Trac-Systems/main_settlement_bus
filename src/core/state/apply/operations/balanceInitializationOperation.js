@@ -33,6 +33,10 @@ class BalanceInitializationHandler {
         this.#stateValidationSchema = stateValidationSchema;
     }
 
+    canHandle(operation) {
+        return operation.type === OperationType.BALANCE_INITIALIZATION;
+    }
+
     async performOperation(op, view, base, node, batch) {
         if (!this.#stateValidationSchema.validateBalanceInitialization(op)) {
             this.#repo.safeLog(OperationType.BALANCE_INITIALIZATION, "Contract schema validation failed.", node.from.key)
