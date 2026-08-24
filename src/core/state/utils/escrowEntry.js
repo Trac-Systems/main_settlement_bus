@@ -66,7 +66,7 @@ export function init(id, maker, taker, lock, nonce, expiryEpoch, amount) {
 function makeSettlement(escrowEntry, publicKeyOffset, status) {
     try {
         if (!isBufferValid(escrowEntry, ESCROW_ENTRY_SIZE)) {
-            return NULL_BUFFER;
+            return null;
         }
 
         const amount = b4a.alloc(BALANCE_BYTE_LENGTH);
@@ -80,7 +80,7 @@ function makeSettlement(escrowEntry, publicKeyOffset, status) {
 
         return { publicKey, amount: toBalance(amount), entry: escrowEntry };
     } catch {
-        return NULL_BUFFER;
+        return null;
     }
 }
 
