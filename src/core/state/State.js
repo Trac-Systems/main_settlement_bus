@@ -759,8 +759,23 @@ class State extends ReadyResource {
             [OperationType.SET_EPOCH]: this.#handleApplySetEpochOperation.bind(this),
             [OperationType.SET_GENESIS_EPOCH]: this.#handleApplySetGenesisEpoch.bind(this),
             [OperationType.SET_CONSENSUS_CONFIG]: this.#handleApplySetConsensusConfig.bind(this),
+            [OperationType.HTLC_LOCK]: this.#handleApplyHtlcLockOperation.bind(this),
+            [OperationType.HTLC_CLAIM]: this.#handleApplyHtlcClaimOperation.bind(this),
+            [OperationType.HTLC_REFUND]: this.#handleApplyHtlcRefundOperation.bind(this),
         };
         return handlers[type] || null;
+    }
+
+    async #handleApplyHtlcLockOperation() {
+        return Status.SUCCESS;
+    }
+
+    async #handleApplyHtlcClaimOperation() {
+        return Status.SUCCESS;
+    }
+
+    async #handleApplyHtlcRefundOperation() {
+        return Status.SUCCESS;
     }
 
     async #handleApplyInitializeBalanceOperation(op, view, base, node, batch) {

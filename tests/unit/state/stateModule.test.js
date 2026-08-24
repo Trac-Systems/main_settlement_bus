@@ -7,6 +7,7 @@ async function runStateTests() {
     await import('./utils/address.test.js');
     await import('./utils/adminEntry.test.js');
     await import('./utils/balance.test.js');
+    await import('./utils/escrowEntry.test.js');
     await import('./utils/nodeEntry.test.js');
     await import('./utils/lengthEntry.test.js');
     await import('./utils/roles.test.js');

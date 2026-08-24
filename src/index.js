@@ -124,6 +124,14 @@ export class MainSettlementBus extends ReadyResource {
         return await this.#network.validatorMessageOrchestrator.send(partialTransactionPayload);
     }
 
+    async htlcLock() {}
+
+    async htlcClaim() {}
+
+    async htlcRefund() {}
+
+    async getHtlc() {}
+
     async validateTransfer(payload) {
         const partialTransferValidator = new PartialTransferValidator(this.#state, null, this.#config);
         return await partialTransferValidator.validate(payload);
