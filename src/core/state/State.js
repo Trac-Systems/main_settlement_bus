@@ -84,7 +84,11 @@ class State extends ReadyResource {
     }
 
     get applyHandler() {
-        return this.#applyState.apply.bind(this.#applyState);
+        return this.#apply.bind(this);
+    }
+
+    async #apply(nodes, view, base) {
+        return await this.#applyState.apply(nodes, view, base);
     }
 
     async _open() {

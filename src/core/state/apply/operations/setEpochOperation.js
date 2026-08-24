@@ -1,3 +1,4 @@
+import BaseHandler from './BaseHandler.js';
 import b4a from 'b4a';
 import {
     EntryType,
@@ -28,12 +29,13 @@ import {
     safeDecodeVdfConfig,
 } from '../../../../codecs/consensus/v1/vdfConfigCodec.js';
 
-class SetEpochHandler {
+class SetEpochHandler extends BaseHandler {
     #repo;
     #config;
     #stateValidationSchema;
 
-    constructor(repo, config, stateValidationSchema) {
+    constructor(repo, config, stateValidationSchema, state, logger) {
+        super(logger, state);
         this.#repo = repo;
         this.#config = config;
         this.#stateValidationSchema = stateValidationSchema;
@@ -45,19 +47,19 @@ class SetEpochHandler {
 
     async performOperation(op, view, base, node, batch) {
         if (!this.#stateValidationSchema.validateSetEpochOperation(op)) {
-            this.#repo.safeLog(OperationType.SET_EPOCH, "Contract schema validation failed.", node.from.key)
+            this.logger.error(OperationType.SET_EPOCH, "Contract schema validation failed.", node.from.key)
             return Status.FAILURE;
         };
 
         const proofProposal = safeDecodeProofProposal(op.seo.pd);
         if (proofProposal === null) {
-            this.#repo.safeLog(OperationType.SET_EPOCH, "Failed to decode proof proposal.", node.from.key)
+            this.logger.error(OperationType.SET_EPOCH, "Failed to decode proof proposal.", node.from.key)
             return Status.FAILURE;
         }
 
         const currentEpochBuffer = await this.#repo.getEntry(EntryType.EPOCH_CURRENT, batch);
         if (currentEpochBuffer === null) {
-            this.#repo.safeLog(OperationType.SET_EPOCH, "Current epoch is not initialized. Genesis epoch has not been set.", node.from.key)
+            this.logger.error(OperationType.SET_EPOCH, "Current epoch is not initialized. Genesis epoch has not been set.", node.from.key)
             return Status.FAILURE;
         }
 
@@ -66,41 +68,41 @@ class SetEpochHandler {
         const proposedEpoch = proofProposal.epoch.readBigUInt64BE(0);
 
         if (proposedEpoch < nextEpoch) {
-            this.#repo.safeLog(OperationType.SET_EPOCH, `Stale epoch proposal. Epoch ${currentEpoch} is already committed.`, node.from.key)
+            this.logger.error(OperationType.SET_EPOCH, `Stale epoch proposal. Epoch ${currentEpoch} is already committed.`, node.from.key)
             return Status.IGNORE;
         }
 
         if (proposedEpoch > nextEpoch) {
-            this.#repo.safeLog(OperationType.SET_EPOCH, `Unexpected epoch. Proposal must target epoch ${nextEpoch} but got ${proposedEpoch}.`, node.from.key)
+            this.logger.error(OperationType.SET_EPOCH, `Unexpected epoch. Proposal must target epoch ${nextEpoch} but got ${proposedEpoch}.`, node.from.key)
             return Status.FAILURE;
         }
 
         if (proofProposal.protocol_version[0] !== ConsensusProtocolVersion.V1) {
-            this.#repo.safeLog(OperationType.SET_EPOCH, "Unsupported proof proposal protocol version.", node.from.key)
+            this.logger.error(OperationType.SET_EPOCH, "Unsupported proof proposal protocol version.", node.from.key)
             return Status.FAILURE;
         }
 
         const expectedNetworkId = uint16ToBuffer(this.#config.networkId);
         if (!b4a.equals(proofProposal.network_id, expectedNetworkId)) {
-            this.#repo.safeLog(OperationType.SET_EPOCH, "Invalid proof proposal network id.", node.from.key)
+            this.logger.error(OperationType.SET_EPOCH, "Invalid proof proposal network id.", node.from.key)
             return Status.FAILURE;
         }
 
         const currentEpochHash = await this.#repo.getEntry(EntryType.EPOCH + currentEpoch.toString(), batch);
         if (currentEpochHash === null || !b4a.equals(currentEpochHash, proofProposal.previous_epoch_record_hash)) {
-            this.#repo.safeLog(OperationType.SET_EPOCH, `Previous epoch record hash mismatch for epoch ${currentEpoch}.`, node.from.key)
+            this.logger.error(OperationType.SET_EPOCH, `Previous epoch record hash mismatch for epoch ${currentEpoch}.`, node.from.key)
             return Status.FAILURE;
         }
 
         const currentConsensusConfigBuffer = await this.#repo.getEntry(EntryType.CONSENSUS_CONFIG_CURRENT, batch);
         if (currentConsensusConfigBuffer === null) {
-            this.#repo.safeLog(OperationType.SET_EPOCH, "Consensus config is not initialized.", node.from.key)
+            this.logger.error(OperationType.SET_EPOCH, "Consensus config is not initialized.", node.from.key)
             return Status.FAILURE;
         }
 
         const currentConsensusConfigIndex = safeReadUint32BE(currentConsensusConfigBuffer);
         if (currentConsensusConfigIndex === null) {
-            this.#repo.safeLog(OperationType.SET_EPOCH, "Failed to read current consensus config index from buffer", node.from.key)
+            this.logger.error(OperationType.SET_EPOCH, "Failed to read current consensus config index from buffer", node.from.key)
             return Status.FAILURE;
         }
 
@@ -109,20 +111,20 @@ class SetEpochHandler {
             batch
         );
         if (consensusConfigBuffer === null) {
-            this.#repo.safeLog(OperationType.SET_EPOCH, "Consensus config record does not exist.", node.from.key)
+            this.logger.error(OperationType.SET_EPOCH, "Consensus config record does not exist.", node.from.key)
             return Status.FAILURE;
         }
 
         const consensusConfig = decodeConsensusConfig(consensusConfigBuffer);
         const schemaVersion = safeReadUint8(consensusConfig.sv);
         if (schemaVersion !== ConsensusConfigSchemaVersion.VDF_V1) {
-            this.#repo.safeLog(OperationType.SET_EPOCH, "Unsupported consensus config schema version.", node.from.key)
+            this.logger.error(OperationType.SET_EPOCH, "Unsupported consensus config schema version.", node.from.key)
             return Status.FAILURE;
         }
 
         const decodedVdfParams = safeDecodeVdfConfig(consensusConfig.cd);
         if (decodedVdfParams === null) {
-            this.#repo.safeLog(OperationType.SET_EPOCH, "Invalid VDF params value.", node.from.key)
+            this.logger.error(OperationType.SET_EPOCH, "Invalid VDF params value.", node.from.key)
             return Status.FAILURE;
         }
 
@@ -131,7 +133,7 @@ class SetEpochHandler {
             !b4a.equals(difficulty, proofProposal.difficulty) ||
             !b4a.equals(discriminantBitSize, proofProposal.discriminant_bit_size)
         ) {
-            this.#repo.safeLog(OperationType.SET_EPOCH, "VDF parameters do not match the current consensus config.", node.from.key)
+            this.logger.error(OperationType.SET_EPOCH, "VDF parameters do not match the current consensus config.", node.from.key)
             return Status.FAILURE;
         }
 
@@ -158,7 +160,7 @@ class SetEpochHandler {
             console.error(error);
         }
         if (!vdfProofVerified) {
-            this.#repo.safeLog(OperationType.SET_EPOCH, "VDF proof is invalid.", node.from.key)
+            this.logger.error(OperationType.SET_EPOCH, "VDF proof is invalid.", node.from.key)
             return Status.FAILURE;
         }
 
@@ -172,7 +174,7 @@ class SetEpochHandler {
 
         const proposerAddress = addressUtils.bufferToAddress(proofProposal.proposer, this.#config.addressPrefix);
         if (!proposerAddress || !indexerAddresses.has(proposerAddress)) {
-            this.#repo.safeLog(OperationType.SET_EPOCH, "Proposer is not a registered indexer.", node.from.key)
+            this.logger.error(OperationType.SET_EPOCH, "Proposer is not a registered indexer.", node.from.key)
             return Status.FAILURE;
         }
 
@@ -188,7 +190,7 @@ class SetEpochHandler {
             }
         }
         if (!proposalSignatureVerified) {
-            this.#repo.safeLog(OperationType.SET_EPOCH, "Failed to verify proof proposal signature.", node.from.key)
+            this.logger.error(OperationType.SET_EPOCH, "Failed to verify proof proposal signature.", node.from.key)
             return Status.FAILURE;
         }
 
@@ -219,13 +221,13 @@ class SetEpochHandler {
         const totalValidSigners = 1 + validApprovers.size; // proposer's own verified signature counts as one signer
 
         if (totalValidSigners < quorumThreshold) {
-            this.#repo.safeLog(OperationType.SET_EPOCH, `Insufficient valid approvals for quorum. Required ${quorumThreshold}, got ${totalValidSigners}.`, node.from.key)
+            this.logger.error(OperationType.SET_EPOCH, `Insufficient valid approvals for quorum. Required ${quorumThreshold}, got ${totalValidSigners}.`, node.from.key)
             return Status.FAILURE;
         }
 
         const encodedEpochProof = safeEncodeEpochProof({ pd: op.seo.pd, app: op.seo.app });
         if (encodedEpochProof.length === 0) {
-            this.#repo.safeLog(OperationType.SET_EPOCH, "Failed to encode epoch proof.", node.from.key)
+            this.logger.error(OperationType.SET_EPOCH, "Failed to encode epoch proof.", node.from.key)
             return Status.FAILURE;
         }
 
@@ -241,7 +243,7 @@ class SetEpochHandler {
             console.info(`Epoch ${nextEpoch} committed. proposer:approvals - ${proposerAddress}:${validApprovers.size}`);
         }
 
-        this.#repo.emitEvent(CustomEventType.EPOCH_CREATED, { epoch: nextEpoch, proposerAddress }); // notify epoch committed
+        this.emitEvent(CustomEventType.EPOCH_CREATED, { epoch: nextEpoch, proposerAddress }); // notify epoch committed
         return Status.SUCCESS;
     }
 

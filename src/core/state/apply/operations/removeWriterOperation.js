@@ -1,3 +1,4 @@
+import BaseHandler from './BaseHandler.js';
 import b4a from 'b4a';
 import {
     OperationType,
@@ -22,12 +23,13 @@ import { Status } from '../../utils/transaction.js';
 import {
 } from '../../../../codecs/consensus/v1/vdfConfigCodec.js';
 
-class RemoveWriterHandler {
+class RemoveWriterHandler extends BaseHandler {
     #repo;
     #config;
     #stateValidationSchema;
 
-    constructor(repo, config, stateValidationSchema) {
+    constructor(repo, config, stateValidationSchema, state, logger) {
+        super(logger, state);
         this.#repo = repo;
         this.#config = config;
         this.#stateValidationSchema = stateValidationSchema;
@@ -38,13 +40,13 @@ class RemoveWriterHandler {
         // Fetch the node entry for the given address
         const requesterNodeEntry = await this.#repo.getEntry(requesterAddressString, batch);
         if (requesterNodeEntry === null) {
-            this.#repo.safeLog(OperationType.REMOVE_WRITER, "Failed to verify requester node entry.", node.from.key)
+            this.logger.error(OperationType.REMOVE_WRITER, "Failed to verify requester node entry.", node.from.key)
             return null;
         };
 
         const decodedNodeEntry = nodeEntryUtils.decode(requesterNodeEntry);
         if (decodedNodeEntry === null) {
-            this.#repo.safeLog(OperationType.REMOVE_WRITER, "Failed to decode requester node entry.", node.from.key)
+            this.logger.error(OperationType.REMOVE_WRITER, "Failed to decode requester node entry.", node.from.key)
             return null;
         };
 
@@ -53,7 +55,7 @@ class RemoveWriterHandler {
         const isNodeIndexer = decodedNodeEntry.isIndexer;
 
         if (isNodeIndexer || !isNodeWriter) {
-            this.#repo.safeLog(OperationType.REMOVE_WRITER, "Node has to be a writer, and cannot be an indexer.", node.from.key)
+            this.logger.error(OperationType.REMOVE_WRITER, "Node has to be a writer, and cannot be an indexer.", node.from.key)
             return null;
         };
 
@@ -68,68 +70,68 @@ class RemoveWriterHandler {
             !b4a.equals(op.rao.iw, decodedNodeEntry.wk) ||
             !b4a.equals(writerKeyHasBeenRegistered, requesterAddress)
         ) {
-            this.#repo.safeLog(OperationType.REMOVE_WRITER, "Writer key must be registered, match node's current key, and belong to the requester.", node.from.key)
+            this.logger.error(OperationType.REMOVE_WRITER, "Writer key must be registered, match node's current key, and belong to the requester.", node.from.key)
             return null;
         }
 
         // Charging fee from the requester
         const requesterBalance = toBalance(decodedNodeEntry.balance);
         if (requesterBalance === null) {
-            this.#repo.safeLog(OperationType.REMOVE_WRITER, "Invalid requester balance.", node.from.key)
+            this.logger.error(OperationType.REMOVE_WRITER, "Invalid requester balance.", node.from.key)
             return null;
         };
 
         if (!requesterBalance.greaterThanOrEquals(BALANCE_FEE)) {
-            this.#repo.safeLog(OperationType.REMOVE_WRITER, "Insufficient requester balance.", node.from.key)
+            this.logger.error(OperationType.REMOVE_WRITER, "Insufficient requester balance.", node.from.key)
             return Status.IGNORE;
         };
 
         const updatedBalance = requesterBalance.sub(BALANCE_FEE);
         if (updatedBalance === null) {
-            this.#repo.safeLog(OperationType.REMOVE_WRITER, "Failed to apply fee to requester balance.", node.from.key)
+            this.logger.error(OperationType.REMOVE_WRITER, "Failed to apply fee to requester balance.", node.from.key)
             return null;
         };
 
         // Downgrade role from WRITER to WHITELISTED and deduct the fee from the requester's balance
         const updatedNodeEntry = nodeEntryUtils.setRole(requesterNodeEntry, nodeRoleUtils.NodeRole.WHITELISTED);
         if (updatedNodeEntry === null) {
-            this.#repo.safeLog(OperationType.REMOVE_WRITER, "Failed to update node entry role.", node.from.key)
+            this.logger.error(OperationType.REMOVE_WRITER, "Failed to update node entry role.", node.from.key)
             return null;
         };
         const chargedNodeEntry = updatedBalance.update(updatedNodeEntry);
         if (chargedNodeEntry === null) {
-            this.#repo.safeLog(OperationType.REMOVE_WRITER, "Failed to update node balance.", node.from.key)
+            this.logger.error(OperationType.REMOVE_WRITER, "Failed to update node balance.", node.from.key)
             return null;
         };
 
         // Validator reward logic 
         const decodedValidatorEntry = nodeEntryUtils.decode(validatorEntryBuffer);
         if (decodedValidatorEntry === null) {
-            this.#repo.safeLog(OperationType.REMOVE_WRITER, "Failed to decode validator node entry.", node.from.key)
+            this.logger.error(OperationType.REMOVE_WRITER, "Failed to decode validator node entry.", node.from.key)
             return null;
         };
 
         const validatorBalance = toBalance(decodedValidatorEntry.balance)
         if (validatorBalance === null) {
-            this.#repo.safeLog(OperationType.REMOVE_WRITER, "Invalid validator balance.", node.from.key)
+            this.logger.error(OperationType.REMOVE_WRITER, "Invalid validator balance.", node.from.key)
             return null;
         };
 
         const validatorNewBalance = validatorBalance.add(BALANCE_FEE.percentage(PERCENT_75))
         if (validatorNewBalance === null) {
-            this.#repo.safeLog(OperationType.REMOVE_WRITER, "Failed to transfer fee to validator balance.", node.from.key)
+            this.logger.error(OperationType.REMOVE_WRITER, "Failed to transfer fee to validator balance.", node.from.key)
             return null;
         };
 
         const updateValidatorEntry = validatorNewBalance.update(validatorEntryBuffer)
         if (updateValidatorEntry === null) {
-            this.#repo.safeLog(OperationType.REMOVE_WRITER, "Failed to update validator balance.", node.from.key)
+            this.logger.error(OperationType.REMOVE_WRITER, "Failed to update validator balance.", node.from.key)
             return null;
         };
 
-        const finalRequesterNodeEntry = this.#repo.withdrawStakedBalance(chargedNodeEntry, node);
+        const finalRequesterNodeEntry = this.withdrawStakedBalance(chargedNodeEntry, node);
         if (finalRequesterNodeEntry === null) {
-            this.#repo.safeLog(OperationType.REMOVE_WRITER, "Failed to unstake balance for writer.", node.from.key)
+            this.logger.error(OperationType.REMOVE_WRITER, "Failed to unstake balance for writer.", node.from.key)
             return null;
         };
 
@@ -145,7 +147,7 @@ class RemoveWriterHandler {
             console.info(`Writer removed: addr:wk:tx - ${requesterAddressString}:${op.rao.iw.toString('hex')}:${txHashHexString}`);
         }
 
-        this.#repo.emitEvent(CustomEventType.UNWRITABLE, tracCryptoApi.address.decodeSafe(requesterAddressString))
+        this.emitEvent(CustomEventType.UNWRITABLE, tracCryptoApi.address.decodeSafe(requesterAddressString))
     }
 
     canHandle(operation) {
@@ -154,31 +156,31 @@ class RemoveWriterHandler {
 
     async performOperation(op, view, base, node, batch) {
         if (!this.#stateValidationSchema.validateRoleAccessOperation(op)) {
-            this.#repo.safeLog(OperationType.REMOVE_WRITER, "Contract schema validation failed.", node.from.key)
+            this.logger.error(OperationType.REMOVE_WRITER, "Contract schema validation failed.", node.from.key)
             return Status.FAILURE;
         };
 
         // if transaction is not complete, do not process it.
         if (!Object.hasOwn(op.rao, "vs") || !Object.hasOwn(op.rao, "va") || !Object.hasOwn(op.rao, "vn")) {
-            this.#repo.safeLog(OperationType.REMOVE_WRITER, "Operation is not complete.", node.from.key)
+            this.logger.error(OperationType.REMOVE_WRITER, "Operation is not complete.", node.from.key)
             return Status.FAILURE;
         };
 
         // for additional security, nonces should be different.
         if (b4a.equals(op.rao.in, op.rao.vn)) {
-            this.#repo.safeLog(OperationType.REMOVE_WRITER, "Nonces should not be the same.", node.from.key)
+            this.logger.error(OperationType.REMOVE_WRITER, "Nonces should not be the same.", node.from.key)
             return Status.FAILURE;
         };
 
         // addresses should be different.
         if (b4a.equals(op.address, op.rao.va)) {
-            this.#repo.safeLog(OperationType.REMOVE_WRITER, "Addresses should be different.", node.from.key)
+            this.logger.error(OperationType.REMOVE_WRITER, "Addresses should be different.", node.from.key)
             return Status.FAILURE;
         };
 
         // signatures should be different.
         if (b4a.equals(op.rao.is, op.rao.vs)) {
-            this.#repo.safeLog(OperationType.REMOVE_WRITER, "Signatures should be different.", node.from.key)
+            this.logger.error(OperationType.REMOVE_WRITER, "Signatures should be different.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -186,14 +188,14 @@ class RemoveWriterHandler {
         const requesterAddress = op.address;
         const requesterAddressString = addressUtils.bufferToAddress(requesterAddress, this.#config.addressPrefix);
         if (requesterAddressString === null) {
-            this.#repo.safeLog(OperationType.REMOVE_WRITER, "Requester address is invalid.", node.from.key)
+            this.logger.error(OperationType.REMOVE_WRITER, "Requester address is invalid.", node.from.key)
             return Status.FAILURE;
         };
 
         // Validate requester public key
         const requesterPublicKey = tracCryptoApi.address.decodeSafe(requesterAddressString);
         if (b4a.equals(requesterPublicKey, NULL_BUFFER)) {
-            this.#repo.safeLog(OperationType.REMOVE_WRITER, "Error while decoding requester public key.", node.from.key)
+            this.logger.error(OperationType.REMOVE_WRITER, "Error while decoding requester public key.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -206,21 +208,21 @@ class RemoveWriterHandler {
             OperationType.REMOVE_WRITER
         );
         if (requesterMessage.length === 0) {
-            this.#repo.safeLog(OperationType.REMOVE_WRITER, "Invalid requester message.", node.from.key)
+            this.logger.error(OperationType.REMOVE_WRITER, "Invalid requester message.", node.from.key)
             return Status.FAILURE;
         };
 
         // compare hashes
         const hash = await tracCryptoApi.hash.blake3Safe(requesterMessage);
         if (!b4a.equals(hash, op.rao.tx)) {
-            this.#repo.safeLog(OperationType.REMOVE_WRITER, "Message hash does not match the tx_hash.", node.from.key)
+            this.logger.error(OperationType.REMOVE_WRITER, "Message hash does not match the tx_hash.", node.from.key)
             return Status.FAILURE;
         };
 
         const isRequesterMessageVerifed = tracCryptoApi.signature.verify(op.rao.is, op.rao.tx, requesterPublicKey);
         const txHashHexString = op.rao.tx.toString('hex');
         if (!isRequesterMessageVerifed) {
-            this.#repo.safeLog(OperationType.REMOVE_WRITER, "Failed to verify message signature.", node.from.key)
+            this.logger.error(OperationType.REMOVE_WRITER, "Failed to verify message signature.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -228,14 +230,14 @@ class RemoveWriterHandler {
         const validatorAddress = op.rao.va;
         const validatorAddressString = addressUtils.bufferToAddress(validatorAddress, this.#config.addressPrefix);
         if (validatorAddressString === null) {
-            this.#repo.safeLog(OperationType.REMOVE_WRITER, "Failed to verify validator address.", node.from.key)
+            this.logger.error(OperationType.REMOVE_WRITER, "Failed to verify validator address.", node.from.key)
             return Status.FAILURE;
         };
 
         // validate validator public key
         const validatorPublicKey = tracCryptoApi.address.decodeSafe(validatorAddressString);
         if (b4a.equals(validatorPublicKey, NULL_BUFFER)) {
-            this.#repo.safeLog(OperationType.REMOVE_WRITER, "Failed to decode validator public key.", node.from.key)
+            this.logger.error(OperationType.REMOVE_WRITER, "Failed to decode validator public key.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -247,54 +249,54 @@ class RemoveWriterHandler {
             OperationType.REMOVE_WRITER
         );
         if (validatorMessage.length === 0) {
-            this.#repo.safeLog(OperationType.REMOVE_WRITER, "Invalid validator message.", node.from.key)
+            this.logger.error(OperationType.REMOVE_WRITER, "Invalid validator message.", node.from.key)
             return Status.FAILURE;
         };
 
         const validatorHash = await tracCryptoApi.hash.blake3Safe(validatorMessage);
         const isValidatorMessageVerifed = tracCryptoApi.signature.verify(op.rao.vs, validatorHash, validatorPublicKey);
         if (!isValidatorMessageVerifed) {
-            this.#repo.safeLog(OperationType.REMOVE_WRITER, "Failed to verify validator message signature.", node.from.key)
+            this.logger.error(OperationType.REMOVE_WRITER, "Failed to verify validator message signature.", node.from.key)
             return Status.FAILURE;
         };
 
         // verify tx validity - prevent deferred execution attack
         const indexersSequenceState = await this.#repo.getIndexerSequenceState(base);
         if (indexersSequenceState === null) {
-            this.#repo.safeLog(OperationType.REMOVE_WRITER, "Indexer sequence state is invalid.", node.from.key)
+            this.logger.error(OperationType.REMOVE_WRITER, "Indexer sequence state is invalid.", node.from.key)
             return Status.FAILURE;
         };
 
         if (!b4a.equals(op.rao.txv, indexersSequenceState)) {
-            this.#repo.safeLog(OperationType.REMOVE_WRITER, "Transaction was not executed.", node.from.key)
+            this.logger.error(OperationType.REMOVE_WRITER, "Transaction was not executed.", node.from.key)
             return Status.FAILURE;
         };
 
         const validatorEntryBuffer = await this.#repo.getEntry(validatorAddressString, batch);
 
         // Validator consistency checks
-        const isValidatorValid = await this.#repo.isValidatorValid(validatorEntryBuffer, node, op);
+        const isValidatorValid = await this.isValidatorValid(validatorEntryBuffer, node, op);
         if (!isValidatorValid) {
-            this.#repo.safeLog(OperationType.REMOVE_WRITER, "Validator consistency check failed.", node.from.key)
+            this.logger.error(OperationType.REMOVE_WRITER, "Validator consistency check failed.", node.from.key)
             return Status.FAILURE;
         };
 
         // anti-replay attack
         const opEntry = await this.#repo.getEntry(txHashHexString, batch);
         if (opEntry !== null) {
-            this.#repo.safeLog(OperationType.REMOVE_WRITER, "Operation has already been applied.", node.from.key)
+            this.logger.error(OperationType.REMOVE_WRITER, "Operation has already been applied.", node.from.key)
             return Status.IGNORE;
         };
 
         // Proceed to remove the writer role from the node
         const removeWriterResult = await this.#removeWriter(op, base, node, batch, txHashHexString, requesterAddressString, requesterAddress, validatorAddressString, validatorEntryBuffer);
         if (removeWriterResult === null) {
-            this.#repo.safeLog(OperationType.REMOVE_WRITER, "Failed to remove writer.", node.from.key)
+            this.logger.error(OperationType.REMOVE_WRITER, "Failed to remove writer.", node.from.key)
             return Status.FAILURE;
         }
 
         if (removeWriterResult === Status.IGNORE) {
-            this.#repo.safeLog(OperationType.REMOVE_WRITER, "Remove writer operation ignored.", node.from.key)
+            this.logger.error(OperationType.REMOVE_WRITER, "Remove writer operation ignored.", node.from.key)
             return Status.IGNORE;
         }
 

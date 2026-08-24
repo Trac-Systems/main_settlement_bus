@@ -1,4 +1,6 @@
 import b4a from 'b4a';
+import tracCryptoApi from 'trac-crypto-api';
+import SafeLogger from './SafeLogger.js';
 import ApplyRepository from './ApplyRepository.js';
 import BalanceInitializationHandler from './operations/balanceInitializationOperation.js';
 import DisableInitializationHandler from './operations/disableInitializationOperation.js';
@@ -23,10 +25,22 @@ import {
     safeDecodeApplyOperation,
 } from '../../../codecs/apply/applyOperationCodec.js';
 import {
+    NULL_BUFFER,
 } from '../../../utils/buffer.js';
 import transactionUtils from '../utils/transaction.js';
 import {
+    BALANCE_FEE,
+    toBalance,
+    BALANCE_ZERO,
+    toTerm,
 } from '../utils/balance.js';
+import addressUtils from '../utils/address.js';
+import adminEntryUtils from '../utils/adminEntry.js';
+import nodeEntryUtils from '../utils/nodeEntry.js';
+import nodeRoleUtils from '../utils/roles.js';
+import {
+    EntryType,
+} from '../../../utils/constants.js';
 import { Status } from '../utils/transaction.js';
 import {
 } from '../../../codecs/consensus/v1/vdfConfigCodec.js';
@@ -40,30 +54,33 @@ class ApplyState {
     #state;
     #repository;
     #handlers;
+    #logger;
 
     constructor(config, stateValidationSchema, state) {
         this.#config = config;
         this.#stateValidationSchema = stateValidationSchema;
         this.#state = state;
-        this.#repository = new ApplyRepository(this.#config, this.#state);
+        this.#logger = new SafeLogger(this.#config);
+        this.#repository = new ApplyRepository();
         this.#handlers = [
-            new BalanceInitializationHandler(this.#repository, this.#config, this.#stateValidationSchema),
-            new DisableInitializationHandler(this.#repository, this.#config, this.#stateValidationSchema),
-            new AddAdminHandler(this.#repository, this.#config, this.#stateValidationSchema),
-            new AppendWhitelistHandler(this.#repository, this.#config, this.#stateValidationSchema),
-            new AddWriterHandler(this.#repository, this.#config, this.#stateValidationSchema),
-            new RemoveWriterHandler(this.#repository, this.#config, this.#stateValidationSchema),
-            new AdminRecoveryHandler(this.#repository, this.#config, this.#stateValidationSchema),
-            new AddIndexerHandler(this.#repository, this.#config, this.#stateValidationSchema),
-            new RemoveIndexerHandler(this.#repository, this.#config, this.#stateValidationSchema),
-            new BanValidatorHandler(this.#repository, this.#config, this.#stateValidationSchema),
-            new BootstrapDeploymentHandler(this.#repository, this.#config, this.#stateValidationSchema),
-            new TxHandler(this.#repository, this.#config, this.#stateValidationSchema),
-            new TransferHandler(this.#repository, this.#config, this.#stateValidationSchema),
-            new SetEpochHandler(this.#repository, this.#config, this.#stateValidationSchema),
-            new SetGenesisEpochHandler(this.#repository, this.#config, this.#stateValidationSchema),
-            new SetConsensusConfigHandler(this.#repository, this.#config, this.#stateValidationSchema),
-        ];    }
+            new BalanceInitializationHandler(this.#repository, this.#config, this.#stateValidationSchema, this.#state, this.#logger),
+            new DisableInitializationHandler(this.#repository, this.#config, this.#stateValidationSchema, this.#state, this.#logger),
+            new AddAdminHandler(this.#repository, this.#config, this.#stateValidationSchema, this.#state, this.#logger),
+            new AppendWhitelistHandler(this.#repository, this.#config, this.#stateValidationSchema, this.#state, this.#logger),
+            new AddWriterHandler(this.#repository, this.#config, this.#stateValidationSchema, this.#state, this.#logger),
+            new RemoveWriterHandler(this.#repository, this.#config, this.#stateValidationSchema, this.#state, this.#logger),
+            new AdminRecoveryHandler(this.#repository, this.#config, this.#stateValidationSchema, this.#state, this.#logger),
+            new AddIndexerHandler(this.#repository, this.#config, this.#stateValidationSchema, this.#state, this.#logger),
+            new RemoveIndexerHandler(this.#repository, this.#config, this.#stateValidationSchema, this.#state, this.#logger),
+            new BanValidatorHandler(this.#repository, this.#config, this.#stateValidationSchema, this.#state, this.#logger),
+            new BootstrapDeploymentHandler(this.#repository, this.#config, this.#stateValidationSchema, this.#state, this.#logger),
+            new TxHandler(this.#repository, this.#config, this.#stateValidationSchema, this.#state, this.#logger),
+            new TransferHandler(this.#repository, this.#config, this.#stateValidationSchema, this.#state, this.#logger),
+            new SetEpochHandler(this.#repository, this.#config, this.#stateValidationSchema, this.#state, this.#logger),
+            new SetGenesisEpochHandler(this.#repository, this.#config, this.#stateValidationSchema, this.#state, this.#logger),
+            new SetConsensusConfigHandler(this.#repository, this.#config, this.#stateValidationSchema, this.#state, this.#logger),
+        ];
+    }
 
     async apply(nodes, view, base) {
         const batch = view.batch();
@@ -71,7 +88,7 @@ class ApplyState {
 
 
         if (nodes.length > BATCH_SIZE) {
-            await this.#repository.validatorPenalty(batchInvoker, batch, base, OVERSIZED_BATCH_PENALTY_MULTIPLIER);
+            await this.#validatorPenalty(batchInvoker, batch, base, OVERSIZED_BATCH_PENALTY_MULTIPLIER);
             await batch.flush();
             await batch.close();
             return;
@@ -82,7 +99,7 @@ class ApplyState {
         for (const node of nodes) {
 
             if (b4a.byteLength(node.value) > transactionUtils.MAXIMUM_OPERATION_PAYLOAD_SIZE) {
-                this.#repository.safeLog("Node payload exceeds the maximum operation payload size.", node.from.key)
+                this.#logger.error("Node payload exceeds the maximum operation payload size.", node.from.key)
                 invalidOperations++;
                 continue;
             }
@@ -90,7 +107,7 @@ class ApplyState {
             const op = safeDecodeApplyOperation(node.value);
 
             if (!op) {
-                this.#repository.safeLog("Failed to decode operation.", node.from.key)
+                this.#logger.error("Failed to decode operation.", node.from.key)
                 invalidOperations++;
                 continue;
             }
@@ -103,7 +120,7 @@ class ApplyState {
                     if (result === Status.FAILURE) {
                         invalidOperations++;
                     } else if (result !== Status.SUCCESS && result !== Status.IGNORE) {
-                        this.#repository.safeLog(`Unknown operation status: ${result}`, node.from.key);
+                        this.#logger.error(`Unknown operation status: ${result}`, node.from.key);
                         invalidOperations++;
                     }
                     break;
@@ -111,62 +128,141 @@ class ApplyState {
             }
 
             if (!operationHandled) {
-                this.#repository.safeLog(`Unknown operation type: ${op.type}`, node.from.key)
+                this.#logger.error(`Unknown operation type: ${op.type}`, node.from.key)
                 invalidOperations++;
             }
         }
         if (invalidOperations > 0) {
-            await this.#repository.validatorPenalty(batchInvoker, batch, base, invalidOperations);
-            this.#repository.safeLog(`Applied with ${invalidOperations} invalid operations.`)
+            await this.#validatorPenalty(batchInvoker, batch, base, invalidOperations);
+            this.#logger.error(`Applied with ${invalidOperations} invalid operations.`)
         }
 
         await batch.flush();
         await batch.close();
     }
 
+    async #validatorPenalty(writingKeyBuffer, batch, base, invalidOperations) {
+        const adminEntryBuffer = await this.#repository.getEntry(EntryType.ADMIN, batch);
+        if (adminEntryBuffer === null) {
+            this.#logger.error("ValidatorPenalty", "Admin entry not found", writingKeyBuffer);
+            return;
+        }
+        const adminEntry = adminEntryUtils.decode(adminEntryBuffer, this.#config.addressPrefix);
+        if (adminEntry === null) {
+            this.#logger.error("ValidatorPenalty", "Failed to decode admin entry", writingKeyBuffer);
+            return;
+        }
 
+        if (b4a.equals(adminEntry.wk, writingKeyBuffer)) {
+            this.#logger.error("ValidatorPenalty", "Admin cannot be penalized", writingKeyBuffer);
+            return;
+        }
 
+        // In theory, none of the negative cases in the if-statements should occur. They are added only for safety reasons.
+        const validatorWk = writingKeyBuffer.toString('hex');
 
+        const validatorAddressBuffer = await this.#repository.getRegisteredWriterKey(batch, validatorWk);
+        if (validatorAddressBuffer === null) {
+            this.#logger.error("ValidatorPenalty", `No validator found for writing key: ${validatorWk}`, writingKeyBuffer);
+            return;
+        }
 
+        const validatorAddressString = addressUtils.bufferToAddress(validatorAddressBuffer, this.#config.addressPrefix);
+        if (validatorAddressString === null) {
+            this.#logger.error("ValidatorPenalty", `Invalid validator address: ${validatorAddressString}`, writingKeyBuffer);
+            return;
+        }
 
+        const validatorPublicKey = tracCryptoApi.address.decodeSafe(validatorAddressString);
+        if (b4a.equals(validatorPublicKey, NULL_BUFFER)) {
+            this.#logger.error("ValidatorPenalty", `Failed to decode validator public key: ${validatorAddressString}`, writingKeyBuffer);
+            return;
+        }
 
+        const validatorNodeEntryBuffer = await this.#repository.getEntry(validatorAddressString, batch);
+        if (validatorNodeEntryBuffer === null) {
+            this.#logger.error("ValidatorPenalty", `No node entry found for validator address: ${validatorAddressString}`, writingKeyBuffer);
+            return;
+        }
 
+        const decodedValidatorNodeEntry = nodeEntryUtils.decode(validatorNodeEntryBuffer);
+        if (decodedValidatorNodeEntry === null) {
+            this.#logger.error("ValidatorPenalty", `Failed to decode validator node entry for address: ${validatorAddressString}`, writingKeyBuffer);
+            return;
+        }
 
+        const stakedBalance = toBalance(decodedValidatorNodeEntry.stakedBalance);
 
+        if (stakedBalance === null) {
+            this.#logger.error("ValidatorPenalty", `Invalid staked balance for validator address: ${validatorAddressString}`, writingKeyBuffer);
+            return;
+        }
 
+        const penalty = BALANCE_FEE.mul(toTerm(BigInt(invalidOperations)));
 
+        if (penalty === null) {
+            this.#logger.error("ValidatorPenalty", `Failed to calculate penalty for validator address: ${validatorAddressString}`, writingKeyBuffer);
+            return;
+        }
 
+        const deductedStakedBalance = penalty.greaterThanOrEquals(stakedBalance) ? BALANCE_ZERO : stakedBalance.sub(penalty);
 
+        if (deductedStakedBalance === null) {
+            this.#logger.error("ValidatorPenalty", `Failed to subtract penalty from staked balance for validator address: ${validatorAddressString}`, writingKeyBuffer);
+            return;
+        }
 
+        if (deductedStakedBalance.greaterThan(BALANCE_ZERO)) {
+            const currentBalance = toBalance(decodedValidatorNodeEntry.balance);
+            if (currentBalance === null) {
+                this.#logger.error("ValidatorPenalty", `Invalid balance for validator address: ${validatorAddressString}`, writingKeyBuffer);
+                return;
+            }
 
+            const newBalance = currentBalance.add(deductedStakedBalance);
+            if (newBalance === null) {
+                this.#logger.error("ValidatorPenalty", `Failed to add remaining staked balance to balance for validator address: ${validatorAddressString}`, writingKeyBuffer);
+                return;
+            }
 
+            const updatedNodeEntryWithBalance = newBalance.update(validatorNodeEntryBuffer);
+            if (updatedNodeEntryWithBalance === null) {
+                this.#logger.error("ValidatorPenalty", `Failed to update node entry with new balance for validator address: ${validatorAddressString}`, writingKeyBuffer);
+                return;
+            }
 
+            const updatedNodeEntryWithAllBalances = nodeEntryUtils.setStakedBalance(updatedNodeEntryWithBalance, BALANCE_ZERO.value);
+            if (updatedNodeEntryWithAllBalances === null) {
+                this.#logger.error("ValidatorPenalty", `Failed to update node entry with new staked balance for validator address: ${validatorAddressString}`, writingKeyBuffer);
+                return;
+            }
 
+            const downgradedNodeEntry = nodeEntryUtils.setRole(updatedNodeEntryWithAllBalances, nodeRoleUtils.NodeRole.WHITELISTED);
+            if (downgradedNodeEntry === null) {
+                this.#logger.error("ValidatorPenalty", `Failed to downgrade validator to whitelisted for address: ${validatorAddressString}`, writingKeyBuffer);
+                return;
+            }
 
+            await base.removeWriter(writingKeyBuffer);
+            await batch.put(validatorAddressString, downgradedNodeEntry);
+            return;
+        }
 
+        const updatedNodeEntryZeroStakedBalance = nodeEntryUtils.setStakedBalance(validatorNodeEntryBuffer, BALANCE_ZERO.value);
+        if (updatedNodeEntryZeroStakedBalance === null) {
+            this.#logger.error("ValidatorPenalty", `Failed to update node entry with new staked balance for validator address: ${validatorAddressString}`, writingKeyBuffer);
+            return;
+        }
 
+        const downgradedNodeEntry = nodeEntryUtils.setRole(updatedNodeEntryZeroStakedBalance, nodeRoleUtils.NodeRole.WHITELISTED);
+        if (downgradedNodeEntry === null) {
+            this.#logger.error("ValidatorPenalty", `Failed to downgrade validator to whitelisted for address: ${validatorAddressString}`, writingKeyBuffer);
+            return;
+        }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+        await base.removeWriter(writingKeyBuffer);
+        await batch.put(validatorAddressString, downgradedNodeEntry);
+    }
 }
 
 export default ApplyState;

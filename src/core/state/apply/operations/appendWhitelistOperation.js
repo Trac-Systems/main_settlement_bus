@@ -1,3 +1,4 @@
+import BaseHandler from './BaseHandler.js';
 import b4a from 'b4a';
 import {
     EntryType,
@@ -23,12 +24,13 @@ import { Status } from '../../utils/transaction.js';
 import {
 } from '../../../../codecs/consensus/v1/vdfConfigCodec.js';
 
-class AppendWhitelistHandler {
+class AppendWhitelistHandler extends BaseHandler {
     #repo;
     #config;
     #stateValidationSchema;
 
-    constructor(repo, config, stateValidationSchema) {
+    constructor(repo, config, stateValidationSchema, state, logger) {
+        super(logger, state);
         this.#repo = repo;
         this.#config = config;
         this.#stateValidationSchema = stateValidationSchema;
@@ -40,7 +42,7 @@ class AppendWhitelistHandler {
 
     async performOperation(op, view, base, node, batch) {
         if (!this.#stateValidationSchema.validateAdminControlOperation(op)) {
-            this.#repo.safeLog(OperationType.APPEND_WHITELIST, "Contract schema validation failed.", node.from.key)
+            this.logger.error(OperationType.APPEND_WHITELIST, "Contract schema validation failed.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -48,31 +50,31 @@ class AppendWhitelistHandler {
         const adminAddressBuffer = op.address;
         const adminAddressString = addressUtils.bufferToAddress(adminAddressBuffer, this.#config.addressPrefix);
         if (adminAddressString === null) {
-            this.#repo.safeLog(OperationType.APPEND_WHITELIST, "Recipient address is invalid.", node.from.key)
+            this.logger.error(OperationType.APPEND_WHITELIST, "Recipient address is invalid.", node.from.key)
             return Status.FAILURE;
         };
         // Validate recipient public key
         const requesterAdminPublicKey = tracCryptoApi.address.decodeSafe(adminAddressString);
         if (b4a.equals(requesterAdminPublicKey, NULL_BUFFER)) {
-            this.#repo.safeLog(OperationType.APPEND_WHITELIST, "Failed to decode recipient public key.", node.from.key)
+            this.logger.error(OperationType.APPEND_WHITELIST, "Failed to decode recipient public key.", node.from.key)
             return Status.FAILURE;
         };
 
         // Retrieve and decode the admin entry to verify the operation is initiated by an admin
         const adminEntry = await this.#repo.getEntry(EntryType.ADMIN, batch);
         if (adminEntry === null) {
-            this.#repo.safeLog(OperationType.APPEND_WHITELIST, "Failed to verify admin entry.", node.from.key)
+            this.logger.error(OperationType.APPEND_WHITELIST, "Failed to verify admin entry.", node.from.key)
             return Status.FAILURE;
         };
 
         const decodedAdminEntry = adminEntryUtils.decode(adminEntry, this.#config.addressPrefix);
         if (decodedAdminEntry === null) {
-            this.#repo.safeLog(OperationType.APPEND_WHITELIST, "Failed to decode admin entry.", node.from.key)
+            this.logger.error(OperationType.APPEND_WHITELIST, "Failed to decode admin entry.", node.from.key)
             return Status.FAILURE;
         }
 
         if (!this.#repo.isAdmin(decodedAdminEntry, node)) {
-            this.#repo.safeLog(OperationType.APPEND_WHITELIST, "Node is not allowed to perform this operation. (ADMIN ONLY)", node.from.key)
+            this.logger.error(OperationType.APPEND_WHITELIST, "Node is not allowed to perform this operation. (ADMIN ONLY)", node.from.key)
             return Status.FAILURE;
         };
 
@@ -80,13 +82,13 @@ class AppendWhitelistHandler {
         const adminAddress = decodedAdminEntry.address;
         const adminPublicKey = tracCryptoApi.address.decodeSafe(adminAddress);
         if (b4a.equals(adminPublicKey, NULL_BUFFER)) {
-            this.#repo.safeLog(OperationType.APPEND_WHITELIST, "Failed to decode admin public key.", node.from.key)
+            this.logger.error(OperationType.APPEND_WHITELIST, "Failed to decode admin public key.", node.from.key)
             return Status.FAILURE;
         };
 
         //admin consistency check
         if (!b4a.equals(adminPublicKey, requesterAdminPublicKey)) {
-            this.#repo.safeLog(OperationType.APPEND_WHITELIST, "System admin and node public keys do not match.", node.from.key)
+            this.logger.error(OperationType.APPEND_WHITELIST, "System admin and node public keys do not match.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -95,12 +97,12 @@ class AppendWhitelistHandler {
 
         const nodeAddressString = addressUtils.bufferToAddress(nodeAddressBuffer, this.#config.addressPrefix);
         if (nodeAddressString === null) {
-            this.#repo.safeLog(OperationType.APPEND_WHITELIST, "Failed to verify node address.", node.from.key)
+            this.logger.error(OperationType.APPEND_WHITELIST, "Failed to verify node address.", node.from.key)
             return Status.FAILURE;
         };
         const nodePublicKey = tracCryptoApi.address.decodeSafe(nodeAddressString);
         if (b4a.equals(nodePublicKey, NULL_BUFFER)) {
-            this.#repo.safeLog(OperationType.APPEND_WHITELIST, "Failed to decode node public key.", node.from.key)
+            this.logger.error(OperationType.APPEND_WHITELIST, "Failed to decode node public key.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -113,20 +115,20 @@ class AppendWhitelistHandler {
             OperationType.APPEND_WHITELIST
         );
         if (message.length === 0) {
-            this.#repo.safeLog(OperationType.APPEND_WHITELIST, "Invalid requester message.", node.from.key)
+            this.logger.error(OperationType.APPEND_WHITELIST, "Invalid requester message.", node.from.key)
             return Status.FAILURE;
         };
 
         // verify signature
         const hash = await tracCryptoApi.hash.blake3Safe(message);
         if (!b4a.equals(hash, op.aco.tx)) {
-            this.#repo.safeLog(OperationType.APPEND_WHITELIST, "Message hash does not match the tx_hash.", node.from.key)
+            this.logger.error(OperationType.APPEND_WHITELIST, "Message hash does not match the tx_hash.", node.from.key)
             return Status.FAILURE;
         };
 
         const isMessageVerified = tracCryptoApi.signature.verify(op.aco.is, op.aco.tx, adminPublicKey);
         if (!isMessageVerified) {
-            this.#repo.safeLog(OperationType.APPEND_WHITELIST, "Failed to verify message signature.", node.from.key)
+            this.logger.error(OperationType.APPEND_WHITELIST, "Failed to verify message signature.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -135,26 +137,26 @@ class AppendWhitelistHandler {
         // verify tx validity - prevent deferred execution attack
         const indexersSequenceState = await this.#repo.getIndexerSequenceState(base);
         if (indexersSequenceState === null) {
-            this.#repo.safeLog(OperationType.APPEND_WHITELIST, "Indexer sequence state is invalid.", node.from.key)
+            this.logger.error(OperationType.APPEND_WHITELIST, "Indexer sequence state is invalid.", node.from.key)
             return Status.FAILURE;
         };
 
         if (!b4a.equals(op.aco.txv, indexersSequenceState)) {
-            this.#repo.safeLog(OperationType.APPEND_WHITELIST, "Transaction was not executed.", node.from.key)
+            this.logger.error(OperationType.APPEND_WHITELIST, "Transaction was not executed.", node.from.key)
             return Status.FAILURE;
         };
 
         // Check if the operation has already been applied
         const opEntry = await this.#repo.getEntry(hashHexString, batch);
         if (opEntry !== null) {
-            this.#repo.safeLog(OperationType.APPEND_WHITELIST, "Operation has already been applied.", node.from.key)
+            this.logger.error(OperationType.APPEND_WHITELIST, "Operation has already been applied.", node.from.key)
             return Status.FAILURE;
         };
 
         // Retrieve the node entry to check its current role
         const nodeEntry = await this.#repo.getEntry(nodeAddressString, batch);
         if (nodeEntryUtils.isWhitelisted(nodeEntry)) {
-            this.#repo.safeLog(OperationType.APPEND_WHITELIST, "Node already whitelisted.", node.from.key)
+            this.logger.error(OperationType.APPEND_WHITELIST, "Node already whitelisted.", node.from.key)
             return Status.FAILURE;
         }; // Node is already whitelisted
 
@@ -162,36 +164,36 @@ class AppendWhitelistHandler {
             // Fee
             const adminNodeEntry = await this.#repo.getEntry(adminAddressString, batch);
             if (adminNodeEntry === null) {
-                this.#repo.safeLog(OperationType.APPEND_WHITELIST, "Failed to validate admin entry.", node.from.key)
+                this.logger.error(OperationType.APPEND_WHITELIST, "Failed to validate admin entry.", node.from.key)
                 return Status.FAILURE;
             };
 
             const decodedNodeEntry = nodeEntryUtils.decode(adminNodeEntry)
             if (decodedNodeEntry === null) {
-                this.#repo.safeLog(OperationType.APPEND_WHITELIST, "Failed to decode admin entry.", node.from.key)
+                this.logger.error(OperationType.APPEND_WHITELIST, "Failed to decode admin entry.", node.from.key)
                 return Status.FAILURE;
             };
 
             const adminBalance = toBalance(decodedNodeEntry.balance)
             if (adminBalance === null) {
-                this.#repo.safeLog(OperationType.APPEND_WHITELIST, "Invalid admin balance.", node.from.key)
+                this.logger.error(OperationType.APPEND_WHITELIST, "Invalid admin balance.", node.from.key)
                 return Status.FAILURE;
             };
 
             if (!adminBalance.greaterThanOrEquals(BALANCE_FEE)) {
-                this.#repo.safeLog(OperationType.APPEND_WHITELIST, "Insufficient admin balance.", node.from.key)
+                this.logger.error(OperationType.APPEND_WHITELIST, "Insufficient admin balance.", node.from.key)
                 return Status.FAILURE;
             };
             const newAdminBalance = adminBalance.sub(BALANCE_FEE)
 
             if (newAdminBalance === null) {
-                this.#repo.safeLog(OperationType.APPEND_WHITELIST, "Failed to apply fee to admin balance.", node.from.key)
+                this.logger.error(OperationType.APPEND_WHITELIST, "Failed to apply fee to admin balance.", node.from.key)
                 return Status.FAILURE;
             };
             const updatedAdminEntry = newAdminBalance.update(adminNodeEntry)
 
             if (updatedAdminEntry === null) {
-                this.#repo.safeLog(OperationType.APPEND_WHITELIST, "Failed to update admin entry.", node.from.key)
+                this.logger.error(OperationType.APPEND_WHITELIST, "Failed to update admin entry.", node.from.key)
                 return Status.FAILURE;
             };
 
@@ -232,12 +234,12 @@ class AppendWhitelistHandler {
                 await batch.put(EntryType.LICENSE_INDEX + decodedNewLicenseLength, nodeAddressBuffer)
             } else {
                 // This log should (if this error ever happend) ALWAYS log.
-                this.#repo.safeLog("SYSTEM ERROR", "Something went wrong while updating license index.", node.from.key)
+                this.logger.error("SYSTEM ERROR", "Something went wrong while updating license index.", node.from.key)
             }
 
             const initializedNodeEntry = nodeEntryUtils.init(ZERO_WK, nodeRoleUtils.NodeRole.WHITELISTED, nodeRoleUtils.ZERO_BALANCE, newLicenseLength);
             if (initializedNodeEntry.length === 0) {
-                this.#repo.safeLog(OperationType.APPEND_WHITELIST, "Failed to initialize node entry.", node.from.key)
+                this.logger.error(OperationType.APPEND_WHITELIST, "Failed to initialize node entry.", node.from.key)
                 return Status.FAILURE;
             }
 
@@ -249,13 +251,13 @@ class AppendWhitelistHandler {
 
             const decodedNodeEntry = nodeEntryUtils.decode(nodeEntry);
             if (decodedNodeEntry === null) {
-                this.#repo.safeLog(OperationType.APPEND_WHITELIST, "Failed to decode node entry.", node.from.key)
+                this.logger.error(OperationType.APPEND_WHITELIST, "Failed to decode node entry.", node.from.key)
                 return Status.FAILURE;
             };
             const editedNodeEntry = nodeEntryUtils.setRole(nodeEntry, nodeRoleUtils.NodeRole.WHITELISTED);
 
             if (editedNodeEntry === null) {
-                this.#repo.safeLog(OperationType.APPEND_WHITELIST, "Failed to edit node entry.", node.from.key)
+                this.logger.error(OperationType.APPEND_WHITELIST, "Failed to edit node entry.", node.from.key)
                 return Status.FAILURE;
             }
 
@@ -274,7 +276,7 @@ class AppendWhitelistHandler {
                     await batch.put(EntryType.LICENSE_INDEX + decodedNewLicenseLength, nodeAddressBuffer)
                 } else {
                     // This log should (if this error ever happend) ALWAYS log.
-                    this.#repo.safeLog("SYSTEM ERROR", "Something went wrong while updating license index.", node.from.key)
+                    this.logger.error("SYSTEM ERROR", "Something went wrong while updating license index.", node.from.key)
                 }
 
                 const nodeEntryWithNewLicense = nodeEntryUtils.setLicense(editedNodeEntry, newLicenseLength)

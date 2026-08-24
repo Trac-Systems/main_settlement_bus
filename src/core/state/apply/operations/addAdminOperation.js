@@ -1,3 +1,4 @@
+import BaseHandler from './BaseHandler.js';
 import b4a from 'b4a';
 import {
     ADMIN_INITIAL_BALANCE,
@@ -23,12 +24,13 @@ import { Status } from '../../utils/transaction.js';
 import {
 } from '../../../../codecs/consensus/v1/vdfConfigCodec.js';
 
-class AddAdminHandler {
+class AddAdminHandler extends BaseHandler {
     #repo;
     #config;
     #stateValidationSchema;
 
-    constructor(repo, config, stateValidationSchema) {
+    constructor(repo, config, stateValidationSchema, state, logger) {
+        super(logger, state);
         this.#repo = repo;
         this.#config = config;
         this.#stateValidationSchema = stateValidationSchema;
@@ -46,7 +48,7 @@ class AddAdminHandler {
         */
 
         if (!this.#stateValidationSchema.validateCoreAdminOperation(op)) {
-            this.#repo.safeLog(OperationType.ADD_ADMIN, "Contract schema validation failed.", node.from.key)
+            this.logger.error(OperationType.ADD_ADMIN, "Contract schema validation failed.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -54,20 +56,20 @@ class AddAdminHandler {
         const adminAddressBuffer = op.address;
         const adminAddressString = addressUtils.bufferToAddress(adminAddressBuffer, this.#config.addressPrefix);
         if (adminAddressString === null) {
-            this.#repo.safeLog(OperationType.ADD_ADMIN, "Requester address is invalid.", node.from.key)
+            this.logger.error(OperationType.ADD_ADMIN, "Requester address is invalid.", node.from.key)
             return Status.FAILURE;
         };
 
         // Validate requester admin public key (admin)
         const adminPublicKey = tracCryptoApi.address.decodeSafe(adminAddressString);
         if (b4a.equals(adminPublicKey, NULL_BUFFER)) {
-            this.#repo.safeLog(OperationType.ADD_ADMIN, "Error while decoding requester public key.", node.from.key)
+            this.logger.error(OperationType.ADD_ADMIN, "Error while decoding requester public key.", node.from.key)
             return Status.FAILURE;
         };
 
         // Check if the operation is being performed by the bootstrap node - the original deployer of the Trac Network
         if (!b4a.equals(node.from.key, this.#config.bootstrap) || !b4a.equals(op.cao.iw, this.#config.bootstrap)) {
-            this.#repo.safeLog(OperationType.ADD_ADMIN, "Node is not a bootstrap node.", node.from.key)
+            this.logger.error(OperationType.ADD_ADMIN, "Node is not a bootstrap node.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -81,13 +83,13 @@ class AddAdminHandler {
         );
 
         if (requesterMessage.length === 0) {
-            this.#repo.safeLog(OperationType.ADD_ADMIN, "Invalid requester message.", node.from.key)
+            this.logger.error(OperationType.ADD_ADMIN, "Invalid requester message.", node.from.key)
             return Status.FAILURE;
         };
 
         const hash = await tracCryptoApi.hash.blake3Safe(requesterMessage);
         if (!b4a.equals(hash, op.cao.tx)) {
-            this.#repo.safeLog(OperationType.ADD_ADMIN, "Message hash does not match the tx_hash.", node.from.key)
+            this.logger.error(OperationType.ADD_ADMIN, "Message hash does not match the tx_hash.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -95,19 +97,19 @@ class AddAdminHandler {
         const isMessageVerified = tracCryptoApi.signature.verify(op.cao.is, op.cao.tx, adminPublicKey)
         const txHashHexString = op.cao.tx.toString('hex');
         if (!isMessageVerified) {
-            this.#repo.safeLog(OperationType.ADD_ADMIN, "Failed to verify message signature.", node.from.key)
+            this.logger.error(OperationType.ADD_ADMIN, "Failed to verify message signature.", node.from.key)
             return Status.FAILURE;
         };
 
         // verify tx validity - prevent deferred execution attack
         const indexersSequenceState = await this.#repo.getIndexerSequenceState(base);
         if (indexersSequenceState === null) {
-            this.#repo.safeLog(OperationType.ADD_ADMIN, "Indexer sequence state is invalid.", node.from.key)
+            this.logger.error(OperationType.ADD_ADMIN, "Indexer sequence state is invalid.", node.from.key)
             return Status.FAILURE;
         };
 
         if (!b4a.equals(op.cao.txv, indexersSequenceState)) {
-            this.#repo.safeLog(OperationType.ADD_ADMIN, "Transaction was not executed.", node.from.key)
+            this.logger.error(OperationType.ADD_ADMIN, "Transaction was not executed.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -115,21 +117,21 @@ class AddAdminHandler {
         // writer key should NOT exists for a brand new admin
         const writerKeyHasBeenRegistered = await this.#repo.getRegisteredWriterKey(batch, op.cao.iw.toString('hex'))
         if (writerKeyHasBeenRegistered !== null) {
-            this.#repo.safeLog(OperationType.ADD_ADMIN, "Writer key already exists.", node.from.key)
+            this.logger.error(OperationType.ADD_ADMIN, "Writer key already exists.", node.from.key)
             return Status.FAILURE;
         };
 
         const adminEntryExists = await this.#repo.getEntry(EntryType.ADMIN, batch);
         // if admin entry already exists, cannot perform this operation
         if (adminEntryExists !== null) {
-            this.#repo.safeLog(OperationType.ADD_ADMIN, "Admin entry already exists.", node.from.key)
+            this.logger.error(OperationType.ADD_ADMIN, "Admin entry already exists.", node.from.key)
             return Status.FAILURE;
         };
 
         // Check if the operation has already been applied
         const opEntry = await this.#repo.getEntry(txHashHexString, batch);
         if (opEntry !== null) {
-            this.#repo.safeLog(OperationType.ADD_ADMIN, "Operation has already been applied.", node.from.key)
+            this.logger.error(OperationType.ADD_ADMIN, "Operation has already been applied.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -139,19 +141,19 @@ class AddAdminHandler {
             await batch.put(EntryType.LICENSE_INDEX + decodedNewLicenseLength, adminAddressBuffer)
         } else {
             // This log should (if this error ever happend) ALWAYS log.
-            this.#repo.safeLog("SYSTEM ERROR", "Something went wrong while updating license index.", node.from.key)
+            this.logger.error("SYSTEM ERROR", "Something went wrong while updating license index.", node.from.key)
         }
 
         const initializedNodeEntry = nodeEntryUtils.init(op.cao.iw, nodeRoleUtils.NodeRole.INDEXER, ADMIN_INITIAL_BALANCE, newLicenseLength, ADMIN_INITIAL_STAKED_BALANCE);
         if (initializedNodeEntry.length === 0) {
-            this.#repo.safeLog(OperationType.ADD_ADMIN, "Failed to initialize node entry.", node.from.key)
+            this.logger.error(OperationType.ADD_ADMIN, "Failed to initialize node entry.", node.from.key)
             return Status.FAILURE;
         }
 
         // Create a new admin entry
         const newAdminEntry = adminEntryUtils.encode(adminAddressBuffer, op.cao.iw, this.#config.addressPrefix);
         if (newAdminEntry.length === 0) {
-            this.#repo.safeLog(OperationType.ADD_ADMIN, "Failed to verify message signature.", node.from.key)
+            this.logger.error(OperationType.ADD_ADMIN, "Failed to verify message signature.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -166,7 +168,7 @@ class AddAdminHandler {
             await batch.put(EntryType.WRITERS_LENGTH, incrementedLength);
         } else {
             // This log should (if this error ever happend) ALWAYS log.
-            this.#repo.safeLog("SYSTEM ERROR", "Something went wrong while updating writers index.", node.from.key)
+            this.logger.error("SYSTEM ERROR", "Something went wrong while updating writers index.", node.from.key)
         }
 
         // initialize admin entry and initialization flag

@@ -1,3 +1,4 @@
+import BaseHandler from './BaseHandler.js';
 import b4a from 'b4a';
 import {
     EntryType,
@@ -19,12 +20,13 @@ import { Status } from '../../utils/transaction.js';
 import {
 } from '../../../../codecs/consensus/v1/vdfConfigCodec.js';
 
-class DisableInitializationHandler {
+class DisableInitializationHandler extends BaseHandler {
     #repo;
     #config;
     #stateValidationSchema;
 
-    constructor(repo, config, stateValidationSchema) {
+    constructor(repo, config, stateValidationSchema, state, logger) {
+        super(logger, state);
         this.#repo = repo;
         this.#config = config;
         this.#stateValidationSchema = stateValidationSchema;
@@ -36,13 +38,13 @@ class DisableInitializationHandler {
 
     async performOperation(op, view, base, node, batch) {
         if (!this.#stateValidationSchema.validateCoreAdminOperation(op)) {
-            this.#repo.safeLog(OperationType.DISABLE_INITIALIZATION, "Schema validation failed.", node.from.key)
+            this.logger.error(OperationType.DISABLE_INITIALIZATION, "Schema validation failed.", node.from.key)
             return Status.FAILURE;
         };
 
         // Entry has been disabled so there is nothing to do
         if (await this.#repo.isInitalizationDisabled(batch)) {
-            this.#repo.safeLog(OperationType.DISABLE_INITIALIZATION, "Balance initialization already disabled.", node.from.key)
+            this.logger.error(OperationType.DISABLE_INITIALIZATION, "Balance initialization already disabled.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -50,14 +52,14 @@ class DisableInitializationHandler {
         const adminAddressBuffer = op.address;
         const adminAddressString = addressUtils.bufferToAddress(adminAddressBuffer, this.#config.addressPrefix);
         if (adminAddressString === null) {
-            this.#repo.safeLog(OperationType.DISABLE_INITIALIZATION, "Failed to validate requester address.", node.from.key)
+            this.logger.error(OperationType.DISABLE_INITIALIZATION, "Failed to validate requester address.", node.from.key)
             return Status.FAILURE;
         };
 
         // Validate requester admin public key
         const requesterAdminPublicKey = tracCryptoApi.address.decodeSafe(adminAddressString);
         if (b4a.equals(requesterAdminPublicKey, NULL_BUFFER)) {
-            this.#repo.safeLog(OperationType.DISABLE_INITIALIZATION, "Failed to decode requester public key.", node.from.key)
+            this.logger.error(OperationType.DISABLE_INITIALIZATION, "Failed to decode requester public key.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -66,24 +68,24 @@ class DisableInitializationHandler {
         const decodedAdminEntry = adminEntryUtils.decode(adminEntry, this.#config.addressPrefix);
 
         if (decodedAdminEntry === null) {
-            this.#repo.safeLog(OperationType.DISABLE_INITIALIZATION, "Failed to decode admin entry.", node.from.key)
+            this.logger.error(OperationType.DISABLE_INITIALIZATION, "Failed to decode admin entry.", node.from.key)
             return Status.FAILURE;
         }
 
         if (!this.#repo.isAdmin(decodedAdminEntry, node)) {
-            this.#repo.safeLog(OperationType.DISABLE_INITIALIZATION, "Node is not allowed to perform this operation. (ADMIN ONLY)", node.from.key)
+            this.logger.error(OperationType.DISABLE_INITIALIZATION, "Node is not allowed to perform this operation. (ADMIN ONLY)", node.from.key)
             return Status.FAILURE;
         };
 
         const adminPublicKey = tracCryptoApi.address.decodeSafe(decodedAdminEntry.address);
         if (b4a.equals(adminPublicKey, NULL_BUFFER)) {
-            this.#repo.safeLog(OperationType.DISABLE_INITIALIZATION, "Failed to decode admin public key.", node.from.key)
+            this.logger.error(OperationType.DISABLE_INITIALIZATION, "Failed to decode admin public key.", node.from.key)
             return Status.FAILURE;
         };
 
         // Admin consistency check
         if (!b4a.equals(adminPublicKey, requesterAdminPublicKey)) {
-            this.#repo.safeLog(OperationType.DISABLE_INITIALIZATION, "System admin and node public keys do not match.", node.from.key)
+            this.logger.error(OperationType.DISABLE_INITIALIZATION, "System admin and node public keys do not match.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -96,40 +98,40 @@ class DisableInitializationHandler {
             OperationType.DISABLE_INITIALIZATION
         );
         if (message.length === 0) {
-            this.#repo.safeLog(OperationType.DISABLE_INITIALIZATION, "Invalid requester message.", node.from.key)
+            this.logger.error(OperationType.DISABLE_INITIALIZATION, "Invalid requester message.", node.from.key)
             return Status.FAILURE;
         };
 
         const hash = await tracCryptoApi.hash.blake3Safe(message);
         const txHashHexString = op.cao.tx.toString('hex');
         if (!b4a.equals(hash, op.cao.tx)) {
-            this.#repo.safeLog(OperationType.DISABLE_INITIALIZATION, "Message hash does not match the tx_hash.", node.from.key)
+            this.logger.error(OperationType.DISABLE_INITIALIZATION, "Message hash does not match the tx_hash.", node.from.key)
             return Status.FAILURE;
         };
 
         // Verify signature
         const isMessageVerified = tracCryptoApi.signature.verify(op.cao.is, hash, adminPublicKey);
         if (!isMessageVerified) {
-            this.#repo.safeLog(OperationType.DISABLE_INITIALIZATION, "Failed to verify message signature.", node.from.key)
+            this.logger.error(OperationType.DISABLE_INITIALIZATION, "Failed to verify message signature.", node.from.key)
             return Status.FAILURE;
         };
 
         // Verify tx validity - prevent deferred execution attack
         const indexersSequenceState = await this.#repo.getIndexerSequenceState(base);
         if (indexersSequenceState === null) {
-            this.#repo.safeLog(OperationType.DISABLE_INITIALIZATION, "Indexer sequence state is invalid.", node.from.key)
+            this.logger.error(OperationType.DISABLE_INITIALIZATION, "Indexer sequence state is invalid.", node.from.key)
             return Status.FAILURE;
         };
 
         if (!b4a.equals(op.cao.txv, indexersSequenceState)) {
-            this.#repo.safeLog(OperationType.DISABLE_INITIALIZATION, "Transaction was not executed.", node.from.key)
+            this.logger.error(OperationType.DISABLE_INITIALIZATION, "Transaction was not executed.", node.from.key)
             return Status.FAILURE;
         };
 
         // Check if the operation has already been applied
         const opEntry = await this.#repo.getEntry(txHashHexString, batch);
         if (opEntry !== null) {
-            this.#repo.safeLog(OperationType.DISABLE_INITIALIZATION, "Operation has already been applied.", node.from.key)
+            this.logger.error(OperationType.DISABLE_INITIALIZATION, "Operation has already been applied.", node.from.key)
             return Status.FAILURE;
         };
 
