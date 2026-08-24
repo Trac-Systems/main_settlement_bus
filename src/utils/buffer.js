@@ -235,3 +235,43 @@ export function incrementBuffer(buffer, enforceLength = null) {
 
     return null;
 }
+
+/**
+ * Converts a big-endian unsigned integer buffer to a numeric string.
+ * The input must contain between 1 and 16 bytes.
+ *
+ * @param {Buffer} buffer - The unsigned integer to convert.
+ * @param {'decimal'|'hex'} [encoding='decimal'] - Output encoding.
+ * @returns {string|null} The normalized numeric string, or null for invalid input.
+ */
+export function toUIntString(buffer, encoding = 'decimal') {
+    if (!b4a.isBuffer(buffer) || buffer.length === 0 || buffer.length > 16) {
+        return null;
+    }
+
+    switch (encoding) {
+        case 'hex':
+            return buffer.toString('hex').replace(/^0+/, '') || '0';
+        case 'decimal': {
+            const digits = [0];
+            for (const byte of buffer) {
+                let carry = byte;
+
+                for (let i = 0; i < digits.length; i++) {
+                    const value = digits[i] * 256 + carry;
+                    digits[i] = value % 10;
+                    carry = Math.floor(value / 10);
+                }
+
+                while (carry > 0) {
+                    digits.push(carry % 10);
+                    carry = Math.floor(carry / 10);
+                }
+            }
+
+            return digits.reverse().join('');
+        }
+        default:
+            return null;
+    }
+}

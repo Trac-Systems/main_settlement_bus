@@ -6,6 +6,7 @@ import {
     safeReadUint16BE,
     safeReadUint32BE,
     incrementBuffer,
+    toUIntString,
     safeUint8ToBuffer,
     safeUint16ToBuffer,
     safeWriteUInt32BE,
@@ -502,6 +503,34 @@ test('incrementBuffer - returns null for invalid input or overflow', t => {
     t.is(incrementBuffer(b4a.alloc(0)), null, 'rejects an empty buffer');
     t.is(incrementBuffer(b4a.alloc(17)), null, 'rejects buffers longer than 16 bytes');
     t.is(incrementBuffer(null), null, 'rejects non-buffer input');
+});
+
+test('toUIntString - converts big-endian buffers to decimal strings', t => {
+    t.is(toUIntString(b4a.from('00', 'hex')), '0', 'converts zero');
+    t.is(toUIntString(b4a.from('000001', 'hex')), '1', 'removes leading zeroes');
+    t.is(toUIntString(b4a.from('0100', 'hex')), '256', 'converts multiple bytes');
+    t.is(
+        toUIntString(b4a.from('ffffffffffffffffffffffffffffffff', 'hex')),
+        '340282366920938463463374607431768211455',
+        'converts the maximum uint128 without precision loss'
+    );
+});
+
+test('toUIntString - converts big-endian buffers to hexadecimal strings', t => {
+    t.is(toUIntString(b4a.from('00', 'hex'), 'hex'), '0', 'converts zero');
+    t.is(toUIntString(b4a.from('000001ff', 'hex'), 'hex'), '1ff', 'normalizes leading zeroes');
+    t.is(
+        toUIntString(b4a.from('ffffffffffffffffffffffffffffffff', 'hex'), 'hex'),
+        'ffffffffffffffffffffffffffffffff',
+        'converts the maximum uint128'
+    );
+});
+
+test('toUIntString - returns null for invalid input or encoding', t => {
+    t.is(toUIntString(null), null, 'rejects non-buffer input');
+    t.is(toUIntString(b4a.alloc(0)), null, 'rejects an empty buffer');
+    t.is(toUIntString(b4a.alloc(17)), null, 'rejects buffers longer than 16 bytes');
+    t.is(toUIntString(b4a.from([1]), 'binary'), null, 'rejects unsupported encodings');
 });
 
 test('createMessage ignores invalid values when valid buffers are present', t => {
