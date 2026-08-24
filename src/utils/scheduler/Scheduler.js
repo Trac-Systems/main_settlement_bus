@@ -25,23 +25,33 @@ class Scheduler {
     #timer = null;
     #currentWorkerRun = null;
 
+    /**
+     * Creates a scheduler for one worker and its default interval.
+     *
+     * @param {Function} worker
+     * @param {number} defaultInterval
+     */
     constructor(worker, defaultInterval) {
-        if (typeof worker !== 'function') {
-            throw new TypeError('Worker must be a function');
-        }
         const interval = Scheduler.#validateDelay(defaultInterval ?? 100, 'defaultInterval');
         this.#worker = worker;
         this.#defaultInterval = interval;
     }
 
+    /** @returns {boolean} true when the scheduler is running */
     get isRunning() {
         return this.#isRunning;
     }
 
+    /** @returns {number} delay used when the worker does not set one */
     get defaultInterval() {
         return this.#defaultInterval;
     }
 
+    /**
+     * Converts and validates a scheduler delay.
+     *
+     * @returns {number}
+     */
     static #validateDelay(delayMs, scope = 'delayMs') {
         const ms = Number(delayMs);
         if (!Number.isFinite(ms) || ms < 0) {
@@ -50,6 +60,7 @@ class Scheduler {
         return ms;
     }
 
+    /** Starts the scheduler and sets the timer for the first run. */
     start(initialDelayMs = 0) {
         if (this.isRunning) return;
         const delayMs = Scheduler.#validateDelay(initialDelayMs, 'start delayMs');
@@ -57,6 +68,12 @@ class Scheduler {
         this.#next(delayMs);
     }
 
+    /**
+     * Runs one worker and schedules the next run.
+     * hold() and scheduleNext() allow the worker to control the next timer.
+     *
+     * @returns {Promise<void>}
+     */
     async run() {
         if (!this.isRunning) return;
 
@@ -77,15 +94,18 @@ class Scheduler {
             this.#next(Scheduler.#validateDelay(ms, 'scheduleNext delayMs'));
         };
 
-        this.#currentWorkerRun = this.#worker(scheduleNext, hold);
+        const workerRun = this.#worker(scheduleNext, hold);
+        this.#currentWorkerRun = workerRun;
         try {
-            await this.#currentWorkerRun;
+            await workerRun;
         } catch (error) {
             console.error('Worker error:', error);
             this.#next(this.defaultInterval);
             return;
         } finally {
-            this.#currentWorkerRun = null;
+            if (this.#currentWorkerRun === workerRun) {
+                this.#currentWorkerRun = null;
+            }
         }
 
         if (!scheduleCalled) {
@@ -93,6 +113,7 @@ class Scheduler {
         }
     }
 
+    /** Replaces the current timer with a new timer. */
     #next(delayMs) {
         if (!this.isRunning) return;
         const ms = Scheduler.#validateDelay(delayMs, 'next delayMs');
@@ -104,6 +125,12 @@ class Scheduler {
         }, ms);
     }
 
+    /**
+     * Stops future runs and can wait for the current worker.
+     *
+     * @param {boolean} waitForCurrent
+     * @returns {Promise<void>}
+     */
     async stop(waitForCurrent = true) {
         if (!this.isRunning) return;
         this.#isRunning = false;
