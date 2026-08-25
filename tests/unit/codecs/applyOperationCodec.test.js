@@ -1,19 +1,24 @@
 import test from 'brittle';
 import b4a from 'b4a';
+import { OperationType } from '../../../src/utils/constants.js';
 
 import applyOperationsGenerated from '../../../src/codecs/apply/applyOperations.generated.cjs';
 import {
     decodeEpochProof,
+    decodeHtlcLockData,
     encodeEpochProof,
+    encodeHtlcLockData,
     normalizeIncomingMessage,
     safeDecodeEpochProof,
+    safeDecodeHtlcLockData,
     safeDecodeApplyOperation,
     safeEncodeEpochProof,
+    safeEncodeHtlcLockData,
     safeEncodeApplyOperation,
 } from '../../../src/codecs/apply/applyOperationCodec.js';
 import fixtures from '../../fixtures/applyOperation.fixtures.js';
 
-const { Operation, SetEpochOperation } = applyOperationsGenerated.apply.operations;
+const { Operation, SetEpochOperation, HtlcLockOperation } = applyOperationsGenerated.apply.operations;
 
 const APPLY_TO_OBJECT_OPTIONS = Object.freeze({
     enums: Number,
@@ -45,9 +50,24 @@ const applyPayloads = new Map([
     ['balanceInitialization', fixtures.validBalanceInitOperation],
     ['disableInitialization', fixtures.validDisableInitialization],
     ['setEpoch', fixtures.validSetEpochOperation],
+    ['htlcLock', {
+        type: OperationType.HTLC_LOCK,
+        address: fixtures.validSetEpochOperation.address,
+        hlo: {
+            tx: b4a.alloc(32, 0x01),
+            txv: b4a.alloc(32, 0x02),
+            ld: encodeHtlcLockData(fixtures.validHtlcLockData),
+            am: b4a.from('00000000000000015af1d78b58c40001', 'hex'),
+            in: b4a.alloc(32, 0x03),
+            is: b4a.alloc(64, 0x04),
+            va: fixtures.validHtlcLockData.ra,
+            vn: b4a.alloc(32, 0x05),
+            vs: b4a.alloc(64, 0x06)
+        }
+    }],
 ]);
 
-const APPLY_PAYLOAD_KEYS = Object.freeze(['txo', 'tro', 'aco', 'cao', 'rao', 'bdo', 'bio', 'seo']);
+const APPLY_PAYLOAD_KEYS = Object.freeze(['txo', 'tro', 'aco', 'cao', 'rao', 'bdo', 'bio', 'seo', 'hlo']);
 
 const formatInvalidPayload = payload => {
     if (typeof payload === 'bigint') return `${payload}n`;
@@ -238,6 +258,31 @@ test('EpochProof codec encodes and decodes SetEpochOperation wire payload', t =>
     t.ok(b4a.isBuffer(encoded) && encoded.length > 0);
     t.alike(decodedWirePayload, epochProof);
     t.alike(decodedEpochProof, epochProof);
+});
+
+test('HtlcLockData codec encodes and decodes separate lock fields', t => {
+    const encoded = encodeHtlcLockData(fixtures.validHtlcLockData);
+    const decoded = decodeHtlcLockData(encoded);
+
+    t.ok(b4a.isBuffer(encoded) && encoded.length > 0);
+    t.alike(decoded, fixtures.validHtlcLockData);
+
+    const wirePayload = HtlcLockOperation.toObject(
+        HtlcLockOperation.decode(
+            HtlcLockOperation.encode({ ld: encoded }).finish()
+        ),
+        APPLY_TO_OBJECT_OPTIONS
+    );
+    t.ok(b4a.equals(wirePayload.ld, encoded), 'lock data is carried as opaque ld bytes');
+});
+
+test('HtlcLockData safe helpers reject invalid payloads', t => {
+    withConsoleLogMuted(() => {
+        t.is(safeEncodeHtlcLockData(null).length, 0);
+        t.is(safeEncodeHtlcLockData({ ...fixtures.validHtlcLockData, ee: b4a.alloc(0) }).length, 0);
+        t.is(safeDecodeHtlcLockData(null), null);
+        t.is(safeDecodeHtlcLockData(b4a.alloc(0)), null);
+    });
 });
 
 test('EpochProof codec rejects non-record payloads', t => {
