@@ -1,13 +1,18 @@
-class PartialHtlcValidator {
+import PartialOperationValidator from './PartialOperationValidator.js';
 
-    constructor(_state, _selfAddress, _config) {
+class PartialHtlcValidator extends PartialOperationValidator {
 
-    }
+    async validate(payload) {
+        this.isPayloadSchemaValid(payload);
+        this.validateNoSelfValidation(payload);
+        this.validateRequesterAddress(payload);
+        await this.validateTransactionUniqueness(payload);
+        await this.validateSignature(payload);
+        await this.validateTransactionValidity(payload);
+        this.isOperationNotCompleted(payload);
 
-    async validate(_payload) {
         return true;
     }
 }
 
 export default PartialHtlcValidator;
-

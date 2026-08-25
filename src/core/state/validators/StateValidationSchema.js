@@ -23,6 +23,9 @@ import {
     encodeProofProposalApproval,
     encodeProofProposal
 } from '../../../codecs/consensus/v1/consensusV1OperationCodec.js';
+import applyOperationsGenerated from '../../../codecs/apply/applyOperations.generated.cjs';
+
+const { HtlcLockData } = applyOperationsGenerated.apply.operations;
 
 class StateValidationSchema {
     #validator;
@@ -35,6 +38,7 @@ class StateValidationSchema {
     #validateBalanceInitializationSchema;
     #validateSetEpochOperationSchema;
     #validateConsensusControlOperationSchema;
+    #validateHtlcLockOperationSchema;
     #proofDataFields;
     #config;
 
@@ -64,6 +68,7 @@ class StateValidationSchema {
                 emptyBuffer: "The '{field}' field must not be an empty Buffer!",
                 proofData: "The '{field}' field must be an encoded ProofProposal buffer.",
                 proofProposalApproval: "The '{field}' field must be an encoded ProofProposalApproval buffer.",
+                htlcLockData: "The '{field}' field must be an encoded HtlcLockData buffer.",
             },
         });
         const isBuffer = b4a.isBuffer;
@@ -283,6 +288,68 @@ class StateValidationSchema {
             };
         });
 
+        this.#validator.add("htlc_lock_data", function ({messages, index}, _path, _context) {
+            const htlcLockDataFields = [
+                {name: 'hl', length: HASH_BYTE_LENGTH},
+                {name: 'ra', length: addressLength},
+                {name: 'ca', length: addressLength},
+                {name: 'ee', length: EPOCH_BYTE_LENGTH},
+            ];
+            _context.customs[index] = {
+                decode: value => HtlcLockData.decode(value),
+                encode: value => HtlcLockData.encode(value).finish(),
+                equals,
+                isBuffer,
+                fields: htlcLockDataFields
+            };
+
+            return {
+                source: `
+                    const htlcRule = context.customs[${index}];
+                    if (!htlcRule.isBuffer(value) || value.length === 0) {
+                        ${this.makeError({type: "htlcLockData", actual: "value", messages})}
+                        return value;
+                    }
+
+                    let lockData;
+                    try {
+                        lockData = htlcRule.decode(value);
+                    } catch {
+                        ${this.makeError({type: "htlcLockData", actual: "value", messages})}
+                        return value;
+                    }
+
+                    const reencodedInput = {};
+                    for (const field of htlcRule.fields) {
+                        const fieldValue = lockData[field.name];
+                        if (!htlcRule.isBuffer(fieldValue) || fieldValue.length !== field.length) {
+                            ${this.makeError({type: "htlcLockData", actual: "value", messages})}
+                            return value;
+                        }
+                        let fieldIsZeroFilled = true;
+                        for (let i = 0; i < fieldValue.length; i++) {
+                            if (fieldValue[i] !== 0) {
+                                fieldIsZeroFilled = false;
+                                break;
+                            }
+                        }
+                        if (fieldIsZeroFilled) {
+                            ${this.makeError({type: "htlcLockData", actual: "value", messages})}
+                            return value;
+                        }
+                        reencodedInput[field.name] = fieldValue;
+                    }
+
+                    const reencoded = htlcRule.encode(reencodedInput);
+                    if (!htlcRule.equals(value, reencoded)) {
+                        ${this.makeError({type: "htlcLockData", actual: "value", messages})}
+                    }
+
+                    return value;
+                `
+            };
+        });
+
 
         this.#validateCoreAdminOperationSchema = this.#compileCoreAdminOperationSchema();
         this.#validateAdminControlOperationSchema = this.#compileAdminControlOperationSchema();
@@ -293,6 +360,7 @@ class StateValidationSchema {
         this.#validateBalanceInitializationSchema = this.#compileBalanceInitializationSchema();
         this.#validateSetEpochOperationSchema = this.#compileSetEpochOperationSchema();
         this.#validateConsensusControlOperationSchema = this.#compileConsensusControlOperationSchema();
+        this.#validateHtlcLockOperationSchema = this.#compileHtlcLockOperationSchema();
 
     }
 
@@ -701,6 +769,34 @@ class StateValidationSchema {
 
     validateConsensusControlOperation(op) {
         return this.#validateConsensusControlOperationSchema(op) === true;
+    }
+
+    #compileHtlcLockOperationSchema() {
+        const schema = {
+            $$strict: true,
+            type: this.#operationTypeDomain(OperationType.HTLC_LOCK),
+            address: {type: 'buffer', length: this.#config.addressLength, required: true},
+            hlo: {
+                strict: true,
+                type: 'object',
+                props: {
+                    tx: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
+                    txv: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
+                    ld: {type: 'htlc_lock_data', required: true},
+                    am: {type: 'buffer_amount', length: AMOUNT_BYTE_LENGTH, required: true},
+                    in: {type: 'buffer', length: NONCE_BYTE_LENGTH, required: true},
+                    is: {type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true},
+                    va: {type: 'buffer', length: this.#config.addressLength, optional: true},
+                    vn: {type: 'buffer', length: NONCE_BYTE_LENGTH, optional: true},
+                    vs: {type: 'buffer', length: SIGNATURE_BYTE_LENGTH, optional: true}
+                }
+            }
+        };
+        return this.#validator.compile(schema);
+    }
+
+    validateHtlcLockOperation(op) {
+        return this.#validateHtlcLockOperationSchema(op) === true;
     }
 
 }
