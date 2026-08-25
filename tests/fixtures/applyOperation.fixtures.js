@@ -1,5 +1,5 @@
 import b4a from 'b4a';
-import { OperationType } from '../../src/utils/constants.js';
+import { HASH_BYTE_LENGTH, OperationType } from '../../src/utils/constants.js';
 import { addressToBuffer } from '../../src/core/state/utils/address.js';
 import { config } from '../helpers/config.js';
 import { asAddress } from '../helpers/address.js';
@@ -306,6 +306,13 @@ const validHtlcClaimOperation = {
     }
 };
 
+const validHtlcLockData = {
+    hl: b4a.alloc(HASH_BYTE_LENGTH, 0xaa),
+    ra: addressToBuffer(asAddress('3300cf88d57280a0a403d931971fd60546c781f8cb8d6d1dad635a8b28db7970'), config.addressPrefix),
+    ca: addressToBuffer(asAddress('3801ebd1f12462ad335b821807c9d87e4f20d57505222284b2634a7e8e5edac2'), config.addressPrefix),
+    ee: b4a.from('0000000000000007', 'hex')
+};
+
 const invalidPayloads = [
     null,
     undefined,
@@ -410,6 +417,7 @@ export default {
     validCompleteBootstrapDeployment,
     validSetEpochOperation,
     validHtlcClaimOperation,
+    validHtlcLockData,
     invalidPayloads,
     invalidPayloadWithMultipleOneOfKeys
 };

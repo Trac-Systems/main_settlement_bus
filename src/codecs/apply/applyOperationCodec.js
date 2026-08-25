@@ -1,7 +1,7 @@
 import b4a from 'b4a';
 import applyOperationsGenerated from './applyOperations.generated.cjs';
 import _ from 'lodash';
-const { Operation, SetEpochOperation, ConsensusControlOperation } = applyOperationsGenerated.apply.operations;
+const { Operation, SetEpochOperation, HtlcLockData, ConsensusControlOperation } = applyOperationsGenerated.apply.operations;
 
 // Options for converting protobuf messages to plain objects, ensuring that bytes are returned as Buffers and enums as numbers.
 const APPLY_TO_OBJECT_OPTIONS = Object.freeze({
@@ -14,7 +14,7 @@ const APPLY_TO_OBJECT_OPTIONS = Object.freeze({
 });
 
 const normalizeDecodedApplyOperation = operation => {
-    const payload = operation.tro || operation.rao || operation.bdo || operation.txo;
+    const payload = operation.tro || operation.rao || operation.bdo || operation.txo || operation.hlo;
     if (!payload) return operation;
 
     payload.va ??= null;
@@ -175,6 +175,74 @@ export const safeDecodeEpochProof = (payload) => {
         return decodeEpochProof(payload);
     } catch (error) {
         console.log("safeDecodeEpochProof error:", error.message);
+    }
+
+    return null;
+}
+
+const getValidatedHtlcLockDataPayload = (payload) => {
+    if (!_.isPlainObject(payload)) {
+        throw new Error('HtlcLockData payload must be an object.');
+    }
+
+    const { hl, ra, ca, ee } = payload;
+    for (const [name, value] of Object.entries({ hl, ra, ca, ee })) {
+        if (!b4a.isBuffer(value) || value.length === 0) {
+            throw new Error(`HtlcLockData ${name} must be a non-empty buffer.`);
+        }
+    }
+
+    return { hl, ra, ca, ee };
+}
+
+/**
+ * Encodes the HTLC lock data using the HtlcLockData wire format.
+ * The outer HtlcLockOperation carries the result as opaque ld bytes, matching seo.pd.
+ *
+ * @param {{hl: Buffer, ra: Buffer, ca: Buffer, ee: Buffer}} payload
+ * @returns {Buffer} Encoded HTLC lock data.
+ */
+export const encodeHtlcLockData = (payload) => {
+    const htlcLockData = getValidatedHtlcLockDataPayload(payload);
+    const error = HtlcLockData.verify(htlcLockData);
+    if (error) throw new Error(error);
+    return b4a.from(HtlcLockData.encode(htlcLockData).finish());
+}
+
+/**
+ * Decodes HTLC lock data encoded with the HtlcLockData wire format.
+ *
+ * @param {Buffer} payload
+ * @returns {{hl: Buffer, ra: Buffer, ca: Buffer, ee: Buffer}}
+ */
+export const decodeHtlcLockData = (payload) => {
+    if (!b4a.isBuffer(payload)) {
+        throw new Error('Encoded HtlcLockData must be a buffer.');
+    }
+
+    return getValidatedHtlcLockDataPayload(
+        HtlcLockData.toObject(
+            HtlcLockData.decode(payload),
+            APPLY_TO_OBJECT_OPTIONS
+        )
+    );
+}
+
+export const safeEncodeHtlcLockData = (payload) => {
+    try {
+        return encodeHtlcLockData(payload);
+    } catch (error) {
+        console.log("safeEncodeHtlcLockData error:", error.message);
+    }
+
+    return b4a.alloc(0);
+}
+
+export const safeDecodeHtlcLockData = (payload) => {
+    try {
+        return decodeHtlcLockData(payload);
+    } catch (error) {
+        console.log("safeDecodeHtlcLockData error:", error.message);
     }
 
     return null;

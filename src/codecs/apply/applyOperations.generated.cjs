@@ -4434,12 +4434,112 @@ $root.apply = (function() {
             return ConsensusControlOperation;
         })();
 
+        operations.HtlcLockData = (function() {
+            function HtlcLockData(properties) {
+                if (properties)
+                    for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
+                        if (properties[keys[i]] != null)
+                            this[keys[i]] = properties[keys[i]];
+            }
+
+            HtlcLockData.prototype.hl = $util.newBuffer([]);
+            HtlcLockData.prototype.ra = $util.newBuffer([]);
+            HtlcLockData.prototype.ca = $util.newBuffer([]);
+            HtlcLockData.prototype.ee = $util.newBuffer([]);
+
+            HtlcLockData.create = function create(properties) {
+                return new HtlcLockData(properties);
+            };
+
+            HtlcLockData.encode = function encode(message, writer) {
+                if (!writer)
+                    writer = $Writer.create();
+                if (message.hl != null && Object.hasOwnProperty.call(message, "hl")) writer.uint32(10).bytes(message.hl);
+                if (message.ra != null && Object.hasOwnProperty.call(message, "ra")) writer.uint32(18).bytes(message.ra);
+                if (message.ca != null && Object.hasOwnProperty.call(message, "ca")) writer.uint32(26).bytes(message.ca);
+                if (message.ee != null && Object.hasOwnProperty.call(message, "ee")) writer.uint32(34).bytes(message.ee);
+                return writer;
+            };
+
+            HtlcLockData.decode = function decode(reader, length, error) {
+                if (!(reader instanceof $Reader))
+                    reader = $Reader.create(reader);
+                var end = length === undefined ? reader.len : reader.pos + length, message = new HtlcLockData();
+                while (reader.pos < end) {
+                    var tag = reader.uint32();
+                    if (tag === error)
+                        break;
+                    switch (tag >>> 3) {
+                    case 1: message.hl = reader.bytes(); break;
+                    case 2: message.ra = reader.bytes(); break;
+                    case 3: message.ca = reader.bytes(); break;
+                    case 4: message.ee = reader.bytes(); break;
+                    default: reader.skipType(tag & 7); break;
+                    }
+                }
+                return message;
+            };
+
+            HtlcLockData.verify = function verify(message) {
+                if (typeof message !== "object" || message === null)
+                    return "object expected";
+                var fields = ["hl", "ra", "ca", "ee"];
+                for (var i = 0; i < fields.length; ++i) {
+                    var field = fields[i];
+                    if (message[field] != null && message.hasOwnProperty(field) && !(message[field] && typeof message[field].length === "number" || $util.isString(message[field])))
+                        return field + ": buffer expected";
+                }
+                return null;
+            };
+
+            HtlcLockData.fromObject = function fromObject(object) {
+                if (object instanceof $root.apply.operations.HtlcLockData)
+                    return object;
+                var message = new HtlcLockData();
+                var fields = ["hl", "ra", "ca", "ee"];
+                for (var i = 0; i < fields.length; ++i) {
+                    var field = fields[i];
+                    if (object[field] != null)
+                        if (typeof object[field] === "string") $util.base64.decode(object[field], message[field] = $util.newBuffer($util.base64.length(object[field])), 0);
+                        else if (object[field].length >= 0) message[field] = object[field];
+                }
+                return message;
+            };
+
+            HtlcLockData.toObject = function toObject(message, options) {
+                if (!options) options = {};
+                var object = {};
+                var fields = ["hl", "ra", "ca", "ee"];
+                for (var i = 0; i < fields.length; ++i) {
+                    var field = fields[i];
+                    if (message[field] != null && Object.hasOwnProperty.call(message, field))
+                        object[field] = options.bytes === String ? $util.base64.encode(message[field], 0, message[field].length) : options.bytes === Array ? Array.prototype.slice.call(message[field]) : message[field];
+                }
+                return object;
+            };
+
+            HtlcLockData.prototype.toJSON = function toJSON() {
+                return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
+            };
+
+            return HtlcLockData;
+        })();
+
         operations.HtlcLockOperation = (function() {
 
             /**
              * Properties of a HtlcLockOperation.
              * @memberof apply.operations
              * @interface IHtlcLockOperation
+             * @property {Uint8Array|null} [tx] HtlcLockOperation tx
+             * @property {Uint8Array|null} [txv] HtlcLockOperation txv
+             * @property {Uint8Array|null} [ld] HtlcLockOperation ld
+             * @property {Uint8Array|null} [am] HtlcLockOperation am
+             * @property {Uint8Array|null} ["in"] HtlcLockOperation in
+             * @property {Uint8Array|null} [is] HtlcLockOperation is
+             * @property {Uint8Array|null} [va] HtlcLockOperation va
+             * @property {Uint8Array|null} [vn] HtlcLockOperation vn
+             * @property {Uint8Array|null} [vs] HtlcLockOperation vs
              */
 
             /**
@@ -4456,6 +4556,16 @@ $root.apply = (function() {
                         if (properties[keys[i]] != null)
                             this[keys[i]] = properties[keys[i]];
             }
+
+            HtlcLockOperation.prototype.tx = $util.newBuffer([]);
+            HtlcLockOperation.prototype.txv = $util.newBuffer([]);
+            HtlcLockOperation.prototype.ld = $util.newBuffer([]);
+            HtlcLockOperation.prototype.am = $util.newBuffer([]);
+            HtlcLockOperation.prototype["in"] = $util.newBuffer([]);
+            HtlcLockOperation.prototype.is = $util.newBuffer([]);
+            HtlcLockOperation.prototype.va = $util.newBuffer([]);
+            HtlcLockOperation.prototype.vn = $util.newBuffer([]);
+            HtlcLockOperation.prototype.vs = $util.newBuffer([]);
 
             /**
              * Creates a new HtlcLockOperation instance using the specified properties.
@@ -4481,6 +4591,15 @@ $root.apply = (function() {
             HtlcLockOperation.encode = function encode(message, writer) {
                 if (!writer)
                     writer = $Writer.create();
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx")) writer.uint32(10).bytes(message.tx);
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv")) writer.uint32(18).bytes(message.txv);
+                if (message.ld != null && Object.hasOwnProperty.call(message, "ld")) writer.uint32(26).bytes(message.ld);
+                if (message.am != null && Object.hasOwnProperty.call(message, "am")) writer.uint32(50).bytes(message.am);
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in")) writer.uint32(66).bytes(message["in"]);
+                if (message.is != null && Object.hasOwnProperty.call(message, "is")) writer.uint32(74).bytes(message.is);
+                if (message.va != null && Object.hasOwnProperty.call(message, "va")) writer.uint32(82).bytes(message.va);
+                if (message.vn != null && Object.hasOwnProperty.call(message, "vn")) writer.uint32(90).bytes(message.vn);
+                if (message.vs != null && Object.hasOwnProperty.call(message, "vs")) writer.uint32(98).bytes(message.vs);
                 return writer;
             };
 
@@ -4517,6 +4636,15 @@ $root.apply = (function() {
                     if (tag === error)
                         break;
                     switch (tag >>> 3) {
+                    case 1: message.tx = reader.bytes(); break;
+                    case 2: message.txv = reader.bytes(); break;
+                    case 3: message.ld = reader.bytes(); break;
+                    case 6: message.am = reader.bytes(); break;
+                    case 8: message["in"] = reader.bytes(); break;
+                    case 9: message.is = reader.bytes(); break;
+                    case 10: message.va = reader.bytes(); break;
+                    case 11: message.vn = reader.bytes(); break;
+                    case 12: message.vs = reader.bytes(); break;
                     default:
                         reader.skipType(tag & 7);
                         break;
@@ -4552,6 +4680,12 @@ $root.apply = (function() {
             HtlcLockOperation.verify = function verify(message) {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
+                var fields = ["tx", "txv", "ld", "am", "in", "is", "va", "vn", "vs"];
+                for (var i = 0; i < fields.length; ++i) {
+                    var field = fields[i];
+                    if (message[field] != null && message.hasOwnProperty(field) && !(message[field] && typeof message[field].length === "number" || $util.isString(message[field])))
+                        return field + ": buffer expected";
+                }
                 return null;
             };
 
@@ -4566,7 +4700,15 @@ $root.apply = (function() {
             HtlcLockOperation.fromObject = function fromObject(object) {
                 if (object instanceof $root.apply.operations.HtlcLockOperation)
                     return object;
-                return new $root.apply.operations.HtlcLockOperation();
+                var message = new $root.apply.operations.HtlcLockOperation();
+                var fields = ["tx", "txv", "ld", "am", "in", "is", "va", "vn", "vs"];
+                for (var i = 0; i < fields.length; ++i) {
+                    var field = fields[i];
+                    if (object[field] != null)
+                        if (typeof object[field] === "string") $util.base64.decode(object[field], message[field] = $util.newBuffer($util.base64.length(object[field])), 0);
+                        else if (object[field].length >= 0) message[field] = object[field];
+                }
+                return message;
             };
 
             /**
@@ -4578,8 +4720,16 @@ $root.apply = (function() {
              * @param {$protobuf.IConversionOptions} [options] Conversion options
              * @returns {Object.<string,*>} Plain object
              */
-            HtlcLockOperation.toObject = function toObject() {
-                return {};
+            HtlcLockOperation.toObject = function toObject(message, options) {
+                if (!options) options = {};
+                var object = {};
+                var fields = ["tx", "txv", "ld", "am", "in", "is", "va", "vn", "vs"];
+                for (var i = 0; i < fields.length; ++i) {
+                    var field = fields[i];
+                    if (message[field] != null && Object.hasOwnProperty.call(message, field))
+                        object[field] = options.bytes === String ? $util.base64.encode(message[field], 0, message[field].length) : options.bytes === Array ? Array.prototype.slice.call(message[field]) : message[field];
+                }
+                return object;
             };
 
             /**

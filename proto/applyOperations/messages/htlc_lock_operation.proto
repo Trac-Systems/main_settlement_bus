@@ -2,4 +2,21 @@ syntax = "proto3";
 
 package apply.operations;
 
-message HtlcLockOperation {}
+message HtlcLockData {
+    bytes hl = 1; // Hash Lock
+    bytes ra = 2; // Address of the refund
+    bytes ca = 3; // Address of the claimant
+    bytes ee = 4; // Expiration epoch
+}
+
+message HtlcLockOperation {
+    bytes tx      = 1; // Transaction hash (unique identifier for the transaction)
+    bytes txv     = 2; // Transaction expiration
+    bytes ld      = 3; // Lock Data
+    bytes am      = 6; // Amount of tokens to transfer
+    bytes in      = 8; // Nonce of the invoker (any account)
+    bytes is      = 9; // Signature of the invoker (any account)
+    bytes va      = 10; // Validator's address (optional)
+    bytes vn      = 11; // Validator's nonce  (optional)
+    bytes vs      = 12; // Validator's signature (optional)
+}
