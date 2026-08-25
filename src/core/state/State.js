@@ -3551,7 +3551,6 @@ class State extends ReadyResource {
         // String helpers
         const currentEpochStr = toUIntString(currentEpochBuffer);
         const nextEpochStr = toUIntString(nextEpochBuffer);
-        const proposedEpochStr = toUIntString(proposedEpochBuffer);
 
         if (epochIndexCompare > 0) { // proposedEpoch < nextEpoch
             this.#safeLogApply(OperationType.SET_EPOCH, `Stale epoch proposal. Epoch ${currentEpochStr} is already committed.`, node.from.key)
@@ -3559,7 +3558,7 @@ class State extends ReadyResource {
         }
 
         if (epochIndexCompare < 0) { // proposedEpoch > nextEpoch
-            this.#safeLogApply(OperationType.SET_EPOCH, `Unexpected epoch. Proposal must target epoch ${nextEpochStr} but got ${proposedEpochStr}.`, node.from.key)
+            this.#safeLogApply(OperationType.SET_EPOCH, `Unexpected epoch. Proposal must target epoch ${nextEpochStr} but got ${toUIntString(proposedEpochBuffer)}.`, node.from.key)
             return Status.FAILURE;
         }
 
