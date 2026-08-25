@@ -3725,7 +3725,7 @@ class State extends ReadyResource {
             console.info(`Epoch ${nextEpochStr} committed. proposer:approvals - ${proposerAddress}:${op.seo.app.length}`);
         }
 
-        this.#emitEvent(CustomEventType.EPOCH_CREATED, { epoch: nextEpochStr, proposerAddress }); // notify epoch committed
+        this.#emitEvent(CustomEventType.EPOCH_CREATED, { epoch: nextEpochBuffer, proposerAddress }); // notify epoch committed
         return Status.SUCCESS;
     }
 

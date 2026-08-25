@@ -10,6 +10,7 @@ import {
 } from './setEpochScenarioHelpers.js';
 import { EntryType, CustomEventType } from '../../../../../src/utils/constants.js';
 import { safeDecodeEpochProof } from '../../../../../src/codecs/apply/applyOperationCodec.js';
+import { uint64ToBuffer } from '../../../../../src/utils/buffer.js';
 
 test('State.apply SET_EPOCH: proposer alone satisfies quorum when it is the sole indexer, and commits the epoch', async t => {
     const context = await setupSetEpochScenario(t);
@@ -23,7 +24,7 @@ test('State.apply SET_EPOCH: proposer alone satisfies quorum when it is the sole
 
     t.alike(
         epochCreatedEvent,
-        { epoch: '1', proposerAddress: adminNode.wallet.address },
+        { epoch: uint64ToBuffer(1n), proposerAddress: adminNode.wallet.address },
         'EPOCH_CREATED identifies the committed epoch and proposer'
     );
     t.is(await getCurrentEpoch(adminNode.base), 1n, 'current epoch advanced to 1');
