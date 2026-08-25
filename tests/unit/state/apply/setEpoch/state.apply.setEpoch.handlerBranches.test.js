@@ -129,6 +129,31 @@ test('State.apply SET_EPOCH commits when an EPOCH_CREATED listener throws', asyn
     t.ok(b4a.equals(reverseEntry?.value, expected.encodedProof), 'reverse epoch proof still commits');
 });
 
+test('State.apply SET_EPOCH isolates persisted state from EPOCH_CREATED payload mutations', async t => {
+    const context = await setupSetEpochScenario(t);
+    const base = context.adminBootstrap.base;
+    const payload = await buildSetEpochPayload(context, { approverNodes: [] });
+    const expected = await expectedEpochWrites(payload);
+    let emittedEpoch = null;
+
+    context.adminBootstrap.state.once(CustomEventType.EPOCH_CREATED, ({ epoch }) => {
+        emittedEpoch = epoch;
+        epoch.fill(0xff);
+    });
+    await appendAndUpdate(base, payload);
+
+    const currentEpochEntry = await base.view.get(EntryType.EPOCH_CURRENT);
+    const forwardEntry = await base.view.get(expected.forwardKey);
+    const reverseEntry = await base.view.get(expected.reverseKey);
+    t.ok(
+        emittedEpoch && b4a.equals(emittedEpoch, b4a.alloc(8, 0xff)),
+        'listener mutates the emitted buffer'
+    );
+    t.ok(b4a.equals(currentEpochEntry?.value, expected.currentEpoch), 'current epoch remains canonical');
+    t.ok(b4a.equals(forwardEntry?.value, expected.proofHash), 'forward epoch record remains correct');
+    t.ok(b4a.equals(reverseEntry?.value, expected.encodedProof), 'reverse epoch proof remains correct');
+});
+
 nodeOnlyTest('State.apply SET_EPOCH encoding failure leaves all epoch records atomic and emits no event', async t => {
     const context = await setupSetEpochScenario(t);
     const payload = await buildSetEpochPayload(context, { approverNodes: [] });
