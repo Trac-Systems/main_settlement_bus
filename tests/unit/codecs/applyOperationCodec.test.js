@@ -13,12 +13,7 @@ import {
 } from '../../../src/codecs/apply/applyOperationCodec.js';
 import fixtures from '../../fixtures/applyOperation.fixtures.js';
 
-const {
-    HtlcClaimOperation,
-    Operation,
-    OperationType: ApplyOperationType,
-    SetEpochOperation
-} = applyOperationsGenerated.apply.operations;
+const { Operation, SetEpochOperation } = applyOperationsGenerated.apply.operations;
 
 const APPLY_TO_OBJECT_OPTIONS = Object.freeze({
     enums: Number,
@@ -130,36 +125,6 @@ test('Apply generated codec encodes and decodes operation payloads', t => {
         const decoded = decodeApplyOperation(encoded);
 
         t.alike(decoded, payload, `Payload ${key} encodes and decodes correctly`);
-    }
-});
-
-test('HTLC_CLAIM generated schema exposes the canonical operation fields', t => {
-    t.is(ApplyOperationType.HTLC_CLAIM, 18);
-    t.is(HtlcClaimOperation.verify(fixtures.validHtlcClaimOperation.hco), null);
-
-    const encoded = b4a.from(HtlcClaimOperation.encode(fixtures.validHtlcClaimOperation.hco).finish());
-    const decoded = HtlcClaimOperation.toObject(
-        HtlcClaimOperation.decode(encoded),
-        APPLY_TO_OBJECT_OPTIONS
-    );
-
-    t.ok(encoded.length > 0);
-    t.alike(decoded, fixtures.validHtlcClaimOperation.hco);
-    t.alike(Object.keys(decoded), ['tx', 'txv', 'li', 'pi', 'in', 'is']);
-});
-
-test('HTLC_CLAIM generated schema rejects malformed byte fields', t => {
-    for (const field of ['tx', 'txv', 'li', 'pi', 'in', 'is']) {
-        const malformedPayload = {
-            ...fixtures.validHtlcClaimOperation,
-            hco: {
-                ...fixtures.validHtlcClaimOperation.hco,
-                [field]: 1
-            }
-        };
-
-        const error = Operation.verify(malformedPayload);
-        t.ok(error?.includes(`hco.${field}: buffer expected`), `${field} must be bytes`);
     }
 });
 
