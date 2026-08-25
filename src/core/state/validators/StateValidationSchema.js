@@ -16,6 +16,8 @@ import {
     VDF_BLOB_PROOF_SIZE,
     CONSENSUS_CONFIG_SCHEMA_VERSION_BYTE_LENGTH,
     CONSENSUS_CONFIG_DATA_MAX_SIZE,
+    HTLC_LOCK_ID_BYTE_LENGTH,
+    HTLC_PREIMAGE_BYTE_LENGTH,
 } from '../../../utils/constants.js';
 import {
     decodeProofProposalApproval,
@@ -35,6 +37,7 @@ class StateValidationSchema {
     #validateBalanceInitializationSchema;
     #validateSetEpochOperationSchema;
     #validateConsensusControlOperationSchema;
+    #validateHtlcClaimOperationSchema;
     #proofDataFields;
     #config;
 
@@ -293,6 +296,7 @@ class StateValidationSchema {
         this.#validateBalanceInitializationSchema = this.#compileBalanceInitializationSchema();
         this.#validateSetEpochOperationSchema = this.#compileSetEpochOperationSchema();
         this.#validateConsensusControlOperationSchema = this.#compileConsensusControlOperationSchema();
+        this.#validateHtlcClaimOperationSchema = this.#compileHtlcClaimOperationSchema();
 
     }
 
@@ -701,6 +705,31 @@ class StateValidationSchema {
 
     validateConsensusControlOperation(op) {
         return this.#validateConsensusControlOperationSchema(op) === true;
+    }
+
+    #compileHtlcClaimOperationSchema() {
+        const schema = {
+            $$strict: true,
+            type: this.#operationTypeDomain(OperationType.HTLC_CLAIM),
+            address: {type: 'buffer', length: this.#config.addressLength, required: true},
+            hco: {
+                strict: true,
+                type: 'object',
+                props: {
+                    tx: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
+                    txv: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
+                    li: {type: 'buffer', length: HTLC_LOCK_ID_BYTE_LENGTH, required: true},
+                    pi: {type: 'buffer', length: HTLC_PREIMAGE_BYTE_LENGTH, required: true},
+                    in: {type: 'buffer', length: NONCE_BYTE_LENGTH, required: true},
+                    is: {type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true},
+                }
+            }
+        };
+        return this.#validator.compile(schema);
+    }
+
+    validateHtlcClaimOperation(op) {
+        return this.#validateHtlcClaimOperationSchema(op) === true;
     }
 
 }
