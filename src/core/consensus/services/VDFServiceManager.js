@@ -137,11 +137,11 @@ export class VDFServiceManager {
      * @returns {Promise<unknown>}
      */
     #enqueue(operation) {
-        const queued = this.#queue
-            .catch(() => {})
-            .then(operation);
+        const result = this.#queue.then(operation);
 
-        this.#queue = queued.catch(() => {});
-        return queued;
+        // Keep the internal queue usable after a failed operation.
+        this.#queue = result.catch(() => {});
+
+        return result;
     }
 }
