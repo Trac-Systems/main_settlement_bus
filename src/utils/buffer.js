@@ -242,11 +242,12 @@ export function incrementBuffer(buffer, enforceLength = null) {
  *
  * @param {Buffer} buffer - The unsigned integer to convert.
  * @param {'decimal'|'hex'} [encoding='decimal'] - Output encoding.
- * @returns {string|null} The normalized numeric string, or null for invalid input.
+ * @returns {string} The normalized numeric string.
+ * @throws {TypeError} When the input or encoding is invalid.
  */
 export function toUIntString(buffer, encoding = 'decimal') {
     if (!b4a.isBuffer(buffer) || buffer.length === 0 || buffer.length > 16) {
-        return null;
+        throw new TypeError('Input must contain between 1 and 16 bytes.');
     }
 
     switch (encoding) {
@@ -272,6 +273,22 @@ export function toUIntString(buffer, encoding = 'decimal') {
             return digits.reverse().join('');
         }
         default:
-            return null;
+            throw new TypeError("Unsupported encoding. Use 'hex' or 'decimal'.");
+    }
+}
+
+/**
+ * Safely converts a big-endian unsigned integer buffer to a numeric string.
+ *
+ * @param {Buffer} buffer - The unsigned integer to convert.
+ * @param {'decimal'|'hex'} [encoding='decimal'] - Output encoding.
+ * @returns {string|null} The normalized numeric string, or null for invalid input.
+ */
+export function safeToUIntString(buffer, encoding = 'decimal') {
+    try {
+        return toUIntString(buffer, encoding);
+    }
+    catch {
+        return null;
     }
 }

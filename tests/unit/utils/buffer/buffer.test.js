@@ -7,6 +7,7 @@ import {
     safeReadUint32BE,
     incrementBuffer,
     toUIntString,
+    safeToUIntString,
     safeUint8ToBuffer,
     safeUint16ToBuffer,
     safeWriteUInt32BE,
@@ -523,6 +524,7 @@ test('toUIntString - converts big-endian buffers to decimal strings', t => {
     t.is(toUIntString(b4a.from('00', 'hex')), '0', 'converts zero');
     t.is(toUIntString(b4a.from('000001', 'hex')), '1', 'removes leading zeroes');
     t.is(toUIntString(b4a.from('0100', 'hex')), '256', 'converts multiple bytes');
+    t.is(toUIntString(b4a.from('0100', 'hex'), 'decimal'), '256', 'accepts the documented decimal encoding');
     t.is(
         toUIntString(b4a.from('ffffffffffffffff', 'hex')),
         '18446744073709551615',
@@ -545,11 +547,20 @@ test('toUIntString - converts big-endian buffers to hexadecimal strings', t => {
     );
 });
 
-test('toUIntString - returns null for invalid input or encoding', t => {
-    t.is(toUIntString(null), null, 'rejects non-buffer input');
-    t.is(toUIntString(b4a.alloc(0)), null, 'rejects an empty buffer');
-    t.is(toUIntString(b4a.alloc(17)), null, 'rejects buffers longer than 16 bytes');
-    t.is(toUIntString(b4a.from([1]), 'binary'), null, 'rejects unsupported encodings');
+test('toUIntString - throws for invalid input or encoding', async t => {
+    await t.exception.all(() => toUIntString(null), /between 1 and 16 bytes/, 'rejects non-buffer input');
+    await t.exception.all(() => toUIntString(b4a.alloc(0)), /between 1 and 16 bytes/, 'rejects an empty buffer');
+    await t.exception.all(() => toUIntString(b4a.alloc(17)), /between 1 and 16 bytes/, 'rejects buffers longer than 16 bytes');
+    await t.exception.all(() => toUIntString(b4a.from([1]), 'binary'), /Unsupported encoding/, 'rejects unsupported encodings');
+});
+
+test('safeToUIntString - converts valid input and returns null for invalid input', t => {
+    t.is(safeToUIntString(b4a.from('0100', 'hex')), '256', 'uses decimal by default');
+    t.is(safeToUIntString(b4a.from('000001ff', 'hex'), 'hex'), '1ff', 'supports hexadecimal output');
+    t.is(safeToUIntString(null), null, 'rejects non-buffer input');
+    t.is(safeToUIntString(b4a.alloc(0)), null, 'rejects an empty buffer');
+    t.is(safeToUIntString(b4a.alloc(17)), null, 'rejects buffers longer than 16 bytes');
+    t.is(safeToUIntString(b4a.from([1]), 'binary'), null, 'rejects unsupported encodings');
 });
 
 test('createMessage ignores invalid values when valid buffers are present', t => {

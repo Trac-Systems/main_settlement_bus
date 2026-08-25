@@ -46,7 +46,7 @@ import {
     uint16ToBuffer,
     isBufferValid,
     incrementBuffer,
-    toUIntString
+    safeToUIntString
 } from '../../utils/buffer.js';
 import { safeDecodeProofProposal, safeDecodeProofProposalApproval } from '../../codecs/consensus/v1/consensusV1OperationCodec.js';
 import addressUtils from './utils/address.js';
@@ -3550,8 +3550,12 @@ class State extends ReadyResource {
         const epochIndexCompare = b4a.compare(nextEpochBuffer, proposedEpochBuffer)
 
         // String helpers
-        const currentEpochStr = toUIntString(currentEpochBuffer);
-        const nextEpochStr = toUIntString(nextEpochBuffer);
+        const currentEpochStr = safeToUIntString(currentEpochBuffer);
+        const nextEpochStr = safeToUIntString(nextEpochBuffer);
+        if (nextEpochStr === null || proposedEpochStr === null) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Epoch index data is malformed or corrupted.", node.from.key)
+            return Status.FAILURE;
+        }
 
         if (epochIndexCompare > 0) { // proposedEpoch < nextEpoch
             this.#safeLogApply(OperationType.SET_EPOCH, `Stale epoch proposal. Epoch ${currentEpochStr} is already committed.`, node.from.key)
@@ -3559,7 +3563,7 @@ class State extends ReadyResource {
         }
 
         if (epochIndexCompare < 0) { // proposedEpoch > nextEpoch
-            this.#safeLogApply(OperationType.SET_EPOCH, `Unexpected epoch. Proposal must target epoch ${nextEpochStr} but got ${toUIntString(proposedEpochBuffer)}.`, node.from.key)
+            this.#safeLogApply(OperationType.SET_EPOCH, `Unexpected epoch. Proposal must target epoch ${nextEpochStr} but got ${safeToUIntString(proposedEpochBuffer)}.`, node.from.key)
             return Status.FAILURE;
         }
 
