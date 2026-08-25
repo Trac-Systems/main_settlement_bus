@@ -344,25 +344,7 @@ class EpochCoordinatorService extends SchedulableService {
 
                 const targetEpoch = stateMachine.context.currentEpoch + 1n;
                 stopAppendListener = listenTo(this.#state, CustomEventType.EPOCH_CREATED, ({ epoch, proposerAddress }) => {
-                    if (
-                        typeof epoch !== 'string' ||
-                        epoch.length === 0 ||
-                        epoch.length > 20 ||
-                        !/^\d+$/.test(epoch)
-                    ) {
-                        this.#logger.error(
-                            '[EpochCoordinatorService] Ignoring EPOCH_CREATED: epoch must be a decimal uint64 string.'
-                        );
-                        return;
-                    }
-
                     const epochUInt = BigInt(epoch);
-                    if (epochUInt > 0xFFFFFFFFFFFFFFFFn) {
-                        this.#logger.error(
-                            '[EpochCoordinatorService] Ignoring EPOCH_CREATED: epoch exceeds the uint64 range.'
-                        );
-                        return;
-                    }
                     if (epochUInt !== targetEpoch) return;
                     stateMachine.send(
                         proposerAddress === this.#wallet.address
