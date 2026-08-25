@@ -1,7 +1,6 @@
 import test from 'brittle';
 import sinon from 'sinon';
 import { CustomEventType } from '../../../../../../src/utils/constants.js';
-import { SCHEDULABLE_SERVICE_EVENTS } from '../../../../../../src/utils/scheduler/SchedulableService.js';
 import { EPOCH_EVENTS, EPOCH_STATES } from '../../../../../../src/core/consensus/services/EpochStateMachine.js';
 import { EpochRoundListeners } from '../../../../../../src/core/consensus/services/EpochRoundListeners.js';
 import { CONFIG, drainMicrotasks, makeEmitter } from '../epochCoordinatorTestHelpers.js';
@@ -39,6 +38,9 @@ function makeMachine() {
         closeListenerCount() {
             return lifecycle.listenerCount('close');
         },
+        shouldRun() {
+            return !closing;
+        },
         sentEvents,
         trace,
     };
@@ -75,28 +77,26 @@ function makeMachine() {
 
 function setup(overrides = {}) {
     const state = makeEmitter();
-    const stopEmitter = makeEmitter();
     const machine = makeMachine();
     const wallet = { address: 'trac1wallet' };
     const config = { ...CONFIG, ...(overrides.config ?? {}) };
     const intervalMs = overrides.intervalMs ?? CONFIG.epochInterval;
     const listeners = new EpochRoundListeners({
         state,
-        stopEmitter,
         machine,
         wallet,
         config,
         intervalMs,
+        isRoundActive: () => machine.shouldRun(),
     });
     listeners.start();
 
-    return { state, stopEmitter, machine, wallet, config, intervalMs, listeners };
+    return { state, machine, wallet, config, intervalMs, listeners };
 }
 
 test('start registers round listeners and machine close removes them all', async t => {
-    const { state, stopEmitter, machine } = setup();
+    const { state, machine } = setup();
 
-    t.is(stopEmitter.listenerCount(SCHEDULABLE_SERVICE_EVENTS.STOP), 1);
     t.is(state.listenerCount(CustomEventType.EPOCH_PROPOSAL_VALIDATION_SUCCESS), 1);
     t.is(state.listenerCount(CustomEventType.EPOCH_CREATED), 1);
     t.is(machine.transitionListenerCount(), 1);
@@ -104,26 +104,24 @@ test('start registers round listeners and machine close removes them all', async
 
     await machine.close();
 
-    t.is(stopEmitter.listenerCount(SCHEDULABLE_SERVICE_EVENTS.STOP), 0);
     t.is(state.listenerCount(CustomEventType.EPOCH_PROPOSAL_VALIDATION_SUCCESS), 0);
     t.is(state.listenerCount(CustomEventType.EPOCH_CREATED), 0);
     t.is(machine.transitionListenerCount(), 0);
     t.is(machine.closeListenerCount(), 0);
 });
 
-test('STOP closes the machine and cancels a pending signature timeout', async t => {
+test('machine close cancels a pending signature timeout', async t => {
     const clock = sinon.useFakeTimers();
     try {
-        const { stopEmitter, machine } = setup({ config: { epochSignatureTimeout: 1000 } });
+        const { machine } = setup({ config: { epochSignatureTimeout: 1000 } });
         machine.transition(EPOCH_STATES.COLLECT_APPROVALS);
 
-        await stopEmitter.emit(SCHEDULABLE_SERVICE_EVENTS.STOP);
+        await machine.close();
         await drainMicrotasks();
         await clock.tickAsync(1100);
 
         t.ok(machine.close.calledOnce);
         t.alike(machine.sentEvents, []);
-        t.is(stopEmitter.listenerCount(SCHEDULABLE_SERVICE_EVENTS.STOP), 0);
     } finally {
         clock.restore();
     }

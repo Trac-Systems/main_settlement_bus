@@ -13,7 +13,6 @@ import {
     uint64ToBuffer,
     uint8ToBuffer,
 } from '../../../../../../src/utils/buffer.js';
-import { SCHEDULABLE_SERVICE_EVENTS } from '../../../../../../src/utils/scheduler/SchedulableService.js';
 import { EpochCoordinationRound } from '../../../../../../src/core/consensus/services/EpochCoordinationRound.js';
 import { addressToBuffer } from '../../../../../../src/core/state/utils/address.js';
 import {
@@ -21,10 +20,19 @@ import {
     drainMicrotasks,
     flush,
     makeConfirmation,
-    makeEmitter,
     makeOperations,
     makeState,
 } from '../epochCoordinatorTestHelpers.js';
+
+const deferred = () => {
+    let resolve;
+    let reject;
+    const promise = new Promise((resolvePromise, rejectPromise) => {
+        resolve = resolvePromise;
+        reject = rejectPromise;
+    });
+    return { promise, resolve, reject };
+};
 
 function setupRound(overrides = {}) {
     const state = makeState(overrides.stateOverrides);
@@ -41,18 +49,21 @@ function setupRound(overrides = {}) {
         error: sinon.stub(),
         info: sinon.stub(),
     };
-    const stopEmitter = makeEmitter();
+    const rounds = [];
 
-    const createRound = () => new EpochCoordinationRound({
-        state,
-        wallet,
-        config,
-        manager,
-        logger,
-        operations,
-        intervalMs: config.epochInterval,
-        stopEmitter,
-    });
+    const createRound = () => {
+        const round = new EpochCoordinationRound({
+            state,
+            wallet,
+            config,
+            manager,
+            logger,
+            operations,
+            intervalMs: config.epochInterval,
+        });
+        rounds.push(round);
+        return round;
+    };
 
     const runRound = async (next = sinon.stub()) => {
         const round = createRound();
@@ -67,12 +78,24 @@ function setupRound(overrides = {}) {
         wallet,
         manager,
         logger,
-        stopEmitter,
         createRound,
         runRound,
-        closeRounds: () => stopEmitter.emit(SCHEDULABLE_SERVICE_EVENTS.STOP),
+        closeRounds: () => Promise.all(rounds.map(round => round.cancel())),
     };
 }
+
+test('an absent epoch finishes the round without starting consensus work', async t => {
+    const context = setupRound({
+        stateOverrides: { getCurrentEpoch: sinon.stub().resolves(null) },
+    });
+    t.teardown(context.closeRounds);
+    const next = sinon.stub();
+
+    await context.runRound(next);
+
+    t.ok(next.calledOnceWith(CONFIG.epochInterval));
+    t.absent(context.operations.calculateVDF.called);
+});
 
 test('queries the indexer count once per round', async t => {
     const context = setupRound({
@@ -265,56 +288,75 @@ test('one failed request does not fail a round while quorum remains reachable', 
 });
 
 test('an unreachable quorum backs off and exits after discovering a newer epoch', async t => {
-    const approvers = [{ key: b4a.alloc(32, 0x02) }, { key: b4a.alloc(32, 0x03) }];
-    const getCurrentEpoch = sinon.stub();
-    getCurrentEpoch.onFirstCall().resolves(5n);
-    getCurrentEpoch.resolves(6n);
-    const context = setupRound({
-        stateOverrides: {
-            indexerCount: sinon.stub().resolves(3),
-            getCurrentEpoch,
-        },
-        opsOverrides: {
-            approvers: sinon.stub().resolves(approvers),
-            collectSignature: sinon.stub().rejects(new Error('no signature')),
-        },
-    });
-    t.teardown(context.closeRounds);
-    const next = sinon.stub();
+    const clock = sinon.useFakeTimers();
+    let context;
+    try {
+        const approvers = [{ key: b4a.alloc(32, 0x02) }, { key: b4a.alloc(32, 0x03) }];
+        const getCurrentEpoch = sinon.stub();
+        getCurrentEpoch.onCall(0).resolves(5n);
+        getCurrentEpoch.onCall(1).resolves(5n);
+        getCurrentEpoch.resolves(6n);
+        context = setupRound({
+            stateOverrides: {
+                indexerCount: sinon.stub().resolves(3),
+                getCurrentEpoch,
+            },
+            opsOverrides: {
+                approvers: sinon.stub().resolves(approvers),
+                collectSignature: sinon.stub().rejects(new Error('no signature')),
+            },
+        });
+        const next = sinon.stub();
 
-    await context.runRound(next);
-    await flush();
+        await context.runRound(next);
+        await drainMicrotasks();
+        t.absent(context.state.refresh.called);
 
-    t.ok(context.state.refresh.calledOnce);
-    t.absent(context.operations.buildSetEpochPayload.called);
-    t.absent(context.operations.appendSetEpoch.called);
-    t.ok(next.calledOnceWith(CONFIG.epochInterval));
+        await clock.tickAsync(CONFIG.epochBackoffDelay);
+
+        t.ok(context.state.refresh.calledOnce);
+        t.absent(context.operations.buildSetEpochPayload.called);
+        t.absent(context.operations.appendSetEpoch.called);
+        t.ok(next.calledOnceWith(CONFIG.epochInterval));
+    } finally {
+        await context?.closeRounds();
+        clock.restore();
+    }
 });
 
 test('approval rejection retries within the same round using the local VDF', async t => {
-    const approvers = [{ key: b4a.alloc(32, 0x02) }];
-    const rejection = new Error('epoch mismatch');
-    rejection.resultCode = ConsensusResultCode.EPOCH_INVALID;
-    const context = setupRound({
-        stateOverrides: { indexerCount: sinon.stub().resolves(3) },
-        opsOverrides: {
-            approvers: sinon.stub().resolves(approvers),
-            collectSignature: sinon.stub()
-                .onFirstCall().rejects(rejection)
-                .onSecondCall().resolves(makeConfirmation()),
-        },
-    });
-    t.teardown(context.closeRounds);
+    const clock = sinon.useFakeTimers();
+    let context;
+    try {
+        const approvers = [{ key: b4a.alloc(32, 0x02) }];
+        const rejection = new Error('epoch mismatch');
+        rejection.resultCode = ConsensusResultCode.EPOCH_INVALID;
+        context = setupRound({
+            stateOverrides: { indexerCount: sinon.stub().resolves(3) },
+            opsOverrides: {
+                approvers: sinon.stub().resolves(approvers),
+                collectSignature: sinon.stub()
+                    .onFirstCall().rejects(rejection)
+                    .onSecondCall().resolves(makeConfirmation()),
+            },
+        });
 
-    await context.runRound();
-    await flush();
+        await context.runRound();
+        await drainMicrotasks();
+        t.is(context.operations.collectSignature.callCount, 1);
 
-    t.is(context.operations.calculateVDF.callCount, 1);
-    t.is(context.operations.createProofProposal.callCount, 2);
-    t.is(context.operations.collectSignature.callCount, 2);
-    t.ok(context.state.refresh.calledOnce);
-    t.ok(context.operations.buildSetEpochPayload.calledOnce);
-    t.ok(context.operations.appendSetEpoch.calledOnce);
+        await clock.tickAsync(CONFIG.epochBackoffDelay);
+
+        t.is(context.operations.calculateVDF.callCount, 1);
+        t.is(context.operations.createProofProposal.callCount, 2);
+        t.is(context.operations.collectSignature.callCount, 2);
+        t.ok(context.state.refresh.calledOnce);
+        t.ok(context.operations.buildSetEpochPayload.calledOnce);
+        t.ok(context.operations.appendSetEpoch.calledOnce);
+    } finally {
+        await context?.closeRounds();
+        clock.restore();
+    }
 });
 
 test('collection timeout traverses BACKOFF and signed-state refresh on the real FSM', async t => {
@@ -322,7 +364,8 @@ test('collection timeout traverses BACKOFF and signed-state refresh on the real 
     let context;
     try {
         const getCurrentEpoch = sinon.stub();
-        getCurrentEpoch.onFirstCall().resolves(5n);
+        getCurrentEpoch.onCall(0).resolves(5n);
+        getCurrentEpoch.onCall(1).resolves(5n);
         getCurrentEpoch.resolves(6n);
         context = setupRound({
             stateOverrides: {
@@ -338,11 +381,15 @@ test('collection timeout traverses BACKOFF and signed-state refresh on the real 
         const next = sinon.stub();
 
         await context.runRound(next);
-        await clock.tickAsync(1100);
+        await clock.tickAsync(2000);
 
         t.ok(context.state.refresh.calledOnce);
         t.absent(context.operations.appendSetEpoch.called);
         t.ok(next.calledOnceWith(CONFIG.epochInterval));
+        t.ok(context.logger.warn.calledOnceWithExactly(
+            '[EpochCoordinationRound] approval collection failed for epoch 6; ' +
+            'entering backoff after receiving 0 of 1 required external approvals.',
+        ));
     } finally {
         await context?.closeRounds();
         clock.restore();
@@ -361,7 +408,7 @@ test('a late approval remains isolated from a later round', async t => {
         collectSignature.onCall(1).returns(new Promise(resolve => { resolveSecond = resolve; }));
         const getCurrentEpoch = sinon.stub();
         getCurrentEpoch.onCall(0).resolves(5n);
-        getCurrentEpoch.onCall(1).resolves(6n);
+        getCurrentEpoch.onCall(1).resolves(5n);
         getCurrentEpoch.resolves(6n);
         context = setupRound({
             stateOverrides: {
@@ -373,7 +420,7 @@ test('a late approval remains isolated from a later round', async t => {
         });
 
         await context.runRound();
-        await clock.tickAsync(1100);
+        await clock.tickAsync(2000);
         t.ok(context.state.refresh.calledOnce);
         await context.runRound();
         t.is(collectSignature.callCount, 2);
@@ -394,7 +441,7 @@ test('a late approval remains isolated from a later round', async t => {
 test('an already-signed target ends the round without appending', async t => {
     const getCurrentEpoch = sinon.stub();
     getCurrentEpoch.onCall(0).resolves(5n);
-    getCurrentEpoch.onCall(1).resolves(6n);
+    getCurrentEpoch.onCall(1).resolves(5n);
     getCurrentEpoch.resolves(6n);
     const context = setupRound({
         stateOverrides: { getCurrentEpoch },
@@ -411,21 +458,31 @@ test('an already-signed target ends the round without appending', async t => {
 });
 
 test('append failure retries within the same round using the local VDF', async t => {
-    const appendSetEpoch = sinon.stub();
-    appendSetEpoch.onFirstCall().rejects(new Error('append failed'));
-    appendSetEpoch.onSecondCall().resolves();
-    const context = setupRound({
-        opsOverrides: { appendSetEpoch },
-    });
-    t.teardown(context.closeRounds);
+    const clock = sinon.useFakeTimers();
+    let context;
+    try {
+        const appendSetEpoch = sinon.stub();
+        appendSetEpoch.onFirstCall().rejects(new Error('append failed'));
+        appendSetEpoch.onSecondCall().resolves();
+        context = setupRound({
+            opsOverrides: { appendSetEpoch },
+        });
 
-    await context.runRound();
-    await flush();
+        const running = context.runRound();
+        await clock.tickAsync(0);
+        t.is(context.operations.appendSetEpoch.callCount, 1);
 
-    t.is(context.operations.calculateVDF.callCount, 1);
-    t.is(context.operations.createProofProposal.callCount, 2);
-    t.is(context.operations.appendSetEpoch.callCount, 2);
-    t.ok(context.state.refresh.calledOnce);
+        await clock.tickAsync(CONFIG.epochBackoffDelay);
+        await running;
+
+        t.is(context.operations.calculateVDF.callCount, 1);
+        t.is(context.operations.createProofProposal.callCount, 2);
+        t.is(context.operations.appendSetEpoch.callCount, 2);
+        t.ok(context.state.refresh.calledOnce);
+    } finally {
+        await context?.closeRounds();
+        clock.restore();
+    }
 });
 
 test('append completion waits for the target EPOCH_CREATED event', async t => {
@@ -484,6 +541,157 @@ test('global EPOCH_CREATED outside append state closes and schedules the round',
     await context.state.emit(CustomEventType.EPOCH_CREATED);
 
     t.ok(next.calledOnceWith(CONFIG.epochInterval));
+});
+
+test('cancel during the epoch preflight prevents the round from starting', async t => {
+    const epoch = deferred();
+    const context = setupRound({
+        stateOverrides: { getCurrentEpoch: sinon.stub().returns(epoch.promise) },
+    });
+    const round = context.createRound();
+    const next = sinon.stub();
+    const running = round.run(next);
+    await drainMicrotasks();
+
+    await round.cancel();
+    epoch.resolve(5n);
+    await running;
+
+    t.absent(context.operations.calculateVDF.called);
+    t.absent(next.called);
+});
+
+test('cancel stops a pending VDF path and ignores its late result', async t => {
+    const calculation = deferred();
+    const context = setupRound({
+        opsOverrides: { calculateVDF: sinon.stub().returns(calculation.promise) },
+    });
+    const round = context.createRound();
+    const next = sinon.stub();
+    const running = round.run(next);
+    await flush();
+    t.ok(context.operations.calculateVDF.calledOnce);
+
+    await round.cancel();
+    calculation.resolve({ solution: b4a.alloc(8), difficulty: 100, discriminantSizeBits: 2048 });
+    await running;
+
+    t.absent(context.operations.createProofProposal.called);
+    t.absent(next.called);
+});
+
+test('cancel during manager connection prevents approval requests', async t => {
+    const connection = deferred();
+    const context = setupRound({
+        stateOverrides: { indexerCount: sinon.stub().resolves(3) },
+        managerOverrides: { connect: sinon.stub().returns(connection.promise) },
+    });
+    const round = context.createRound();
+    const running = round.run();
+    await flush();
+    t.ok(context.manager.connect.calledOnce);
+
+    await round.cancel();
+    connection.resolve();
+    await running;
+
+    t.absent(context.operations.collectSignature.called);
+});
+
+test('cancel ignores an approval received after its request was sent', async t => {
+    const approval = deferred();
+    const context = setupRound({
+        stateOverrides: { indexerCount: sinon.stub().resolves(3) },
+        opsOverrides: {
+            approvers: sinon.stub().resolves([{ key: b4a.alloc(32, 0x02) }]),
+            collectSignature: sinon.stub().returns(approval.promise),
+        },
+    });
+    const round = context.createRound();
+    await round.run();
+    t.ok(context.operations.collectSignature.calledOnce);
+
+    await round.cancel();
+    approval.resolve(makeConfirmation());
+    await drainMicrotasks();
+
+    t.absent(context.operations.buildSetEpochPayload.called);
+});
+
+test('cancel while building the payload prevents a stale append', async t => {
+    const payload = deferred();
+    const context = setupRound({
+        opsOverrides: { buildSetEpochPayload: sinon.stub().returns(payload.promise) },
+    });
+    const round = context.createRound();
+    const running = round.run();
+    await flush();
+    t.ok(context.operations.buildSetEpochPayload.calledOnce);
+
+    await round.cancel();
+    payload.resolve(b4a.alloc(64, 0xdd));
+    await running;
+
+    t.absent(context.operations.appendSetEpoch.called);
+});
+
+test('cancel ignores a late append failure', async t => {
+    const append = deferred();
+    const context = setupRound({
+        opsOverrides: { appendSetEpoch: sinon.stub().returns(append.promise) },
+    });
+    const round = context.createRound();
+    const next = sinon.stub();
+    const running = round.run(next);
+    await flush();
+    t.ok(context.operations.appendSetEpoch.calledOnce);
+
+    await round.cancel();
+    append.reject(new Error('late append failure'));
+    await running;
+
+    t.absent(context.logger.error.called);
+    t.absent(next.called);
+});
+
+test('cancel interrupts the remote-proposal delay', async t => {
+    const proposal = deferred();
+    const context = setupRound({
+        config: { epochRemoteProposalTimeout: 60_000 },
+        opsOverrides: { createProofProposal: sinon.stub().returns(proposal.promise) },
+    });
+    const round = context.createRound();
+    const running = round.run();
+    await drainMicrotasks();
+
+    await context.state.emit(CustomEventType.EPOCH_PROPOSAL_VALIDATION_SUCCESS);
+    proposal.resolve({ proof_proposal: { epoch: b4a.alloc(8) } });
+    await drainMicrotasks();
+    await round.cancel();
+    await running;
+
+    t.is(context.state.getCurrentEpoch.callCount, 2);
+    t.absent(context.operations.buildSetEpochPayload.called);
+});
+
+test('cancel interrupts the backoff delay', async t => {
+    const context = setupRound({
+        config: { epochBackoffDelay: 60_000 },
+        stateOverrides: { indexerCount: sinon.stub().resolves(3) },
+        opsOverrides: {
+            approvers: sinon.stub().resolves([{ key: b4a.alloc(32, 0x02) }]),
+            collectSignature: sinon.stub().rejects(new Error('no signature')),
+        },
+    });
+    const round = context.createRound();
+
+    await round.run();
+    await drainMicrotasks();
+    t.ok(context.logger.warn.calledOnce);
+
+    await round.cancel();
+
+    t.absent(context.state.refresh.called);
 });
 
 test('a fresh round reads an epoch that advanced since the previous round', async t => {

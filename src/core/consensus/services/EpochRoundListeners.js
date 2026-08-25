@@ -1,33 +1,41 @@
-import { SCHEDULABLE_SERVICE_EVENTS } from '../../../utils/scheduler/SchedulableService.js';
 import { CustomEventType } from '../../../utils/constants.js';
 import { EPOCH_EVENTS, EPOCH_STATES } from './EpochStateMachine.js';
 
+/**
+ * Adds an event listener and returns a function which removes it.
+ *
+ * @returns {() => void}
+ */
 const listenTo = (eventEmitter, event, handler) => {
     eventEmitter.on(event, handler);
     return () => eventEmitter.off(event, handler);
 };
 
-/** Owns event subscriptions and timers for one epoch round. */
+/** Keeps event listeners and timers for one epoch round. */
 export class EpochRoundListeners {
     #state;
-    #stopEmitter;
     #machine;
     #wallet;
     #config;
     #intervalMs;
+    #isRoundActive;
     #cleanups = [];
 
-    constructor({ state, stopEmitter, machine, wallet, config, intervalMs }) {
+    /** Creates listeners for one state machine round. */
+    constructor({ state, machine, wallet, config, intervalMs, isRoundActive }) {
         this.#state = state;
-        this.#stopEmitter = stopEmitter;
         this.#machine = machine;
         this.#wallet = wallet;
         this.#config = config;
         this.#intervalMs = intervalMs;
+        this.#isRoundActive = isRoundActive;
     }
 
+    /**
+     * Starts listeners and timers for this round.
+     * They are removed when the state machine closes.
+     */
     start() {
-        this.#listenForStop();
         this.#listenForRemoteProposal();
         this.#listenForEpochCreated();
         this.#listenForStateTransitions();
@@ -35,48 +43,55 @@ export class EpochRoundListeners {
         this.#machine.once('close', () => this.#cleanup());
     }
 
+    /** Removes all listeners and timers created by {@link start}. */
     #cleanup() {
         for (const cleanup of this.#cleanups.splice(0)) {
             cleanup();
         }
     }
 
-    #listenForStop() {
-        this.#cleanups.push(
-            listenTo(this.#stopEmitter, SCHEDULABLE_SERVICE_EVENTS.STOP, () => {
-                this.#machine.close();
-            }),
-        );
-    }
-
+    /** Saves information about a valid remote proposal. */
     #listenForRemoteProposal() {
         this.#cleanups.push(
             listenTo(this.#state, CustomEventType.EPOCH_PROPOSAL_VALIDATION_SUCCESS, () => {
+                if (!this.#isRoundActive()) return;
                 this.#machine.appendContext({ remoteProposalReceived: true });
             }),
         );
     }
 
+    /** Restarts coordination when a new epoch is created outside the append state. */
     #listenForEpochCreated() {
         this.#cleanups.push(
             listenTo(this.#state, CustomEventType.EPOCH_CREATED, async () => {
+                if (!this.#isRoundActive()) return;
                 if (this.#machine.state !== EPOCH_STATES.APPEND_SET_EPOCH) {
                     await this.#machine.close();
-                    this.#machine.context.next(this.#intervalMs);
+                    await this.#machine.context.next(this.#intervalMs);
                 }
             }),
         );
     }
 
+    /**
+     * Starts and clears approval and append timers.
+     * The EPOCH_CREATED listener exists only in APPEND_SET_EPOCH state.
+     */
     #listenForStateTransitions() {
         let signatureTimer = null;
         let appendTimer = null;
         let stopAppendListener = null;
 
         this.#machine.on('*', ({ next, prev }) => {
+            if (!this.#isRoundActive()) return;
+
             if (next === EPOCH_STATES.COLLECT_APPROVALS && prev !== EPOCH_STATES.COLLECT_APPROVALS) {
                 signatureTimer = setTimeout(
-                    () => this.#machine.send(EPOCH_EVENTS.APPROVAL_COLLECTION_FAILED),
+                    () => {
+                        if (this.#isRoundActive()) {
+                            this.#machine.send(EPOCH_EVENTS.APPROVAL_COLLECTION_FAILED);
+                        }
+                    },
                     this.#config.epochSignatureTimeout,
                 );
             } else if (prev === EPOCH_STATES.COLLECT_APPROVALS && next !== EPOCH_STATES.COLLECT_APPROVALS) {
@@ -85,7 +100,9 @@ export class EpochRoundListeners {
 
             if (next === EPOCH_STATES.APPEND_SET_EPOCH) {
                 appendTimer = setTimeout(
-                    () => this.#machine.send(EPOCH_EVENTS.APPEND_FAILED),
+                    () => {
+                        if (this.#isRoundActive()) this.#machine.send(EPOCH_EVENTS.APPEND_FAILED);
+                    },
                     this.#config.epochAppendTimeout,
                 );
 
@@ -94,7 +111,7 @@ export class EpochRoundListeners {
                     this.#state,
                     CustomEventType.EPOCH_CREATED,
                     ({ epoch, proposerAddress }) => {
-                        if (epoch !== targetEpoch) return;
+                        if (!this.#isRoundActive() || epoch !== targetEpoch) return;
                         this.#machine.send(
                             proposerAddress === this.#wallet.address
                                 ? EPOCH_EVENTS.APPEND_ACCEPTED

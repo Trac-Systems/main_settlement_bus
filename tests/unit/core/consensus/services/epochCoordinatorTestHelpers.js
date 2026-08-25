@@ -3,6 +3,7 @@ import b4a from 'b4a';
 
 export const CONFIG = Object.freeze({
     epochInterval: 1000,
+    epochBackoffDelay: 1000,
     epochSignatureTimeout: 5000,
     epochAppendTimeout: 5000,
     epochRemoteProposalTimeout: 5000,
