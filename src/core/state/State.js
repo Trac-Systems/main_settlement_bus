@@ -20,7 +20,8 @@ import {
     ConsensusProtocolVersion,
     VDF_PROOF_BYTE_LENGTHS,
     HASH_BYTE_LENGTH,
-    EPOCH_BYTE_LENGTH
+    EPOCH_BYTE_LENGTH,
+    CONSENSUS_CONFIG_INDEX_SIZE
 } from '../../utils/constants.js';
 import { isHexString, sleep, isTransactionRecordPut } from '../../utils/helpers.js';
 import tracCryptoApi from 'trac-crypto-api';
@@ -3585,12 +3586,12 @@ class State extends ReadyResource {
             return Status.FAILURE;
         }
 
-        const currentConsensusConfigIndex = safeReadUint32BE(currentConsensusConfigIndexBuffer);
-        if (currentConsensusConfigIndex === null) {
+        if (currentConsensusConfigIndexBuffer.length !== CONSENSUS_CONFIG_INDEX_SIZE) {
             this.#safeLogApply(OperationType.SET_EPOCH, "Consensus config data is malformed or corrupted.", node.from.key)
             return Status.FAILURE;
         }
 
+        const currentConsensusConfigIndex = safeReadUint32BE(currentConsensusConfigIndexBuffer);
         const consensusConfigBuffer = await this.#getEntryApply(
             EntryType.CONSENSUS_CONFIG_RECORD + currentConsensusConfigIndex,
             batch
