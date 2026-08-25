@@ -75,6 +75,7 @@ import {
     safeDecodeVdfConfig,
 } from '../../codecs/consensus/v1/vdfConfigCodec.js';
 import _ from 'lodash';
+import { StateEventQueue } from './StateEventQueue.js';
 
 const OVERSIZED_BATCH_PENALTY_MULTIPLIER = BATCH_SIZE;
 
@@ -90,6 +91,8 @@ class State extends ReadyResource {
     #wallet
     #stateValidationSchema;
     #activeWriterCountCache = new Map();
+    #stateEventQueue = new StateEventQueue();
+    #viewUpdateListener;
 
     /**
      * @param {Corestore} store
@@ -104,6 +107,7 @@ class State extends ReadyResource {
         this.#store = store;
 
         this.#stateValidationSchema = new StateValidationSchema(config);
+        this.#viewUpdateListener = this.handleViewUpdate.bind(this);
         this.#base = new Autobase(this.#store, this.#config.bootstrap, {
             ackInterval: ACK_INTERVAL,
             valueEncoding: AUTOBASE_VALUE_ENCODING,
@@ -135,12 +139,17 @@ class State extends ReadyResource {
         await this.#base.ready();
         this.#writingKey = this.#base.local.key;
 
+        // Catch-up events describe state which is already available at startup.
+        this.#stateEventQueue.clear();
+        this.#base.on('update', this.#viewUpdateListener);
         await this.#listeners()
     }
 
     async _close() {
         console.log("State: closing gracefully...");
 
+        this.#base.off('update', this.#viewUpdateListener);
+        this.#stateEventQueue.clear();
         this.removeAllListeners();
 
         if (this.#bee !== null) {
@@ -446,6 +455,19 @@ class State extends ReadyResource {
         return await this.#base.update()
     }
 
+    /**
+     * Publishes apply events after the related state changes become signed.
+     * The optional length is used by tests which provide their own Autobase instance.
+     *
+     * @param {number} signedLength current signed view length
+     */
+    handleViewUpdate(signedLength = this.getSignedLength()) {
+        this.#stateEventQueue.flush(signedLength, (event, ...args) => {
+            console.log('[ConsensusReloadDebug] dispatching published state event', event);
+            this.#emitEvent(event, ...args);
+        });
+    }
+
     async isWkInIndexersEntry(wk) {
         if (wk === null) return false;
         const indexerListHasWk = Object.values(this.#base.system.indexers)
@@ -695,6 +717,7 @@ class State extends ReadyResource {
     async #apply(nodes, view, base) {
         const batch = view.batch();
         const batchInvoker = nodes[0].from.key;
+        const postApplyEvents = [];
 
 
         if (nodes.length > BATCH_SIZE) {
@@ -725,7 +748,7 @@ class State extends ReadyResource {
             const handler = this.#getApplyOperationHandler(op.type);
 
             if (handler) {
-                const result = await handler(op, view, base, node, batch);
+                const result = await handler(op, view, base, node, batch, postApplyEvents);
                 if (result === Status.FAILURE) {
                     invalidOperations++;
                 } else if (result === Status.IGNORE) {
@@ -746,6 +769,14 @@ class State extends ReadyResource {
 
         await batch.flush();
         await batch.close();
+
+        if (postApplyEvents.length !== 0) {
+            try {
+                this.#stateEventQueue.enqueue(postApplyEvents, view.core.length);
+            } catch (error) {
+                this.#safeLogApply('StateEventQueue', `Failed to queue post apply events: ${String(error)}`);
+            }
+        }
     }
 
     #getApplyOperationHandler(type) {
@@ -3553,7 +3584,7 @@ class State extends ReadyResource {
             this.#safeLogApply(OperationType.SET_EPOCH, "Current epoch is not initialized. Genesis epoch has not been set.", node.from.key)
             return Status.FAILURE;
         }
-        
+
         const nextEpochBuffer = incrementBuffer(currentEpochBuffer, EPOCH_BYTE_LENGTH);
         if (nextEpochBuffer === null) {
             this.#safeLogApply(OperationType.SET_EPOCH, "Current epoch index value is invalid or corrupted", node.from.key)
@@ -3739,7 +3770,7 @@ class State extends ReadyResource {
             console.info(`Epoch ${nextEpochStr} committed. proposer:approvals - ${proposerAddress}:${op.seo.app.length + 1}`); // We should account for the proposer approval too, hence the '+ 1' at the end
         }
 
-        this.#emitEvent(CustomEventType.EPOCH_CREATED, { epoch: b4a.from(nextEpochBuffer), proposerAddress }); // notify epoch committed
+        this.#emitEvent(CustomEventType.EPOCH_CREATED, { epoch: nextEpochStr, proposerAddress }); // notify epoch committed
         return Status.SUCCESS;
     }
 
@@ -3772,7 +3803,7 @@ class State extends ReadyResource {
                 approvalHash,
                 approverPublicKey
             );
-            
+
             if (!approvalVerified) return 'Failed to verify epoch approval signature.';
 
             approverIdentities.add(approverAddress);
@@ -4655,11 +4686,11 @@ class State extends ReadyResource {
             console.info(`Genesis Epoch initialized addr:wk:tx - ${requesterAddressString}:${decodedAdminEntry.wk.toString('hex')}:${txHashHexString}`);
         }
 
-        this.emit(CustomEventType.GENESIS_EPOCH_CREATED, { epoch: 0n, proposerAddress: requesterAddressString });
+        this.#emitEvent(CustomEventType.GENESIS_EPOCH_CREATED, { epoch: 0n, proposerAddress: requesterAddressString });
         return Status.SUCCESS;
     }
 
-    async #handleApplySetConsensusConfig(op, _view, base, node, batch) {
+    async #handleApplySetConsensusConfig(op, _view, base, node, batch, postApplyEvents) {
         if (!this.#stateValidationSchema.validateConsensusControlOperation(op)) {
             this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Contract schema validation failed.", node.from.key)
             return Status.FAILURE;
@@ -4793,7 +4824,10 @@ class State extends ReadyResource {
             console.info(`VDF params updated addr:wk:tx - ${requesterAddressString}:${decodedAdminEntry.wk.toString('hex')}:${txHashHexString}`);
         }
 
-        this.emit(CustomEventType.CONSENSUS_CONFIG_CHANGED);
+        postApplyEvents.push({
+            type: CustomEventType.CONSENSUS_CONFIG_CHANGED,
+        });
+
         return Status.SUCCESS;
     }
 
