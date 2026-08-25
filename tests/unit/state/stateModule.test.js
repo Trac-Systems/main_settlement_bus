@@ -4,6 +4,7 @@ import { isBare } from './stateTestUtils.js';
 async function runStateTests() {
     test.pause();
     await import('./StateValidationSchema/stateValidationSchema.test.js');
+    await import('./StateEventQueue.test.js');
     await import('./utils/address.test.js');
     await import('./utils/adminEntry.test.js');
     await import('./utils/balance.test.js');
