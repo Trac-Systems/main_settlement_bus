@@ -63,6 +63,8 @@ class PartialOperationValidator {
                 return this.stateValidationSchema.validateTransactionOperation.bind(this.stateValidationSchema);
             case OperationType.TRANSFER:
                 return this.stateValidationSchema.validateTransferOperation.bind(this.stateValidationSchema);
+            case OperationType.HTLC_LOCK:
+                return this.stateValidationSchema.validateHtlcLockOperation.bind(this.stateValidationSchema);
             default:
                 throw new V1ProtocolError(
                     ResultCode.OPERATION_TYPE_UNKNOWN,
@@ -128,6 +130,15 @@ class PartialOperationValidator {
                     operation.am,
                     operation.in,
                     OperationType.TRANSFER
+                ];
+            case OperationType.HTLC_LOCK:
+                return [
+                    this.#config.networkId,
+                    operation.txv,
+                    operation.ld,
+                    operation.am,
+                    operation.in,
+                    OperationType.HTLC_LOCK
                 ];
             default:
                 throw new V1ProtocolError(
