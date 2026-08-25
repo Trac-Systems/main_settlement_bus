@@ -3585,7 +3585,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         }
 
-        const currentConsensusConfigIndex = safeReadUint32BE(currentConsensusConfigIndexBuffer, 0);
+        const currentConsensusConfigIndex = safeReadUint32BE(currentConsensusConfigIndexBuffer);
         if (currentConsensusConfigIndex === null) {
             this.#safeLogApply(OperationType.SET_EPOCH, "Consensus config data is malformed or corrupted.", node.from.key)
             return Status.FAILURE;
