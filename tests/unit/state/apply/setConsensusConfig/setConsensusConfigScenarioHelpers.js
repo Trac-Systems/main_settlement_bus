@@ -45,6 +45,16 @@ export async function setupSetConsensusConfigScenario(
         stateOptions: { enableTxApplyLogs: false }
     });
 
+    for (const peer of context.peers) {
+        peer.base.on('update', () => {
+            // Test views do not create signed checkpoints. The next tick represents
+            // the point at which Autobase has published the updated view.
+            setImmediate(() => {
+                peer.state.handleViewUpdate(peer.base.view.core.length);
+            });
+        });
+    }
+
     seedBootstrapIndexer(context);
     t.teardown(async () => context.teardown());
 
