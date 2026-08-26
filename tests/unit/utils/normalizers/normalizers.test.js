@@ -8,6 +8,8 @@ import { OperationType } from '../../../../src/utils/constants.js';
 import {
     normalizeBootstrapDeploymentOperation,
     normalizeDecodedPayloadForJson,
+    normalizeHtlcLockOperation,
+    normalizeMessageByOperationType,
     normalizeRoleAccessOperation,
     normalizeTransactionOperation,
     normalizeTransferOperation
@@ -430,6 +432,41 @@ test('normalizeBootstrapDeploymentOperation throws on invalid hex string', t => 
         () => normalizeBootstrapDeploymentOperation(payload, config),
         errorMessageIncludes('Invalid hex string')
     );
+});
+
+test('normalizeHtlcLockOperation normalizes hex strings and addresses', t => {
+    const sender = randomAddress(config.addressPrefix);
+    const refundAddress = randomAddress(config.addressPrefix);
+    const claimantAddress = randomAddress(config.addressPrefix);
+    const lockData = b4a.concat([
+        toBuffer(hex('66', 32)),
+        addressToBuffer(refundAddress, config.addressPrefix),
+        addressToBuffer(claimantAddress, config.addressPrefix),
+        toBuffer(hex('77', 8))
+    ]).toString('hex');
+    const payload = {
+        type: OperationType.HTLC_LOCK,
+        address: sender,
+        hlo: {
+            tx: hex('11', 32),
+            txv: hex('22', 32),
+            ld: lockData,
+            am: hex('33', 16),
+            in: hex('44', 32),
+            is: hex('55', 64)
+        }
+    };
+
+    const normalized = normalizeMessageByOperationType(payload, config);
+    t.alike(normalized, normalizeHtlcLockOperation(payload, config));
+    t.is(normalized.type, OperationType.HTLC_LOCK);
+    t.ok(b4a.equals(normalized.address, addressToBuffer(sender, config.addressPrefix)));
+    t.ok(b4a.equals(normalized.hlo.tx, toBuffer(hex('11', 32))));
+    t.ok(b4a.equals(normalized.hlo.txv, toBuffer(hex('22', 32))));
+    t.ok(b4a.equals(normalized.hlo.ld, toBuffer(lockData)));
+    t.ok(b4a.equals(normalized.hlo.am, toBuffer(hex('33', 16))));
+    t.ok(b4a.equals(normalized.hlo.in, toBuffer(hex('44', 32))));
+    t.ok(b4a.equals(normalized.hlo.is, toBuffer(hex('55', 64))));
 });
 
 test('normalizeDecodedPayloadForJson converts buffers to strings', t => {

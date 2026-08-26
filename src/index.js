@@ -36,6 +36,8 @@ import PartialTransactionValidator from "./core/network/protocols/shared/validat
 import PartialTransferValidator from "./core/network/protocols/shared/validators/PartialTransferValidator.js";
 import { BroadcastError, ValidationError } from "./utils/errors.js";
 import { uint8ToBuffer, uint16ToBuffer, uint32ToBuffer } from "./utils/buffer.js";
+import { encodeHtlcLockData } from "./utils/htlcLockData.js";
+import { WalletProvider } from "trac-wallet";
 
 export class MainSettlementBus extends ReadyResource {
     #store;
@@ -124,7 +126,50 @@ export class MainSettlementBus extends ReadyResource {
         return await this.#network.validatorMessageOrchestrator.send(partialTransactionPayload);
     }
 
-    async htlcLock() {}
+    async htlcLock({ lockData, amount } = {}) {
+        const wallet = await new WalletProvider(this.#config).generate({
+            derivationPath: this.#config.derivationPath
+        })
+
+        let amountBuffer;
+        let encodedLockData;
+        try {
+            amountBuffer = bigIntTo16ByteBuffer(decimalStringToBigInt(amount));
+            encodedLockData = encodeHtlcLockData(lockData, this.#config.addressPrefix);
+        } catch (error) {
+            throw new ValidationError(error.message);
+        }
+
+        const txValidity = await this.#state.getIndexerSequenceState();
+        const payload = await applyStateMessageFactory(wallet, this.#config)
+            .buildPartialHtlcLockOperationMessage(
+                wallet.address,
+                txValidity,
+                encodedLockData,
+                amountBuffer
+            );
+
+        const success = await this.broadcastPartialTransaction(payload);
+        if (!success) {
+            throw new BroadcastError("Failed to broadcast HTLC lock after multiple attempts.");
+        }
+
+        const tx = b4a.toString(payload.hlo.tx, "hex");
+        const isConfirmed = await this.#state.waitForUnsigned(
+            tx,
+            this.#config.messageValidatorResponseTimeout,
+            100
+        );
+        if (!isConfirmed) {
+            throw new BroadcastError("Failed to broadcast HTLC lock after multiple attempts.");
+        }
+
+        return {
+            signedLength: this.#state.getSignedLength(),
+            unsignedLength: this.#state.getUnsignedLength(),
+            tx
+        };
+    }
 
     async htlcClaim() {}
 

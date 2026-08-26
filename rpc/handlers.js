@@ -46,9 +46,56 @@ export async function handleBalance({ req, respond, msbInstance }) {
     respond(200, { address, balance });
 }
 
-export async function handleHtlcLock({ msbInstance, respond }) {
-    await msbInstance.htlcLock();
-    respond(200, {});
+export async function handleHtlcLock({ msbInstance, respond, req }) {
+    let body = '';
+    const MAX_BODY_SIZE = 100_000;
+    let limitExceeded = false;
+
+    req.on('data', chunk => {
+        if (limitExceeded) return;
+        body += chunk.toString();
+        if (body.length > MAX_BODY_SIZE) {
+            limitExceeded = true;
+            respond(413, { error: 'Payload too large.' });
+            req.resume();
+        }
+    });
+
+    req.on('end', async () => {
+        if (limitExceeded) return;
+
+        try {
+            if (!body) throw new ValidationError('Invalid JSON payload.');
+
+            let parsedBody;
+            try {
+                parsedBody = JSON.parse(body);
+            } catch {
+                throw new ValidationError('Invalid JSON payload.');
+            }
+
+            const result = await msbInstance.htlcLock(parsedBody);
+            respond(200, { result });
+        } catch (error) {
+            if (error instanceof ValidationError) {
+                respond(400, { error: error.message });
+                return;
+            }
+            if (error instanceof BroadcastError) {
+                respond(429, { error: error.message });
+                return;
+            }
+
+            console.error('Error in handleHtlcLock:', error);
+            respond(500, { error: 'An error occurred processing the HTLC lock.' });
+        }
+    });
+
+    req.on('error', () => {
+        if (!limitExceeded) {
+            respond(500, { error: 'Request stream failed during body transfer.' });
+        }
+    });
 }
 
 export async function handleHtlcClaim({ msbInstance, respond }) {

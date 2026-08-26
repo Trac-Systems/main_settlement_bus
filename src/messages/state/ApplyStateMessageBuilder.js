@@ -50,6 +50,7 @@ class ApplyStateMessageBuilder {
     #incomingNonce;
     #incomingSignature;
     #incomingWriterKey;
+    #htlcLockData;
     #msbBootstrap;
     #operationType;
     #output;
@@ -196,6 +197,11 @@ class ApplyStateMessageBuilder {
         return this;
     }
 
+    setHtlcLockData(lockData) {
+        this.#htlcLockData = this.#normalizeBytesBuffer(lockData, 'HTLC lock data');
+        return this;
+    }
+
     setApprovals(approvals) {
         if (!Array.isArray(approvals)) {
             throw new Error('Approvals must be an array.');
@@ -335,6 +341,20 @@ class ApplyStateMessageBuilder {
 
         switch (this.#operationType) {
             case OperationType.HTLC_LOCK:
+                this.#requireFields([
+                    [this.#txValidity, 'Transaction validity'],
+                    [this.#htlcLockData, 'HTLC lock data'],
+                    [this.#amount, 'Amount']
+                ]);
+                msg = createMessage(
+                    this.#config.networkId,
+                    this.#txValidity,
+                    this.#htlcLockData,
+                    this.#amount,
+                    nonce,
+                    this.#operationType
+                );
+                break;
             case OperationType.HTLC_REFUND:
                 return {};
             case OperationType.HTLC_CLAIM:
@@ -465,6 +485,16 @@ class ApplyStateMessageBuilder {
                 is: signature
             };
         }
+        if (this.#operationType === OperationType.HTLC_LOCK) {
+            return {
+                tx,
+                txv: this.#txValidity,
+                ld: this.#htlcLockData,
+                am: this.#amount,
+                in: nonce,
+                is: signature
+            };
+        }
         if (this.#operationType === OperationType.HTLC_CLAIM) {
             return {
                 tx,
@@ -515,6 +545,23 @@ class ApplyStateMessageBuilder {
 
         switch (this.#operationType) {
             case OperationType.HTLC_LOCK:
+                this.#requireFields([
+                    [this.#txHash, 'Transaction hash'],
+                    [this.#txValidity, 'Transaction validity'],
+                    [this.#htlcLockData, 'HTLC lock data'],
+                    [this.#amount, 'Amount'],
+                    [this.#incomingNonce, 'Incoming nonce'],
+                    [this.#incomingSignature, 'Incoming signature']
+                ]);
+                msg = createMessage(
+                    this.#config.networkId,
+                    this.#txValidity,
+                    this.#htlcLockData,
+                    this.#amount,
+                    nonce,
+                    this.#operationType
+                );
+                break;
             case OperationType.HTLC_REFUND:
                 return {};
             case OperationType.ADD_ADMIN:
@@ -719,6 +766,19 @@ class ApplyStateMessageBuilder {
                 tx: this.#txHash,
                 txv: this.#txValidity,
                 to: this.#incomingAddress,
+                am: this.#amount,
+                in: this.#incomingNonce,
+                is: this.#incomingSignature,
+                va: validatorAddress,
+                vn: nonce,
+                vs: signature
+            };
+        }
+        if (this.#operationType === OperationType.HTLC_LOCK) {
+            return {
+                tx: this.#txHash,
+                txv: this.#txValidity,
+                ld: this.#htlcLockData,
                 am: this.#amount,
                 in: this.#incomingNonce,
                 is: this.#incomingSignature,
