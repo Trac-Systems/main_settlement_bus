@@ -572,13 +572,16 @@ class ApplyStateMessageDirector {
         return this.#builder.getPayload();
     }
 
-    async buildPartialHtlcLockOperationMessage(invokerAddress) {
+    async buildPartialHtlcLockOperationMessage(invokerAddress, txValidity, lockData, amount) {
         if (!this.#builder) throw new Error('Builder has not been set.');
         await this.#builder
             .setPhase('partial')
             .setOutput('buffer')
             .setOperationType(OperationType.HTLC_LOCK)
             .setAddress(invokerAddress)
+            .setTxValidity(txValidity)
+            .setHtlcLockData(lockData)
+            .setAmount(amount)
             .build();
         return this.#builder.getPayload();
     }
@@ -605,13 +608,19 @@ class ApplyStateMessageDirector {
         return this.#builder.getPayload();
     }
 
-    async buildCompleteHtlcLockOperationMessage(invokerAddress) {
+    async buildCompleteHtlcLockOperationMessage(invokerAddress, txHash, txValidity, lockData, amount, incomingNonce, incomingSignature) {
         if (!this.#builder) throw new Error('Builder has not been set.');
         await this.#builder
             .setPhase('complete')
             .setOutput('buffer')
             .setOperationType(OperationType.HTLC_LOCK)
             .setAddress(invokerAddress)
+            .setTxHash(txHash)
+            .setTxValidity(txValidity)
+            .setHtlcLockData(lockData)
+            .setAmount(amount)
+            .setIncomingNonce(incomingNonce)
+            .setIncomingSignature(incomingSignature)
             .build();
         return this.#builder.getPayload();
     }

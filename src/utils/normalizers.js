@@ -202,6 +202,43 @@ export function normalizeBootstrapDeploymentOperation(payload, config) {
 }
 
 /**
+ * Normalizes the payload for an HTLC lock operation.
+ *
+ * @param {Object} payload The raw payload for the HTLC lock operation.
+ * @param {object} config The environment configuration object.
+ * @returns {Object} A normalized payload with address converted to buffer and hex values normalized.
+ */
+export function normalizeHtlcLockOperation(payload, config) {
+    if (!payload || typeof payload !== 'object' || !payload.hlo) {
+        throw new Error('Invalid payload for HTLC lock operation normalization.');
+    }
+    const { type, address, hlo } = payload;
+    if (
+        type !== OperationType.HTLC_LOCK ||
+        !address ||
+        !hlo.tx || !hlo.txv || !hlo.ld ||
+        !hlo.am || !hlo.in || !hlo.is
+    ) {
+        throw new Error('Missing required fields in HTLC lock operation payload.');
+    }
+
+    const normalizedHlo = {
+        tx: normalizeHex(hlo.tx),
+        txv: normalizeHex(hlo.txv),
+        ld: normalizeHex(hlo.ld),
+        am: normalizeHex(hlo.am),
+        in: normalizeHex(hlo.in),
+        is: normalizeHex(hlo.is)
+    };
+
+    return {
+        type,
+        address: addressToBuffer(address, config.addressPrefix),
+        hlo: normalizedHlo
+    };
+}
+
+/**
  * Normalizes an incoming partial operation message based on its operation type.
  *
  * @param {Object} message The raw incoming message.
@@ -233,6 +270,10 @@ export function normalizeMessageByOperationType(message, config) {
 
     if (isTransfer(type)) {
         return normalizeTransferOperation(message, config);
+    }
+
+    if (type === OperationType.HTLC_LOCK) {
+        return normalizeHtlcLockOperation(message, config);
     }
 
     throw new Error(`Unsupported operation type for normalization: ${type}`);

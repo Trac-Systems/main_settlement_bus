@@ -90,6 +90,9 @@ class V1BroadcastTransactionResponse extends V1BaseOperation {
 
         let isValid = false;
         switch (type) {
+            case OperationType.HTLC_LOCK:
+                isValid =  this.#stateValidationSchema.validateHtlcLockOperation(validatorDecodedTx);
+                break;
             case OperationType.ADD_WRITER:
             case OperationType.REMOVE_WRITER:
             case OperationType.ADMIN_RECOVERY:

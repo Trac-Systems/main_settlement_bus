@@ -26,7 +26,6 @@ import {
 import applyOperationsGenerated from '../../../codecs/apply/applyOperations.generated.cjs';
 
 const { HtlcLockData } = applyOperationsGenerated.apply.operations;
-
 class StateValidationSchema {
     #validator;
     #validateCoreAdminOperationSchema;
@@ -68,7 +67,7 @@ class StateValidationSchema {
                 emptyBuffer: "The '{field}' field must not be an empty Buffer!",
                 proofData: "The '{field}' field must be an encoded ProofProposal buffer.",
                 proofProposalApproval: "The '{field}' field must be an encoded ProofProposalApproval buffer.",
-                htlcLockData: "The '{field}' field must be an encoded HtlcLockData buffer.",
+                htlcLockData: "The '{field}' field must be a serialized HtlcLockData buffer.",
             },
         });
         const isBuffer = b4a.isBuffer;
@@ -311,21 +310,29 @@ class StateValidationSchema {
                         return value;
                     }
 
+                    const expectedLength = htlcRule.fields.reduce((total, field) => total + field.length, 0);
+                    const isSerialized = value.length === expectedLength;
                     let lockData;
-                    try {
-                        lockData = htlcRule.decode(value);
-                    } catch {
-                        ${this.makeError({type: "htlcLockData", actual: "value", messages})}
-                        return value;
+                    if (!isSerialized) {
+                        try {
+                            lockData = htlcRule.decode(value);
+                        } catch {
+                            ${this.makeError({type: "htlcLockData", actual: "value", messages})}
+                            return value;
+                        }
                     }
 
+                    let offset = 0;
                     const reencodedInput = {};
                     for (const field of htlcRule.fields) {
-                        const fieldValue = lockData[field.name];
+                        const fieldValue = isSerialized
+                            ? value.subarray(offset, offset + field.length)
+                            : lockData[field.name];
                         if (!htlcRule.isBuffer(fieldValue) || fieldValue.length !== field.length) {
                             ${this.makeError({type: "htlcLockData", actual: "value", messages})}
                             return value;
                         }
+                        offset += field.length;
                         let fieldIsZeroFilled = true;
                         for (let i = 0; i < fieldValue.length; i++) {
                             if (fieldValue[i] !== 0) {
@@ -340,8 +347,7 @@ class StateValidationSchema {
                         reencodedInput[field.name] = fieldValue;
                     }
 
-                    const reencoded = htlcRule.encode(reencodedInput);
-                    if (!htlcRule.equals(value, reencoded)) {
+                    if (!isSerialized && !htlcRule.equals(value, htlcRule.encode(reencodedInput))) {
                         ${this.makeError({type: "htlcLockData", actual: "value", messages})}
                     }
 
