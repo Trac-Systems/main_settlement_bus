@@ -46,9 +46,10 @@ const applyPayloads = new Map([
     ['balanceInitialization', fixtures.validBalanceInitOperation],
     ['disableInitialization', fixtures.validDisableInitialization],
     ['setEpoch', getValidSetEpochOperation()],
+    ['htlcClaim', fixtures.validHtlcClaimOperation],
 ]);
 
-const APPLY_PAYLOAD_KEYS = Object.freeze(['txo', 'tro', 'aco', 'cao', 'rao', 'bdo', 'bio', 'seo']);
+const APPLY_PAYLOAD_KEYS = Object.freeze(['txo', 'tro', 'aco', 'cao', 'rao', 'bdo', 'bio', 'seo', 'hco']);
 
 const formatInvalidPayload = payload => {
     if (typeof payload === 'bigint') return `${payload}n`;
