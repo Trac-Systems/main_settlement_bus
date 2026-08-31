@@ -3528,6 +3528,20 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
+        const requesterAddressBuffer = op.address;
+        const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer, this.#config.addressPrefix);
+        if (requesterAddressString === null) {
+            this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Requester address is invalid.", node.from.key)
+            return Status.FAILURE;
+        };
+
+        // validate requester public key
+        const requesterPublicKey = tracCryptoApi.address.decodeSafe(requesterAddressString);
+        if (b4a.equals(requesterPublicKey, NULL_BUFFER)) {
+            this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Failed to decode requester public key.", node.from.key)
+            return Status.FAILURE;
+        };
+
         const proofProposal = safeDecodeProofProposal(op.seo.pd);
         if (proofProposal === null) {
             this.#safeLogApply(OperationType.SET_EPOCH, "Failed to decode proof proposal.", node.from.key)
@@ -3552,7 +3566,7 @@ class State extends ReadyResource {
         // String helpers
         const currentEpochStr = safeToUIntString(currentEpochBuffer);
         const nextEpochStr = safeToUIntString(nextEpochBuffer);
-        if (nextEpochStr === null || proposedEpochStr === null) {
+        if (nextEpochStr === null || currentEpochStr === null) {
             this.#safeLogApply(OperationType.SET_EPOCH, "Epoch index data is malformed or corrupted.", node.from.key)
             return Status.FAILURE;
         }
@@ -3669,12 +3683,8 @@ class State extends ReadyResource {
         let proposalSignatureVerified = false;
         if (!b4a.equals(proposerPublicKey, NULL_BUFFER)) {
             const proposalMessage = createMessage(challengeData, proofProposal.proof);
-            try {
-                const proposalHash = await tracCryptoApi.hash.blake3(proposalMessage);
-                proposalSignatureVerified = tracCryptoApi.signature.verify(proofProposal.signature, proposalHash, proposerPublicKey);
-            } catch {
-                proposalSignatureVerified = false;
-            }
+            const proposalHash = await tracCryptoApi.hash.blake3Safe(proposalMessage);
+            proposalSignatureVerified = tracCryptoApi.signature.verify(proofProposal.signature, proposalHash, proposerPublicKey);
         }
         if (!proposalSignatureVerified) {
             this.#safeLogApply(OperationType.SET_EPOCH, "Failed to verify proof proposal signature.", node.from.key)
@@ -3756,16 +3766,13 @@ class State extends ReadyResource {
                 proofProposal.signature
             );
             let approvalVerified = false;
-            try {
-                const approvalHash = await tracCryptoApi.hash.blake3(approvalMessage);
-                approvalVerified = tracCryptoApi.signature.verify(
-                    approval.approval_sig,
-                    approvalHash,
-                    approverPublicKey
-                );
-            } catch {
-                approvalVerified = false;
-            }
+            const approvalHash = await tracCryptoApi.hash.blake3Safe(approvalMessage);
+            approvalVerified = tracCryptoApi.signature.verify(
+                approval.approval_sig,
+                approvalHash,
+                approverPublicKey
+            );
+            
             if (!approvalVerified) return 'Failed to verify epoch approval signature.';
 
             approverIdentities.add(approverAddress);
