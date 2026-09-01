@@ -19,6 +19,9 @@ import {
     UINT32_MAX,
     ConsensusProtocolVersion,
     VDF_PROOF_BYTE_LENGTHS,
+    HASH_BYTE_LENGTH,
+    EPOCH_BYTE_LENGTH,
+    CONSENSUS_CONFIG_INDEX_SIZE
 } from '../../utils/constants.js';
 import { isHexString, sleep, isTransactionRecordPut } from '../../utils/helpers.js';
 import tracCryptoApi from 'trac-crypto-api';
@@ -26,6 +29,7 @@ import { verifyWesolowski } from '@tracsystems/trac-vdf';
 import StateValidationSchema from './validators/StateValidationSchema.js';
 import {
     decodeConsensusConfig,
+    safeDecodeConsensusConfig,
     safeDecodeApplyOperation,
     safeEncodeConsensusConfig,
     safeEncodeEpochProof
@@ -39,7 +43,10 @@ import {
     safeReadUint32BE,
     deepCopyBuffer,
     safeReadUint8,
-    uint16ToBuffer
+    uint16ToBuffer,
+    isBufferValid,
+    incrementBuffer,
+    safeToUIntString
 } from '../../utils/buffer.js';
 import { safeDecodeProofProposal, safeDecodeProofProposalApproval } from '../../codecs/consensus/v1/consensusV1OperationCodec.js';
 import addressUtils from './utils/address.js';
@@ -3515,9 +3522,23 @@ class State extends ReadyResource {
         return Status.SUCCESS;
     }
 
-    async #handleApplySetEpochOperation(op, view, base, node, batch) {
+    async #handleApplySetEpochOperation(op, _view, base, node, batch) {
         if (!this.#stateValidationSchema.validateSetEpochOperation(op)) {
             this.#safeLogApply(OperationType.SET_EPOCH, "Contract schema validation failed.", node.from.key)
+            return Status.FAILURE;
+        };
+
+        const requesterAddressBuffer = op.address;
+        const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer, this.#config.addressPrefix);
+        if (requesterAddressString === null) {
+            this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Requester address is invalid.", node.from.key)
+            return Status.FAILURE;
+        };
+
+        // validate requester public key
+        const requesterPublicKey = tracCryptoApi.address.decodeSafe(requesterAddressString);
+        if (b4a.equals(requesterPublicKey, NULL_BUFFER)) {
+            this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Failed to decode requester public key.", node.from.key)
             return Status.FAILURE;
         };
 
@@ -3532,18 +3553,31 @@ class State extends ReadyResource {
             this.#safeLogApply(OperationType.SET_EPOCH, "Current epoch is not initialized. Genesis epoch has not been set.", node.from.key)
             return Status.FAILURE;
         }
+        
+        const nextEpochBuffer = incrementBuffer(currentEpochBuffer, EPOCH_BYTE_LENGTH);
+        if (nextEpochBuffer === null) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Current epoch index value is invalid or corrupted", node.from.key)
+            return Status.FAILURE;
+        }
 
-        const currentEpoch = currentEpochBuffer.readBigUInt64BE(0);
-        const nextEpoch = currentEpoch + 1n;
-        const proposedEpoch = proofProposal.epoch.readBigUInt64BE(0);
+        const proposedEpochBuffer = proofProposal.epoch;
+        const epochIndexCompare = b4a.compare(nextEpochBuffer, proposedEpochBuffer)
 
-        if (proposedEpoch < nextEpoch) {
-            this.#safeLogApply(OperationType.SET_EPOCH, `Stale epoch proposal. Epoch ${currentEpoch} is already committed.`, node.from.key)
+        // String helpers
+        const currentEpochStr = safeToUIntString(currentEpochBuffer);
+        const nextEpochStr = safeToUIntString(nextEpochBuffer);
+        if (nextEpochStr === null || currentEpochStr === null) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Epoch index data is malformed or corrupted.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        if (epochIndexCompare > 0) { // proposedEpoch < nextEpoch
+            this.#safeLogApply(OperationType.SET_EPOCH, `Stale epoch proposal. Epoch ${currentEpochStr} is already committed.`, node.from.key)
             return Status.IGNORE;
         }
 
-        if (proposedEpoch > nextEpoch) {
-            this.#safeLogApply(OperationType.SET_EPOCH, `Unexpected epoch. Proposal must target epoch ${nextEpoch} but got ${proposedEpoch}.`, node.from.key)
+        if (epochIndexCompare < 0) { // proposedEpoch > nextEpoch
+            this.#safeLogApply(OperationType.SET_EPOCH, `Unexpected epoch. Proposal must target epoch ${nextEpochStr} but got ${safeToUIntString(proposedEpochBuffer)}.`, node.from.key)
             return Status.FAILURE;
         }
 
@@ -3558,24 +3592,24 @@ class State extends ReadyResource {
             return Status.FAILURE;
         }
 
-        const currentEpochHash = await this.#getEntryApply(EntryType.EPOCH + currentEpoch.toString(), batch);
+        const currentEpochHash = await this.#getEntryApply(EntryType.EPOCH + currentEpochStr, batch);
         if (currentEpochHash === null || !b4a.equals(currentEpochHash, proofProposal.previous_epoch_record_hash)) {
-            this.#safeLogApply(OperationType.SET_EPOCH, `Previous epoch record hash mismatch for epoch ${currentEpoch}.`, node.from.key)
+            this.#safeLogApply(OperationType.SET_EPOCH, `Previous epoch record hash mismatch for epoch ${currentEpochStr}.`, node.from.key)
             return Status.FAILURE;
         }
 
-        const currentConsensusConfigBuffer = await this.#getEntryApply(EntryType.CONSENSUS_CONFIG_CURRENT, batch);
-        if (currentConsensusConfigBuffer === null) {
+        const currentConsensusConfigIndexBuffer = await this.#getEntryApply(EntryType.CONSENSUS_CONFIG_CURRENT, batch);
+        if (currentConsensusConfigIndexBuffer === null) {
             this.#safeLogApply(OperationType.SET_EPOCH, "Consensus config is not initialized.", node.from.key)
             return Status.FAILURE;
         }
 
-        const currentConsensusConfigIndex = safeReadUint32BE(currentConsensusConfigBuffer);
-        if (currentConsensusConfigIndex === null) {
-            this.#safeLogApply(OperationType.SET_EPOCH, "Failed to read current consensus config index from buffer", node.from.key)
+        if (currentConsensusConfigIndexBuffer.length !== CONSENSUS_CONFIG_INDEX_SIZE) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Consensus config data is malformed or corrupted.", node.from.key)
             return Status.FAILURE;
         }
 
+        const currentConsensusConfigIndex = safeReadUint32BE(currentConsensusConfigIndexBuffer);
         const consensusConfigBuffer = await this.#getEntryApply(
             EntryType.CONSENSUS_CONFIG_RECORD + currentConsensusConfigIndex,
             batch
@@ -3585,7 +3619,11 @@ class State extends ReadyResource {
             return Status.FAILURE;
         }
 
-        const consensusConfig = decodeConsensusConfig(consensusConfigBuffer);
+        const consensusConfig = safeDecodeConsensusConfig(consensusConfigBuffer);
+        if (consensusConfig === null) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Failed to decode consensus config.", node.from.key)
+            return Status.FAILURE;
+        }
         const schemaVersion = safeReadUint8(consensusConfig.sv);
         if (schemaVersion !== ConsensusConfigSchemaVersion.VDF_V1) {
             this.#safeLogApply(OperationType.SET_EPOCH, "Unsupported consensus config schema version.", node.from.key)
@@ -3607,6 +3645,30 @@ class State extends ReadyResource {
             return Status.FAILURE;
         }
 
+        const indexers = Object.values(base.system.indexers);
+        const indexerAddresses = new Set();
+        for (const indexer of indexers) {
+            const indexerAddressBuffer = await this.#getRegisteredWriterKeyApply(batch, indexer.key.toString('hex'));
+            if (!indexerAddressBuffer) continue;
+            const indexerAddress = addressUtils.bufferToAddress(indexerAddressBuffer, this.#config.addressPrefix);
+            if (indexerAddress) indexerAddresses.add(indexerAddress);
+        }
+
+        const proposerAddress = addressUtils.bufferToAddress(proofProposal.proposer, this.#config.addressPrefix);
+        if (!proposerAddress || !indexerAddresses.has(proposerAddress)) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Proposer is not a registered indexer.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const indexerCount = indexers.length;
+        const quorumThreshold = indexerCount <= 2 ? 1 : Math.floor(indexerCount / 2) + 1;
+        const approvalCount = 1 + op.seo.app.length; // proposer plus submitted approvals (proposer's own verified signature counts as one approval)
+
+        if (approvalCount < quorumThreshold) {
+            this.#safeLogApply(OperationType.SET_EPOCH, `Insufficient submitted approvals for quorum. Required ${quorumThreshold}, got ${approvalCount}.`, node.from.key)
+            return Status.FAILURE;
+        }
+
         const challengeData = createMessage(
             proofProposal.protocol_version,
             proofProposal.network_id,
@@ -3617,9 +3679,32 @@ class State extends ReadyResource {
             proofProposal.discriminant_bit_size
         );
 
+        const proposerPublicKey = tracCryptoApi.address.decodeSafe(proposerAddress);
+        let proposalSignatureVerified = false;
+        if (!b4a.equals(proposerPublicKey, NULL_BUFFER)) {
+            const proposalMessage = createMessage(challengeData, proofProposal.proof);
+            const proposalHash = await tracCryptoApi.hash.blake3Safe(proposalMessage);
+            proposalSignatureVerified = tracCryptoApi.signature.verify(proofProposal.signature, proposalHash, proposerPublicKey);
+        }
+        if (!proposalSignatureVerified) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Failed to verify proof proposal signature.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const approvalErrorMessage = await this.#validateEpochApprovals(
+            op.seo.app,
+            indexerAddresses,
+            proposerAddress,
+            challengeData,
+            proofProposal
+        );
+        if (approvalErrorMessage) {
+            this.#safeLogApply(OperationType.SET_EPOCH, approvalErrorMessage, node.from.key)
+            return Status.FAILURE;
+        }
+
         let vdfProofVerified = false;
         try {
-            //TODO: Implement safe version
             vdfProofVerified = await verifyWesolowski(
                 challengeData,
                 difficulty.readUInt32BE(0),
@@ -3634,67 +3719,6 @@ class State extends ReadyResource {
             return Status.FAILURE;
         }
 
-        const indexerAddresses = new Set();
-        for (const indexer of Object.values(base.system.indexers)) {
-            const indexerAddressBuffer = await this.#getRegisteredWriterKeyApply(batch, indexer.key.toString('hex'));
-            if (!indexerAddressBuffer) continue;
-            const indexerAddress = addressUtils.bufferToAddress(indexerAddressBuffer, this.#config.addressPrefix);
-            if (indexerAddress) indexerAddresses.add(indexerAddress);
-        }
-
-        const proposerAddress = addressUtils.bufferToAddress(proofProposal.proposer, this.#config.addressPrefix);
-        if (!proposerAddress || !indexerAddresses.has(proposerAddress)) {
-            this.#safeLogApply(OperationType.SET_EPOCH, "Proposer is not a registered indexer.", node.from.key)
-            return Status.FAILURE;
-        }
-
-        const proposerPublicKey = tracCryptoApi.address.decodeSafe(proposerAddress);
-        let proposalSignatureVerified = false;
-        if (!b4a.equals(proposerPublicKey, NULL_BUFFER)) {
-            const proposalMessage = createMessage(challengeData, proofProposal.proof);
-            try {
-                const proposalHash = await tracCryptoApi.hash.blake3(proposalMessage);
-                proposalSignatureVerified = tracCryptoApi.signature.verify(proofProposal.signature, proposalHash, proposerPublicKey);
-            } catch {
-                proposalSignatureVerified = false;
-            }
-        }
-        if (!proposalSignatureVerified) {
-            this.#safeLogApply(OperationType.SET_EPOCH, "Failed to verify proof proposal signature.", node.from.key)
-            return Status.FAILURE;
-        }
-
-        const validApprovers = new Set();
-        for (const encodedApproval of op.seo.app) {
-            const approval = safeDecodeProofProposalApproval(encodedApproval);
-            if (approval === null) continue;
-
-            const approverAddress = addressUtils.bufferToAddress(approval.approver, this.#config.addressPrefix);
-            if (!approverAddress || approverAddress === proposerAddress || !indexerAddresses.has(approverAddress)) continue;
-
-            const approverPublicKey = tracCryptoApi.address.decodeSafe(approverAddress);
-            if (b4a.equals(approverPublicKey, NULL_BUFFER)) continue;
-
-            const approvalMessage = createMessage(challengeData, proofProposal.proof, approval.approver, proofProposal.signature);
-            let approvalVerified = false;
-            try {
-                const approvalHash = await tracCryptoApi.hash.blake3(approvalMessage);
-                approvalVerified = tracCryptoApi.signature.verify(approval.approval_sig, approvalHash, approverPublicKey);
-            } catch {
-                approvalVerified = false;
-            }
-            if (approvalVerified) validApprovers.add(approverAddress);
-        }
-
-        const indexerCount = Object.values(base.system.indexers).length;
-        const quorumThreshold = indexerCount <= 2 ? 1 : Math.floor(indexerCount / 2) + 1;
-        const totalValidSigners = 1 + validApprovers.size; // proposer's own verified signature counts as one signer
-
-        if (totalValidSigners < quorumThreshold) {
-            this.#safeLogApply(OperationType.SET_EPOCH, `Insufficient valid approvals for quorum. Required ${quorumThreshold}, got ${totalValidSigners}.`, node.from.key)
-            return Status.FAILURE;
-        }
-
         const encodedEpochProof = safeEncodeEpochProof({ pd: op.seo.pd, app: op.seo.app });
         if (encodedEpochProof.length === 0) {
             this.#safeLogApply(OperationType.SET_EPOCH, "Failed to encode epoch proof.", node.from.key)
@@ -3702,19 +3726,59 @@ class State extends ReadyResource {
         }
 
         const epochProofHash = await tracCryptoApi.hash.blake3Safe(encodedEpochProof);
-        const nextEpochBuffer = b4a.alloc(8);
-        nextEpochBuffer.writeBigUInt64BE(nextEpoch);
+        if (!isBufferValid(epochProofHash, HASH_BYTE_LENGTH)) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Failed to hash epoch proof.", node.from.key)
+            return Status.FAILURE;
+        }
 
         await batch.put(EntryType.EPOCH_CURRENT, nextEpochBuffer);
-        await batch.put(EntryType.EPOCH + nextEpoch.toString(), epochProofHash);
+        await batch.put(EntryType.EPOCH + nextEpochStr, epochProofHash);
         await batch.put(EntryType.EPOCH_HASH + epochProofHash.toString('hex'), encodedEpochProof);
 
         if (this.#config.enableTxApplyLogs) {
-            console.info(`Epoch ${nextEpoch} committed. proposer:approvals - ${proposerAddress}:${validApprovers.size}`);
+            console.info(`Epoch ${nextEpochStr} committed. proposer:approvals - ${proposerAddress}:${op.seo.app.length + 1}`); // We should account for the proposer approval too, hence the '+ 1' at the end
         }
 
-        this.emit(CustomEventType.EPOCH_CREATED, { epoch: nextEpoch, proposerAddress }); // notify epoch committed
+        this.#emitEvent(CustomEventType.EPOCH_CREATED, { epoch: b4a.from(nextEpochBuffer), proposerAddress }); // notify epoch committed
         return Status.SUCCESS;
+    }
+
+    async #validateEpochApprovals(encodedApprovals, indexerAddresses, proposerAddress, challengeData, proofProposal) {
+        const approverIdentities = new Set();
+
+        for (const encodedApproval of encodedApprovals) {
+            const approval = safeDecodeProofProposalApproval(encodedApproval);
+            if (approval === null) return 'Failed to decode epoch approval.';
+
+            const approverAddress = addressUtils.bufferToAddress(approval.approver, this.#config.addressPrefix);
+            if (!approverAddress) return 'Epoch approval contains an invalid approver.';
+            if (approverAddress === proposerAddress) return 'Proposer cannot approve its own epoch proposal.';
+            if (!indexerAddresses.has(approverAddress)) return 'Epoch approver is not a registered indexer.';
+            if (approverIdentities.has(approverAddress)) return 'Epoch approval contains a duplicate approver.';
+
+            const approverPublicKey = tracCryptoApi.address.decodeSafe(approverAddress);
+            if (b4a.equals(approverPublicKey, NULL_BUFFER)) return 'Failed to decode epoch approver public key.';
+
+            const approvalMessage = createMessage(
+                challengeData,
+                proofProposal.proof,
+                approval.approver,
+                proofProposal.signature
+            );
+            let approvalVerified = false;
+            const approvalHash = await tracCryptoApi.hash.blake3Safe(approvalMessage);
+            approvalVerified = tracCryptoApi.signature.verify(
+                approval.approval_sig,
+                approvalHash,
+                approverPublicKey
+            );
+            
+            if (!approvalVerified) return 'Failed to verify epoch approval signature.';
+
+            approverIdentities.add(approverAddress);
+        }
+
+        return null;
     }
 
     async #transfer(senderAddressString, recipientAddressString, validatorAddressString, validatorEntryBuffer, transferAmountBuffer, feeAmountBuffer, isSelfTransfer, isRecipientValidator, batch, node) {
@@ -4547,6 +4611,12 @@ class State extends ReadyResource {
             return Status.FAILURE;
         }
 
+        const epochProofHash = await tracCryptoApi.hash.blake3Safe(genesisEpoch);
+        if (!isBufferValid(epochProofHash, HASH_BYTE_LENGTH)) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Failed to hash genesis epoch proof.", node.from.key)
+            return Status.FAILURE;
+        }
+
         // initialize CurrentEpoch field
         const zeroAsUint64Buffer = b4a.alloc(8, 0);
         await batch.put(
@@ -4555,7 +4625,6 @@ class State extends ReadyResource {
         );
         
         // initialize Epoch Field
-        const epochProofHash = await tracCryptoApi.hash.blake3Safe(genesisEpoch);
         await batch.put(
             epochZero,
             epochProofHash

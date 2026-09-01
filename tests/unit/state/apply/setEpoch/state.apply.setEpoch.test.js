@@ -10,18 +10,23 @@ import {
 } from './setEpochScenarioHelpers.js';
 import { EntryType, CustomEventType } from '../../../../../src/utils/constants.js';
 import { safeDecodeEpochProof } from '../../../../../src/codecs/apply/applyOperationCodec.js';
+import { uint64ToBuffer } from '../../../../../src/utils/buffer.js';
 
 test('State.apply SET_EPOCH: proposer alone satisfies quorum when it is the sole indexer, and commits the epoch', async t => {
     const context = await setupSetEpochScenario(t);
     const adminNode = context.adminBootstrap;
 
-    let epochCreatedEmitted = false;
-    adminNode.state.once(CustomEventType.EPOCH_CREATED, () => { epochCreatedEmitted = true; });
+    let epochCreatedEvent = null;
+    adminNode.state.once(CustomEventType.EPOCH_CREATED, event => { epochCreatedEvent = event; });
 
     const payload = await buildSetEpochPayload(context, { epoch: 1n, approverNodes: [] });
     await appendAndUpdate(adminNode.base, payload);
 
-    t.ok(epochCreatedEmitted, 'EPOCH_CREATED was emitted');
+    t.alike(
+        epochCreatedEvent,
+        { epoch: uint64ToBuffer(1n), proposerAddress: adminNode.wallet.address },
+        'EPOCH_CREATED identifies the committed epoch and proposer'
+    );
     t.is(await getCurrentEpoch(adminNode.base), 1n, 'current epoch advanced to 1');
 
     const epochHash = await getEpochHash(adminNode.base, 1n);
@@ -83,6 +88,46 @@ test('State.apply SET_EPOCH: ignores a stale epoch proposal without disturbing t
     t.is(await getCurrentEpoch(adminNode.base), 1n, 'stale re-proposal for epoch 1 is ignored, epoch stays at 1');
 });
 
+test('State.apply SET_EPOCH: ignores stale proposals without signature, approval, or VDF verification', async t => {
+    const context = await setupSetEpochScenario(t);
+    const adminNode = context.adminBootstrap;
+
+    const firstPayload = await buildSetEpochPayload(context, { epoch: 1n, approverNodes: [] });
+    await appendAndUpdate(adminNode.base, firstPayload);
+
+    let epochCreatedEmitted = false;
+    const onEpochCreated = () => { epochCreatedEmitted = true; };
+    adminNode.state.once(CustomEventType.EPOCH_CREATED, onEpochCreated);
+
+    const stalePayload = await buildSetEpochPayload(context, {
+        epoch: 1n,
+        approverNodes: [],
+        previousEpochHash: await getEpochHash(adminNode.base, 0n),
+        challengeOverride: b4a.alloc(32, 0xff),
+        proposalSignatureOverride: b4a.alloc(64, 0x11)
+    });
+    const { logs, result } = captureApplyErrors(() =>
+        appendAndUpdate(adminNode.base, stalePayload)
+    );
+    await result;
+    adminNode.state.off(CustomEventType.EPOCH_CREATED, onEpochCreated);
+
+    t.ok(
+        logs.some(args => args.some(arg => String(arg).includes('Stale epoch proposal.'))),
+        'the stale branch is observed'
+    );
+    t.absent(
+        logs.some(args => args.some(arg => String(arg).includes('Failed to verify proof proposal signature.'))),
+        'the invalid stale proposer signature is not verified'
+    );
+    t.absent(
+        logs.some(args => args.some(arg => String(arg).includes('VDF proof is invalid.'))),
+        'the invalid stale VDF is not verified'
+    );
+    t.is(await getCurrentEpoch(adminNode.base), 1n, 'stale proposal does not change the committed epoch');
+    t.absent(epochCreatedEmitted, 'stale proposal does not emit EPOCH_CREATED');
+});
+
 test('State.apply SET_EPOCH: rejects a proposal that skips ahead of the next expected epoch', async t => {
     const context = await setupSetEpochScenario(t);
     const adminNode = context.adminBootstrap;
@@ -97,3 +142,17 @@ test('State.apply SET_EPOCH: rejects a proposal that skips ahead of the next exp
 
     t.is(await getCurrentEpoch(adminNode.base), 0n, 'current epoch remains unchanged when the proposal skips ahead');
 });
+
+function captureApplyErrors(apply) {
+    const logs = [];
+    const originalConsoleError = console.error;
+    console.error = (...args) => logs.push(args);
+
+    const result = Promise.resolve()
+        .then(apply)
+        .finally(() => {
+            console.error = originalConsoleError;
+        });
+
+    return { logs, result };
+}

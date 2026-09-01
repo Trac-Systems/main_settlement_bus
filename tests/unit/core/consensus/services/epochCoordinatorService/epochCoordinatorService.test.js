@@ -2,6 +2,7 @@ import test from 'brittle';
 import sinon from 'sinon';
 import b4a from 'b4a';
 import { ConsensusResultCode } from '../../../../../../src/utils/constants.js';
+import { uint64ToBuffer } from '../../../../../../src/utils/buffer.js';
 
 const isBareRuntime = typeof globalThis.Bare !== 'undefined';
 
@@ -109,11 +110,18 @@ async function setup(overrides = {}) {
         constructor() { return mockOps; }
     };
 
+    const logger = {
+        debug: sinon.stub(),
+        warn: sinon.stub(),
+        error: sinon.stub(),
+        info: sinon.stub(),
+    };
+
     const { default: esmock } = await import('esmock');
     const { default: Service } = await esmock(SVC_PATH, {
         [CREATE_VDF_PATH]: { createVDFService: sinon.stub().resolves(mockVdfService) },
         [OPERATIONS_PATH]: { EpochCoordinatorOperations: MockCoordinatorOperations },
-        [LOGGER_PATH]: { Logger: class { debug() {} warn() {} error() {} info() {} } },
+        [LOGGER_PATH]: { Logger: class { constructor() { return logger; } } },
     });
 
     const state = makeState(overrides.stateOverrides ?? {});
@@ -123,7 +131,7 @@ async function setup(overrides = {}) {
     const service = new Service(state, wallet, config, manager);
     await service.ready();
 
-    return { service, state, mockOps, mockVdfService, manager };
+    return { service, state, mockOps, mockVdfService, manager, logger };
 }
 
 if (isBareRuntime) {
@@ -564,7 +572,7 @@ if (isBareRuntime) {
         t.ok(mockOps.appendSetEpoch.calledOnce, 'append was issued');
         t.absent(next.called, 'a stale getCurrentEpoch right after append must not resolve the cycle');
 
-        await state.emit(EPOCH_CREATED, { epoch: 6n, proposerAddress: 'trac1wallet' });
+        await state.emit(EPOCH_CREATED, { epoch: uint64ToBuffer(6n), proposerAddress: 'trac1wallet' });
         await drainMicrotasks();
 
         t.ok(next.calledOnce, 'EPOCH_CREATED for our own proposal reached the terminal SEND_APPEND_SIGNAL state');
@@ -587,7 +595,7 @@ if (isBareRuntime) {
         await drainMicrotasks();
         t.is(mockOps.appendSetEpoch.callCount, 1);
 
-        await state.emit(EPOCH_CREATED, { epoch: 6n, proposerAddress: 'trac1someone-else' });
+        await state.emit(EPOCH_CREATED, { epoch: uint64ToBuffer(6n), proposerAddress: 'trac1someone-else' });
         // The listener sends the reload event fire-and-forget; a real timer tick lets it settle.
         await flush();
 
@@ -606,7 +614,7 @@ if (isBareRuntime) {
         await service.worker(next, sinon.stub());
         await drainMicrotasks();
 
-        await state.emit(EPOCH_CREATED, { epoch: 99n, proposerAddress: 'trac1wallet' });
+        await state.emit(EPOCH_CREATED, { epoch: uint64ToBuffer(99n), proposerAddress: 'trac1wallet' });
         await drainMicrotasks();
 
         t.absent(next.called, 'an EPOCH_CREATED for an unrelated epoch must not resolve this cycle');
@@ -654,7 +662,7 @@ if (isBareRuntime) {
         await service.worker(next, sinon.stub()); // sits in COLLECT_APPROVALS
         t.absent(next.called);
 
-        await state.emit(EPOCH_CREATED);
+        await state.emit(EPOCH_CREATED, { epoch: uint64ToBuffer(6n), proposerAddress: 'trac1someone-else' });
         t.ok(next.calledOnce);
         t.ok(next.calledWith(CONFIG.epochInterval));
     });
@@ -673,7 +681,7 @@ if (isBareRuntime) {
 
             const next = sinon.stub();
             await service.worker(next, sinon.stub());
-            await state.emit(EPOCH_CREATED);
+            await state.emit(EPOCH_CREATED, { epoch: uint64ToBuffer(6n), proposerAddress: 'trac1someone-else' });
             t.ok(next.calledOnce);
 
             await clock.tickAsync(1100); // stale timeout - must not fire a second next()

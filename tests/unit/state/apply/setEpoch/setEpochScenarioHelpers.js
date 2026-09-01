@@ -22,13 +22,17 @@ import { config } from '../../../../helpers/config.js';
 
 const isBare = typeof globalThis.Bare !== 'undefined';
 
-// Difficulty is kept tiny so real VDF computation stays fast in tests, but the discriminant
-// size must be 2048 bits: that's the only size whose solution matches the protocol's fixed
-// 516-byte VDF_BLOB_PROOF_SIZE wire format (verified empirically: 512->132B, 1024->260B, 2048->516B).
+// Difficulty is kept tiny so real VDF computation stays fast. The representative fixture uses
+// a 2048-bit discriminant and its corresponding 516-byte proof; the protocol also supports the
+// configured proof sizes for 1024- and 4096-bit discriminants.
 export const VDF_DIFFICULTY = 100;
 export const VDF_DISCRIMINANT_SIZE = 2048;
 
-export async function computeRealVdfSolution(challenge) {
+export async function computeRealVdfSolution(
+    challenge,
+    difficulty = VDF_DIFFICULTY,
+    discriminantBitSize = VDF_DISCRIMINANT_SIZE
+) {
     const Service = isBare
         ? (await import('../../../../../src/core/consensus/services/VDFBare.js')).VDFBare
         : (await import('../../../../../src/core/consensus/services/VDFNode.js')).VDFNode;
@@ -36,7 +40,11 @@ export async function computeRealVdfSolution(challenge) {
     const service = new Service();
     await service.ready();
     try {
-        const { result, error } = await service.calculateVDF(challenge, VDF_DIFFICULTY, VDF_DISCRIMINANT_SIZE);
+        const { result, error } = await service.calculateVDF(
+            challenge,
+            difficulty,
+            discriminantBitSize
+        );
         if (error) {
             throw new Error(`VDF computation failed in test helper (is @tracsystems/trac-vdf built?): ${error}`);
         }
@@ -146,7 +154,11 @@ export async function buildSetEpochPayload(context, {
     );
 
     const challenge = challengeOverride ?? challengeData;
-    const vdfSolution = await computeRealVdfSolution(challenge);
+    const vdfSolution = await computeRealVdfSolution(
+        challenge,
+        vdfDifficulty,
+        vdfDiscriminantSize
+    );
 
     const proposalMessage = await consensusMessageFactory(proposerNode.wallet, config)
         .buildProofProposal(

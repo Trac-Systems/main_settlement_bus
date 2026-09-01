@@ -5,6 +5,9 @@ import {
     isBufferValid,
     safeReadUint16BE,
     safeReadUint32BE,
+    incrementBuffer,
+    toUIntString,
+    safeToUIntString,
     safeUint8ToBuffer,
     safeUint16ToBuffer,
     safeWriteUInt32BE,
@@ -479,6 +482,85 @@ test('safeReadUint32BE - returns decoded number or null', t => {
     t.is(safeReadUint32BE(b4a.alloc(3)), null, 'returns null for short buffer');
     t.is(safeReadUint32BE(buffer, 9), null, 'returns null for out-of-bounds offset');
     t.is(safeReadUint32BE(null), null, 'returns null for invalid input');
+});
+
+test('incrementBuffer - increments fixed-width big-endian buffers', t => {
+    const input = b4a.from('00ffff', 'hex');
+    const result = incrementBuffer(input);
+
+    t.is(result.toString('hex'), '010000', 'propagates carry across bytes');
+    t.is(result.length, input.length, 'preserves the input width');
+    t.is(input.toString('hex'), '00ffff', 'does not mutate the input');
+    t.is(incrementBuffer(b4a.from('00', 'hex')).toString('hex'), '01', 'increments a one-byte buffer');
+    t.is(
+        incrementBuffer(b4a.from('000000000000000000000000000000ff', 'hex')).toString('hex'),
+        '00000000000000000000000000000100',
+        'supports buffers longer than eight bytes'
+    );
+    t.is(
+        incrementBuffer(b4a.from('0000000000000001', 'hex'), 8).toString('hex'),
+        '0000000000000002',
+        'increments an exact enforced width'
+    );
+    t.is(
+        incrementBuffer(b4a.from('fffffffffffffffe', 'hex'), 8).toString('hex'),
+        'ffffffffffffffff',
+        'increments the maximum uint64 predecessor'
+    );
+});
+
+test('incrementBuffer - returns null for invalid input or overflow', t => {
+    t.is(incrementBuffer(b4a.from('ffffff', 'hex')), null, 'returns null on overflow');
+    t.is(incrementBuffer(b4a.alloc(2), 8), null, 'rejects an enforced-width mismatch');
+    t.is(incrementBuffer(b4a.alloc(7), 8), null, 'rejects an input shorter than the enforced width');
+    t.is(incrementBuffer(b4a.alloc(9), 8), null, 'rejects an input longer than the enforced width');
+    t.is(incrementBuffer(b4a.alloc(8, 0xff), 8), null, 'returns null on uint64 overflow');
+    t.is(incrementBuffer(b4a.alloc(0)), null, 'rejects an empty buffer');
+    t.is(incrementBuffer(b4a.alloc(17)), null, 'rejects buffers longer than 16 bytes');
+    t.is(incrementBuffer(null), null, 'rejects non-buffer input');
+});
+
+test('toUIntString - converts big-endian buffers to decimal strings', t => {
+    t.is(toUIntString(b4a.from('00', 'hex')), '0', 'converts zero');
+    t.is(toUIntString(b4a.from('000001', 'hex')), '1', 'removes leading zeroes');
+    t.is(toUIntString(b4a.from('0100', 'hex')), '256', 'converts multiple bytes');
+    t.is(toUIntString(b4a.from('0100', 'hex'), 'decimal'), '256', 'accepts the documented decimal encoding');
+    t.is(
+        toUIntString(b4a.from('ffffffffffffffff', 'hex')),
+        '18446744073709551615',
+        'converts the maximum uint64 without precision loss'
+    );
+    t.is(
+        toUIntString(b4a.from('ffffffffffffffffffffffffffffffff', 'hex')),
+        '340282366920938463463374607431768211455',
+        'converts the maximum uint128 without precision loss'
+    );
+});
+
+test('toUIntString - converts big-endian buffers to hexadecimal strings', t => {
+    t.is(toUIntString(b4a.from('00', 'hex'), 'hex'), '0', 'converts zero');
+    t.is(toUIntString(b4a.from('000001ff', 'hex'), 'hex'), '1ff', 'normalizes leading zeroes');
+    t.is(
+        toUIntString(b4a.from('ffffffffffffffffffffffffffffffff', 'hex'), 'hex'),
+        'ffffffffffffffffffffffffffffffff',
+        'converts the maximum uint128'
+    );
+});
+
+test('toUIntString - throws for invalid input or encoding', async t => {
+    await t.exception.all(() => toUIntString(null), /between 1 and 16 bytes/, 'rejects non-buffer input');
+    await t.exception.all(() => toUIntString(b4a.alloc(0)), /between 1 and 16 bytes/, 'rejects an empty buffer');
+    await t.exception.all(() => toUIntString(b4a.alloc(17)), /between 1 and 16 bytes/, 'rejects buffers longer than 16 bytes');
+    await t.exception.all(() => toUIntString(b4a.from([1]), 'binary'), /Unsupported encoding/, 'rejects unsupported encodings');
+});
+
+test('safeToUIntString - converts valid input and returns null for invalid input', t => {
+    t.is(safeToUIntString(b4a.from('0100', 'hex')), '256', 'uses decimal by default');
+    t.is(safeToUIntString(b4a.from('000001ff', 'hex'), 'hex'), '1ff', 'supports hexadecimal output');
+    t.is(safeToUIntString(null), null, 'rejects non-buffer input');
+    t.is(safeToUIntString(b4a.alloc(0)), null, 'rejects an empty buffer');
+    t.is(safeToUIntString(b4a.alloc(17)), null, 'rejects buffers longer than 16 bytes');
+    t.is(safeToUIntString(b4a.from([1]), 'binary'), null, 'rejects unsupported encodings');
 });
 
 test('createMessage ignores invalid values when valid buffers are present', t => {

@@ -24,6 +24,7 @@ import {
     applyWithConsensusConfigEncodingFailure,
     applyWithEntryOverrides,
     applyWithGenesisEpochEncodingFailure,
+    applyWithGenesisEpochHashFailure,
     applyWithMessageConstructionFailure,
     assertGenesisInitialized,
     assertGenesisUninitialized,
@@ -505,6 +506,25 @@ test('State.apply SET_GENESIS_EPOCH fails when final epoch proof encoding fails'
     t.ok(injected, 'safeEncodeEpochProof failure was injected');
     await assertSetGenesisEpochFailureState(t, context, payload, { skipSync: true });
     assertLog(t, logs, 'Could not initialize genesis epoch');
+});
+
+test('State.apply SET_GENESIS_EPOCH fails when final epoch proof hashing fails', async t => {
+    const context = await setupSetGenesisEpochScenario(t);
+    const payload = await buildSetGenesisEpochPayload(context);
+    const events = [];
+    context.adminBootstrap.state.on(
+        CustomEventType.GENESIS_EPOCH_CREATED,
+        event => events.push(event)
+    );
+    const { logs, result } = captureApplyErrors(() =>
+        applyWithGenesisEpochHashFailure(context, payload)
+    );
+    const injected = await result;
+
+    t.ok(injected, 'genesis epoch proof hash failure was injected');
+    await assertSetGenesisEpochFailureState(t, context, payload, { skipSync: true });
+    t.is(events.length, 0, 'hash failure does not emit GENESIS_EPOCH_CREATED');
+    assertLog(t, logs, 'Failed to hash genesis epoch proof.');
 });
 
 // Status.SUCCESS

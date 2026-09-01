@@ -1,3 +1,4 @@
+import b4a from "b4a";
 import SchedulableService, { SCHEDULABLE_SERVICE_EVENTS } from "../../../utils/scheduler/SchedulableService.js";
 import { EPOCH_EVENTS, EPOCH_STATES, EpochStateMachine } from "./EpochStateMachine.js";
 import { ConsensusProtocolVersion, CustomEventType } from "../../../utils/constants.js";
@@ -342,9 +343,9 @@ class EpochCoordinatorService extends SchedulableService {
             if (next === EPOCH_STATES.APPEND_SET_EPOCH) {
                 appendTimer = setTimeout(() => stateMachine.send(EPOCH_EVENTS.APPEND_FAILED), this.#config.epochAppendTimeout);
 
-                const targetEpoch = stateMachine.context.currentEpoch + 1n;
+                const targetEpoch = uint64ToBuffer(stateMachine.context.currentEpoch + 1n);
                 stopAppendListener = listenTo(this.#state, CustomEventType.EPOCH_CREATED, ({ epoch, proposerAddress }) => {
-                    if (epoch !== targetEpoch) return;
+                    if (!b4a.equals(epoch, targetEpoch)) return;
                     stateMachine.send(
                         proposerAddress === this.#wallet.address
                             ? EPOCH_EVENTS.APPEND_ACCEPTED
