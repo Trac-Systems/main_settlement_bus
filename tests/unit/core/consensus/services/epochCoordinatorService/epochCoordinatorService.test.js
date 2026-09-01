@@ -341,25 +341,95 @@ if (isBareRuntime) {
         }
     });
 
-    test('a failed VDF replacement keeps the scheduler stopped', async t => {
+    test('a failed VDF replacement retries after backoff and restarts the scheduler', async t => {
         const clock = sinon.useFakeTimers();
         let context;
         try {
+            const freshOperations = {};
+            const replace = sinon.stub();
+            replace.onFirstCall().rejects(new Error('startup failed'));
+            replace.onSecondCall().callsFake(async () => {
+                context.vdfManager.operations = freshOperations;
+                return freshOperations;
+            });
             context = await setup({
                 vdfManagerOverrides: {
-                    replace: sinon.stub().rejects(new Error('startup failed')),
+                    replace,
                 },
             });
             await context.service.start();
 
             await context.state.emit(CustomEventType.CONSENSUS_CONFIG_CHANGED);
             await drainMicrotasks();
-            await clock.tickAsync(CONFIG.epochInterval);
 
-            t.is(context.vdfManager.open.callCount, 2);
-            t.ok(context.vdfManager.replace.calledOnce);
+            t.ok(replace.calledOnce);
             t.ok(context.logger.error.calledOnce);
             t.absent(context.roundConstructed.called);
+
+            await context.state.emit(CustomEventType.CONSENSUS_CONFIG_CHANGED);
+            await drainMicrotasks();
+            t.ok(replace.calledOnce, 'a config signal during backoff shares the active reload');
+
+            await clock.tickAsync(CONFIG.epochBackoffDelay - 1);
+            t.ok(replace.calledOnce);
+            t.absent(context.roundConstructed.called);
+
+            await clock.tickAsync(1);
+            await drainMicrotasks();
+            await clock.tickAsync(0);
+            await drainMicrotasks();
+            await clock.tickAsync(1);
+
+            t.ok(replace.calledTwice);
+            t.ok(context.roundConstructed.calledOnce);
+            t.is(context.rounds[0].options.operations, freshOperations);
+        } finally {
+            await context?.service.close();
+            clock.restore();
+        }
+    });
+
+    test('stop cancels a pending config reload retry', async t => {
+        const clock = sinon.useFakeTimers();
+        let context;
+        try {
+            const replace = sinon.stub().rejects(new Error('startup failed'));
+            context = await setup({ vdfManagerOverrides: { replace } });
+            await context.service.start();
+
+            await context.state.emit(CustomEventType.CONSENSUS_CONFIG_CHANGED);
+            await drainMicrotasks();
+            t.ok(replace.calledOnce);
+
+            await context.service.stop(false);
+            await clock.tickAsync(CONFIG.epochBackoffDelay);
+
+            t.ok(replace.calledOnce);
+            t.absent(context.roundConstructed.called);
+        } finally {
+            await context?.service.close();
+            clock.restore();
+        }
+    });
+
+    test('close cancels a pending config reload retry', async t => {
+        const clock = sinon.useFakeTimers();
+        let context;
+        try {
+            const replace = sinon.stub().rejects(new Error('startup failed'));
+            context = await setup({ vdfManagerOverrides: { replace } });
+            await context.service.start();
+
+            await context.state.emit(CustomEventType.CONSENSUS_CONFIG_CHANGED);
+            await drainMicrotasks();
+            t.ok(replace.calledOnce);
+
+            await context.service.close();
+            await clock.tickAsync(CONFIG.epochBackoffDelay);
+
+            t.ok(replace.calledOnce);
+            t.absent(context.roundConstructed.called);
+            t.is(context.state.listenerCount(CustomEventType.CONSENSUS_CONFIG_CHANGED), 0);
         } finally {
             await context?.service.close();
             clock.restore();

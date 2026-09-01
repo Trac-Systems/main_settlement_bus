@@ -15,7 +15,7 @@
  *
  * TODO: Investigate whether other types of events can be safely supported.
  * Verify that bursts or frequent events (for example, many nodes removing a
- * writer at the same time) cann5ot cause excessive memory usage while queued.
+ * writer at the same time) cannot cause excessive memory usage while queued.
  */
 
 export class StateEventQueue {

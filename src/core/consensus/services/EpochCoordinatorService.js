@@ -16,6 +16,7 @@ class EpochCoordinatorService extends SchedulableService {
     #currentRound = null;
     #unfinishedRounds = new Set();
     #configReload = null;
+    #cancelReloadDelay = null;
     #configChangeListener;
 
     /**
@@ -58,6 +59,7 @@ class EpochCoordinatorService extends SchedulableService {
     async _close() {
         this.#state.off(CustomEventType.CONSENSUS_CONFIG_CHANGED, this.#configChangeListener);
         this.#enabled = false;
+        this.#cancelReloadDelay?.();
 
         const roundCancelled = this.#cancelCurrentRound();
         const schedulerStopped = super.stop(false);
@@ -101,6 +103,7 @@ class EpochCoordinatorService extends SchedulableService {
      */
     async stop(waitForCurrent = true) {
         this.#enabled = false;
+        this.#cancelReloadDelay?.();
         const roundCancelled = this.#cancelCurrentRound();
         const stopped = await super.stop(false);
 
@@ -203,7 +206,7 @@ class EpochCoordinatorService extends SchedulableService {
         const previousRound = this.#currentRound;
         this.#currentRound = round;
 
-        if (previousRound) this.#cancelRound(previousRound);
+        if (previousRound) void this.#cancelRound(previousRound);
     }
 
     /**
@@ -269,19 +272,11 @@ class EpochCoordinatorService extends SchedulableService {
         const shouldRestart = this.#enabled;
 
         try {
-            const roundCancelled = this.#cancelCurrentRound();
-            const schedulerStopped = super.stop(false);
-            let vdfReload;
-
-            if (shouldRestart) {
-                vdfReload = this.#vdfManager.replace();
-            } else {
-                vdfReload = this.#vdfManager.close();
-            }
-
-            await schedulerStopped;
-            await roundCancelled;
-            await vdfReload;
+            await Promise.all([
+                this.#cancelCurrentRound(),
+                super.stop(false),
+                shouldRestart ? this.#reloadVdf() : this.#vdfManager.close(),
+            ]);
         } catch (error) {
             this.#logger.error(`[EpochCoordinatorService] config reload failed: ${error.message}`);
             return;
@@ -293,6 +288,38 @@ class EpochCoordinatorService extends SchedulableService {
         if (!this.#vdfManager.operations || !this.#canStart()) return;
 
         super.start(0);
+    }
+
+    /** Reloads VDF, retrying while the coordinator is running. */
+    async #reloadVdf() {
+        while (this.#canStart()) {
+            try {
+                await this.#vdfManager.replace();
+                return true;
+            } catch (error) {
+                if (!this.#canStart()) return false;
+
+                this.#logger.error(
+                    `[EpochCoordinatorService] config reload failed: ${error.message}; ` +
+                    `retrying in ${this.#config.epochBackoffDelay}ms`,
+                );
+                await this.#waitBeforeRetry();
+            }
+        }
+
+        return false;
+    }
+
+    #waitBeforeRetry() {
+        return new Promise(resolve => {
+            const timer = setTimeout(resolve, this.#config.epochBackoffDelay);
+            this.#cancelReloadDelay = () => {
+                clearTimeout(timer);
+                resolve();
+            };
+        }).finally(() => {
+            this.#cancelReloadDelay = null;
+        });
     }
 }
 

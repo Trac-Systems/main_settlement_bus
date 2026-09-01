@@ -129,6 +129,26 @@ if (isBareRuntime) {
         await t.exception(context.manager.open(), /Previous VDF service is still open/);
     });
 
+    test('replace can be retried after the old VDF eventually closes', async t => {
+        const close = sinon.stub();
+        close.onFirstCall().rejects(new Error('old VDF is still running'));
+        close.onSecondCall().resolves();
+        const oldVdf = makeVdf({ close });
+        const newVdf = makeVdf();
+        const context = await setup([oldVdf, newVdf]);
+        await context.manager.open();
+
+        await t.exception(context.manager.replace(), /Failed to close VDF service/);
+        t.ok(context.createVDFService.calledOnce, 'no replacement is opened after the failed close');
+
+        const operations = await context.manager.replace();
+
+        t.ok(close.calledTwice);
+        t.ok(context.createVDFService.calledTwice);
+        t.is(operations.service, newVdf);
+        await context.manager.close();
+    });
+
     test('open can be retried after VDF startup fails and cleanup succeeds', async t => {
         const failedVdf = makeVdf({
             ready: sinon.stub().rejects(new Error('startup failed')),

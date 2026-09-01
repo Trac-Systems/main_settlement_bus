@@ -5,77 +5,76 @@ import b4a from 'b4a';
 import {
     ACK_INTERVAL,
     ADMIN_INITIAL_BALANCE,
-    EntryType,
-    OperationType,
+    ADMIN_INITIAL_STAKED_BALANCE,
     AUTOBASE_VALUE_ENCODING,
+    BATCH_SIZE,
+    CONSENSUS_CONFIG_INDEX_SIZE,
+    ConsensusConfigSchemaVersion,
+    ConsensusProtocolVersion,
+    CustomEventType,
+    EntryType,
+    EPOCH_BYTE_LENGTH,
+    EventType,
+    HASH_BYTE_LENGTH,
     HYPERBEE_KEY_ENCODING,
     HYPERBEE_VALUE_ENCODING,
-    BATCH_SIZE,
-    ADMIN_INITIAL_STAKED_BALANCE,
+    OperationType,
     TRAC_NAMESPACE,
-    EventType,
-    CustomEventType,
-    ConsensusConfigSchemaVersion,
     UINT32_MAX,
-    ConsensusProtocolVersion,
-    VDF_PROOF_BYTE_LENGTHS,
-    HASH_BYTE_LENGTH,
-    EPOCH_BYTE_LENGTH,
-    CONSENSUS_CONFIG_INDEX_SIZE
+    VDF_PROOF_BYTE_LENGTHS
 } from '../../utils/constants.js';
-import { isHexString, sleep, isTransactionRecordPut } from '../../utils/helpers.js';
+import {isHexString, isTransactionRecordPut, sleep} from '../../utils/helpers.js';
 import tracCryptoApi from 'trac-crypto-api';
-import { verifyWesolowski } from '@tracsystems/trac-vdf';
+import {verifyWesolowski} from '@tracsystems/trac-vdf';
 import StateValidationSchema from './validators/StateValidationSchema.js';
 import {
     decodeConsensusConfig,
-    safeDecodeConsensusConfig,
     safeDecodeApplyOperation,
+    safeDecodeConsensusConfig,
     safeEncodeConsensusConfig,
     safeEncodeEpochProof
 } from '../../codecs/apply/applyOperationCodec.js';
 import {
     createMessage,
-    ZERO_WK,
-    NULL_BUFFER,
-    isZeroBuffer,
-    safeWriteUInt32BE,
-    safeReadUint32BE,
     deepCopyBuffer,
-    safeReadUint8,
-    uint16ToBuffer,
-    isBufferValid,
     incrementBuffer,
-    safeToUIntString
+    isBufferValid,
+    isZeroBuffer,
+    NULL_BUFFER,
+    safeReadUint32BE,
+    safeReadUint8,
+    safeToUIntString,
+    safeWriteUInt32BE,
+    uint16ToBuffer,
+    ZERO_WK
 } from '../../utils/buffer.js';
-import { safeDecodeProofProposal, safeDecodeProofProposalApproval } from '../../codecs/consensus/v1/consensusV1OperationCodec.js';
+import {
+    safeDecodeProofProposal,
+    safeDecodeProofProposalApproval
+} from '../../codecs/consensus/v1/consensusV1OperationCodec.js';
 import addressUtils from './utils/address.js';
 import adminEntryUtils from './utils/adminEntry.js';
-import nodeEntryUtils, { setWritingKey, NODE_ENTRY_SIZE } from './utils/nodeEntry.js';
+import nodeEntryUtils, {NODE_ENTRY_SIZE, setWritingKey} from './utils/nodeEntry.js';
 import nodeRoleUtils from './utils/roles.js';
 import lengthEntryUtils from './utils/lengthEntry.js';
-import transactionUtils from './utils/transaction.js';
+import transactionUtils, {Status} from './utils/transaction.js';
 import {
     BALANCE_FEE,
-    toBalance,
-    PERCENT_75,
-    PERCENT_50,
-    PERCENT_25,
     BALANCE_TO_STAKE,
     BALANCE_ZERO,
+    PERCENT_25,
+    PERCENT_50,
+    PERCENT_75,
+    toBalance,
     toTerm,
 } from './utils/balance.js';
 import deploymentEntryUtils from './utils/deploymentEntry.js';
-import { Status } from './utils/transaction.js';
 import remote from 'hypercore/lib/fully-remote-proof.js'
 import PQueue from 'p-queue';
-import { createGenesisEpochProof } from './utils/epochProof.js';
-import {
-    decodeVdfConfig,
-    safeDecodeVdfConfig,
-} from '../../codecs/consensus/v1/vdfConfigCodec.js';
+import {createGenesisEpochProof} from './utils/epochProof.js';
+import {decodeVdfConfig, safeDecodeVdfConfig,} from '../../codecs/consensus/v1/vdfConfigCodec.js';
 import _ from 'lodash';
-import { StateEventQueue } from './StateEventQueue.js';
+import {StateEventQueue} from './StateEventQueue.js';
 
 const OVERSIZED_BATCH_PENALTY_MULTIPLIER = BATCH_SIZE;
 
@@ -463,16 +462,14 @@ class State extends ReadyResource {
      */
     handleViewUpdate(signedLength = this.getSignedLength()) {
         this.#stateEventQueue.flush(signedLength, (event, ...args) => {
-            console.log('[ConsensusReloadDebug] dispatching published state event', event);
             this.#emitEvent(event, ...args);
         });
     }
 
     async isWkInIndexersEntry(wk) {
         if (wk === null) return false;
-        const indexerListHasWk = Object.values(this.#base.system.indexers)
+        return Object.values(this.#base.system.indexers)
             .some(entry => b4a.equals(entry.key, wk));
-        return indexerListHasWk;
     }
 
     async getWriterLength() {
