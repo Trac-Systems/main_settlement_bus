@@ -2,7 +2,11 @@ import b4a from 'b4a';
 import tracCryptoApi from 'trac-crypto-api';
 
 import { createMessage, toHex } from '../../utils/buffer.js';
-import { OperationType } from '../../utils/constants.js';
+import {
+    HTLC_LOCK_ID_BYTE_LENGTH,
+    HTLC_PREIMAGE_BYTE_LENGTH,
+    OperationType
+} from '../../utils/constants.js';
 import { addressToBuffer, bufferToAddress } from '../../core/state/utils/address.js';
 import { isAddressValid } from "../../core/state/utils/address.js";
 import {
@@ -40,6 +44,8 @@ class ApplyStateMessageBuilder {
     #consensusConfig;
     #encodedConsensusConfig;
     #externalBootstrap;
+    #htlcLockId;
+    #htlcPreimage;
     #incomingAddress;
     #incomingNonce;
     #incomingSignature;
@@ -159,6 +165,24 @@ class ApplyStateMessageBuilder {
 
     setTxValidity(txValidity) {
         this.#txValidity = this.#normalizeHexBuffer(txValidity, 32, 'Transaction validity');
+        return this;
+    }
+
+    setHtlcLockId(lockId) {
+        this.#htlcLockId = this.#normalizeHexBuffer(
+            lockId,
+            HTLC_LOCK_ID_BYTE_LENGTH,
+            'HTLC lock ID'
+        );
+        return this;
+    }
+
+    setHtlcPreimage(preimage) {
+        this.#htlcPreimage = this.#normalizeHexBuffer(
+            preimage,
+            HTLC_PREIMAGE_BYTE_LENGTH,
+            'HTLC preimage'
+        );
         return this;
     }
 
@@ -311,9 +335,23 @@ class ApplyStateMessageBuilder {
 
         switch (this.#operationType) {
             case OperationType.HTLC_LOCK:
-            case OperationType.HTLC_CLAIM:
             case OperationType.HTLC_REFUND:
                 return {};
+            case OperationType.HTLC_CLAIM:
+                this.#requireFields([
+                    [this.#txValidity, 'Transaction validity'],
+                    [this.#htlcLockId, 'HTLC lock ID'],
+                    [this.#htlcPreimage, 'HTLC preimage']
+                ]);
+                msg = createMessage(
+                    this.#config.networkId,
+                    this.#txValidity,
+                    this.#htlcLockId,
+                    this.#htlcPreimage,
+                    nonce,
+                    OperationType.HTLC_CLAIM
+                );
+                break;
             case OperationType.ADD_WRITER:
             case OperationType.REMOVE_WRITER:
             case OperationType.ADMIN_RECOVERY:
@@ -427,6 +465,16 @@ class ApplyStateMessageBuilder {
                 is: signature
             };
         }
+        if (this.#operationType === OperationType.HTLC_CLAIM) {
+            return {
+                tx,
+                txv: this.#txValidity,
+                li: this.#htlcLockId,
+                pi: this.#htlcPreimage,
+                in: nonce,
+                is: signature
+            };
+        }
 
         throw new Error(`No corresponding value type for operation: ${this.#operationType}`);
     }
@@ -443,12 +491,30 @@ class ApplyStateMessageBuilder {
             };
         }
 
+        if (this.#operationType === OperationType.HTLC_CLAIM) {
+            this.#requireFields([
+                [this.#txHash, 'Transaction hash'],
+                [this.#txValidity, 'Transaction validity'],
+                [this.#htlcLockId, 'HTLC lock ID'],
+                [this.#htlcPreimage, 'HTLC preimage'],
+                [this.#incomingNonce, 'Incoming nonce'],
+                [this.#incomingSignature, 'Incoming signature']
+            ]);
+            return {
+                tx: this.#txHash,
+                txv: this.#txValidity,
+                li: this.#htlcLockId,
+                pi: this.#htlcPreimage,
+                in: this.#incomingNonce,
+                is: this.#incomingSignature
+            };
+        }
+
         const nonce = tracCryptoApi.nonce.generate();
         let msg;
 
         switch (this.#operationType) {
             case OperationType.HTLC_LOCK:
-            case OperationType.HTLC_CLAIM:
             case OperationType.HTLC_REFUND:
                 return {};
             case OperationType.ADD_ADMIN:

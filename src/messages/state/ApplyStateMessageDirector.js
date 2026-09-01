@@ -583,13 +583,24 @@ class ApplyStateMessageDirector {
         return this.#builder.getPayload();
     }
 
-    async buildPartialHtlcClaimOperationMessage(invokerAddress) {
+    /**
+     * Build a signed partial HTLC claim payload.
+     * @param {string|Buffer} invokerAddress
+     * @param {string|Buffer} txValidity
+     * @param {string|Buffer} lockId
+     * @param {string|Buffer} preimage
+     * @returns {Promise<object>}
+     */
+    async buildPartialHtlcClaimOperationMessage(invokerAddress, txValidity, lockId, preimage) {
         if (!this.#builder) throw new Error('Builder has not been set.');
         await this.#builder
             .setPhase('partial')
             .setOutput('buffer')
             .setOperationType(OperationType.HTLC_CLAIM)
             .setAddress(invokerAddress)
+            .setTxValidity(txValidity)
+            .setHtlcLockId(lockId)
+            .setHtlcPreimage(preimage)
             .build();
         return this.#builder.getPayload();
     }
@@ -616,13 +627,38 @@ class ApplyStateMessageDirector {
         return this.#builder.getPayload();
     }
 
-    async buildCompleteHtlcClaimOperationMessage(invokerAddress) {
+    /**
+     * Preserve a validated, submitter-signed HTLC claim for state application.
+     * @param {string|Buffer} invokerAddress
+     * @param {string|Buffer} transactionHash
+     * @param {string|Buffer} txValidity
+     * @param {string|Buffer} lockId
+     * @param {string|Buffer} preimage
+     * @param {string|Buffer} incomingNonce
+     * @param {string|Buffer} incomingSignature
+     * @returns {Promise<object>}
+     */
+    async buildCompleteHtlcClaimOperationMessage(
+        invokerAddress,
+        transactionHash,
+        txValidity,
+        lockId,
+        preimage,
+        incomingNonce,
+        incomingSignature
+    ) {
         if (!this.#builder) throw new Error('Builder has not been set.');
         await this.#builder
             .setPhase('complete')
             .setOutput('buffer')
             .setOperationType(OperationType.HTLC_CLAIM)
             .setAddress(invokerAddress)
+            .setTxHash(transactionHash)
+            .setTxValidity(txValidity)
+            .setHtlcLockId(lockId)
+            .setHtlcPreimage(preimage)
+            .setIncomingNonce(incomingNonce)
+            .setIncomingSignature(incomingSignature)
             .build();
         return this.#builder.getPayload();
     }

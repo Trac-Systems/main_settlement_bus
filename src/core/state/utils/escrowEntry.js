@@ -16,11 +16,11 @@ export const Status = Object.freeze({
     REFUNDED: 2,
 });
 
-export function init(id, maker, taker, lock, nonce, expiryEpoch, amount) {
+export function init(lockId, maker, taker, lock, nonce, expiryEpoch, amount) {
     if (!isBufferValid(amount, BALANCE_BYTE_LENGTH) ||
         !isBufferValid(maker, TRAC_PUB_KEY_SIZE) ||
         !isBufferValid(taker, TRAC_PUB_KEY_SIZE) ||
-        !isBufferValid(id, TRAC_HASH_SIZE) ||
+        !isBufferValid(lockId, TRAC_HASH_SIZE) ||
         !isBufferValid(nonce, TRAC_HASH_SIZE) ||
         !isBufferValid(lock, TRAC_HASH_SIZE) ||
         !isBufferValid(expiryEpoch, EPOCH_BYTE_LENGTH)) {
@@ -43,7 +43,7 @@ export function init(id, maker, taker, lock, nonce, expiryEpoch, amount) {
         b4a.copy(maker, escrowEntry, offset);
         offset += TRAC_PUB_KEY_SIZE;
 
-        b4a.copy(id, escrowEntry, offset);
+        b4a.copy(lockId, escrowEntry, offset);
         offset += TRAC_HASH_SIZE;
 
         b4a.copy(nonce, escrowEntry, offset);

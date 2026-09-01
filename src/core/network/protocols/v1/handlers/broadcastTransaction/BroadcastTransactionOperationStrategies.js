@@ -131,7 +131,13 @@ export function createBroadcastTransactionOperationStrategies({
                 'hco',
                 partialHtlcValidator,
                 decodedOperation => createApplyStateMessageFactory().buildCompleteHtlcClaimOperationMessage(
-                    decodedOperation.address
+                    decodedOperation.address,
+                    decodedOperation.hco.tx,
+                    decodedOperation.hco.txv,
+                    decodedOperation.hco.li,
+                    decodedOperation.hco.pi,
+                    decodedOperation.hco.in,
+                    decodedOperation.hco.is
                 )
             )
         ],
