@@ -9,7 +9,9 @@ import {
     NONCE_BYTE_LENGTH,
     OperationType,
     AMOUNT_BYTE_LENGTH,
-    CONSENSUS_CONFIG_SCHEMA_VERSION_BYTE_LENGTH
+    CONSENSUS_CONFIG_SCHEMA_VERSION_BYTE_LENGTH,
+    HTLC_LOCK_ID_BYTE_LENGTH,
+    HTLC_PREIMAGE_BYTE_LENGTH
 } from '../../src/utils/constants.js';
 import { config } from '../helpers/config.js'
 import { asAddress } from '../helpers/address.js';
@@ -476,6 +478,31 @@ export const CCO = {
     },
     required_length_of_consensus_config_fields: {
         sv: CONSENSUS_CONFIG_SCHEMA_VERSION_BYTE_LENGTH
+    }
+}
+
+export const HCO = {
+    valid_htlc_claim_operation: {
+        type: OperationType.HTLC_CLAIM,
+        address: addressToBuffer(asAddress('544514242356432739de9af71deb8d526fb03d6c5c15e0a934d9a20b6710e2fe'), config.addressPrefix),
+        hco: {
+            tx: b4a.from('77d1646b575144aeafaa2eab8ac8a36cebeed04f4b275f23f77c972fc5a21b64', 'hex'),
+            txv: b4a.from('8527bf71c57a435d280ba794c31255210c4c6ed31ce619f8a5428d26afd7e38f', 'hex'),
+            li: b4a.from('37d945281373acf4a3c214228ea6bd5a9865b6d8329224870eda8f9d54431b3b', 'hex'),
+            pi: b4a.from('24ef8d04c91f8c745b336d12a80929c4863b9a4e6b54fc093bd5849019510adc', 'hex'),
+            in: b4a.from('a36760285dcfb6f61ae6bef42b743b73df2d0043aae5e9b08bb4e5cb53fd6764', 'hex'),
+            is: b4a.from('b4215709fee946172b186563b6d3315db71195f1269d4070cc721b8a1bfe824dcc8921fa2ed1c0275526a8edd2752ad3d3be6948a2ee944078694044ca75026b', 'hex')
+        }
+    },
+    top_fields_htlc_claim: ['type', 'address', 'hco'],
+    htlc_claim_value_fields: ['tx', 'txv', 'li', 'pi', 'in', 'is'],
+    required_length_of_fields_for_htlc_claim: {
+        tx: HASH_BYTE_LENGTH,
+        txv: HASH_BYTE_LENGTH,
+        li: HTLC_LOCK_ID_BYTE_LENGTH,
+        pi: HTLC_PREIMAGE_BYTE_LENGTH,
+        in: NONCE_BYTE_LENGTH,
+        is: SIGNATURE_BYTE_LENGTH
     }
 }
 

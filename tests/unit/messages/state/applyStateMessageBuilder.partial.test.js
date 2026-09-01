@@ -1,10 +1,14 @@
 import { test } from 'brittle';
+import b4a from 'b4a';
+import tracCryptoApi from 'trac-crypto-api';
 import { WalletProvider } from 'trac-wallet';
 import ApplyStateMessageBuilder from '../../../../src/messages/state/ApplyStateMessageBuilder.js';
 import { OperationType } from '../../../../src/utils/constants.js';
 import { isHexString } from '../../../../src/utils/helpers.js';
+import { createMessage } from '../../../../src/utils/buffer.js';
 import { config } from '../../../helpers/config.js';
 import { testKeyPair1, testKeyPair2 } from '../../../fixtures/apply.fixtures.js';
+import applyOperationFixtures from '../../../fixtures/applyOperation.fixtures.js';
 import { isAddressValid } from '../../../../src/core/state/utils/address.js';
 
 const hex = (value, bytes) => value.repeat(bytes);
@@ -17,6 +21,11 @@ function expectHexField(t, value, bytes, label) {
     t.is(typeof value, 'string', `${label} type`);
     t.is(value.length, bytes * 2, `${label} length`);
     t.ok(isHexString(value), `${label} hex`);
+}
+
+function expectBufferField(t, value, bytes, label) {
+    t.ok(b4a.isBuffer(value), `${label} type`);
+    t.is(value.length, bytes, `${label} length`);
 }
 
 function expectAddressField(t, value, label) {
@@ -226,4 +235,41 @@ test('ApplyStateMessageBuilder partial transfer operation (tro)', async t => {
     t.is(payload.tro.txv, txValidity);
     t.is(payload.tro.to, otherWallet.address);
     t.is(payload.tro.am, amount);
+});
+
+test('ApplyStateMessageBuilder partial HTLC claim operation (hco)', async t => {
+    const wallet = await createWallet(testKeyPair1.mnemonic);
+    const { txv, li: lockId, pi: preimage } = applyOperationFixtures.validHtlcClaimOperation.hco;
+
+    const builder = new ApplyStateMessageBuilder(wallet, config);
+    await builder
+        .setPhase('partial')
+        .setOutput('buffer')
+        .setOperationType(OperationType.HTLC_CLAIM)
+        .setAddress(wallet.address)
+        .setTxValidity(txv)
+        .setHtlcLockId(lockId)
+        .setHtlcPreimage(preimage)
+        .build();
+
+    const payload = builder.getPayload();
+    const expectedTx = await tracCryptoApi.hash.blake3(createMessage(
+        config.networkId,
+        txv,
+        lockId,
+        preimage,
+        payload.hco.in,
+        OperationType.HTLC_CLAIM
+    ));
+
+    t.is(payload.type, OperationType.HTLC_CLAIM);
+    expectPayloadKeys(t, payload, 'hco');
+    expectKeys(t, payload.hco, ['tx', 'txv', 'li', 'pi', 'in', 'is'], 'hco');
+    t.ok(b4a.equals(payload.hco.tx, expectedTx), 'hco.tx binds the canonical claim fields');
+    t.ok(b4a.equals(payload.hco.txv, txv), 'hco.txv matches');
+    t.ok(b4a.equals(payload.hco.li, lockId), 'hco.li matches the lock ID');
+    t.ok(b4a.equals(payload.hco.pi, preimage), 'hco.pi matches');
+    expectBufferField(t, payload.hco.in, 32, 'hco.in');
+    expectBufferField(t, payload.hco.is, 64, 'hco.is');
+    t.ok(wallet.verify(payload.hco.is, payload.hco.tx, wallet.publicKey), 'hco.is signs hco.tx');
 });

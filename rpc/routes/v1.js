@@ -11,6 +11,10 @@ import {
     handleFetchBulkTxPayloads,
     handleTransactionExtendedDetails,
     handleAccountDetails,
+    handleHtlcLock,
+    handleHtlcClaim,
+    handleHtlcRefund,
+    handleHtlc,
 } from '../handlers.js';
 
 export const v1Routes = [
@@ -22,6 +26,10 @@ export const v1Routes = [
     { method: 'POST', path: '/broadcast-transaction', handler: handleBroadcastTransaction },
     { method: 'GET', path: '/tx-hashes/', handler: handleTxHashes },
     { method: 'GET', path: '/unconfirmed-length', handler: handleUnconfirmedLength },
+    { method: 'POST', path: '/htlc', handler: handleHtlcLock },
+    { method: 'POST', path: '/htlc/:id/claim', handler: handleHtlcClaim },
+    { method: 'POST', path: '/htlc/:id/refund', handler: handleHtlcRefund },
+    { method: 'GET', path: '/htlc/:id', handler: handleHtlc },
     { method: 'GET', path: '/tx', handler: handleTransactionDetails },
     { method: 'POST', path: '/tx-payloads-bulk', handler: handleFetchBulkTxPayloads },
     { method: 'GET', path: '/tx/details', handler: handleTransactionExtendedDetails },

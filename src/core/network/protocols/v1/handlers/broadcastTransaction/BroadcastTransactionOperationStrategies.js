@@ -16,6 +16,7 @@ export function createBroadcastTransactionOperationStrategies({
     partialBootstrapDeploymentValidator,
     partialTransactionValidator,
     partialTransferValidator,
+    partialHtlcValidator,
     createApplyStateMessageFactory
 }) {
     return new Map([
@@ -111,6 +112,42 @@ export function createBroadcastTransactionOperationStrategies({
                     decodedTransaction.tro.to,
                     decodedTransaction.tro.am,
                     decodedTransaction.tro.is
+                )
+            )
+        ],
+        [
+            OperationType.HTLC_LOCK,
+            createOperationStrategy(
+                'hlo',
+                partialHtlcValidator,
+                decodedOperation => createApplyStateMessageFactory().buildCompleteHtlcLockOperationMessage(
+                    decodedOperation.address
+                )
+            )
+        ],
+        [
+            OperationType.HTLC_CLAIM,
+            createOperationStrategy(
+                'hco',
+                partialHtlcValidator,
+                decodedOperation => createApplyStateMessageFactory().buildCompleteHtlcClaimOperationMessage(
+                    decodedOperation.address,
+                    decodedOperation.hco.tx,
+                    decodedOperation.hco.txv,
+                    decodedOperation.hco.li,
+                    decodedOperation.hco.pi,
+                    decodedOperation.hco.in,
+                    decodedOperation.hco.is
+                )
+            )
+        ],
+        [
+            OperationType.HTLC_REFUND,
+            createOperationStrategy(
+                'hro',
+                partialHtlcValidator,
+                decodedOperation => createApplyStateMessageFactory().buildCompleteHtlcRefundOperationMessage(
+                    decodedOperation.address
                 )
             )
         ]

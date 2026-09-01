@@ -45,6 +45,9 @@ export const OperationType = Object.freeze({
     SET_EPOCH: ApplyOperationType.SET_EPOCH,
     SET_GENESIS_EPOCH: ApplyOperationType.SET_GENESIS_EPOCH,
     SET_CONSENSUS_CONFIG: ApplyOperationType.SET_CONSENSUS_CONFIG,
+    HTLC_LOCK: ApplyOperationType.HTLC_LOCK,
+    HTLC_CLAIM: ApplyOperationType.HTLC_CLAIM,
+    HTLC_REFUND: ApplyOperationType.HTLC_REFUND,
 });
 
 export const NetworkOperationType = Object.freeze({
@@ -211,6 +214,8 @@ export const BOOTSTRAP_BYTE_LENGTH = 32;
 export const CHANNEL_BYTE_LENGTH = 32;
 export const NONCE_BYTE_LENGTH = 32;
 export const HASH_BYTE_LENGTH = 32;
+export const HTLC_LOCK_ID_BYTE_LENGTH = 32;
+export const HTLC_PREIMAGE_BYTE_LENGTH = 32;
 export const BALANCE_BYTE_LENGTH = 16;
 export const SIGNATURE_BYTE_LENGTH = 64;
 export const PEER_PUBLIC_KEY_HEX_LENGTH = 64;

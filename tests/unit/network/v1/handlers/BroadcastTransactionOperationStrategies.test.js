@@ -7,6 +7,7 @@ import {
 } from '../../../../../src/core/network/protocols/v1/handlers/broadcastTransaction/BroadcastTransactionOperationStrategies.js';
 import {OperationType, ResultCode} from '../../../../../src/utils/constants.js';
 import {V1ProtocolError} from '../../../../../src/core/network/protocols/v1/V1ProtocolError.js';
+import applyOperationFixtures from '../../../../fixtures/applyOperation.fixtures.js';
 
 const VALID_ADDR = 'trac123z3gfpr2epjwww7ntm3m6ud2fhmq0tvts27p2f5mx3qkecsutlqfys769';
 const VALID_TO_ADDR = 'trac1mqktwme8fvklrds4hlhfy6lhmsu9qgfn3c3kuhz7c5zwjt8rc3dqj9tx7h';
@@ -56,6 +57,10 @@ function createFakeFactory() {
                 buildCompleteTransferOperationMessage(...args) {
                     calls.push({args, method: 'buildCompleteTransferOperationMessage'});
                     return {method: 'buildCompleteTransferOperationMessage'};
+                },
+                buildCompleteHtlcClaimOperationMessage(...args) {
+                    calls.push({args, method: 'buildCompleteHtlcClaimOperationMessage'});
+                    return {method: 'buildCompleteHtlcClaimOperationMessage'};
                 }
             };
         }
@@ -199,4 +204,30 @@ test('resolveBroadcastTransactionOperationStrategy rejects unsupported transacti
     t.ok(error instanceof V1ProtocolError);
     t.is(error.resultCode, ResultCode.TX_INVALID_PAYLOAD);
     t.is(error.message, 'Unsupported transaction type: 9999');
+});
+
+test('HTLC claim strategy validates and forwards the complete signed claim', async t => {
+    const validatorCalls = [];
+    const factory = createFakeFactory();
+    const decodedOperation = applyOperationFixtures.validHtlcClaimOperation;
+    const strategies = createBroadcastTransactionOperationStrategies({
+        partialHtlcValidator: createFakeValidator('htlc', validatorCalls),
+        createApplyStateMessageFactory: () => factory.createApplyStateMessageFactory()
+    });
+
+    const strategy = resolveBroadcastTransactionOperationStrategy(OperationType.HTLC_CLAIM, strategies);
+    const result = await strategy.build(decodedOperation);
+
+    t.alike(result, {method: 'buildCompleteHtlcClaimOperationMessage'});
+    t.is(validatorCalls.length, 1);
+    t.is(validatorCalls[0].decodedTransaction, decodedOperation);
+    t.alike(factory.calls[0].args, [
+        decodedOperation.address,
+        decodedOperation.hco.tx,
+        decodedOperation.hco.txv,
+        decodedOperation.hco.li,
+        decodedOperation.hco.pi,
+        decodedOperation.hco.in,
+        decodedOperation.hco.is
+    ]);
 });

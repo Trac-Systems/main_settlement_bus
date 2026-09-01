@@ -48,6 +48,9 @@ $root.apply = (function() {
              * @property {apply.operations.ITxOperation|null} [txo] Operation txo
              * @property {apply.operations.ISetEpochOperation|null} [seo] Operation seo
              * @property {apply.operations.IConsensusControlOperation|null} [cco] Operation cco
+             * @property {apply.operations.IHtlcLockOperation|null} [hlo] Operation hlo
+             * @property {apply.operations.IHtlcClaimOperation|null} [hco] Operation hco
+             * @property {apply.operations.IHtlcRefundOperation|null} [hro] Operation hro
              */
 
             /**
@@ -153,17 +156,41 @@ $root.apply = (function() {
              */
             Operation.prototype.cco = null;
 
+            /**
+             * Operation hlo.
+             * @member {apply.operations.IHtlcLockOperation|null|undefined} hlo
+             * @memberof apply.operations.Operation
+             * @instance
+             */
+            Operation.prototype.hlo = null;
+
+            /**
+             * Operation hco.
+             * @member {apply.operations.IHtlcClaimOperation|null|undefined} hco
+             * @memberof apply.operations.Operation
+             * @instance
+             */
+            Operation.prototype.hco = null;
+
+            /**
+             * Operation hro.
+             * @member {apply.operations.IHtlcRefundOperation|null|undefined} hro
+             * @memberof apply.operations.Operation
+             * @instance
+             */
+            Operation.prototype.hro = null;
+
             // OneOf field names bound to virtual getters and setters
             var $oneOfFields;
 
             /**
              * Operation value.
-             * @member {"cao"|"aco"|"bio"|"tro"|"rao"|"bdo"|"txo"|"seo"|"cco"|undefined} value
+             * @member {"cao"|"aco"|"bio"|"tro"|"rao"|"bdo"|"txo"|"seo"|"cco"|"hlo"|"hco"|"hro"|undefined} value
              * @memberof apply.operations.Operation
              * @instance
              */
             Object.defineProperty(Operation.prototype, "value", {
-                get: $util.oneOfGetter($oneOfFields = ["cao", "aco", "bio", "tro", "rao", "bdo", "txo", "seo", "cco"]),
+                get: $util.oneOfGetter($oneOfFields = ["cao", "aco", "bio", "tro", "rao", "bdo", "txo", "seo", "cco", "hlo", "hco", "hro"]),
                 set: $util.oneOfSetter($oneOfFields)
             });
 
@@ -213,6 +240,12 @@ $root.apply = (function() {
                     $root.apply.operations.SetEpochOperation.encode(message.seo, writer.uint32(/* id 10, wireType 2 =*/82).fork()).ldelim();
                 if (message.cco != null && Object.hasOwnProperty.call(message, "cco"))
                     $root.apply.operations.ConsensusControlOperation.encode(message.cco, writer.uint32(/* id 11, wireType 2 =*/90).fork()).ldelim();
+                if (message.hlo != null && Object.hasOwnProperty.call(message, "hlo"))
+                    $root.apply.operations.HtlcLockOperation.encode(message.hlo, writer.uint32(/* id 12, wireType 2 =*/98).fork()).ldelim();
+                if (message.hco != null && Object.hasOwnProperty.call(message, "hco"))
+                    $root.apply.operations.HtlcClaimOperation.encode(message.hco, writer.uint32(/* id 13, wireType 2 =*/106).fork()).ldelim();
+                if (message.hro != null && Object.hasOwnProperty.call(message, "hro"))
+                    $root.apply.operations.HtlcRefundOperation.encode(message.hro, writer.uint32(/* id 14, wireType 2 =*/114).fork()).ldelim();
                 return writer;
             };
 
@@ -293,6 +326,18 @@ $root.apply = (function() {
                             message.cco = $root.apply.operations.ConsensusControlOperation.decode(reader, reader.uint32());
                             break;
                         }
+                    case 12: {
+                            message.hlo = $root.apply.operations.HtlcLockOperation.decode(reader, reader.uint32());
+                            break;
+                        }
+                    case 13: {
+                            message.hco = $root.apply.operations.HtlcClaimOperation.decode(reader, reader.uint32());
+                            break;
+                        }
+                    case 14: {
+                            message.hro = $root.apply.operations.HtlcRefundOperation.decode(reader, reader.uint32());
+                            break;
+                        }
                     default:
                         reader.skipType(tag & 7);
                         break;
@@ -350,6 +395,9 @@ $root.apply = (function() {
                     case 14:
                     case 15:
                     case 16:
+                    case 17:
+                    case 18:
+                    case 19:
                         break;
                     }
                 if (message.address != null && message.hasOwnProperty("address"))
@@ -443,6 +491,36 @@ $root.apply = (function() {
                             return "cco." + error;
                     }
                 }
+                if (message.hlo != null && message.hasOwnProperty("hlo")) {
+                    if (properties.value === 1)
+                        return "value: multiple values";
+                    properties.value = 1;
+                    {
+                        var error = $root.apply.operations.HtlcLockOperation.verify(message.hlo);
+                        if (error)
+                            return "hlo." + error;
+                    }
+                }
+                if (message.hco != null && message.hasOwnProperty("hco")) {
+                    if (properties.value === 1)
+                        return "value: multiple values";
+                    properties.value = 1;
+                    {
+                        var error = $root.apply.operations.HtlcClaimOperation.verify(message.hco);
+                        if (error)
+                            return "hco." + error;
+                    }
+                }
+                if (message.hro != null && message.hasOwnProperty("hro")) {
+                    if (properties.value === 1)
+                        return "value: multiple values";
+                    properties.value = 1;
+                    {
+                        var error = $root.apply.operations.HtlcRefundOperation.verify(message.hro);
+                        if (error)
+                            return "hro." + error;
+                    }
+                }
                 return null;
             };
 
@@ -533,6 +611,18 @@ $root.apply = (function() {
                 case 16:
                     message.type = 16;
                     break;
+                case "HTLC_LOCK":
+                case 17:
+                    message.type = 17;
+                    break;
+                case "HTLC_CLAIM":
+                case 18:
+                    message.type = 18;
+                    break;
+                case "HTLC_REFUND":
+                case 19:
+                    message.type = 19;
+                    break;
                 }
                 if (object.address != null)
                     if (typeof object.address === "string")
@@ -583,6 +673,21 @@ $root.apply = (function() {
                     if (typeof object.cco !== "object")
                         throw TypeError(".apply.operations.Operation.cco: object expected");
                     message.cco = $root.apply.operations.ConsensusControlOperation.fromObject(object.cco);
+                }
+                if (object.hlo != null) {
+                    if (typeof object.hlo !== "object")
+                        throw TypeError(".apply.operations.Operation.hlo: object expected");
+                    message.hlo = $root.apply.operations.HtlcLockOperation.fromObject(object.hlo);
+                }
+                if (object.hco != null) {
+                    if (typeof object.hco !== "object")
+                        throw TypeError(".apply.operations.Operation.hco: object expected");
+                    message.hco = $root.apply.operations.HtlcClaimOperation.fromObject(object.hco);
+                }
+                if (object.hro != null) {
+                    if (typeof object.hro !== "object")
+                        throw TypeError(".apply.operations.Operation.hro: object expected");
+                    message.hro = $root.apply.operations.HtlcRefundOperation.fromObject(object.hro);
                 }
                 return message;
             };
@@ -659,6 +764,21 @@ $root.apply = (function() {
                     if (options.oneofs)
                         object.value = "cco";
                 }
+                if (message.hlo != null && message.hasOwnProperty("hlo")) {
+                    object.hlo = $root.apply.operations.HtlcLockOperation.toObject(message.hlo, options);
+                    if (options.oneofs)
+                        object.value = "hlo";
+                }
+                if (message.hco != null && message.hasOwnProperty("hco")) {
+                    object.hco = $root.apply.operations.HtlcClaimOperation.toObject(message.hco, options);
+                    if (options.oneofs)
+                        object.value = "hco";
+                }
+                if (message.hro != null && message.hasOwnProperty("hro")) {
+                    object.hro = $root.apply.operations.HtlcRefundOperation.toObject(message.hro, options);
+                    if (options.oneofs)
+                        object.value = "hro";
+                }
                 return object;
             };
 
@@ -712,6 +832,9 @@ $root.apply = (function() {
          * @property {number} SET_EPOCH=14 SET_EPOCH value
          * @property {number} SET_GENESIS_EPOCH=15 SET_GENESIS_EPOCH value
          * @property {number} SET_CONSENSUS_CONFIG=16 SET_CONSENSUS_CONFIG value
+         * @property {number} HTLC_LOCK=17 HTLC_LOCK value
+         * @property {number} HTLC_CLAIM=18 HTLC_CLAIM value
+         * @property {number} HTLC_REFUND=19 HTLC_REFUND value
          */
         operations.OperationType = (function() {
             var valuesById = {}, values = Object.create(valuesById);
@@ -732,6 +855,9 @@ $root.apply = (function() {
             values[valuesById[14] = "SET_EPOCH"] = 14;
             values[valuesById[15] = "SET_GENESIS_EPOCH"] = 15;
             values[valuesById[16] = "SET_CONSENSUS_CONFIG"] = 16;
+            values[valuesById[17] = "HTLC_LOCK"] = 17;
+            values[valuesById[18] = "HTLC_CLAIM"] = 18;
+            values[valuesById[19] = "HTLC_REFUND"] = 19;
             return values;
         })();
 
@@ -4306,6 +4432,735 @@ $root.apply = (function() {
             };
 
             return ConsensusControlOperation;
+        })();
+
+        operations.HtlcLockOperation = (function() {
+
+            /**
+             * Properties of a HtlcLockOperation.
+             * @memberof apply.operations
+             * @interface IHtlcLockOperation
+             */
+
+            /**
+             * Constructs a new HtlcLockOperation.
+             * @memberof apply.operations
+             * @classdesc Represents a HtlcLockOperation.
+             * @implements IHtlcLockOperation
+             * @constructor
+             * @param {apply.operations.IHtlcLockOperation=} [properties] Properties to set
+             */
+            function HtlcLockOperation(properties) {
+                if (properties)
+                    for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
+                        if (properties[keys[i]] != null)
+                            this[keys[i]] = properties[keys[i]];
+            }
+
+            /**
+             * Creates a new HtlcLockOperation instance using the specified properties.
+             * @function create
+             * @memberof apply.operations.HtlcLockOperation
+             * @static
+             * @param {apply.operations.IHtlcLockOperation=} [properties] Properties to set
+             * @returns {apply.operations.HtlcLockOperation} HtlcLockOperation instance
+             */
+            HtlcLockOperation.create = function create(properties) {
+                return new HtlcLockOperation(properties);
+            };
+
+            /**
+             * Encodes the specified HtlcLockOperation message. Does not implicitly {@link apply.operations.HtlcLockOperation.verify|verify} messages.
+             * @function encode
+             * @memberof apply.operations.HtlcLockOperation
+             * @static
+             * @param {apply.operations.IHtlcLockOperation} message HtlcLockOperation message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            HtlcLockOperation.encode = function encode(message, writer) {
+                if (!writer)
+                    writer = $Writer.create();
+                return writer;
+            };
+
+            /**
+             * Encodes the specified HtlcLockOperation message, length delimited. Does not implicitly {@link apply.operations.HtlcLockOperation.verify|verify} messages.
+             * @function encodeDelimited
+             * @memberof apply.operations.HtlcLockOperation
+             * @static
+             * @param {apply.operations.IHtlcLockOperation} message HtlcLockOperation message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            HtlcLockOperation.encodeDelimited = function encodeDelimited(message, writer) {
+                return this.encode(message, writer).ldelim();
+            };
+
+            /**
+             * Decodes a HtlcLockOperation message from the specified reader or buffer.
+             * @function decode
+             * @memberof apply.operations.HtlcLockOperation
+             * @static
+             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {number} [length] Message length if known beforehand
+             * @returns {apply.operations.HtlcLockOperation} HtlcLockOperation
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            HtlcLockOperation.decode = function decode(reader, length, error) {
+                if (!(reader instanceof $Reader))
+                    reader = $Reader.create(reader);
+                var end = length === undefined ? reader.len : reader.pos + length, message = new $root.apply.operations.HtlcLockOperation();
+                while (reader.pos < end) {
+                    var tag = reader.uint32();
+                    if (tag === error)
+                        break;
+                    switch (tag >>> 3) {
+                    default:
+                        reader.skipType(tag & 7);
+                        break;
+                    }
+                }
+                return message;
+            };
+
+            /**
+             * Decodes a HtlcLockOperation message from the specified reader or buffer, length delimited.
+             * @function decodeDelimited
+             * @memberof apply.operations.HtlcLockOperation
+             * @static
+             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @returns {apply.operations.HtlcLockOperation} HtlcLockOperation
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            HtlcLockOperation.decodeDelimited = function decodeDelimited(reader) {
+                if (!(reader instanceof $Reader))
+                    reader = new $Reader(reader);
+                return this.decode(reader, reader.uint32());
+            };
+
+            /**
+             * Verifies a HtlcLockOperation message.
+             * @function verify
+             * @memberof apply.operations.HtlcLockOperation
+             * @static
+             * @param {Object.<string,*>} message Plain object to verify
+             * @returns {string|null} `null` if valid, otherwise the reason why it is not
+             */
+            HtlcLockOperation.verify = function verify(message) {
+                if (typeof message !== "object" || message === null)
+                    return "object expected";
+                return null;
+            };
+
+            /**
+             * Creates a HtlcLockOperation message from a plain object. Also converts values to their respective internal types.
+             * @function fromObject
+             * @memberof apply.operations.HtlcLockOperation
+             * @static
+             * @param {Object.<string,*>} object Plain object
+             * @returns {apply.operations.HtlcLockOperation} HtlcLockOperation
+             */
+            HtlcLockOperation.fromObject = function fromObject(object) {
+                if (object instanceof $root.apply.operations.HtlcLockOperation)
+                    return object;
+                return new $root.apply.operations.HtlcLockOperation();
+            };
+
+            /**
+             * Creates a plain object from a HtlcLockOperation message. Also converts values to other types if specified.
+             * @function toObject
+             * @memberof apply.operations.HtlcLockOperation
+             * @static
+             * @param {apply.operations.HtlcLockOperation} message HtlcLockOperation
+             * @param {$protobuf.IConversionOptions} [options] Conversion options
+             * @returns {Object.<string,*>} Plain object
+             */
+            HtlcLockOperation.toObject = function toObject() {
+                return {};
+            };
+
+            /**
+             * Converts this HtlcLockOperation to JSON.
+             * @function toJSON
+             * @memberof apply.operations.HtlcLockOperation
+             * @instance
+             * @returns {Object.<string,*>} JSON object
+             */
+            HtlcLockOperation.prototype.toJSON = function toJSON() {
+                return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
+            };
+
+            /**
+             * Gets the default type url for HtlcLockOperation
+             * @function getTypeUrl
+             * @memberof apply.operations.HtlcLockOperation
+             * @static
+             * @param {string} [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
+             * @returns {string} The default type url
+             */
+            HtlcLockOperation.getTypeUrl = function getTypeUrl(typeUrlPrefix) {
+                if (typeUrlPrefix === undefined) {
+                    typeUrlPrefix = "type.googleapis.com";
+                }
+                return typeUrlPrefix + "/apply.operations.HtlcLockOperation";
+            };
+
+            return HtlcLockOperation;
+        })();
+
+        operations.HtlcClaimOperation = (function() {
+
+            /**
+             * Properties of a HtlcClaimOperation.
+             * @memberof apply.operations
+             * @interface IHtlcClaimOperation
+             * @property {Uint8Array|null} [tx] HtlcClaimOperation tx
+             * @property {Uint8Array|null} [txv] HtlcClaimOperation txv
+             * @property {Uint8Array|null} [li] HtlcClaimOperation li
+             * @property {Uint8Array|null} [pi] HtlcClaimOperation pi
+             * @property {Uint8Array|null} ["in"] HtlcClaimOperation in
+             * @property {Uint8Array|null} [is] HtlcClaimOperation is
+             */
+
+            /**
+             * Constructs a new HtlcClaimOperation.
+             * @memberof apply.operations
+             * @classdesc Represents a HtlcClaimOperation.
+             * @implements IHtlcClaimOperation
+             * @constructor
+             * @param {apply.operations.IHtlcClaimOperation=} [properties] Properties to set
+             */
+            function HtlcClaimOperation(properties) {
+                if (properties)
+                    for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
+                        if (properties[keys[i]] != null)
+                            this[keys[i]] = properties[keys[i]];
+            }
+
+            /**
+             * HtlcClaimOperation tx.
+             * @member {Uint8Array} tx
+             * @memberof apply.operations.HtlcClaimOperation
+             * @instance
+             */
+            HtlcClaimOperation.prototype.tx = $util.newBuffer([]);
+
+            /**
+             * HtlcClaimOperation txv.
+             * @member {Uint8Array} txv
+             * @memberof apply.operations.HtlcClaimOperation
+             * @instance
+             */
+            HtlcClaimOperation.prototype.txv = $util.newBuffer([]);
+
+            /**
+             * HtlcClaimOperation li.
+             * @member {Uint8Array} li
+             * @memberof apply.operations.HtlcClaimOperation
+             * @instance
+             */
+            HtlcClaimOperation.prototype.li = $util.newBuffer([]);
+
+            /**
+             * HtlcClaimOperation pi.
+             * @member {Uint8Array} pi
+             * @memberof apply.operations.HtlcClaimOperation
+             * @instance
+             */
+            HtlcClaimOperation.prototype.pi = $util.newBuffer([]);
+
+            /**
+             * HtlcClaimOperation in.
+             * @member {Uint8Array} in
+             * @memberof apply.operations.HtlcClaimOperation
+             * @instance
+             */
+            HtlcClaimOperation.prototype["in"] = $util.newBuffer([]);
+
+            /**
+             * HtlcClaimOperation is.
+             * @member {Uint8Array} is
+             * @memberof apply.operations.HtlcClaimOperation
+             * @instance
+             */
+            HtlcClaimOperation.prototype.is = $util.newBuffer([]);
+
+            /**
+             * Creates a new HtlcClaimOperation instance using the specified properties.
+             * @function create
+             * @memberof apply.operations.HtlcClaimOperation
+             * @static
+             * @param {apply.operations.IHtlcClaimOperation=} [properties] Properties to set
+             * @returns {apply.operations.HtlcClaimOperation} HtlcClaimOperation instance
+             */
+            HtlcClaimOperation.create = function create(properties) {
+                return new HtlcClaimOperation(properties);
+            };
+
+            /**
+             * Encodes the specified HtlcClaimOperation message. Does not implicitly {@link apply.operations.HtlcClaimOperation.verify|verify} messages.
+             * @function encode
+             * @memberof apply.operations.HtlcClaimOperation
+             * @static
+             * @param {apply.operations.IHtlcClaimOperation} message HtlcClaimOperation message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            HtlcClaimOperation.encode = function encode(message, writer) {
+                if (!writer)
+                    writer = $Writer.create();
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
+                    writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.tx);
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
+                    writer.uint32(/* id 2, wireType 2 =*/18).bytes(message.txv);
+                if (message.li != null && Object.hasOwnProperty.call(message, "li"))
+                    writer.uint32(/* id 3, wireType 2 =*/26).bytes(message.li);
+                if (message.pi != null && Object.hasOwnProperty.call(message, "pi"))
+                    writer.uint32(/* id 4, wireType 2 =*/34).bytes(message.pi);
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
+                    writer.uint32(/* id 5, wireType 2 =*/42).bytes(message["in"]);
+                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
+                    writer.uint32(/* id 6, wireType 2 =*/50).bytes(message.is);
+                return writer;
+            };
+
+            /**
+             * Encodes the specified HtlcClaimOperation message, length delimited. Does not implicitly {@link apply.operations.HtlcClaimOperation.verify|verify} messages.
+             * @function encodeDelimited
+             * @memberof apply.operations.HtlcClaimOperation
+             * @static
+             * @param {apply.operations.IHtlcClaimOperation} message HtlcClaimOperation message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            HtlcClaimOperation.encodeDelimited = function encodeDelimited(message, writer) {
+                return this.encode(message, writer).ldelim();
+            };
+
+            /**
+             * Decodes a HtlcClaimOperation message from the specified reader or buffer.
+             * @function decode
+             * @memberof apply.operations.HtlcClaimOperation
+             * @static
+             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {number} [length] Message length if known beforehand
+             * @returns {apply.operations.HtlcClaimOperation} HtlcClaimOperation
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            HtlcClaimOperation.decode = function decode(reader, length, error) {
+                if (!(reader instanceof $Reader))
+                    reader = $Reader.create(reader);
+                var end = length === undefined ? reader.len : reader.pos + length, message = new $root.apply.operations.HtlcClaimOperation();
+                while (reader.pos < end) {
+                    var tag = reader.uint32();
+                    if (tag === error)
+                        break;
+                    switch (tag >>> 3) {
+                    case 1: {
+                            message.tx = reader.bytes();
+                            break;
+                        }
+                    case 2: {
+                            message.txv = reader.bytes();
+                            break;
+                        }
+                    case 3: {
+                            message.li = reader.bytes();
+                            break;
+                        }
+                    case 4: {
+                            message.pi = reader.bytes();
+                            break;
+                        }
+                    case 5: {
+                            message["in"] = reader.bytes();
+                            break;
+                        }
+                    case 6: {
+                            message.is = reader.bytes();
+                            break;
+                        }
+                    default:
+                        reader.skipType(tag & 7);
+                        break;
+                    }
+                }
+                return message;
+            };
+
+            /**
+             * Decodes a HtlcClaimOperation message from the specified reader or buffer, length delimited.
+             * @function decodeDelimited
+             * @memberof apply.operations.HtlcClaimOperation
+             * @static
+             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @returns {apply.operations.HtlcClaimOperation} HtlcClaimOperation
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            HtlcClaimOperation.decodeDelimited = function decodeDelimited(reader) {
+                if (!(reader instanceof $Reader))
+                    reader = new $Reader(reader);
+                return this.decode(reader, reader.uint32());
+            };
+
+            /**
+             * Verifies a HtlcClaimOperation message.
+             * @function verify
+             * @memberof apply.operations.HtlcClaimOperation
+             * @static
+             * @param {Object.<string,*>} message Plain object to verify
+             * @returns {string|null} `null` if valid, otherwise the reason why it is not
+             */
+            HtlcClaimOperation.verify = function verify(message) {
+                if (typeof message !== "object" || message === null)
+                    return "object expected";
+                if (message.tx != null && message.hasOwnProperty("tx"))
+                    if (!(message.tx && typeof message.tx.length === "number" || $util.isString(message.tx)))
+                        return "tx: buffer expected";
+                if (message.txv != null && message.hasOwnProperty("txv"))
+                    if (!(message.txv && typeof message.txv.length === "number" || $util.isString(message.txv)))
+                        return "txv: buffer expected";
+                if (message.li != null && message.hasOwnProperty("li"))
+                    if (!(message.li && typeof message.li.length === "number" || $util.isString(message.li)))
+                        return "li: buffer expected";
+                if (message.pi != null && message.hasOwnProperty("pi"))
+                    if (!(message.pi && typeof message.pi.length === "number" || $util.isString(message.pi)))
+                        return "pi: buffer expected";
+                if (message["in"] != null && message.hasOwnProperty("in"))
+                    if (!(message["in"] && typeof message["in"].length === "number" || $util.isString(message["in"])))
+                        return "in: buffer expected";
+                if (message.is != null && message.hasOwnProperty("is"))
+                    if (!(message.is && typeof message.is.length === "number" || $util.isString(message.is)))
+                        return "is: buffer expected";
+                return null;
+            };
+
+            /**
+             * Creates a HtlcClaimOperation message from a plain object. Also converts values to their respective internal types.
+             * @function fromObject
+             * @memberof apply.operations.HtlcClaimOperation
+             * @static
+             * @param {Object.<string,*>} object Plain object
+             * @returns {apply.operations.HtlcClaimOperation} HtlcClaimOperation
+             */
+            HtlcClaimOperation.fromObject = function fromObject(object) {
+                if (object instanceof $root.apply.operations.HtlcClaimOperation)
+                    return object;
+                var message = new $root.apply.operations.HtlcClaimOperation();
+                if (object.tx != null)
+                    if (typeof object.tx === "string")
+                        $util.base64.decode(object.tx, message.tx = $util.newBuffer($util.base64.length(object.tx)), 0);
+                    else if (object.tx.length >= 0)
+                        message.tx = object.tx;
+                if (object.txv != null)
+                    if (typeof object.txv === "string")
+                        $util.base64.decode(object.txv, message.txv = $util.newBuffer($util.base64.length(object.txv)), 0);
+                    else if (object.txv.length >= 0)
+                        message.txv = object.txv;
+                if (object.li != null)
+                    if (typeof object.li === "string")
+                        $util.base64.decode(object.li, message.li = $util.newBuffer($util.base64.length(object.li)), 0);
+                    else if (object.li.length >= 0)
+                        message.li = object.li;
+                if (object.pi != null)
+                    if (typeof object.pi === "string")
+                        $util.base64.decode(object.pi, message.pi = $util.newBuffer($util.base64.length(object.pi)), 0);
+                    else if (object.pi.length >= 0)
+                        message.pi = object.pi;
+                if (object["in"] != null)
+                    if (typeof object["in"] === "string")
+                        $util.base64.decode(object["in"], message["in"] = $util.newBuffer($util.base64.length(object["in"])), 0);
+                    else if (object["in"].length >= 0)
+                        message["in"] = object["in"];
+                if (object.is != null)
+                    if (typeof object.is === "string")
+                        $util.base64.decode(object.is, message.is = $util.newBuffer($util.base64.length(object.is)), 0);
+                    else if (object.is.length >= 0)
+                        message.is = object.is;
+                return message;
+            };
+
+            /**
+             * Creates a plain object from a HtlcClaimOperation message. Also converts values to other types if specified.
+             * @function toObject
+             * @memberof apply.operations.HtlcClaimOperation
+             * @static
+             * @param {apply.operations.HtlcClaimOperation} message HtlcClaimOperation
+             * @param {$protobuf.IConversionOptions} [options] Conversion options
+             * @returns {Object.<string,*>} Plain object
+             */
+            HtlcClaimOperation.toObject = function toObject(message, options) {
+                if (!options)
+                    options = {};
+                var object = {};
+                if (options.defaults) {
+                    if (options.bytes === String)
+                        object.tx = "";
+                    else {
+                        object.tx = [];
+                        if (options.bytes !== Array)
+                            object.tx = $util.newBuffer(object.tx);
+                    }
+                    if (options.bytes === String)
+                        object.txv = "";
+                    else {
+                        object.txv = [];
+                        if (options.bytes !== Array)
+                            object.txv = $util.newBuffer(object.txv);
+                    }
+                    if (options.bytes === String)
+                        object.li = "";
+                    else {
+                        object.li = [];
+                        if (options.bytes !== Array)
+                            object.li = $util.newBuffer(object.li);
+                    }
+                    if (options.bytes === String)
+                        object.pi = "";
+                    else {
+                        object.pi = [];
+                        if (options.bytes !== Array)
+                            object.pi = $util.newBuffer(object.pi);
+                    }
+                    if (options.bytes === String)
+                        object["in"] = "";
+                    else {
+                        object["in"] = [];
+                        if (options.bytes !== Array)
+                            object["in"] = $util.newBuffer(object["in"]);
+                    }
+                    if (options.bytes === String)
+                        object.is = "";
+                    else {
+                        object.is = [];
+                        if (options.bytes !== Array)
+                            object.is = $util.newBuffer(object.is);
+                    }
+                }
+                if (message.tx != null && message.hasOwnProperty("tx"))
+                    object.tx = options.bytes === String ? $util.base64.encode(message.tx, 0, message.tx.length) : options.bytes === Array ? Array.prototype.slice.call(message.tx) : message.tx;
+                if (message.txv != null && message.hasOwnProperty("txv"))
+                    object.txv = options.bytes === String ? $util.base64.encode(message.txv, 0, message.txv.length) : options.bytes === Array ? Array.prototype.slice.call(message.txv) : message.txv;
+                if (message.li != null && message.hasOwnProperty("li"))
+                    object.li = options.bytes === String ? $util.base64.encode(message.li, 0, message.li.length) : options.bytes === Array ? Array.prototype.slice.call(message.li) : message.li;
+                if (message.pi != null && message.hasOwnProperty("pi"))
+                    object.pi = options.bytes === String ? $util.base64.encode(message.pi, 0, message.pi.length) : options.bytes === Array ? Array.prototype.slice.call(message.pi) : message.pi;
+                if (message["in"] != null && message.hasOwnProperty("in"))
+                    object["in"] = options.bytes === String ? $util.base64.encode(message["in"], 0, message["in"].length) : options.bytes === Array ? Array.prototype.slice.call(message["in"]) : message["in"];
+                if (message.is != null && message.hasOwnProperty("is"))
+                    object.is = options.bytes === String ? $util.base64.encode(message.is, 0, message.is.length) : options.bytes === Array ? Array.prototype.slice.call(message.is) : message.is;
+                return object;
+            };
+
+            /**
+             * Converts this HtlcClaimOperation to JSON.
+             * @function toJSON
+             * @memberof apply.operations.HtlcClaimOperation
+             * @instance
+             * @returns {Object.<string,*>} JSON object
+             */
+            HtlcClaimOperation.prototype.toJSON = function toJSON() {
+                return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
+            };
+
+            /**
+             * Gets the default type url for HtlcClaimOperation
+             * @function getTypeUrl
+             * @memberof apply.operations.HtlcClaimOperation
+             * @static
+             * @param {string} [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
+             * @returns {string} The default type url
+             */
+            HtlcClaimOperation.getTypeUrl = function getTypeUrl(typeUrlPrefix) {
+                if (typeUrlPrefix === undefined) {
+                    typeUrlPrefix = "type.googleapis.com";
+                }
+                return typeUrlPrefix + "/apply.operations.HtlcClaimOperation";
+            };
+
+            return HtlcClaimOperation;
+        })();
+
+        operations.HtlcRefundOperation = (function() {
+
+            /**
+             * Properties of a HtlcRefundOperation.
+             * @memberof apply.operations
+             * @interface IHtlcRefundOperation
+             */
+
+            /**
+             * Constructs a new HtlcRefundOperation.
+             * @memberof apply.operations
+             * @classdesc Represents a HtlcRefundOperation.
+             * @implements IHtlcRefundOperation
+             * @constructor
+             * @param {apply.operations.IHtlcRefundOperation=} [properties] Properties to set
+             */
+            function HtlcRefundOperation(properties) {
+                if (properties)
+                    for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
+                        if (properties[keys[i]] != null)
+                            this[keys[i]] = properties[keys[i]];
+            }
+
+            /**
+             * Creates a new HtlcRefundOperation instance using the specified properties.
+             * @function create
+             * @memberof apply.operations.HtlcRefundOperation
+             * @static
+             * @param {apply.operations.IHtlcRefundOperation=} [properties] Properties to set
+             * @returns {apply.operations.HtlcRefundOperation} HtlcRefundOperation instance
+             */
+            HtlcRefundOperation.create = function create(properties) {
+                return new HtlcRefundOperation(properties);
+            };
+
+            /**
+             * Encodes the specified HtlcRefundOperation message. Does not implicitly {@link apply.operations.HtlcRefundOperation.verify|verify} messages.
+             * @function encode
+             * @memberof apply.operations.HtlcRefundOperation
+             * @static
+             * @param {apply.operations.IHtlcRefundOperation} message HtlcRefundOperation message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            HtlcRefundOperation.encode = function encode(message, writer) {
+                if (!writer)
+                    writer = $Writer.create();
+                return writer;
+            };
+
+            /**
+             * Encodes the specified HtlcRefundOperation message, length delimited. Does not implicitly {@link apply.operations.HtlcRefundOperation.verify|verify} messages.
+             * @function encodeDelimited
+             * @memberof apply.operations.HtlcRefundOperation
+             * @static
+             * @param {apply.operations.IHtlcRefundOperation} message HtlcRefundOperation message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            HtlcRefundOperation.encodeDelimited = function encodeDelimited(message, writer) {
+                return this.encode(message, writer).ldelim();
+            };
+
+            /**
+             * Decodes a HtlcRefundOperation message from the specified reader or buffer.
+             * @function decode
+             * @memberof apply.operations.HtlcRefundOperation
+             * @static
+             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {number} [length] Message length if known beforehand
+             * @returns {apply.operations.HtlcRefundOperation} HtlcRefundOperation
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            HtlcRefundOperation.decode = function decode(reader, length, error) {
+                if (!(reader instanceof $Reader))
+                    reader = $Reader.create(reader);
+                var end = length === undefined ? reader.len : reader.pos + length, message = new $root.apply.operations.HtlcRefundOperation();
+                while (reader.pos < end) {
+                    var tag = reader.uint32();
+                    if (tag === error)
+                        break;
+                    switch (tag >>> 3) {
+                    default:
+                        reader.skipType(tag & 7);
+                        break;
+                    }
+                }
+                return message;
+            };
+
+            /**
+             * Decodes a HtlcRefundOperation message from the specified reader or buffer, length delimited.
+             * @function decodeDelimited
+             * @memberof apply.operations.HtlcRefundOperation
+             * @static
+             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @returns {apply.operations.HtlcRefundOperation} HtlcRefundOperation
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            HtlcRefundOperation.decodeDelimited = function decodeDelimited(reader) {
+                if (!(reader instanceof $Reader))
+                    reader = new $Reader(reader);
+                return this.decode(reader, reader.uint32());
+            };
+
+            /**
+             * Verifies a HtlcRefundOperation message.
+             * @function verify
+             * @memberof apply.operations.HtlcRefundOperation
+             * @static
+             * @param {Object.<string,*>} message Plain object to verify
+             * @returns {string|null} `null` if valid, otherwise the reason why it is not
+             */
+            HtlcRefundOperation.verify = function verify(message) {
+                if (typeof message !== "object" || message === null)
+                    return "object expected";
+                return null;
+            };
+
+            /**
+             * Creates a HtlcRefundOperation message from a plain object. Also converts values to their respective internal types.
+             * @function fromObject
+             * @memberof apply.operations.HtlcRefundOperation
+             * @static
+             * @param {Object.<string,*>} object Plain object
+             * @returns {apply.operations.HtlcRefundOperation} HtlcRefundOperation
+             */
+            HtlcRefundOperation.fromObject = function fromObject(object) {
+                if (object instanceof $root.apply.operations.HtlcRefundOperation)
+                    return object;
+                return new $root.apply.operations.HtlcRefundOperation();
+            };
+
+            /**
+             * Creates a plain object from a HtlcRefundOperation message. Also converts values to other types if specified.
+             * @function toObject
+             * @memberof apply.operations.HtlcRefundOperation
+             * @static
+             * @param {apply.operations.HtlcRefundOperation} message HtlcRefundOperation
+             * @param {$protobuf.IConversionOptions} [options] Conversion options
+             * @returns {Object.<string,*>} Plain object
+             */
+            HtlcRefundOperation.toObject = function toObject() {
+                return {};
+            };
+
+            /**
+             * Converts this HtlcRefundOperation to JSON.
+             * @function toJSON
+             * @memberof apply.operations.HtlcRefundOperation
+             * @instance
+             * @returns {Object.<string,*>} JSON object
+             */
+            HtlcRefundOperation.prototype.toJSON = function toJSON() {
+                return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
+            };
+
+            /**
+             * Gets the default type url for HtlcRefundOperation
+             * @function getTypeUrl
+             * @memberof apply.operations.HtlcRefundOperation
+             * @static
+             * @param {string} [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
+             * @returns {string} The default type url
+             */
+            HtlcRefundOperation.getTypeUrl = function getTypeUrl(typeUrlPrefix) {
+                if (typeUrlPrefix === undefined) {
+                    typeUrlPrefix = "type.googleapis.com";
+                }
+                return typeUrlPrefix + "/apply.operations.HtlcRefundOperation";
+            };
+
+            return HtlcRefundOperation;
         })();
 
         return operations;

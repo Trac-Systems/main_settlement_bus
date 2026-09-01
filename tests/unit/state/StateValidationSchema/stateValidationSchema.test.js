@@ -13,6 +13,7 @@ async function runCheckTests() {
     await import('./setEpochOperation.test.js')
     await import('./setGenesisEpochOperation.test.js')
     await import('./setConsensusConfigOperation.test.js')
+    await import('./htlcClaimOperation.test.js')
 
     test.resume();
 }
