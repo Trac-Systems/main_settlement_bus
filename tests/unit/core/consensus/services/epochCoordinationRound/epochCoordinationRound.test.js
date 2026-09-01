@@ -1,0 +1,710 @@
+import test from 'brittle';
+import sinon from 'sinon';
+import b4a from 'b4a';
+import {
+    ConsensusProtocolVersion,
+    ConsensusResultCode,
+    CustomEventType,
+} from '../../../../../../src/utils/constants.js';
+import {
+    createMessage,
+    uint16ToBuffer,
+    uint32ToBuffer,
+    uint64ToBuffer,
+    uint8ToBuffer,
+} from '../../../../../../src/utils/buffer.js';
+import { EpochCoordinationRound } from '../../../../../../src/core/consensus/services/EpochCoordinationRound.js';
+import { addressToBuffer } from '../../../../../../src/core/state/utils/address.js';
+import {
+    CONFIG,
+    drainMicrotasks,
+    flush,
+    makeConfirmation,
+    makeOperations,
+    makeState,
+} from '../epochCoordinatorTestHelpers.js';
+
+const deferred = () => {
+    let resolve;
+    let reject;
+    const promise = new Promise((resolvePromise, rejectPromise) => {
+        resolve = resolvePromise;
+        reject = rejectPromise;
+    });
+    return { promise, resolve, reject };
+};
+
+function setupRound(overrides = {}) {
+    const state = makeState(overrides.stateOverrides);
+    const operations = makeOperations(overrides.opsOverrides);
+    const config = { ...CONFIG, ...(overrides.config ?? {}) };
+    const wallet = overrides.wallet ?? { address: 'trac1wallet' };
+    const manager = {
+        connect: sinon.stub().resolves(),
+        ...(overrides.managerOverrides ?? {}),
+    };
+    const logger = overrides.logger ?? {
+        debug: sinon.stub(),
+        warn: sinon.stub(),
+        error: sinon.stub(),
+        info: sinon.stub(),
+    };
+    const rounds = [];
+
+    const createRound = () => {
+        const round = new EpochCoordinationRound({
+            state,
+            wallet,
+            config,
+            manager,
+            logger,
+            operations,
+            intervalMs: config.epochInterval,
+        });
+        rounds.push(round);
+        return round;
+    };
+
+    const runRound = async (next = sinon.stub()) => {
+        const round = createRound();
+        await round.run(next);
+        return round;
+    };
+
+    return {
+        state,
+        operations,
+        config,
+        wallet,
+        manager,
+        logger,
+        createRound,
+        runRound,
+        closeRounds: () => Promise.all(rounds.map(round => round.cancel())),
+    };
+}
+
+test('an absent epoch finishes the round without starting consensus work', async t => {
+    const context = setupRound({
+        stateOverrides: { getCurrentEpoch: sinon.stub().resolves(null) },
+    });
+    t.teardown(context.closeRounds);
+    const next = sinon.stub();
+
+    await context.runRound(next);
+
+    t.ok(next.calledOnceWith(CONFIG.epochInterval));
+    t.absent(context.operations.calculateVDF.called);
+});
+
+test('queries the indexer count once per round', async t => {
+    const context = setupRound({
+        stateOverrides: { indexerCount: sinon.stub().resolves(3) },
+    });
+    t.teardown(context.closeRounds);
+
+    await context.runRound();
+
+    t.is(context.state.indexerCount.callCount, 1);
+});
+
+for (const indexerCount of [1, 2]) {
+    test(`quorum is one when the network has ${indexerCount} indexer(s)`, async t => {
+        const context = setupRound({
+            stateOverrides: { indexerCount: sinon.stub().resolves(indexerCount) },
+        });
+        t.teardown(context.closeRounds);
+
+        await context.runRound();
+
+        t.absent(context.operations.approvers.called);
+        t.ok(context.operations.buildSetEpochPayload.calledOnce);
+    });
+}
+
+test('self and one external approval reach quorum in a three-indexer network', async t => {
+    const approvers = [{ key: b4a.alloc(32, 0x02) }, { key: b4a.alloc(32, 0x03) }];
+    const context = setupRound({
+        stateOverrides: { indexerCount: sinon.stub().resolves(3) },
+        opsOverrides: { approvers: sinon.stub().resolves(approvers) },
+    });
+    t.teardown(context.closeRounds);
+
+    await context.runRound();
+    await flush();
+
+    t.ok(context.operations.approvers.calledOnce);
+    t.ok(context.operations.buildSetEpochPayload.calledOnce);
+});
+
+test('a five-indexer network waits for two external approvals', async t => {
+    const approvers = [
+        { key: b4a.alloc(32, 0x02) },
+        { key: b4a.alloc(32, 0x03) },
+        { key: b4a.alloc(32, 0x04) },
+        { key: b4a.alloc(32, 0x05) },
+    ];
+    let resolveSecond;
+    const collectSignature = sinon.stub();
+    collectSignature.onCall(0).resolves(makeConfirmation());
+    collectSignature.onCall(1).returns(new Promise(resolve => { resolveSecond = resolve; }));
+    collectSignature.onCall(2).returns(new Promise(() => {}));
+    collectSignature.onCall(3).returns(new Promise(() => {}));
+    const context = setupRound({
+        stateOverrides: { indexerCount: sinon.stub().resolves(5) },
+        opsOverrides: { approvers: sinon.stub().resolves(approvers), collectSignature },
+    });
+    t.teardown(context.closeRounds);
+
+    await context.runRound();
+    await flush();
+    t.absent(context.operations.buildSetEpochPayload.called);
+
+    resolveSecond(makeConfirmation());
+    await drainMicrotasks();
+    t.ok(context.operations.buildSetEpochPayload.calledOnce);
+});
+
+test('runs the quorum-one path from VDF calculation through append', async t => {
+    const context = setupRound();
+    t.teardown(context.closeRounds);
+
+    await context.runRound();
+
+    t.ok(context.operations.calculateVDF.calledOnce);
+    t.ok(context.operations.createProofProposal.calledOnce);
+    t.absent(context.operations.approvers.called);
+    t.ok(context.operations.buildSetEpochPayload.calledOnce);
+    t.ok(context.operations.appendSetEpoch.calledOnce);
+    t.ok(b4a.equals(
+        context.operations.appendSetEpoch.firstCall.args[0],
+        await context.operations.buildSetEpochPayload.firstCall.returnValue,
+    ));
+});
+
+test('builds the VDF challenge with the signed difficulty and discriminant size', async t => {
+    const currentEpoch = 5n;
+    const currentEpochHash = b4a.alloc(32, 0xaa);
+    const difficulty = 123_456;
+    const discriminantBitSize = 2048;
+    const wallet = {
+        address: 'trac1xf5sa6k8ykee2dmawpqawj0yjxfx42arx7924eh6k7edf72wrn7seev3pa',
+    };
+    const context = setupRound({
+        wallet,
+        stateOverrides: {
+            getCurrentEpoch: sinon.stub().resolves(currentEpoch),
+            getEpoch: sinon.stub().resolves(currentEpochHash),
+            getSignedConsensusConfig: sinon.stub().resolves({
+                schemaVersion: 1,
+                configData: { difficulty, discriminantBitSize },
+            }),
+        },
+    });
+    t.teardown(context.closeRounds);
+
+    await context.runRound();
+
+    const expectedChallenge = createMessage(
+        uint8ToBuffer(ConsensusProtocolVersion.V1),
+        uint16ToBuffer(context.config.networkId),
+        uint64ToBuffer(currentEpoch + 1n),
+        currentEpochHash,
+        addressToBuffer(wallet.address, context.config.addressPrefix),
+        uint32ToBuffer(difficulty),
+        uint16ToBuffer(discriminantBitSize),
+    );
+    const [challenge, actualDifficulty, actualDiscriminantBitSize] =
+        context.operations.calculateVDF.firstCall.args;
+
+    t.ok(b4a.equals(challenge, expectedChallenge));
+    t.is(actualDifficulty, difficulty);
+    t.is(actualDiscriminantBitSize, discriminantBitSize);
+});
+
+test('builds a quorum-one payload without external approvals', async t => {
+    const context = setupRound();
+    t.teardown(context.closeRounds);
+
+    await context.runRound();
+
+    const [proofProposal, approvals] = context.operations.buildSetEpochPayload.firstCall.args;
+    t.ok(proofProposal);
+    t.alike(approvals, []);
+});
+
+test('dispatches the proposal to every approver and waits for quorum', async t => {
+    const approvers = [{ key: b4a.alloc(32, 0x02) }, { key: b4a.alloc(32, 0x03) }];
+    const context = setupRound({
+        stateOverrides: { indexerCount: sinon.stub().resolves(3) },
+        opsOverrides: {
+            approvers: sinon.stub().resolves(approvers),
+            collectSignature: sinon.stub().returns(new Promise(() => {})),
+        },
+    });
+    t.teardown(context.closeRounds);
+
+    await context.runRound();
+
+    t.ok(context.operations.approvers.calledOnce);
+    t.is(context.operations.collectSignature.callCount, 2);
+    t.absent(context.operations.buildSetEpochPayload.called);
+});
+
+test('reaching quorum builds and appends the set-epoch payload', async t => {
+    const approvers = [{ key: b4a.alloc(32, 0x02) }, { key: b4a.alloc(32, 0x03) }];
+    const context = setupRound({
+        stateOverrides: { indexerCount: sinon.stub().resolves(3) },
+        opsOverrides: { approvers: sinon.stub().resolves(approvers) },
+    });
+    t.teardown(context.closeRounds);
+
+    await context.runRound();
+    await flush();
+
+    t.ok(context.operations.buildSetEpochPayload.calledOnce);
+    t.ok(context.operations.appendSetEpoch.calledOnce);
+    const [, approvals] = context.operations.buildSetEpochPayload.firstCall.args;
+    t.ok(approvals.length >= 1);
+});
+
+test('one failed request does not fail a round while quorum remains reachable', async t => {
+    const approvers = [{ key: b4a.alloc(32, 0x02) }, { key: b4a.alloc(32, 0x03) }];
+    const context = setupRound({
+        stateOverrides: { indexerCount: sinon.stub().resolves(3) },
+        opsOverrides: {
+            approvers: sinon.stub().resolves(approvers),
+            collectSignature: sinon.stub()
+                .onFirstCall().rejects(new Error('connection error'))
+                .onSecondCall().resolves(makeConfirmation()),
+        },
+    });
+    t.teardown(context.closeRounds);
+
+    await context.runRound();
+    await flush();
+
+    t.ok(context.operations.buildSetEpochPayload.calledOnce);
+});
+
+test('an unreachable quorum backs off and exits after discovering a newer epoch', async t => {
+    const clock = sinon.useFakeTimers();
+    let context;
+    try {
+        const approvers = [{ key: b4a.alloc(32, 0x02) }, { key: b4a.alloc(32, 0x03) }];
+        const getCurrentEpoch = sinon.stub();
+        getCurrentEpoch.onCall(0).resolves(5n);
+        getCurrentEpoch.onCall(1).resolves(5n);
+        getCurrentEpoch.resolves(6n);
+        context = setupRound({
+            stateOverrides: {
+                indexerCount: sinon.stub().resolves(3),
+                getCurrentEpoch,
+            },
+            opsOverrides: {
+                approvers: sinon.stub().resolves(approvers),
+                collectSignature: sinon.stub().rejects(new Error('no signature')),
+            },
+        });
+        const next = sinon.stub();
+
+        await context.runRound(next);
+        await drainMicrotasks();
+        t.absent(context.state.refresh.called);
+
+        await clock.tickAsync(CONFIG.epochBackoffDelay);
+
+        t.ok(context.state.refresh.calledOnce);
+        t.absent(context.operations.buildSetEpochPayload.called);
+        t.absent(context.operations.appendSetEpoch.called);
+        t.ok(next.calledOnceWith(CONFIG.epochInterval));
+    } finally {
+        await context?.closeRounds();
+        clock.restore();
+    }
+});
+
+test('approval rejection retries within the same round using the local VDF', async t => {
+    const clock = sinon.useFakeTimers();
+    let context;
+    try {
+        const approvers = [{ key: b4a.alloc(32, 0x02) }];
+        const rejection = new Error('epoch mismatch');
+        rejection.resultCode = ConsensusResultCode.EPOCH_INVALID;
+        context = setupRound({
+            stateOverrides: { indexerCount: sinon.stub().resolves(3) },
+            opsOverrides: {
+                approvers: sinon.stub().resolves(approvers),
+                collectSignature: sinon.stub()
+                    .onFirstCall().rejects(rejection)
+                    .onSecondCall().resolves(makeConfirmation()),
+            },
+        });
+
+        await context.runRound();
+        await drainMicrotasks();
+        t.is(context.operations.collectSignature.callCount, 1);
+
+        await clock.tickAsync(CONFIG.epochBackoffDelay);
+
+        t.is(context.operations.calculateVDF.callCount, 1);
+        t.is(context.operations.createProofProposal.callCount, 2);
+        t.is(context.operations.collectSignature.callCount, 2);
+        t.ok(context.state.refresh.calledOnce);
+        t.ok(context.operations.buildSetEpochPayload.calledOnce);
+        t.ok(context.operations.appendSetEpoch.calledOnce);
+    } finally {
+        await context?.closeRounds();
+        clock.restore();
+    }
+});
+
+test('collection timeout traverses BACKOFF and signed-state refresh on the real FSM', async t => {
+    const clock = sinon.useFakeTimers();
+    let context;
+    try {
+        const getCurrentEpoch = sinon.stub();
+        getCurrentEpoch.onCall(0).resolves(5n);
+        getCurrentEpoch.onCall(1).resolves(5n);
+        getCurrentEpoch.resolves(6n);
+        context = setupRound({
+            stateOverrides: {
+                indexerCount: sinon.stub().resolves(3),
+                getCurrentEpoch,
+            },
+            config: { epochSignatureTimeout: 1000 },
+            opsOverrides: {
+                approvers: sinon.stub().resolves([{ key: b4a.alloc(32, 0x02) }]),
+                collectSignature: sinon.stub().returns(new Promise(() => {})),
+            },
+        });
+        const next = sinon.stub();
+
+        await context.runRound(next);
+        await clock.tickAsync(2000);
+
+        t.ok(context.state.refresh.calledOnce);
+        t.absent(context.operations.appendSetEpoch.called);
+        t.ok(next.calledOnceWith(CONFIG.epochInterval));
+        t.ok(context.logger.warn.calledOnceWithExactly(
+            '[EpochCoordinationRound] approval collection failed for epoch 6; ' +
+            'entering backoff after receiving 0 of 1 required external approvals.',
+        ));
+    } finally {
+        await context?.closeRounds();
+        clock.restore();
+    }
+});
+
+test('a late approval remains isolated from a later round', async t => {
+    const clock = sinon.useFakeTimers();
+    let context;
+    try {
+        const approvers = [{ key: b4a.alloc(32, 0x02) }];
+        let resolveFirst;
+        let resolveSecond;
+        const collectSignature = sinon.stub();
+        collectSignature.onCall(0).returns(new Promise(resolve => { resolveFirst = resolve; }));
+        collectSignature.onCall(1).returns(new Promise(resolve => { resolveSecond = resolve; }));
+        const getCurrentEpoch = sinon.stub();
+        getCurrentEpoch.onCall(0).resolves(5n);
+        getCurrentEpoch.onCall(1).resolves(5n);
+        getCurrentEpoch.resolves(6n);
+        context = setupRound({
+            stateOverrides: {
+                indexerCount: sinon.stub().resolves(3),
+                getCurrentEpoch,
+            },
+            config: { epochSignatureTimeout: 1000 },
+            opsOverrides: { approvers: sinon.stub().resolves(approvers), collectSignature },
+        });
+
+        await context.runRound();
+        await clock.tickAsync(2000);
+        t.ok(context.state.refresh.calledOnce);
+        await context.runRound();
+        t.is(collectSignature.callCount, 2);
+
+        resolveFirst(makeConfirmation());
+        await drainMicrotasks();
+        t.absent(context.operations.buildSetEpochPayload.called);
+
+        resolveSecond(makeConfirmation());
+        await drainMicrotasks();
+        t.ok(context.operations.buildSetEpochPayload.calledOnce);
+    } finally {
+        await context?.closeRounds();
+        clock.restore();
+    }
+});
+
+test('an already-signed target ends the round without appending', async t => {
+    const getCurrentEpoch = sinon.stub();
+    getCurrentEpoch.onCall(0).resolves(5n);
+    getCurrentEpoch.onCall(1).resolves(5n);
+    getCurrentEpoch.resolves(6n);
+    const context = setupRound({
+        stateOverrides: { getCurrentEpoch },
+    });
+    t.teardown(context.closeRounds);
+    const next = sinon.stub();
+
+    await context.runRound(next);
+
+    t.is(context.operations.buildSetEpochPayload.callCount, 1);
+    t.is(context.operations.appendSetEpoch.callCount, 0);
+    t.is(context.operations.calculateVDF.callCount, 1);
+    t.ok(next.calledOnceWith(CONFIG.epochInterval));
+});
+
+test('append failure retries within the same round using the local VDF', async t => {
+    const clock = sinon.useFakeTimers();
+    let context;
+    try {
+        const appendSetEpoch = sinon.stub();
+        appendSetEpoch.onFirstCall().rejects(new Error('append failed'));
+        appendSetEpoch.onSecondCall().resolves();
+        context = setupRound({
+            opsOverrides: { appendSetEpoch },
+        });
+
+        const running = context.runRound();
+        await clock.tickAsync(0);
+        t.is(context.operations.appendSetEpoch.callCount, 1);
+
+        await clock.tickAsync(CONFIG.epochBackoffDelay);
+        await running;
+
+        t.is(context.operations.calculateVDF.callCount, 1);
+        t.is(context.operations.createProofProposal.callCount, 2);
+        t.is(context.operations.appendSetEpoch.callCount, 2);
+        t.ok(context.state.refresh.calledOnce);
+    } finally {
+        await context?.closeRounds();
+        clock.restore();
+    }
+});
+
+test('append completion waits for the target EPOCH_CREATED event', async t => {
+    const context = setupRound();
+    t.teardown(context.closeRounds);
+    const next = sinon.stub();
+
+    await context.runRound(next);
+    await drainMicrotasks();
+
+    t.ok(context.operations.appendSetEpoch.calledOnce);
+    t.absent(next.called);
+
+    await context.state.emit(CustomEventType.EPOCH_CREATED, {
+        epoch: uint64ToBuffer(6n),
+        proposerAddress: context.wallet.address,
+    });
+    await drainMicrotasks();
+
+    t.ok(next.calledOnceWith(CONFIG.epochInterval));
+});
+
+test('peer EPOCH_CREATED in append state reloads without repeating work', async t => {
+    const context = setupRound();
+    t.teardown(context.closeRounds);
+    const next = sinon.stub();
+
+    await context.runRound(next);
+    await drainMicrotasks();
+    t.ok(context.operations.appendSetEpoch.calledOnce);
+
+    await context.state.emit(CustomEventType.EPOCH_CREATED, {
+        epoch: uint64ToBuffer(6n),
+        proposerAddress: 'trac1peer',
+    });
+    await flush();
+
+    t.is(context.operations.calculateVDF.callCount, 1);
+    t.is(context.operations.appendSetEpoch.callCount, 1);
+    t.ok(next.calledOnceWith(CONFIG.epochInterval));
+});
+
+test('global EPOCH_CREATED outside append state closes and schedules the round', async t => {
+    const context = setupRound({
+        stateOverrides: { indexerCount: sinon.stub().resolves(3) },
+        opsOverrides: {
+            collectSignature: sinon.stub().returns(new Promise(() => {})),
+        },
+    });
+    t.teardown(context.closeRounds);
+    const next = sinon.stub();
+
+    await context.runRound(next);
+    t.absent(next.called);
+
+    await context.state.emit(CustomEventType.EPOCH_CREATED);
+
+    t.ok(next.calledOnceWith(CONFIG.epochInterval));
+});
+
+test('cancel during the epoch preflight prevents the round from starting', async t => {
+    const epoch = deferred();
+    const context = setupRound({
+        stateOverrides: { getCurrentEpoch: sinon.stub().returns(epoch.promise) },
+    });
+    const round = context.createRound();
+    const next = sinon.stub();
+    const running = round.run(next);
+    await drainMicrotasks();
+
+    await round.cancel();
+    epoch.resolve(5n);
+    await running;
+
+    t.absent(context.operations.calculateVDF.called);
+    t.absent(next.called);
+});
+
+test('cancel stops a pending VDF path and ignores its late result', async t => {
+    const calculation = deferred();
+    const context = setupRound({
+        opsOverrides: { calculateVDF: sinon.stub().returns(calculation.promise) },
+    });
+    const round = context.createRound();
+    const next = sinon.stub();
+    const running = round.run(next);
+    await flush();
+    t.ok(context.operations.calculateVDF.calledOnce);
+
+    await round.cancel();
+    calculation.resolve({ solution: b4a.alloc(8), difficulty: 100, discriminantSizeBits: 2048 });
+    await running;
+
+    t.absent(context.operations.createProofProposal.called);
+    t.absent(next.called);
+});
+
+test('cancel during manager connection prevents approval requests', async t => {
+    const connection = deferred();
+    const context = setupRound({
+        stateOverrides: { indexerCount: sinon.stub().resolves(3) },
+        managerOverrides: { connect: sinon.stub().returns(connection.promise) },
+    });
+    const round = context.createRound();
+    const running = round.run();
+    await flush();
+    t.ok(context.manager.connect.calledOnce);
+
+    await round.cancel();
+    connection.resolve();
+    await running;
+
+    t.absent(context.operations.collectSignature.called);
+});
+
+test('cancel ignores an approval received after its request was sent', async t => {
+    const approval = deferred();
+    const context = setupRound({
+        stateOverrides: { indexerCount: sinon.stub().resolves(3) },
+        opsOverrides: {
+            approvers: sinon.stub().resolves([{ key: b4a.alloc(32, 0x02) }]),
+            collectSignature: sinon.stub().returns(approval.promise),
+        },
+    });
+    const round = context.createRound();
+    await round.run();
+    t.ok(context.operations.collectSignature.calledOnce);
+
+    await round.cancel();
+    approval.resolve(makeConfirmation());
+    await drainMicrotasks();
+
+    t.absent(context.operations.buildSetEpochPayload.called);
+});
+
+test('cancel while building the payload prevents a stale append', async t => {
+    const payload = deferred();
+    const context = setupRound({
+        opsOverrides: { buildSetEpochPayload: sinon.stub().returns(payload.promise) },
+    });
+    const round = context.createRound();
+    const running = round.run();
+    await flush();
+    t.ok(context.operations.buildSetEpochPayload.calledOnce);
+
+    await round.cancel();
+    payload.resolve(b4a.alloc(64, 0xdd));
+    await running;
+
+    t.absent(context.operations.appendSetEpoch.called);
+});
+
+test('cancel ignores a late append failure', async t => {
+    const append = deferred();
+    const context = setupRound({
+        opsOverrides: { appendSetEpoch: sinon.stub().returns(append.promise) },
+    });
+    const round = context.createRound();
+    const next = sinon.stub();
+    const running = round.run(next);
+    await flush();
+    t.ok(context.operations.appendSetEpoch.calledOnce);
+
+    await round.cancel();
+    append.reject(new Error('late append failure'));
+    await running;
+
+    t.absent(context.logger.error.called);
+    t.absent(next.called);
+});
+
+test('cancel interrupts the remote-proposal delay', async t => {
+    const proposal = deferred();
+    const context = setupRound({
+        config: { epochRemoteProposalTimeout: 60_000 },
+        opsOverrides: { createProofProposal: sinon.stub().returns(proposal.promise) },
+    });
+    const round = context.createRound();
+    const running = round.run();
+    await drainMicrotasks();
+
+    await context.state.emit(CustomEventType.EPOCH_PROPOSAL_VALIDATION_SUCCESS);
+    proposal.resolve({ proof_proposal: { epoch: b4a.alloc(8) } });
+    await drainMicrotasks();
+    await round.cancel();
+    await running;
+
+    t.is(context.state.getCurrentEpoch.callCount, 2);
+    t.absent(context.operations.buildSetEpochPayload.called);
+});
+
+test('cancel interrupts the backoff delay', async t => {
+    const context = setupRound({
+        config: { epochBackoffDelay: 60_000 },
+        stateOverrides: { indexerCount: sinon.stub().resolves(3) },
+        opsOverrides: {
+            approvers: sinon.stub().resolves([{ key: b4a.alloc(32, 0x02) }]),
+            collectSignature: sinon.stub().rejects(new Error('no signature')),
+        },
+    });
+    const round = context.createRound();
+
+    await round.run();
+    await drainMicrotasks();
+    t.ok(context.logger.warn.calledOnce);
+
+    await round.cancel();
+
+    t.absent(context.state.refresh.called);
+});
+
+test('a fresh round reads an epoch that advanced since the previous round', async t => {
+    const getCurrentEpoch = sinon.stub().resolves(5n);
+    const context = setupRound({ stateOverrides: { getCurrentEpoch } });
+    t.teardown(context.closeRounds);
+
+    await context.runRound();
+    await drainMicrotasks();
+    t.is(context.operations.appendSetEpoch.callCount, 1);
+
+    getCurrentEpoch.resolves(6n);
+    await context.runRound();
+
+    t.is(context.operations.calculateVDF.callCount, 2);
+});

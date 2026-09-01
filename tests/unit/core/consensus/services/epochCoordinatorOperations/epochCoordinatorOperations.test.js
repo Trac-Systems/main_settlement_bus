@@ -216,6 +216,31 @@ nodeOnlyTest('collectSignature returns signature and approver address buffer on 
     t.ok(result.approver);
 });
 
+nodeOnlyTest('collectSignature does not send a request after its approval collection is closed', async t => {
+    const otherAddress = 'trac1otheraddress';
+    const decodedPublicKey = b4a.alloc(32, 0x09);
+    const make = await opsWithMocks({
+        [ADDRESS_UTILS_PATH]: { default: { bufferToAddress: sinon.stub().returns(otherAddress) } },
+        'trac-crypto-api': { default: { address: { decode: sinon.stub().returns(decodedPublicKey) } } },
+    });
+    const connectionManager = makeConnectionManager();
+    const approvalCollection = { closed: true };
+    const ops = make();
+    sinon.stub(ops, 'createProofProposal').resolves({});
+
+    await t.exception(
+        ops.collectSignature(
+            { key: b4a.alloc(32) },
+            {},
+            connectionManager,
+            approvalCollection,
+        ),
+        /cancelled/,
+    );
+
+    t.absent(connectionManager.send.called);
+});
+
 // --- buildSetEpochPayload ---
 
 nodeOnlyTest('buildSetEpochPayload encodes proof + approvals into the applied payload', async t => {

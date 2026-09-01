@@ -11,7 +11,10 @@ async function runConsensusModuleTests() {
     await import('./services/IndexerPendingRequestService.test.js');
     await import('./services/VDFService.test.js');
     await import('../core/consensus/services/epochCoordinatorService/epochCoordinatorService.test.js');
+    await import('../core/consensus/services/epochCoordinationRound/epochCoordinationRound.test.js');
+    await import('../core/consensus/services/epochRoundListeners/epochRoundListeners.test.js');
     await import('../core/consensus/services/epochCoordinatorOperations/epochCoordinatorOperations.test.js');
+    await import('../core/consensus/services/vdfServiceManager/vdfServiceManager.test.js');
     test.resume();
 }
 

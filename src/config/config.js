@@ -223,6 +223,10 @@ export class Config {
         return this.#config.epochInterval
     }
 
+    get epochBackoffDelay() {
+        return this.#config.epochBackoffDelay
+    }
+
     get epochSignatureTimeout() {
         return this.#config.epochSignatureTimeout
     }

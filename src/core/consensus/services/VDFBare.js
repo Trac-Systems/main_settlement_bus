@@ -17,6 +17,11 @@ let bareBinaryPathPromise = null;
 // reproduced in manual QA - worked outside Pear, failed under `pear run .`). Reading the
 // already-installed file straight off disk sidesteps that resolver entirely, the same way
 // #workerFileUrl() below already does for vdf-worker.js.
+/**
+ * Finds and caches the Bare executable used to start VDF processes.
+ *
+ * @returns {Promise<string>}
+ */
 async function resolveBareBinaryPath() {
     if (!bareBinaryPathPromise) {
         bareBinaryPathPromise = (async () => {
@@ -49,23 +54,43 @@ async function resolveBareBinaryPath() {
 class SubprocessPort {
     #workerFileUrl;
     #child = null;
+    #childExit = null;
     #pendingResponse = null;
+    #finishPending = null;
+    #closed = false;
 
+    /** @param {string} workerFileUrl file URL of the VDF worker script */
     constructor(workerFileUrl) {
         this.#workerFileUrl = workerFileUrl;
     }
 
+    /**
+     * Starts one Bare process and writes the VDF request to stdin.
+     * It checks close state again after async setup, so a process is not started after close().
+     *
+     * @param {object} request
+     * @returns {Promise<void>}
+     */
     async write({ challenge, difficulty, discriminantSizeBits }) {
+        if (this.#closed) throw new Error('VDF subprocess is closed');
+
         const { spawn } = await import('bare-subprocess');
         const { fileURLToPath } = await import('bare-url');
 
         const bareBinaryPath = await resolveBareBinaryPath();
+        if (this.#closed) throw new Error('VDF subprocess is closed');
+
         const child = spawn(
             bareBinaryPath,
             [fileURLToPath(new URL(this.#workerFileUrl))],
             { stdio: ['pipe', 'pipe', 'pipe'] }
         );
         this.#child = child;
+
+        let resolveChildExit;
+        this.#childExit = new Promise(resolve => {
+            resolveChildExit = resolve;
+        });
 
         // Attached synchronously, right after spawn, in the same tick as the write below -
         // no await/gap in between where a fast response or an unexpected early exit could
@@ -84,6 +109,7 @@ class SubprocessPort {
                 // resolving) - reproduced and fixed by decoupling the kill from the resolve.
                 setImmediate(() => child.kill('SIGKILL'));
             };
+            this.#finishPending = finish;
 
             child.stdout.on('data', (chunk) => {
                 buffer += chunk.toString();
@@ -104,30 +130,77 @@ class SubprocessPort {
                 finish(decodeResponse(message));
             });
 
-            child.on('exit', () => finish({ error: 'VDF worker process exited unexpectedly' }));
+            child.on('exit', () => {
+                finish({ error: 'VDF worker process exited unexpectedly' });
+                resolveChildExit();
+            });
         });
 
-        child.stdin.write(JSON.stringify({
-            challenge: challenge.toString('hex'),
-            difficulty,
-            discriminantSizeBits
-        }) + '\n');
+        try {
+            child.stdin.write(JSON.stringify({
+                challenge: challenge.toString('hex'),
+                difficulty,
+                discriminantSizeBits
+            }) + '\n');
+        } catch (error) {
+            this.#finishPending?.({ error });
+            child.kill('SIGKILL');
+            throw error;
+        }
     }
 
+    /**
+     * Waits for the worker response and for the process to exit.
+     *
+     * @returns {Promise<{result?: object, error?: Error|string}>}
+     */
     async read() {
         const response = this.#pendingResponse;
-        this.#child = null;
-        this.#pendingResponse = null;
-        return response ?? { error: 'No pending VDF request' };
+        const childExit = this.#childExit;
+        if (!response) return { error: 'No pending VDF request' };
+
+        try {
+            const result = await response;
+            await childExit;
+            return result;
+        } finally {
+            if (this.#pendingResponse === response) {
+                this.#child = null;
+                this.#childExit = null;
+                this.#pendingResponse = null;
+                this.#finishPending = null;
+            }
+        }
     }
 
-    async close() {
-        this.#child?.kill('SIGKILL');
-        this.#child = null;
-        this.#pendingResponse = null;
+    /**
+     * Finishes the pending calculation with an error, kills the process and waits for its exit.
+     *
+     * @param {Error} error cancellation reason returned to the waiting calculation
+     * @returns {Promise<void>}
+     */
+    async close(error = new Error('VDF subprocess closed')) {
+        this.#closed = true;
+
+        const child = this.#child;
+        const childExit = this.#childExit;
+        const response = this.#pendingResponse;
+
+        this.#finishPending?.({ error });
+        child?.kill('SIGKILL');
+
+        try {
+            await Promise.all([response, childExit]);
+        } finally {
+            if (this.#child === child) this.#child = null;
+            if (this.#childExit === childExit) this.#childExit = null;
+            if (this.#pendingResponse === response) this.#pendingResponse = null;
+            this.#finishPending = null;
+        }
     }
 }
 
+/** Converts the JSON worker response to buffers used by consensus. */
 function decodeResponse(message) {
     if (message.error) return { error: message.error };
     const { challenge, difficulty, discriminantSizeBits, solution } = message.result;
@@ -144,15 +217,26 @@ function decodeResponse(message) {
 export class VDFBare extends VDFService {
     #workerURL; // for test injection
 
+    /**
+     * Creates the Bare VDF service. Tests can provide another worker URL.
+     *
+     * @param {URL} workerURL
+     */
     constructor(workerURL = new URL('./vdf-worker.js', import.meta.url)) {
         super();
         this.#workerURL = workerURL;
     }
 
+    /** Creates the process port used by VDFService. */
     async _open() {
         this._setPort(new SubprocessPort(this.#workerFileUrl()));
     }
 
+    /**
+     * Returns the worker file URL which can be used by Bare and Pear.
+     *
+     * @returns {string}
+     */
     #workerFileUrl() {
         // Pear's `pear://dev/` module protocol isn't registered inside a freshly
         // spawned subprocess, so a pear:// reference (e.g. import.meta.url under

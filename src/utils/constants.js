@@ -179,7 +179,8 @@ export const CustomEventType = Object.freeze({
     EPOCH_PROPOSAL_APPROVAL_SUCCESS: 'msb:epoch_proposal_approval_success',
     EPOCH_PROPOSAL_APPROVAL_FAILURE: 'msb:epoch_proposal_approval_failure',
     GENESIS_EPOCH_CREATED: 'msb:genesis_epoch_created',
-    EPOCH_CREATED: 'msb:epoch_created'
+    EPOCH_CREATED: 'msb:epoch_created',
+    CONSENSUS_CONFIG_CHANGED: 'msb:consensus_config_changed'
 });
 
 // Token

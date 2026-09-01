@@ -40,7 +40,10 @@ import {
     setupSetConsensusConfigScenario
 } from './setConsensusConfigScenarioHelpers.js';
 import { safeDecodeApplyOperation } from '../../../../../src/codecs/apply/applyOperationCodec.js';
-import { CONSENSUS_CONFIG_DATA_MAX_SIZE } from '../../../../../src/utils/constants.js';
+import {
+    CONSENSUS_CONFIG_DATA_MAX_SIZE,
+    CustomEventType,
+} from '../../../../../src/utils/constants.js';
 import { config as stateConfig } from '../../../../helpers/config.js';
 
 const assertRejected = (t, context, validPayload, invalidPayload) =>
@@ -278,6 +281,7 @@ new TransactionValidityMismatchScenario({
 
 test('State.apply SET_CONSENSUS_CONFIG detects a duplicate transaction inside one batch', async t => {
     const context = await setupSetConsensusConfigScenario(t);
+    const events = captureConfigChangedEvents(context);
     const payload = await buildSetConsensusConfigPayload(context);
     const { logs, result } = captureApplyErrors(() =>
         appendBatchAndUpdate(context.adminBootstrap.base, [payload, payload])
@@ -294,6 +298,7 @@ test('State.apply SET_CONSENSUS_CONFIG detects a duplicate transaction inside on
     );
     await assertConfigRecordMissing(t, context.adminBootstrap.base, 2);
     await assertOperationRecorded(t, context.adminBootstrap.base, payload, true);
+    t.is(events.length, 1);
     assertLog(t, logs, 'Operation has already been applied.');
 });
 
@@ -324,6 +329,7 @@ test('State.apply SET_CONSENSUS_CONFIG detects the same transaction in consecuti
 
 test('State.apply SET_CONSENSUS_CONFIG ignores updates before genesis initialization', async t => {
     const context = await setupSetConsensusConfigScenario(t, { initializeGenesis: false });
+    const events = captureConfigChangedEvents(context);
     const payload = await buildSetConsensusConfigPayload(context);
     const { logs, result } = captureApplyErrors(() =>
         appendAndUpdate(context.adminBootstrap.base, payload)
@@ -331,6 +337,7 @@ test('State.apply SET_CONSENSUS_CONFIG ignores updates before genesis initializa
     await result;
 
     await assertConsensusConfigUninitialized(t, context.adminBootstrap.base, payload);
+    t.is(events.length, 0);
     assertLog(t, logs, 'Initial consensus config has not been initialized yet');
 });
 
@@ -397,6 +404,7 @@ test('State.apply SET_CONSENSUS_CONFIG rejects an overflowing current pointer wi
 
 test('State.apply SET_CONSENSUS_CONFIG appends a config and replicates immutable history', async t => {
     const context = await setupSetConsensusConfigScenario(t);
+    const events = captureConfigChangedEvents(context);
     const payload = await buildSetConsensusConfigPayload(context);
 
     await appendAndUpdate(context.adminBootstrap.base, payload);
@@ -418,6 +426,7 @@ test('State.apply SET_CONSENSUS_CONFIG appends a config and replicates immutable
     );
     await assertConfigRecordMissing(t, context.adminBootstrap.base, 2);
     await assertOperationRecorded(t, context.adminBootstrap.base, payload, true);
+    t.alike(events, [[]]);
 
     await context.sync();
     const reader = context.peers[1];
@@ -468,6 +477,7 @@ test('State.apply SET_CONSENSUS_CONFIG advances config sequence across consecuti
 
 test('State.apply SET_CONSENSUS_CONFIG applies two distinct updates atomically in one batch', async t => {
     const context = await setupSetConsensusConfigScenario(t);
+    const events = captureConfigChangedEvents(context);
     const minimumPayload = await buildSetConsensusConfigPayload(context, {
         difficulty: 1,
         discriminantBitSize: 1024
@@ -495,6 +505,7 @@ test('State.apply SET_CONSENSUS_CONFIG applies two distinct updates atomically i
     await assertConfigRecordMissing(t, context.adminBootstrap.base, 3);
     await assertOperationRecorded(t, context.adminBootstrap.base, minimumPayload, true);
     await assertOperationRecorded(t, context.adminBootstrap.base, maximumPayload, true);
+    t.is(events.length, 2);
 });
 
 test('State.apply SET_CONSENSUS_CONFIG accepts every supported discriminant size in one batch', async t => {
@@ -629,6 +640,7 @@ async function assertConfigUpdateApplied(t, base, payload) {
 function registerRejectedConfigCase({ title, buildOptions, expectedLog }) {
     test(title, async t => {
         const context = await setupSetConsensusConfigScenario(t);
+        const events = captureConfigChangedEvents(context);
         const payload = await buildSetConsensusConfigPayload(context, buildOptions);
         const { logs, result } = captureApplyErrors(() =>
             appendAndUpdate(context.adminBootstrap.base, payload)
@@ -636,6 +648,7 @@ function registerRejectedConfigCase({ title, buildOptions, expectedLog }) {
         await result;
 
         await assertSetConsensusConfigFailureState(t, context, payload);
+        t.is(events.length, 0);
         assertLog(t, logs, expectedLog);
     });
 }
@@ -652,6 +665,15 @@ function captureApplyErrors(apply) {
         });
 
     return { logs, result };
+}
+
+function captureConfigChangedEvents(context) {
+    const events = [];
+    context.adminBootstrap.state.on(
+        CustomEventType.CONSENSUS_CONFIG_CHANGED,
+        (...args) => events.push(args),
+    );
+    return events;
 }
 
 function assertLog(t, logs, expected) {

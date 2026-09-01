@@ -1,18 +1,8 @@
-import b4a from "b4a";
-import SchedulableService, { SCHEDULABLE_SERVICE_EVENTS } from "../../../utils/scheduler/SchedulableService.js";
-import { EPOCH_EVENTS, EPOCH_STATES, EpochStateMachine } from "./EpochStateMachine.js";
-import { ConsensusProtocolVersion, CustomEventType } from "../../../utils/constants.js";
-import { Logger } from "../../../utils/logger.js";
-import { createVDFService } from "./createVDFService.js";
-import { EpochCoordinatorOperations } from './EpochCoordinatorOperations.js';
-import { createMessage, uint16ToBuffer, uint32ToBuffer, uint64ToBuffer, uint8ToBuffer } from "../../../utils/buffer.js";
-import { addressToBuffer } from "../../state/utils/address.js"
-import { sleep } from "../../../utils/helpers.js"
-
-const listenTo = (eventEmitter, event, handler) => {
-    eventEmitter.on(event, handler);
-    return () => eventEmitter.off(event, handler);
-}
+import SchedulableService from '../../../utils/scheduler/SchedulableService.js';
+import { Logger } from '../../../utils/logger.js';
+import { CustomEventType } from '../../../utils/constants.js';
+import { EpochCoordinationRound } from './EpochCoordinationRound.js';
+import { VDFServiceManager } from './VDFServiceManager.js';
 
 class EpochCoordinatorService extends SchedulableService {
     #state;
@@ -21,348 +11,315 @@ class EpochCoordinatorService extends SchedulableService {
     #manager;
     #intervalMs;
     #logger;
-    #vdfService;
-    #operations;
+    #vdfManager;
+    #enabled = false;
+    #currentRound = null;
+    #unfinishedRounds = new Set();
+    #configReload = null;
+    #cancelReloadDelay = null;
+    #configChangeListener;
 
     /**
-   * @param {object} state
-   * @param {object} wallet
-   * @param {object} config
-   * @param {object} manager
-   */
+     * Creates the coordinator and its VDF manager.
+     * The scheduler is started later by {@link start}.
+     *
+     * @param {object} state
+     * @param {object} wallet
+     * @param {object} config
+     * @param {object} manager
+     */
     constructor(state, wallet, config, manager) {
         super();
         this.#state = state;
         this.#wallet = wallet;
         this.#config = config;
         this.#manager = manager;
-        this.#intervalMs = this.#config.epochInterval;
+        this.#intervalMs = config.epochInterval;
         this.#logger = new Logger(config);
+        this.#vdfManager = new VDFServiceManager(state, wallet, config);
+        this.#configChangeListener = this.#handleConfigChange.bind(this);
     }
 
+    /**
+     * Opens the first VDF service and starts listening for config changes.
+     *
+     * @returns {Promise<void>}
+     */
     async _open() {
-        this.#vdfService = await createVDFService();
-        await this.#vdfService.ready();
-
-        this.#operations = new EpochCoordinatorOperations(this.#state, this.#vdfService, this.#wallet, this.#config);
+        await this.#vdfManager.open();
+        this.#state.on(CustomEventType.CONSENSUS_CONFIG_CHANGED, this.#configChangeListener);
     }
 
+    /**
+     * Stops listening for config changes, cancels the current round and closes the VDF.
+     * It does not wait for network operations which cannot be cancelled.
+     *
+     * @returns {Promise<void>}
+     */
     async _close() {
-        await super._close();
-        await this.#vdfService?.close();
+        this.#state.off(CustomEventType.CONSENSUS_CONFIG_CHANGED, this.#configChangeListener);
+        this.#enabled = false;
+        this.#cancelReloadDelay?.();
+
+        const roundCancelled = this.#cancelCurrentRound();
+        const schedulerStopped = super.stop(false);
+        const vdfClosed = this.#vdfManager.close();
+
+        await Promise.all([
+            roundCancelled,
+            schedulerStopped,
+            this.#configReload,
+            vdfClosed,
+        ]);
     }
 
-    async start() {
-        if (this.isSchedulerRunning) {
+    /**
+     * Makes sure that VDF is ready and starts the scheduler.
+     *
+     * @param {number} initialDelayMs delay before the first coordination round
+     * @returns {Promise<boolean>} true when the scheduler was started
+     */
+    async start(initialDelayMs = this.#intervalMs) {
+        if (this.isSchedulerRunning || this.closing !== null || this.closed) return false;
+
+        this.#enabled = true;
+
+        try {
+            await this.#openVdf();
+        } catch (error) {
+            this.#logger.error(`[EpochCoordinatorService] failed to initialize VDF service: ${error.message}`);
             return false;
         }
 
-        return super.start(this.#intervalMs);
+        if (!this.#canStart()) return false;
+        return super.start(initialDelayMs);
     }
 
+    /**
+     * Stops the scheduler and cancels the current round.
+     *
+     * @param {boolean} waitForCurrent wait for operations which have already started
+     * @returns {Promise<boolean>} true when a running scheduler was stopped
+     */
     async stop(waitForCurrent = true) {
-        return super.stop(waitForCurrent);
+        this.#enabled = false;
+        this.#cancelReloadDelay?.();
+        const roundCancelled = this.#cancelCurrentRound();
+        const stopped = await super.stop(false);
+
+        await roundCancelled;
+        if (waitForCurrent) {
+            await Promise.allSettled([...this.#unfinishedRounds]);
+        }
+
+        return stopped;
     }
 
-    async #getQuorum() {
-        const indexerCount = await this.#state.indexerCount();
-        return indexerCount <= 2 ? 1 : Math.floor(indexerCount / 2) + 1;
-    }
-
+    /** @returns {number} delay between coordination rounds */
     getScheduleInterval() {
         return this.#intervalMs;
     }
 
+    /**
+     * Creates and runs one coordination round.
+     * The round is stored before async work starts, so stop() can always cancel it.
+     *
+     * @param {(delay: number) => void} next schedules the next worker run
+     * @param {() => void} hold marks scheduling as owned by the round
+     * @returns {Promise<void>}
+     */
     async worker(next, hold) {
-        if (!await this.#shouldRun()) {
-            next(this.#intervalMs);
-            return;
-        }
+        if (!this.#canRun()) return;
 
-        // prevent automatic scheduling which is required because the processing is async.
+        const operations = this.#vdfManager.operations;
+        if (!operations) return;
+
         hold();
-        const machine = new EpochStateMachine(this.#buildHandlers());
-        this.#setupListeners(machine)
 
-        const scheduleNext = async (delay) => {
-            await machine.close();
-            next(delay);
-        };
+        const round = new EpochCoordinationRound({
+            state: this.#state,
+            wallet: this.#wallet,
+            config: this.#config,
+            manager: this.#manager,
+            logger: this.#logger,
+            operations,
+            intervalMs: this.#intervalMs,
+        });
 
-        // kick off the process
-        await machine.enter({ next: scheduleNext });
-    }
+        this.#replaceCurrentRound(round);
 
-    async #handleLoadEpochContext(_context, machine) {
-        // "snapshot"
-        const currentEpoch = await this.#state.requireCurrentEpoch();
-        const currentEpochHash = await this.#state.requireEpoch(currentEpoch);
-        const { 
-            configData: {
-                difficulty: vdfDifficulty,
-                discriminantBitSize: vdfDiscriminantSize,
-            } 
-        } = await this.#state.requireSignedConsensusConfig();
-        const quorum = await this.#getQuorum();
-
-        machine.appendContext({ currentEpoch, currentEpochHash, vdfDifficulty, vdfDiscriminantSize, quorum });
-        await machine.send(EPOCH_EVENTS.START);
-    }
-
-    // Transition handlers
-    
-    async #handleInitializeVdf(context, machine) {
-        const { currentEpochHash, vdfDifficulty, vdfDiscriminantSize, currentEpoch } = context;
-
-        const challenge = createMessage(
-            uint8ToBuffer(ConsensusProtocolVersion.V1), 
-            uint16ToBuffer(this.#config.networkId),
-            uint64ToBuffer(currentEpoch + 1n),
-            currentEpochHash,
-            addressToBuffer(this.#wallet.address, this.#config.addressPrefix),
-            uint32ToBuffer(vdfDifficulty),
-            uint16ToBuffer(vdfDiscriminantSize)
-        );
+        const roundRun = round.run((delay) => this.#scheduleNextRound(round, next, delay));
+        this.#unfinishedRounds.add(roundRun);
 
         try {
-            const vdf = await this.#operations.calculateVDF(challenge, vdfDifficulty, vdfDiscriminantSize);
-            machine.appendContext({ vdf });
-            await machine.send(EPOCH_EVENTS.LOCAL_PROOF_READY);    
+            await roundRun;
         } catch (error) {
-            this.#logger.error(error);
-            await machine.send(EPOCH_EVENTS.SOLVER_FAILURE);
-        }
-    }
+            if (round !== this.#currentRound || !this.#canRun()) return;
 
-    async #handleBuildAndSignProofProposal(context, machine) {
-        const { currentEpoch, currentEpochHash, vdf } = context;
-        const proofProposalMessage = await this.#operations.createProofProposal(currentEpoch, currentEpochHash, vdf);
-        machine.appendContext({ proofProposalMessage, proofProposal: proofProposalMessage.proof_proposal });
-        await machine.send(EPOCH_EVENTS.PROPOSAL_BUILT);
+            this.#logger.error(`[EpochCoordinatorService] round failed: ${error.message}`);
+            await this.#cancelRound(round);
+            this.#scheduleNextRound(round, next, this.#intervalMs);
+        } finally {
+            this.#unfinishedRounds.delete(roundRun);
+        }
     }
 
     /**
-     * If a competing proposal for this epoch was already seen, wait epochRemoteProposalTimeout
-     * before broadcasting ours, so we don't race the other proposer.
+     * Waits for the current config reload and opens VDF before the scheduler starts.
+     * It repeats when another reload starts while VDF is opening.
+     *
+     * @returns {Promise<void>}
      */
-    async #handleQuorumDecision(context, machine) {
-        if (context.remoteProposalReceived) {
-            await sleep(this.#config.epochRemoteProposalTimeout);
-            const latestEpoch = await this.#state.getCurrentEpoch();
-            if (latestEpoch > context.currentEpoch) {
-                await machine.send(EPOCH_EVENTS.TARGET_EPOCH_ALREADY_SIGNED);
-                return;
-            }
-        }
-
-        if (context.quorum <= 1) {
-            await machine.send(EPOCH_EVENTS.EXTERNAL_APPROVALS_NOT_REQUIRED);
-        } else {
-            await machine.send(EPOCH_EVENTS.EXTERNAL_APPROVALS_REQUIRED);
-        }
+    async #openVdf() {
+        do {
+            if (this.#configReload) await this.#configReload;
+            await this.#vdfManager.open();
+        } while (this.#configReload);
     }
 
-    async #handleSendProposalToIndexers(context, machine) {
-        const approvers = await this.#operations.approvers();
-        await this.#manager.connect();
-
-        if (approvers.length + 1 < machine.context.quorum) {
-            await machine.send(EPOCH_EVENTS.APPROVAL_COLLECTION_FAILED);
-            return;
-        }
-
-        const proposals = {
-            approvers, approvals: [], rejections: [], closed: false,
-        };
-        
-        machine.appendContext({ proposals });
-        this.#dispatchApprovalRequests(approvers, this.#manager, machine, proposals);
-        await machine.send(EPOCH_EVENTS.PROPOSAL_BROADCAST);
+    /**
+     * Checks if a worker can run or schedule an epoch round.
+     * It also checks if stop() interrupted the scheduler.
+     *
+     * @returns {boolean}
+     */
+    #canRun() {
+        return this.#canStart() && !this.isInterrupted;
     }
 
-    #dispatchApprovalRequests(approvers, indexerConnectionManager, machine, proposals) {
-        for (const member of approvers) {
-            const {currentEpoch, currentEpochHash, vdf} = machine.context;
-            this.#operations.collectSignature(member, {currentEpoch, currentEpochHash, vdf}, indexerConnectionManager)
-                .then((confirmation) => this.#handleApproval(confirmation, proposals, machine))
-                .catch((err) => this.#handleApprovalFailure(err, member, proposals, machine))
-        }
+    /**
+     * Checks if the coordinator is enabled and can start the scheduler.
+     * It ignores the temporary scheduler stop used during a config reset.
+     *
+     * @returns {boolean}
+     */
+    #canStart() {
+        return this.#enabled && this.closing === null && !this.closed;
     }
 
-    async #handleApproval(confirmation, proposals, machine) {
-        if (!proposals.closed) {
-            proposals.approvals.push(confirmation); // this updates the reference in the context because the thing is an object pointer
+    /**
+     * Stores the new current round and cancels the previous one.
+     *
+     * @param {EpochCoordinationRound} round
+     */
+    #replaceCurrentRound(round) {
+        const previousRound = this.#currentRound;
+        this.#currentRound = round;
 
-            if (proposals.approvals.length + 1 >= machine.context.quorum) {
-                proposals.closed = true;
-                await machine.send(EPOCH_EVENTS.QUORUM_REACHED);
-            }
-        }
+        if (previousRound) void this.#cancelRound(previousRound);
     }
 
-    async #handleApprovalFailure(err, member, proposals, machine) {
-        if (!proposals.closed) {
-            proposals.rejections.push({ member, error: err });
+    /**
+     * Cancels the current round and removes it from the coordinator.
+     *
+     * @returns {Promise<void>}
+     */
+    async #cancelCurrentRound() {
+        const round = this.#currentRound;
+        this.#currentRound = null;
 
-            if (proposals.rejections.length > proposals.approvers.length - machine.context.quorum + 1) {
-                proposals.closed = true;
-                await machine.send(EPOCH_EVENTS.APPROVAL_COLLECTION_FAILED);
-            }
-        }
+        if (round) await this.#cancelRound(round);
     }
 
-    async #handleBuildSetEpoch(context, machine) {
-        const setEpochPayload = await this.#operations.buildSetEpochPayload(context.proofProposal, context.proposals?.approvals ?? []);
-        machine.appendContext({ setEpochPayload });
-        await machine.send(EPOCH_EVENTS.SET_EPOCH_BUILT);
-    }
-
-    async #handleRefreshSignedStateBeforeAppend(context, machine) {
-        const latestEpochBeforeAppend = await this.#state.getCurrentEpoch();
-        if (latestEpochBeforeAppend === context.currentEpoch) {
-            await machine.send(EPOCH_EVENTS.TARGET_EPOCH_ABSENT);
-        } else {
-            await machine.send(EPOCH_EVENTS.TARGET_EPOCH_ALREADY_SIGNED);
-        }
-    }
-
-    async #handleAppendSetEpoch(context, machine) {
+    /**
+     * Cancels a round and logs a cleanup error instead of passing it to the caller.
+     *
+     * @param {EpochCoordinationRound} round
+     * @returns {Promise<void>}
+     */
+    async #cancelRound(round) {
         try {
-            await this.#operations.appendSetEpoch(context.setEpochPayload);
-            // append() only confirms the operation is durable on our local writer core.
-            // The consensus mechanism (autobase apply) still has to process it before the
-            // epoch actually advances, so resolution happens via the EPOCH_CREATED listener
-            // wired in #setupListeners (or the append timeout), not here.
+            await round.cancel();
         } catch (error) {
-            this.#logger.error(error);
-            await machine.send(EPOCH_EVENTS.APPEND_FAILED);
+            this.#logger.error(`[EpochCoordinatorService] failed to cancel epoch round: ${error.message}`);
         }
     }
 
-    async #handleSendAppendSignal(context, _machine) {
-        context.next(this.#intervalMs);
+    /**
+     * Schedules the next run only for the current round.
+     * A callback from an old round cannot replace the new timer.
+     *
+     * @param {EpochCoordinationRound} round
+     * @param {(delay: number) => void} next
+     * @param {number} delay
+     */
+    #scheduleNextRound(round, next, delay) {
+        if (round !== this.#currentRound || !this.#canRun()) return;
+
+        this.#currentRound = null;
+        next(delay);
     }
 
-    async #handleRefreshSignedState(context, machine) {
-        await this.#state.refresh()
-        const latestEpoch = await this.#state.getCurrentEpoch();
-        if (latestEpoch > context.currentEpoch) {
-            await machine.send(EPOCH_EVENTS.NEW_EPOCH_DISCOVERED);
-        } else if (context.vdf) {
-            await machine.send(EPOCH_EVENTS.EPOCH_UNCHANGED_WITH_LOCAL_PROOF);
-        } else {
-            await machine.send(EPOCH_EVENTS.EPOCH_UNCHANGED_WITHOUT_LOCAL_PROOF);
+    /**
+     * Handles a consensus config change.
+     * It cancels the round first, replaces the old VDF and starts the scheduler again.
+     * Repeated signals use the same reset which is already running.
+     *
+     * @returns {void}
+     */
+    #handleConfigChange() {
+        if (this.closing !== null || this.closed || this.#configReload) return;
+        this.#configReload = this.#reloadConfig();
+    }
+
+    /**
+     * Stops the current round and reloads VDF.
+     * If the coordinator was running, it starts again without delay.
+     *
+     * @returns {Promise<void>}
+     */
+    async #reloadConfig() {
+        const shouldRestart = this.#enabled;
+
+        try {
+            await Promise.all([
+                this.#cancelCurrentRound(),
+                super.stop(false),
+                shouldRestart ? this.#reloadVdf() : this.#vdfManager.close(),
+            ]);
+        } catch (error) {
+            this.#logger.error(`[EpochCoordinatorService] config reload failed: ${error.message}`);
+            return;
+        } finally {
+            this.#configReload = null;
         }
+
+        if (!shouldRestart) return;
+        if (!this.#vdfManager.operations || !this.#canStart()) return;
+
+        super.start(0);
     }
 
-    async #handleBackoff(context, machine) {
-        await machine.send(EPOCH_EVENTS.BACKOFF_ELAPSED);
-    }
-
-    async #handleReloadSignedContext(context, machine) {
-        await machine.close()
-        context.next(this.#intervalMs);
-    }
-
-    /** Any handler error ends the cycle via next() instead of leaving the machine stuck open. */
-    #wrapHandler(handler) {
-        return async (context, machine) => {
+    /** Reloads VDF, retrying while the coordinator is running. */
+    async #reloadVdf() {
+        while (this.#canStart()) {
             try {
-                await handler(context, machine);
-            } catch (err) {
-                this.#logger.error(`[EpochCoordinatorService] handler failed: ${err.message}`);
-                await machine.close()
-                context.next(this.#intervalMs);
+                await this.#vdfManager.replace();
+                return true;
+            } catch (error) {
+                if (!this.#canStart()) return false;
+
+                this.#logger.error(
+                    `[EpochCoordinatorService] config reload failed: ${error.message}; ` +
+                    `retrying in ${this.#config.epochBackoffDelay}ms`,
+                );
+                await this.#waitBeforeRetry();
             }
-        };
+        }
+
+        return false;
     }
 
-    #buildHandlers() {
-        const handlers = {
-            [EPOCH_STATES.LOAD_EPOCH_CONTEXT]: this.#handleLoadEpochContext.bind(this),
-            [EPOCH_STATES.INITIALIZE_VDF]: this.#handleInitializeVdf.bind(this),
-            [EPOCH_STATES.BUILD_AND_SIGN_PROOF_PROPOSAL]: this.#handleBuildAndSignProofProposal.bind(this),
-            [EPOCH_STATES.QUORUM_DECISION]: this.#handleQuorumDecision.bind(this),
-            [EPOCH_STATES.SEND_PROPOSAL_TO_INDEXERS]: this.#handleSendProposalToIndexers.bind(this),
-            [EPOCH_STATES.BUILD_SET_EPOCH]: this.#handleBuildSetEpoch.bind(this),
-            [EPOCH_STATES.REFRESH_SIGNED_STATE_BEFORE_APPEND]: this.#handleRefreshSignedStateBeforeAppend.bind(this),
-            [EPOCH_STATES.APPEND_SET_EPOCH]: this.#handleAppendSetEpoch.bind(this),
-            [EPOCH_STATES.SEND_APPEND_SIGNAL]: this.#handleSendAppendSignal.bind(this),
-            [EPOCH_STATES.REFRESH_SIGNED_STATE]: this.#handleRefreshSignedState.bind(this),
-            [EPOCH_STATES.BACKOFF]: this.#handleBackoff.bind(this),
-            [EPOCH_STATES.RELOAD_SIGNED_CONTEXT]: this.#handleReloadSignedContext.bind(this),
-        };
-
-        return Object.fromEntries(
-            Object.entries(handlers).map(([state, fn]) => [state, this.#wrapHandler(fn)])
-        );
-    }
-
-    async #shouldRun() {
-        const epoch = await this.#state.getCurrentEpoch()
-        return epoch !== null && epoch >= 0n && !this.isInterrupted
-    }
-
-    #setupListeners(stateMachine) {
-        const toClean = []
-
-        // External events
-
-        const cleanStop = listenTo(this, SCHEDULABLE_SERVICE_EVENTS.STOP, () => {
-            stateMachine.close();
+    #waitBeforeRetry() {
+        return new Promise(resolve => {
+            const timer = setTimeout(resolve, this.#config.epochBackoffDelay);
+            this.#cancelReloadDelay = () => {
+                clearTimeout(timer);
+                resolve();
+            };
+        }).finally(() => {
+            this.#cancelReloadDelay = null;
         });
-        toClean.push(cleanStop)
-
-        const cleanProposal = listenTo(this.#state, CustomEventType.EPOCH_PROPOSAL_VALIDATION_SUCCESS, () => {
-            stateMachine.appendContext({ remoteProposalReceived: true })
-        })
-        toClean.push(cleanProposal)
-
-        const cleanEpochCreated = listenTo(this.#state, CustomEventType.EPOCH_CREATED, async () => {
-            if (stateMachine.state !== EPOCH_STATES.APPEND_SET_EPOCH) {
-                await stateMachine.close()
-                stateMachine.context.next(this.#intervalMs);
-            }
-        })
-        toClean.push(cleanEpochCreated)
-
-        // Machine states
-
-        let signatureTimer = null;
-        let appendTimer = null;
-        let stopAppendListener = null;
-        stateMachine.on('*', ({ next, prev }) => {
-            if (next === EPOCH_STATES.COLLECT_APPROVALS && prev !== EPOCH_STATES.COLLECT_APPROVALS) {
-                signatureTimer = setTimeout(() => stateMachine.send(EPOCH_EVENTS.APPROVAL_COLLECTION_FAILED), this.#config.epochSignatureTimeout);
-            } else if (prev === EPOCH_STATES.COLLECT_APPROVALS && next !== EPOCH_STATES.COLLECT_APPROVALS) {
-                clearTimeout(signatureTimer);
-            }
-
-            // APPEND_SET_EPOCH has no self-loop transition, so unlike COLLECT_APPROVALS above,
-            // there's no re-entry case to guard against here.
-            if (next === EPOCH_STATES.APPEND_SET_EPOCH) {
-                appendTimer = setTimeout(() => stateMachine.send(EPOCH_EVENTS.APPEND_FAILED), this.#config.epochAppendTimeout);
-
-                const targetEpoch = uint64ToBuffer(stateMachine.context.currentEpoch + 1n);
-                stopAppendListener = listenTo(this.#state, CustomEventType.EPOCH_CREATED, ({ epoch, proposerAddress }) => {
-                    if (!b4a.equals(epoch, targetEpoch)) return;
-                    stateMachine.send(
-                        proposerAddress === this.#wallet.address
-                            ? EPOCH_EVENTS.APPEND_ACCEPTED
-                            : EPOCH_EVENTS.TARGET_EPOCH_ALREADY_SIGNED
-                    );
-                });
-            } else if (prev === EPOCH_STATES.APPEND_SET_EPOCH) {
-                clearTimeout(appendTimer);
-                stopAppendListener?.();
-                stopAppendListener = null;
-            }
-        })
-        toClean.push(() => clearTimeout(signatureTimer))
-        toClean.push(() => clearTimeout(appendTimer))
-        toClean.push(() => stopAppendListener?.())
-
-        stateMachine.once('close', () => toClean.forEach(cleanup => cleanup()))
     }
 }
 

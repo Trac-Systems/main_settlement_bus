@@ -5,76 +5,76 @@ import b4a from 'b4a';
 import {
     ACK_INTERVAL,
     ADMIN_INITIAL_BALANCE,
-    EntryType,
-    OperationType,
+    ADMIN_INITIAL_STAKED_BALANCE,
     AUTOBASE_VALUE_ENCODING,
+    BATCH_SIZE,
+    CONSENSUS_CONFIG_INDEX_SIZE,
+    ConsensusConfigSchemaVersion,
+    ConsensusProtocolVersion,
+    CustomEventType,
+    EntryType,
+    EPOCH_BYTE_LENGTH,
+    EventType,
+    HASH_BYTE_LENGTH,
     HYPERBEE_KEY_ENCODING,
     HYPERBEE_VALUE_ENCODING,
-    BATCH_SIZE,
-    ADMIN_INITIAL_STAKED_BALANCE,
+    OperationType,
     TRAC_NAMESPACE,
-    EventType,
-    CustomEventType,
-    ConsensusConfigSchemaVersion,
     UINT32_MAX,
-    ConsensusProtocolVersion,
-    VDF_PROOF_BYTE_LENGTHS,
-    HASH_BYTE_LENGTH,
-    EPOCH_BYTE_LENGTH,
-    CONSENSUS_CONFIG_INDEX_SIZE
+    VDF_PROOF_BYTE_LENGTHS
 } from '../../utils/constants.js';
-import { isHexString, sleep, isTransactionRecordPut } from '../../utils/helpers.js';
+import {isHexString, isTransactionRecordPut, sleep} from '../../utils/helpers.js';
 import tracCryptoApi from 'trac-crypto-api';
-import { verifyWesolowski } from '@tracsystems/trac-vdf';
+import {verifyWesolowski} from '@tracsystems/trac-vdf';
 import StateValidationSchema from './validators/StateValidationSchema.js';
 import {
     decodeConsensusConfig,
-    safeDecodeConsensusConfig,
     safeDecodeApplyOperation,
+    safeDecodeConsensusConfig,
     safeEncodeConsensusConfig,
     safeEncodeEpochProof
 } from '../../codecs/apply/applyOperationCodec.js';
 import {
     createMessage,
-    ZERO_WK,
-    NULL_BUFFER,
-    isZeroBuffer,
-    safeWriteUInt32BE,
-    safeReadUint32BE,
     deepCopyBuffer,
-    safeReadUint8,
-    uint16ToBuffer,
-    isBufferValid,
     incrementBuffer,
-    safeToUIntString
+    isBufferValid,
+    isZeroBuffer,
+    NULL_BUFFER,
+    safeReadUint32BE,
+    safeReadUint8,
+    safeToUIntString,
+    safeWriteUInt32BE,
+    uint16ToBuffer,
+    ZERO_WK
 } from '../../utils/buffer.js';
-import { safeDecodeProofProposal, safeDecodeProofProposalApproval } from '../../codecs/consensus/v1/consensusV1OperationCodec.js';
+import {
+    safeDecodeProofProposal,
+    safeDecodeProofProposalApproval
+} from '../../codecs/consensus/v1/consensusV1OperationCodec.js';
 import addressUtils from './utils/address.js';
 import adminEntryUtils from './utils/adminEntry.js';
-import nodeEntryUtils, { setWritingKey, NODE_ENTRY_SIZE } from './utils/nodeEntry.js';
+import nodeEntryUtils, {NODE_ENTRY_SIZE, setWritingKey} from './utils/nodeEntry.js';
 import nodeRoleUtils from './utils/roles.js';
 import lengthEntryUtils from './utils/lengthEntry.js';
-import transactionUtils from './utils/transaction.js';
+import transactionUtils, {Status} from './utils/transaction.js';
 import {
     BALANCE_FEE,
-    toBalance,
-    PERCENT_75,
-    PERCENT_50,
-    PERCENT_25,
     BALANCE_TO_STAKE,
     BALANCE_ZERO,
+    PERCENT_25,
+    PERCENT_50,
+    PERCENT_75,
+    toBalance,
     toTerm,
 } from './utils/balance.js';
 import deploymentEntryUtils from './utils/deploymentEntry.js';
-import { Status } from './utils/transaction.js';
 import remote from 'hypercore/lib/fully-remote-proof.js'
 import PQueue from 'p-queue';
-import { createGenesisEpochProof } from './utils/epochProof.js';
-import {
-    decodeVdfConfig,
-    safeDecodeVdfConfig,
-} from '../../codecs/consensus/v1/vdfConfigCodec.js';
+import {createGenesisEpochProof} from './utils/epochProof.js';
+import {decodeVdfConfig, safeDecodeVdfConfig,} from '../../codecs/consensus/v1/vdfConfigCodec.js';
 import _ from 'lodash';
+import {StateEventQueue} from './StateEventQueue.js';
 
 const OVERSIZED_BATCH_PENALTY_MULTIPLIER = BATCH_SIZE;
 
@@ -90,6 +90,8 @@ class State extends ReadyResource {
     #wallet
     #stateValidationSchema;
     #activeWriterCountCache = new Map();
+    #stateEventQueue = new StateEventQueue();
+    #viewUpdateListener;
 
     /**
      * @param {Corestore} store
@@ -104,6 +106,7 @@ class State extends ReadyResource {
         this.#store = store;
 
         this.#stateValidationSchema = new StateValidationSchema(config);
+        this.#viewUpdateListener = this.handleViewUpdate.bind(this);
         this.#base = new Autobase(this.#store, this.#config.bootstrap, {
             ackInterval: ACK_INTERVAL,
             valueEncoding: AUTOBASE_VALUE_ENCODING,
@@ -135,12 +138,17 @@ class State extends ReadyResource {
         await this.#base.ready();
         this.#writingKey = this.#base.local.key;
 
+        // Catch-up events describe state which is already available at startup.
+        this.#stateEventQueue.clear();
+        this.#base.on('update', this.#viewUpdateListener);
         await this.#listeners()
     }
 
     async _close() {
         console.log("State: closing gracefully...");
 
+        this.#base.off('update', this.#viewUpdateListener);
+        this.#stateEventQueue.clear();
         this.removeAllListeners();
 
         if (this.#bee !== null) {
@@ -446,11 +454,22 @@ class State extends ReadyResource {
         return await this.#base.update()
     }
 
+    /**
+     * Publishes apply events after the related state changes become signed.
+     * The optional length is used by tests which provide their own Autobase instance.
+     *
+     * @param {number} signedLength current signed view length
+     */
+    handleViewUpdate(signedLength = this.getSignedLength()) {
+        this.#stateEventQueue.flush(signedLength, (event, ...args) => {
+            this.#emitEvent(event, ...args);
+        });
+    }
+
     async isWkInIndexersEntry(wk) {
         if (wk === null) return false;
-        const indexerListHasWk = Object.values(this.#base.system.indexers)
+        return Object.values(this.#base.system.indexers)
             .some(entry => b4a.equals(entry.key, wk));
-        return indexerListHasWk;
     }
 
     async getWriterLength() {
@@ -695,6 +714,7 @@ class State extends ReadyResource {
     async #apply(nodes, view, base) {
         const batch = view.batch();
         const batchInvoker = nodes[0].from.key;
+        const postApplyEvents = [];
 
 
         if (nodes.length > BATCH_SIZE) {
@@ -725,7 +745,7 @@ class State extends ReadyResource {
             const handler = this.#getApplyOperationHandler(op.type);
 
             if (handler) {
-                const result = await handler(op, view, base, node, batch);
+                const result = await handler(op, view, base, node, batch, postApplyEvents);
                 if (result === Status.FAILURE) {
                     invalidOperations++;
                 } else if (result === Status.IGNORE) {
@@ -746,6 +766,14 @@ class State extends ReadyResource {
 
         await batch.flush();
         await batch.close();
+
+        if (postApplyEvents.length !== 0) {
+            try {
+                this.#stateEventQueue.enqueue(postApplyEvents, view.core.length);
+            } catch (error) {
+                this.#safeLogApply('StateEventQueue', `Failed to queue post apply events: ${String(error)}`);
+            }
+        }
     }
 
     #getApplyOperationHandler(type) {
@@ -3553,7 +3581,7 @@ class State extends ReadyResource {
             this.#safeLogApply(OperationType.SET_EPOCH, "Current epoch is not initialized. Genesis epoch has not been set.", node.from.key)
             return Status.FAILURE;
         }
-        
+
         const nextEpochBuffer = incrementBuffer(currentEpochBuffer, EPOCH_BYTE_LENGTH);
         if (nextEpochBuffer === null) {
             this.#safeLogApply(OperationType.SET_EPOCH, "Current epoch index value is invalid or corrupted", node.from.key)
@@ -3772,7 +3800,7 @@ class State extends ReadyResource {
                 approvalHash,
                 approverPublicKey
             );
-            
+
             if (!approvalVerified) return 'Failed to verify epoch approval signature.';
 
             approverIdentities.add(approverAddress);
@@ -4655,11 +4683,11 @@ class State extends ReadyResource {
             console.info(`Genesis Epoch initialized addr:wk:tx - ${requesterAddressString}:${decodedAdminEntry.wk.toString('hex')}:${txHashHexString}`);
         }
 
-        this.emit(CustomEventType.GENESIS_EPOCH_CREATED, { epoch: 0n, proposerAddress: requesterAddressString });
+        this.#emitEvent(CustomEventType.GENESIS_EPOCH_CREATED, { epoch: 0n, proposerAddress: requesterAddressString });
         return Status.SUCCESS;
     }
 
-    async #handleApplySetConsensusConfig(op, _view, base, node, batch) {
+    async #handleApplySetConsensusConfig(op, _view, base, node, batch, postApplyEvents) {
         if (!this.#stateValidationSchema.validateConsensusControlOperation(op)) {
             this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Contract schema validation failed.", node.from.key)
             return Status.FAILURE;
@@ -4792,6 +4820,10 @@ class State extends ReadyResource {
         if (this.#config.enableTxApplyLogs) {
             console.info(`VDF params updated addr:wk:tx - ${requesterAddressString}:${decodedAdminEntry.wk.toString('hex')}:${txHashHexString}`);
         }
+
+        postApplyEvents.push({
+            type: CustomEventType.CONSENSUS_CONFIG_CHANGED,
+        });
 
         return Status.SUCCESS;
     }

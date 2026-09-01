@@ -60,6 +60,7 @@ const configData = {
         txPoolSize: 1000, // size of transaction pool
         validatorHealthCheckInterval: 5 * 60 * 1000, // How often to check validator health (ms)
         epochInterval: 3 * 60 * 1000, // How often to trigger epoch proof proposal (ms)
+        epochBackoffDelay: 30_000, // Delay before retrying epoch coordination after a failed attempt (ms)
         epochSignatureTimeout: 20_000, // Max time delay an indexer have to sign a proposal
         epochAppendTimeout: 2_000, // Max time a proposer has to append the new epoch in the log
         epochRemoteProposalTimeout: 20_000, // Max time to wait for a competing proposal to land before broadcasting our own
@@ -116,6 +117,7 @@ const configData = {
         txPoolSize: 1000, // size of transaction pool
         validatorHealthCheckInterval: 5 * 60 * 1000, // How often to check validator health (ms)
         epochInterval: 3 * 60 * 1000, // How often to trigger epoch proof proposal (ms)
+        epochBackoffDelay: 30_000, // Delay before retrying epoch coordination after a failed attempt (ms)
         epochSignatureTimeout: 20_000, // Max time delay an indexer have to sign a proposal
         epochAppendTimeout: 2_000, // Max time a proposer has to append the new epoch in the log
         epochRemoteProposalTimeout: 20_000, // Max time to wait for a competing proposal to land before broadcasting our own
@@ -128,8 +130,8 @@ const configData = {
         addressPrefix: TRAC_NETWORK_MSB_MAINNET_PREFIX,
         addressPrefixLength: TRAC_NETWORK_MSB_MAINNET_PREFIX.length,
         bech32mHrpLength: TRAC_NETWORK_MSB_MAINNET_PREFIX.length + 1, // len(addressPrefix + separator)
-        bootstrap: '12f7f1668eac2e691e17cbc6a53e509c5cee78cdcac562313091c64e5fd077d6',
-        channel: '12312313123123',
+        bootstrap: 'e81a23d67224e794a7df923843591880c24a4fd4de1795a80108035a7fcdfcbd',
+        channel: '123123131231233',
         dhtBootstrap: ['116.202.214.149:10001','157.180.12.214:10001','node1.hyperdht.org:49737','node2.hyperdht.org:49737','node3.hyperdht.org:49737'],
         derivationPath: address.MAINNET_DERIVATION_PATH,
         pollInterval: 500, // Validator observer poll interval
@@ -172,6 +174,7 @@ const configData = {
         txPoolSize: 1000, // size of transaction pool
         validatorHealthCheckInterval: 1_000, // How often to check validator health (ms)
         epochInterval: 30 * 1000, // How often to trigger epoch proof proposal (ms)
+        epochBackoffDelay: 30_000, // Delay before retrying epoch coordination after a failed attempt (ms)
         epochSignatureTimeout: 40_000, // Max time delay an indexer have to sign a proposal
         epochAppendTimeout: 10_000, // Max time a proposer has to append the new epoch in the log
         epochRemoteProposalTimeout: 40_000, // Max time to wait for a competing proposal to land before broadcasting our own
