@@ -7,7 +7,8 @@ import { addressToBuffer } from '../../../../src/core/state/utils/address.js';
 import { encodeConsensusConfig } from '../../../../src/codecs/apply/applyOperationCodec.js';
 import { OperationType } from '../../../../src/utils/constants.js';
 import { config } from '../../../helpers/config.js';
-import { testKeyPair1 } from '../../../fixtures/apply.fixtures.js';
+import { testKeyPair1, testKeyPair2 } from '../../../fixtures/apply.fixtures.js';
+import applyOperationFixtures from '../../../fixtures/applyOperation.fixtures.js';
 import {
     proofProposalApproval as approval,
     proofProposalData
@@ -93,4 +94,35 @@ test('ApplyStateMessageDirector builds complete set consensus config message', a
     t.is(payload.cco.tx.length, 32);
     t.is(payload.cco.in.length, 32);
     t.is(payload.cco.is.length, 64);
+});
+
+test('ApplyStateMessageDirector builds and preserves a signed HTLC claim', async t => {
+    const requesterWallet = await createWallet(testKeyPair1.mnemonic);
+    const validatorWallet = await createWallet(testKeyPair2.mnemonic);
+    const { txv, li: lockId, pi: preimage } = applyOperationFixtures.validHtlcClaimOperation.hco;
+
+    const partial = await applyStateMessageFactory(requesterWallet, config)
+        .buildPartialHtlcClaimOperationMessage(
+            requesterWallet.address,
+            txv,
+            lockId,
+            preimage
+        );
+    const complete = await applyStateMessageFactory(validatorWallet, config)
+        .buildCompleteHtlcClaimOperationMessage(
+            requesterWallet.address,
+            partial.hco.tx,
+            partial.hco.txv,
+            partial.hco.li,
+            partial.hco.pi,
+            partial.hco.in,
+            partial.hco.is
+        );
+
+    t.is(partial.type, OperationType.HTLC_CLAIM);
+    t.ok(b4a.equals(partial.address, addressToBuffer(requesterWallet.address, config.addressPrefix)));
+    t.alike(Object.keys(partial.hco).sort(), ['in', 'is', 'li', 'pi', 'tx', 'txv']);
+    for (const field of ['tx', 'txv', 'li', 'pi', 'in', 'is']) {
+        t.ok(b4a.equals(complete.hco[field], partial.hco[field]), `hco.${field} is preserved`);
+    }
 });

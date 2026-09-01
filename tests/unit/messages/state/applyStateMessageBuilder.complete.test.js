@@ -11,6 +11,7 @@ import {
 import { OperationType } from '../../../../src/utils/constants.js';
 import { config } from '../../../helpers/config.js';
 import { testKeyPair1, testKeyPair2 } from '../../../fixtures/apply.fixtures.js';
+import applyOperationFixtures from '../../../fixtures/applyOperation.fixtures.js';
 import { addressToBuffer } from '../../../../src/core/state/utils/address.js';
 import {
     proofProposalApproval as approval,
@@ -528,6 +529,51 @@ test('ApplyStateMessageBuilder complete transfer operation (tro)', async t => {
     t.ok(b4a.equals(payload.tro.am, amount));
     t.ok(b4a.equals(payload.tro.in, incomingNonce));
     t.ok(b4a.equals(payload.tro.is, incomingSignature));
+});
+
+test('ApplyStateMessageBuilder complete HTLC claim preserves the submitter-signed operation', async t => {
+    const requesterWallet = await createWallet(testKeyPair1.mnemonic);
+    const validatorWallet = await createWallet(testKeyPair2.mnemonic);
+    const { txv, li: lockId, pi: preimage } = applyOperationFixtures.validHtlcClaimOperation.hco;
+
+    const partialBuilder = new ApplyStateMessageBuilder(requesterWallet, config);
+    await partialBuilder
+        .setPhase('partial')
+        .setOutput('buffer')
+        .setOperationType(OperationType.HTLC_CLAIM)
+        .setAddress(requesterWallet.address)
+        .setTxValidity(txv)
+        .setHtlcLockId(lockId)
+        .setHtlcPreimage(preimage)
+        .build();
+    const partial = partialBuilder.getPayload();
+
+    const completeBuilder = new ApplyStateMessageBuilder(validatorWallet, config);
+    await completeBuilder
+        .setPhase('complete')
+        .setOutput('buffer')
+        .setOperationType(OperationType.HTLC_CLAIM)
+        .setAddress(requesterWallet.address)
+        .setTxHash(partial.hco.tx)
+        .setTxValidity(partial.hco.txv)
+        .setHtlcLockId(partial.hco.li)
+        .setHtlcPreimage(partial.hco.pi)
+        .setIncomingNonce(partial.hco.in)
+        .setIncomingSignature(partial.hco.is)
+        .build();
+
+    const complete = completeBuilder.getPayload();
+    const encoded = safeEncodeApplyOperation(complete);
+    const decoded = safeDecodeApplyOperation(encoded);
+
+    t.is(complete.type, OperationType.HTLC_CLAIM);
+    expectPayloadKeys(t, complete, 'hco');
+    expectKeys(t, complete.hco, ['tx', 'txv', 'li', 'pi', 'in', 'is'], 'hco');
+    for (const field of ['tx', 'txv', 'li', 'pi', 'in', 'is']) {
+        t.ok(b4a.equals(complete.hco[field], partial.hco[field]), `hco.${field} is preserved`);
+        t.ok(b4a.equals(decoded.hco[field], partial.hco[field]), `encoded hco.${field} is preserved`);
+    }
+    t.ok(requesterWallet.verify(complete.hco.is, complete.hco.tx, requesterWallet.publicKey), 'submitter signature remains valid');
 });
 
 test('ApplyStateMessageBuilder complete set epoch operation (seo)', async t => {
