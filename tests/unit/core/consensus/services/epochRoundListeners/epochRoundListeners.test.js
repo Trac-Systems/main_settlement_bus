@@ -1,6 +1,7 @@
 import test from 'brittle';
 import sinon from 'sinon';
 import { CustomEventType } from '../../../../../../src/utils/constants.js';
+import { uint64ToBuffer } from '../../../../../../src/utils/buffer.js';
 import { EPOCH_EVENTS, EPOCH_STATES } from '../../../../../../src/core/consensus/services/EpochStateMachine.js';
 import { EpochRoundListeners } from '../../../../../../src/core/consensus/services/EpochRoundListeners.js';
 import { CONFIG, drainMicrotasks, makeEmitter } from '../epochCoordinatorTestHelpers.js';
@@ -174,7 +175,7 @@ test('target EPOCH_CREATED from self is handled by the append listener without g
     machine.transition(EPOCH_STATES.APPEND_SET_EPOCH);
 
     await state.emit(CustomEventType.EPOCH_CREATED, {
-        epoch: 6n,
+        epoch: uint64ToBuffer(6n),
         proposerAddress: wallet.address,
     });
 
@@ -189,13 +190,13 @@ test('append listener maps peer targets and ignores unrelated epochs', async t =
     machine.transition(EPOCH_STATES.APPEND_SET_EPOCH);
 
     await state.emit(CustomEventType.EPOCH_CREATED, {
-        epoch: 99n,
+        epoch: uint64ToBuffer(99n),
         proposerAddress: 'trac1peer',
     });
     t.alike(machine.sentEvents, []);
 
     await state.emit(CustomEventType.EPOCH_CREATED, {
-        epoch: 6n,
+        epoch: uint64ToBuffer(6n),
         proposerAddress: 'trac1peer',
     });
     t.alike(machine.sentEvents, [EPOCH_EVENTS.TARGET_EPOCH_ALREADY_SIGNED]);

@@ -497,7 +497,7 @@ test('append completion waits for the target EPOCH_CREATED event', async t => {
     t.absent(next.called);
 
     await context.state.emit(CustomEventType.EPOCH_CREATED, {
-        epoch: 6n,
+        epoch: uint64ToBuffer(6n),
         proposerAddress: context.wallet.address,
     });
     await drainMicrotasks();
@@ -515,7 +515,7 @@ test('peer EPOCH_CREATED in append state reloads without repeating work', async 
     t.ok(context.operations.appendSetEpoch.calledOnce);
 
     await context.state.emit(CustomEventType.EPOCH_CREATED, {
-        epoch: 6n,
+        epoch: uint64ToBuffer(6n),
         proposerAddress: 'trac1peer',
     });
     await flush();

@@ -1,4 +1,5 @@
-import { CustomEventType } from '../../../utils/constants.js';
+import b4a from 'b4a';
+import { CustomEventType, EPOCH_BYTE_LENGTH } from '../../../utils/constants.js';
 import { EPOCH_EVENTS, EPOCH_STATES } from './EpochStateMachine.js';
 
 /**
@@ -110,8 +111,14 @@ export class EpochRoundListeners {
                 stopAppendListener = listenTo(
                     this.#state,
                     CustomEventType.EPOCH_CREATED,
-                    ({ epoch, proposerAddress }) => {
-                        if (!this.#isRoundActive() || epoch !== targetEpoch) return;
+                    (event) => {
+                        if (!this.#isRoundActive()) return;
+
+                        const { epoch, proposerAddress } = event ?? {};
+                        if (!b4a.isBuffer(epoch) || epoch.length !== EPOCH_BYTE_LENGTH) return;
+
+                        const eventEpoch = epoch.readBigUInt64BE(0);
+                        if (eventEpoch !== targetEpoch) return;
                         this.#machine.send(
                             proposerAddress === this.#wallet.address
                                 ? EPOCH_EVENTS.APPEND_ACCEPTED

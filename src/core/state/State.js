@@ -3770,7 +3770,7 @@ class State extends ReadyResource {
             console.info(`Epoch ${nextEpochStr} committed. proposer:approvals - ${proposerAddress}:${op.seo.app.length + 1}`); // We should account for the proposer approval too, hence the '+ 1' at the end
         }
 
-        this.#emitEvent(CustomEventType.EPOCH_CREATED, { epoch: nextEpochStr, proposerAddress }); // notify epoch committed
+        this.#emitEvent(CustomEventType.EPOCH_CREATED, { epoch: b4a.from(nextEpochBuffer), proposerAddress }); // notify epoch committed
         return Status.SUCCESS;
     }
 
