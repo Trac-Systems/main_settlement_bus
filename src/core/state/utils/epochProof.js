@@ -13,7 +13,7 @@ import {
     safeWriteUInt32BE,
 } from '../../../utils/buffer.js';
 import { safeDecodeVersionedConsensusConfig } from './consensusConfig.js';
-import { safeEncodeEpochProof } from '../../../codecs/apply/applyOperationCodec.js';
+import { safeEncodeEpochProofV1 } from '../../../codecs/apply/applyOperationCodec.js';
 import { safeEncodeProofProposal } from '../../../codecs/consensus/v1/consensusV1OperationCodec.js';
 import { addressToBuffer } from './address.js';
 
@@ -96,7 +96,7 @@ async function createVdfV1GenesisEpochProof(config, proposerAddress, configData)
         app: []
     }
 
-    const encodedEpochProof = safeEncodeEpochProof(genesisEpochProof);
+    const encodedEpochProof = safeEncodeEpochProofV1(genesisEpochProof);
     if (encodedEpochProof.length === 0) {
         return null;
     }

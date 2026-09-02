@@ -503,7 +503,7 @@ test('State.apply SET_GENESIS_EPOCH fails when final epoch proof encoding fails'
     );
     const injected = await result;
 
-    t.ok(injected, 'safeEncodeEpochProof failure was injected');
+    t.ok(injected, 'safeEncodeEpochProofV1 failure was injected');
     await assertSetGenesisEpochFailureState(t, context, payload, { skipSync: true });
     assertLog(t, logs, 'Could not initialize genesis epoch');
 });

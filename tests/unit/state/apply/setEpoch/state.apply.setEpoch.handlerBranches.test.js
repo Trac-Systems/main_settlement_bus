@@ -4,7 +4,7 @@ import tracCryptoApi from 'trac-crypto-api';
 import { CustomEventType, EntryType } from '../../../../../src/utils/constants.js';
 import {
     encodeApplyOperation,
-    safeDecodeEpochProof
+    safeDecodeEpochProofV1
 } from '../../../../../src/codecs/apply/applyOperationCodec.js';
 import {
     VDF_DIFFICULTY,
@@ -102,7 +102,7 @@ test('State.apply SET_EPOCH success changes exactly the pointer, forward hash, a
     t.ok(b4a.equals(reverseEntry?.value, expected.encodedProof), 'reverse record stores the exact submitted proof and approvals');
     t.ok(b4a.equals(await tracCryptoApi.hash.blake3Safe(reverseEntry.value), forwardEntry.value), 'forward and reverse records are cryptographically linked');
 
-    const decodedStoredProof = safeDecodeEpochProof(reverseEntry.value);
+    const decodedStoredProof = safeDecodeEpochProofV1(reverseEntry.value);
     const submittedOperation = decodeSetEpochPayload(payload);
     t.ok(decodedStoredProof, 'stored epoch proof decodes');
     t.ok(b4a.equals(decodedStoredProof.pd, submittedOperation.seo.pd), 'stored proof data is byte-exact');
