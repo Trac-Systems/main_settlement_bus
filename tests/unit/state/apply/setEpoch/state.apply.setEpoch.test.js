@@ -9,7 +9,7 @@ import {
     setupSetEpochScenario
 } from './setEpochScenarioHelpers.js';
 import { EntryType, CustomEventType } from '../../../../../src/utils/constants.js';
-import { safeDecodeEpochProof } from '../../../../../src/codecs/apply/applyOperationCodec.js';
+import { safeDecodeEpochProofV1 } from '../../../../../src/codecs/apply/applyOperationCodec.js';
 import { uint64ToBuffer } from '../../../../../src/utils/buffer.js';
 
 test('State.apply SET_EPOCH: proposer alone satisfies quorum when it is the sole indexer, and commits the epoch', async t => {
@@ -35,7 +35,7 @@ test('State.apply SET_EPOCH: proposer alone satisfies quorum when it is the sole
     const storedProof = await adminNode.base.view.get(EntryType.EPOCH_HASH + epochHash.toString('hex'));
     t.ok(storedProof, 'epoch proof is stored under its hash');
 
-    const decodedStoredProof = safeDecodeEpochProof(storedProof.value);
+    const decodedStoredProof = safeDecodeEpochProofV1(storedProof.value);
     const decodedPayload = decodeSetEpochPayload(payload);
     t.ok(decodedStoredProof, 'stored epoch proof decodes');
     t.ok(b4a.equals(decodedStoredProof.pd, decodedPayload.seo.pd), 'stored proof data matches the submitted proposal');

@@ -32,7 +32,7 @@ import {
     safeDecodeApplyOperation,
     safeDecodeConsensusConfig,
     safeEncodeConsensusConfig,
-    safeEncodeEpochProof
+    safeEncodeEpochProofV1
 } from '../../codecs/apply/applyOperationCodec.js';
 import {
     createMessage,
@@ -3747,7 +3747,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         }
 
-        const encodedEpochProof = safeEncodeEpochProof({ pd: op.seo.pd, app: op.seo.app });
+        const encodedEpochProof = safeEncodeEpochProofV1({ pd: op.seo.pd, app: op.seo.app });
         if (encodedEpochProof.length === 0) {
             this.#safeLogApply(OperationType.SET_EPOCH, "Failed to encode epoch proof.", node.from.key)
             return Status.FAILURE;

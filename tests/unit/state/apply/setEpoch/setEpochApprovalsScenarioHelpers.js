@@ -3,7 +3,7 @@ import tracCryptoApi from 'trac-crypto-api';
 import { createWallet, eventFlush } from '../../../../helpers/autobaseTestHelpers.js';
 import {
     encodeApplyOperation,
-    safeEncodeEpochProof
+    safeEncodeEpochProofV1
 } from '../../../../../src/codecs/apply/applyOperationCodec.js';
 import {
     encodeProofProposalApproval,
@@ -114,7 +114,7 @@ export function tamperApprovalSignature(payload, approvalIndex = 0) {
 
 export async function assertEpochUnchangedAfterRejectedApprovals(t, base, payload, description) {
     const operation = decodeSetEpochPayload(payload);
-    const encodedEpochProof = safeEncodeEpochProof({
+    const encodedEpochProof = safeEncodeEpochProofV1({
         pd: operation.seo.pd,
         app: operation.seo.app
     });

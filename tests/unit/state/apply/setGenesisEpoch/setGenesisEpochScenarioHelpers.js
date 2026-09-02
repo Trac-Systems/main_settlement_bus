@@ -10,7 +10,7 @@ import {
 import { applyStateMessageFactory } from '../../../../../src/messages/state/applyStateMessageFactory.js';
 import {
     safeDecodeApplyOperation,
-    safeDecodeEpochProof,
+    safeDecodeEpochProofV1,
     safeEncodeApplyOperation,
     safeEncodeConsensusConfig
 } from '../../../../../src/codecs/apply/applyOperationCodec.js';
@@ -193,7 +193,7 @@ export async function assertGenesisInitialized(
         'epoch zero points to the stored genesis proof'
     );
 
-    const epochProof = safeDecodeEpochProof(epochProofEntry.value);
+    const epochProof = safeDecodeEpochProofV1(epochProofEntry.value);
     t.ok(epochProof, 'stored genesis epoch proof decodes');
     if (!epochProof) return;
     t.is(epochProof.app.length, 0, 'genesis epoch proof has no approvals');
@@ -507,7 +507,7 @@ function buffersHaveSameBytes(left, right) {
 }
 
 function isEncodedGenesisEpochProof(value) {
-    const epochProof = safeDecodeEpochProof(value);
+    const epochProof = safeDecodeEpochProofV1(value);
     if (!epochProof || epochProof.app.length !== 0) return false;
 
     const proofProposal = safeDecodeProofProposal(epochProof.pd);
