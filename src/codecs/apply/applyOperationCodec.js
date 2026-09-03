@@ -1,7 +1,9 @@
 import b4a from 'b4a';
 import applyOperationsGenerated from './applyOperations.generated.cjs';
+import consensusV1Generated from '../consensus/v1/consensusV1.generated.cjs';
 import _ from 'lodash';
-const { Operation, SetEpochOperation, ConsensusControlOperation } = applyOperationsGenerated.apply.operations;
+const { Operation, ConsensusControlOperation } = applyOperationsGenerated.apply.operations;
+const { EpochProofV1 } = consensusV1Generated.common.consensus;
 
 // Options for converting protobuf messages to plain objects, ensuring that bytes are returned as Buffers and enums as numbers.
 const APPLY_TO_OBJECT_OPTIONS = Object.freeze({
@@ -120,28 +122,28 @@ const validateEpochProofV1 = (payload) => {
 }
 
 /**
- * Encodes an EpochProofV1 using the SetEpochOperation wire format.
+ * Encodes an EpochProofV1.
  *
  * @param {{pd: Buffer, app: Buffer[]}} payload - Epoch proof payload.
  * @returns {Buffer} Encoded EpochProofV1.
  */
 export const encodeEpochProofV1 = (payload) => {
-    const setEpochPayload = validateEpochProofV1(payload);
-    const error = SetEpochOperation.verify(setEpochPayload);
+    const epochProof = validateEpochProofV1(payload);
+    const error = EpochProofV1.verify(epochProof);
     if (error) throw new Error(error);
-    return b4a.from(SetEpochOperation.encode(setEpochPayload).finish());
+    return b4a.from(EpochProofV1.encode(epochProof).finish());
 }
 
 /**
- * Decodes an EpochProofV1 encoded with the SetEpochOperation wire format.
+ * Decodes an EpochProofV1.
  *
  * @param {Buffer} payload - Encoded EpochProofV1 buffer.
  * @returns {{pd: Buffer, app: Buffer[]}} Decoded EpochProofV1.
  */
 export const decodeEpochProofV1 = (payload) => {
     return validateEpochProofV1(
-        SetEpochOperation.toObject(
-            SetEpochOperation.decode(payload),
+        EpochProofV1.toObject(
+            EpochProofV1.decode(payload),
             APPLY_TO_OBJECT_OPTIONS
         )
     );

@@ -1989,6 +1989,275 @@ $root.common = (function() {
         return v1;
     })();
 
+    common.consensus = (function() {
+
+        /**
+         * Namespace consensus.
+         * @memberof common
+         * @namespace
+         */
+        var consensus = {};
+
+        consensus.EpochProofV1 = (function() {
+
+            /**
+             * Properties of an EpochProofV1.
+             * @memberof common.consensus
+             * @interface IEpochProofV1
+             * @property {Uint8Array|null} [pd] EpochProofV1 pd
+             * @property {Array.<Uint8Array>|null} [app] EpochProofV1 app
+             */
+
+            /**
+             * Constructs a new EpochProofV1.
+             * @memberof common.consensus
+             * @classdesc Represents an EpochProofV1.
+             * @implements IEpochProofV1
+             * @constructor
+             * @param {common.consensus.IEpochProofV1=} [properties] Properties to set
+             */
+            function EpochProofV1(properties) {
+                this.app = [];
+                if (properties)
+                    for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
+                        if (properties[keys[i]] != null)
+                            this[keys[i]] = properties[keys[i]];
+            }
+
+            /**
+             * EpochProofV1 pd.
+             * @member {Uint8Array} pd
+             * @memberof common.consensus.EpochProofV1
+             * @instance
+             */
+            EpochProofV1.prototype.pd = $util.newBuffer([]);
+
+            /**
+             * EpochProofV1 app.
+             * @member {Array.<Uint8Array>} app
+             * @memberof common.consensus.EpochProofV1
+             * @instance
+             */
+            EpochProofV1.prototype.app = $util.emptyArray;
+
+            /**
+             * Creates a new EpochProofV1 instance using the specified properties.
+             * @function create
+             * @memberof common.consensus.EpochProofV1
+             * @static
+             * @param {common.consensus.IEpochProofV1=} [properties] Properties to set
+             * @returns {common.consensus.EpochProofV1} EpochProofV1 instance
+             */
+            EpochProofV1.create = function create(properties) {
+                return new EpochProofV1(properties);
+            };
+
+            /**
+             * Encodes the specified EpochProofV1 message. Does not implicitly {@link common.consensus.EpochProofV1.verify|verify} messages.
+             * @function encode
+             * @memberof common.consensus.EpochProofV1
+             * @static
+             * @param {common.consensus.IEpochProofV1} message EpochProofV1 message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            EpochProofV1.encode = function encode(message, writer) {
+                if (!writer)
+                    writer = $Writer.create();
+                if (message.pd != null && Object.hasOwnProperty.call(message, "pd"))
+                    writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.pd);
+                if (message.app != null && message.app.length)
+                    for (var i = 0; i < message.app.length; ++i)
+                        writer.uint32(/* id 2, wireType 2 =*/18).bytes(message.app[i]);
+                return writer;
+            };
+
+            /**
+             * Encodes the specified EpochProofV1 message, length delimited. Does not implicitly {@link common.consensus.EpochProofV1.verify|verify} messages.
+             * @function encodeDelimited
+             * @memberof common.consensus.EpochProofV1
+             * @static
+             * @param {common.consensus.IEpochProofV1} message EpochProofV1 message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            EpochProofV1.encodeDelimited = function encodeDelimited(message, writer) {
+                return this.encode(message, writer).ldelim();
+            };
+
+            /**
+             * Decodes an EpochProofV1 message from the specified reader or buffer.
+             * @function decode
+             * @memberof common.consensus.EpochProofV1
+             * @static
+             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {number} [length] Message length if known beforehand
+             * @returns {common.consensus.EpochProofV1} EpochProofV1
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            EpochProofV1.decode = function decode(reader, length, error) {
+                if (!(reader instanceof $Reader))
+                    reader = $Reader.create(reader);
+                var end = length === undefined ? reader.len : reader.pos + length, message = new $root.common.consensus.EpochProofV1();
+                while (reader.pos < end) {
+                    var tag = reader.uint32();
+                    if (tag === error)
+                        break;
+                    switch (tag >>> 3) {
+                    case 1: {
+                            message.pd = reader.bytes();
+                            break;
+                        }
+                    case 2: {
+                            if (!(message.app && message.app.length))
+                                message.app = [];
+                            message.app.push(reader.bytes());
+                            break;
+                        }
+                    default:
+                        reader.skipType(tag & 7);
+                        break;
+                    }
+                }
+                return message;
+            };
+
+            /**
+             * Decodes an EpochProofV1 message from the specified reader or buffer, length delimited.
+             * @function decodeDelimited
+             * @memberof common.consensus.EpochProofV1
+             * @static
+             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @returns {common.consensus.EpochProofV1} EpochProofV1
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            EpochProofV1.decodeDelimited = function decodeDelimited(reader) {
+                if (!(reader instanceof $Reader))
+                    reader = new $Reader(reader);
+                return this.decode(reader, reader.uint32());
+            };
+
+            /**
+             * Verifies an EpochProofV1 message.
+             * @function verify
+             * @memberof common.consensus.EpochProofV1
+             * @static
+             * @param {Object.<string,*>} message Plain object to verify
+             * @returns {string|null} `null` if valid, otherwise the reason why it is not
+             */
+            EpochProofV1.verify = function verify(message) {
+                if (typeof message !== "object" || message === null)
+                    return "object expected";
+                if (message.pd != null && message.hasOwnProperty("pd"))
+                    if (!(message.pd && typeof message.pd.length === "number" || $util.isString(message.pd)))
+                        return "pd: buffer expected";
+                if (message.app != null && message.hasOwnProperty("app")) {
+                    if (!Array.isArray(message.app))
+                        return "app: array expected";
+                    for (var i = 0; i < message.app.length; ++i)
+                        if (!(message.app[i] && typeof message.app[i].length === "number" || $util.isString(message.app[i])))
+                            return "app: buffer[] expected";
+                }
+                return null;
+            };
+
+            /**
+             * Creates an EpochProofV1 message from a plain object. Also converts values to their respective internal types.
+             * @function fromObject
+             * @memberof common.consensus.EpochProofV1
+             * @static
+             * @param {Object.<string,*>} object Plain object
+             * @returns {common.consensus.EpochProofV1} EpochProofV1
+             */
+            EpochProofV1.fromObject = function fromObject(object) {
+                if (object instanceof $root.common.consensus.EpochProofV1)
+                    return object;
+                var message = new $root.common.consensus.EpochProofV1();
+                if (object.pd != null)
+                    if (typeof object.pd === "string")
+                        $util.base64.decode(object.pd, message.pd = $util.newBuffer($util.base64.length(object.pd)), 0);
+                    else if (object.pd.length >= 0)
+                        message.pd = object.pd;
+                if (object.app) {
+                    if (!Array.isArray(object.app))
+                        throw TypeError(".common.consensus.EpochProofV1.app: array expected");
+                    message.app = [];
+                    for (var i = 0; i < object.app.length; ++i)
+                        if (typeof object.app[i] === "string")
+                            $util.base64.decode(object.app[i], message.app[i] = $util.newBuffer($util.base64.length(object.app[i])), 0);
+                        else if (object.app[i].length >= 0)
+                            message.app[i] = object.app[i];
+                }
+                return message;
+            };
+
+            /**
+             * Creates a plain object from an EpochProofV1 message. Also converts values to other types if specified.
+             * @function toObject
+             * @memberof common.consensus.EpochProofV1
+             * @static
+             * @param {common.consensus.EpochProofV1} message EpochProofV1
+             * @param {$protobuf.IConversionOptions} [options] Conversion options
+             * @returns {Object.<string,*>} Plain object
+             */
+            EpochProofV1.toObject = function toObject(message, options) {
+                if (!options)
+                    options = {};
+                var object = {};
+                if (options.arrays || options.defaults)
+                    object.app = [];
+                if (options.defaults)
+                    if (options.bytes === String)
+                        object.pd = "";
+                    else {
+                        object.pd = [];
+                        if (options.bytes !== Array)
+                            object.pd = $util.newBuffer(object.pd);
+                    }
+                if (message.pd != null && message.hasOwnProperty("pd"))
+                    object.pd = options.bytes === String ? $util.base64.encode(message.pd, 0, message.pd.length) : options.bytes === Array ? Array.prototype.slice.call(message.pd) : message.pd;
+                if (message.app && message.app.length) {
+                    object.app = [];
+                    for (var j = 0; j < message.app.length; ++j)
+                        object.app[j] = options.bytes === String ? $util.base64.encode(message.app[j], 0, message.app[j].length) : options.bytes === Array ? Array.prototype.slice.call(message.app[j]) : message.app[j];
+                }
+                return object;
+            };
+
+            /**
+             * Converts this EpochProofV1 to JSON.
+             * @function toJSON
+             * @memberof common.consensus.EpochProofV1
+             * @instance
+             * @returns {Object.<string,*>} JSON object
+             */
+            EpochProofV1.prototype.toJSON = function toJSON() {
+                return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
+            };
+
+            /**
+             * Gets the default type url for EpochProofV1
+             * @function getTypeUrl
+             * @memberof common.consensus.EpochProofV1
+             * @static
+             * @param {string} [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
+             * @returns {string} The default type url
+             */
+            EpochProofV1.getTypeUrl = function getTypeUrl(typeUrlPrefix) {
+                if (typeUrlPrefix === undefined) {
+                    typeUrlPrefix = "type.googleapis.com";
+                }
+                return typeUrlPrefix + "/common.consensus.EpochProofV1";
+            };
+
+            return EpochProofV1;
+        })();
+
+        return consensus;
+    })();
+
     return common;
 })();
 
