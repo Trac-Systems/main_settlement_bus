@@ -1,7 +1,10 @@
 import b4a from 'b4a';
 import tracCryptoApi from 'trac-crypto-api';
 import { CustomEventType, EntryType } from '../../../../../src/utils/constants.js';
-import { safeEncodeEpochProof } from '../../../../../src/codecs/apply/applyOperationCodec.js';
+import {
+    safeDecodeEpochProofV1,
+    safeEncodeEpochProofV1
+} from '../../../../../src/codecs/apply/applyOperationCodec.js';
 import {
     appendAndUpdate,
     decodeSetEpochPayload
@@ -56,10 +59,11 @@ export async function applyRejectedEpoch(t, context, payload, label) {
 
 export async function expectedEpochWrites(payload, epoch = 1n) {
     const operation = decodeSetEpochPayload(payload);
-    const encodedProof = safeEncodeEpochProof({
-        pd: operation.seo.pd,
-        app: operation.seo.app
-    });
+    const epochProof = safeDecodeEpochProofV1(operation.seo.data);
+    if (epochProof === null) {
+        throw new Error('SET_EPOCH test fixture contains invalid epoch data.');
+    }
+    const encodedProof = safeEncodeEpochProofV1(epochProof);
     const proofHash = await tracCryptoApi.hash.blake3Safe(encodedProof);
     const currentEpoch = b4a.alloc(8);
     currentEpoch.writeBigUInt64BE(epoch);

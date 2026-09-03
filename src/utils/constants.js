@@ -219,7 +219,6 @@ export const UINT16_MAX = 0xFFFF;
 export const UINT32_MAX = 0xFFFFFFFF;
 
 // consensus
-export const PROTOCOL_VERSION_BYTE_LENGTH = 1; // 1 BYTE 0-255
 export const NETWORK_ID_BYTE_LENGTH = 2; // 2 BYTES - UINT16
 export const EPOCH_BYTE_LENGTH = 8; // 8 BYTES - UINT64
 export const VDF_DIFFICULTY_SIZE = 4; // 4 BYTES - UINT32
@@ -228,6 +227,7 @@ export const MAX_VDF_DIFFICULTY = UINT32_MAX;
 export const CONSENSUS_CONFIG_INDEX_SIZE = 4 // 4 BYTES - UINT32
 export const CONSENSUS_CONFIG_SCHEMA_VERSION_BYTE_LENGTH = 1;
 export const CONSENSUS_CONFIG_DATA_MAX_SIZE = 3072; // 3 KiB
+export const SET_EPOCH_DATA_MAX_SIZE = 3072; // 3 KiB
 export const VDF_PROOF_BYTE_LENGTHS = Object.freeze({
     1024: 260,
     2048: 516,

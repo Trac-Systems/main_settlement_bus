@@ -31,8 +31,9 @@ import {
     decodeConsensusConfig,
     safeDecodeApplyOperation,
     safeDecodeConsensusConfig,
+    safeDecodeEpochProofV1,
     safeEncodeConsensusConfig,
-    safeEncodeEpochProof
+    safeEncodeEpochProofV1
 } from '../../codecs/apply/applyOperationCodec.js';
 import {
     createMessage,
@@ -46,6 +47,7 @@ import {
     safeToUIntString,
     safeWriteUInt32BE,
     uint16ToBuffer,
+    uint8ToBuffer,
     ZERO_WK
 } from '../../utils/buffer.js';
 import {
@@ -3554,7 +3556,29 @@ class State extends ReadyResource {
         if (!this.#stateValidationSchema.validateSetEpochOperation(op)) {
             this.#safeLogApply(OperationType.SET_EPOCH, "Contract schema validation failed.", node.from.key)
             return Status.FAILURE;
-        };
+        }
+
+        const epochSchemaVersion = safeReadUint8(op.seo.sv);
+        let epochProof;
+
+        switch (epochSchemaVersion) {
+            case ConsensusConfigSchemaVersion.VDF_V1:
+                epochProof = safeDecodeEpochProofV1(op.seo.data);
+                if (epochProof === null) {
+                    this.#safeLogApply(OperationType.SET_EPOCH, "Failed to decode epoch data.", node.from.key)
+                    return Status.FAILURE;
+                }
+                if (!this.#stateValidationSchema.validateEpochProofV1(epochProof)) {
+                    this.#safeLogApply(OperationType.SET_EPOCH, "Epoch data schema validation failed.", node.from.key)
+                    return Status.FAILURE;
+                }
+                break;
+            default:
+                this.#safeLogApply(OperationType.SET_EPOCH, "Unsupported epoch schema version.", node.from.key)
+                return Status.FAILURE;
+        }
+
+        const { pd: encodedProofProposal, app: encodedApprovals } = epochProof;
 
         const requesterAddressBuffer = op.address;
         const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer, this.#config.addressPrefix);
@@ -3570,7 +3594,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const proofProposal = safeDecodeProofProposal(op.seo.pd);
+        const proofProposal = safeDecodeProofProposal(encodedProofProposal);
         if (proofProposal === null) {
             this.#safeLogApply(OperationType.SET_EPOCH, "Failed to decode proof proposal.", node.from.key)
             return Status.FAILURE;
@@ -3606,11 +3630,6 @@ class State extends ReadyResource {
 
         if (epochIndexCompare < 0) { // proposedEpoch > nextEpoch
             this.#safeLogApply(OperationType.SET_EPOCH, `Unexpected epoch. Proposal must target epoch ${nextEpochStr} but got ${safeToUIntString(proposedEpochBuffer)}.`, node.from.key)
-            return Status.FAILURE;
-        }
-
-        if (proofProposal.protocol_version[0] !== ConsensusProtocolVersion.V1) {
-            this.#safeLogApply(OperationType.SET_EPOCH, "Unsupported proof proposal protocol version.", node.from.key)
             return Status.FAILURE;
         }
 
@@ -3652,9 +3671,13 @@ class State extends ReadyResource {
             this.#safeLogApply(OperationType.SET_EPOCH, "Failed to decode consensus config.", node.from.key)
             return Status.FAILURE;
         }
-        const schemaVersion = safeReadUint8(consensusConfig.sv);
-        if (schemaVersion !== ConsensusConfigSchemaVersion.VDF_V1) {
+        const consensusSchemaVersion = safeReadUint8(consensusConfig.sv);
+        if (consensusSchemaVersion !== ConsensusConfigSchemaVersion.VDF_V1) {
             this.#safeLogApply(OperationType.SET_EPOCH, "Unsupported consensus config schema version.", node.from.key)
+            return Status.FAILURE;
+        }
+        if (consensusSchemaVersion !== epochSchemaVersion) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Epoch schema version does not match the current consensus config.", node.from.key)
             return Status.FAILURE;
         }
 
@@ -3690,7 +3713,7 @@ class State extends ReadyResource {
 
         const indexerCount = indexers.length;
         const quorumThreshold = indexerCount <= 2 ? 1 : Math.floor(indexerCount / 2) + 1;
-        const approvalCount = 1 + op.seo.app.length; // proposer plus submitted approvals (proposer's own verified signature counts as one approval)
+        const approvalCount = 1 + encodedApprovals.length; // proposer plus submitted approvals (proposer's own verified signature counts as one approval)
 
         if (approvalCount < quorumThreshold) {
             this.#safeLogApply(OperationType.SET_EPOCH, `Insufficient submitted approvals for quorum. Required ${quorumThreshold}, got ${approvalCount}.`, node.from.key)
@@ -3698,7 +3721,7 @@ class State extends ReadyResource {
         }
 
         const challengeData = createMessage(
-            proofProposal.protocol_version,
+            uint8ToBuffer(ConsensusProtocolVersion.V1),
             proofProposal.network_id,
             proofProposal.epoch,
             proofProposal.previous_epoch_record_hash,
@@ -3720,7 +3743,7 @@ class State extends ReadyResource {
         }
 
         const approvalErrorMessage = await this.#validateEpochApprovals(
-            op.seo.app,
+            encodedApprovals,
             indexerAddresses,
             proposerAddress,
             challengeData,
@@ -3747,7 +3770,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         }
 
-        const encodedEpochProof = safeEncodeEpochProof({ pd: op.seo.pd, app: op.seo.app });
+        const encodedEpochProof = safeEncodeEpochProofV1(epochProof);
         if (encodedEpochProof.length === 0) {
             this.#safeLogApply(OperationType.SET_EPOCH, "Failed to encode epoch proof.", node.from.key)
             return Status.FAILURE;
@@ -3764,7 +3787,7 @@ class State extends ReadyResource {
         await batch.put(EntryType.EPOCH_HASH + epochProofHash.toString('hex'), encodedEpochProof);
 
         if (this.#config.enableTxApplyLogs) {
-            console.info(`Epoch ${nextEpochStr} committed. proposer:approvals - ${proposerAddress}:${op.seo.app.length + 1}`); // We should account for the proposer approval too, hence the '+ 1' at the end
+            console.info(`Epoch ${nextEpochStr} committed. proposer:approvals - ${proposerAddress}:${encodedApprovals.length + 1}`); // We should account for the proposer approval too, hence the '+ 1' at the end
         }
 
         this.#emitEvent(CustomEventType.EPOCH_CREATED, { epoch: b4a.from(nextEpochBuffer), proposerAddress }); // notify epoch committed

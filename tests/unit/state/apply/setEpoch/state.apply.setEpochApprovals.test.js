@@ -15,8 +15,8 @@ import {
     tamperApprovalSignature
 } from './setEpochApprovalsScenarioHelpers.js';
 import {
-    safeDecodeEpochProof,
-    safeEncodeEpochProof
+    safeDecodeEpochProofV1,
+    safeEncodeEpochProofV1
 } from '../../../../../src/codecs/apply/applyOperationCodec.js';
 import { safeDecodeProofProposal } from '../../../../../src/codecs/consensus/v1/consensusV1OperationCodec.js';
 import { EntryType } from '../../../../../src/utils/constants.js';
@@ -36,7 +36,7 @@ test('State.apply SET_EPOCH approvals: accepts exact quorum from five indexers',
     const stored = await context.adminBootstrap.base.view.get(
         EntryType.EPOCH_HASH + epochHash.toString('hex')
     );
-    const proof = safeDecodeEpochProof(stored?.value);
+    const proof = safeDecodeEpochProofV1(stored?.value);
     t.ok(proof, 'exact-quorum approvals store a decodable epoch proof');
     t.is(proof?.app.length, 2, 'stored proof contains exactly the two required external approvals');
     const proofProposal = safeDecodeProofProposal(proof?.pd);
@@ -72,7 +72,7 @@ test('State.apply SET_EPOCH approvals: accepts excess valid approvals and stores
     const receivedOrder = [indexers[4], indexers[2], indexers[3], indexers[1]];
     const payload = await buildSetEpochPayload(context, { approverNodes: receivedOrder });
     const submittedOperation = decodeSetEpochPayload(payload);
-    const submittedProof = safeEncodeEpochProof({
+    const submittedProof = safeEncodeEpochProofV1({
         pd: submittedOperation.seo.pd,
         app: submittedOperation.seo.app
     });
@@ -90,7 +90,7 @@ test('State.apply SET_EPOCH approvals: accepts excess valid approvals and stores
         'stored epoch proof is byte-for-byte identical to the received proposal and approval order'
     );
 
-    const decodedStoredProof = safeDecodeEpochProof(stored.value);
+    const decodedStoredProof = safeDecodeEpochProofV1(stored.value);
     t.is(decodedStoredProof?.app.length, receivedOrder.length, 'all excess approvals are retained');
     for (const [index, submittedApproval] of submittedOperation.seo.app.entries()) {
         t.ok(

@@ -10,7 +10,7 @@ import {
 import { applyStateMessageFactory } from '../../../../../src/messages/state/applyStateMessageFactory.js';
 import {
     safeDecodeApplyOperation,
-    safeDecodeEpochProof,
+    safeDecodeEpochProofV1,
     safeEncodeApplyOperation,
     safeEncodeConsensusConfig
 } from '../../../../../src/codecs/apply/applyOperationCodec.js';
@@ -21,7 +21,6 @@ import {
 import { safeDecodeProofProposal } from '../../../../../src/codecs/consensus/v1/consensusV1OperationCodec.js';
 import {
     AUTOBASE_VALUE_ENCODING,
-    ConsensusProtocolVersion,
     EntryType,
     HASH_BYTE_LENGTH,
     SIGNATURE_BYTE_LENGTH,
@@ -29,7 +28,6 @@ import {
 } from '../../../../../src/utils/constants.js';
 import {
     safeReadUint32BE,
-    safeUint8ToBuffer,
     uint16ToBuffer,
     uint32ToBuffer
 } from '../../../../../src/utils/buffer.js';
@@ -193,7 +191,7 @@ export async function assertGenesisInitialized(
         'epoch zero points to the stored genesis proof'
     );
 
-    const epochProof = safeDecodeEpochProof(epochProofEntry.value);
+    const epochProof = safeDecodeEpochProofV1(epochProofEntry.value);
     t.ok(epochProof, 'stored genesis epoch proof decodes');
     if (!epochProof) return;
     t.is(epochProof.app.length, 0, 'genesis epoch proof has no approvals');
@@ -202,13 +200,6 @@ export async function assertGenesisInitialized(
     t.ok(proofProposal, 'stored genesis proof proposal decodes');
     if (!proofProposal) return;
 
-    t.ok(
-        b4a.equals(
-            proofProposal.protocol_version,
-            safeUint8ToBuffer(ConsensusProtocolVersion.V1)
-        ),
-        'genesis proof uses consensus protocol version 1'
-    );
     t.ok(
         b4a.equals(proofProposal.network_id, uint16ToBuffer(config.networkId)),
         'genesis proof stores the configured network id'
@@ -507,7 +498,7 @@ function buffersHaveSameBytes(left, right) {
 }
 
 function isEncodedGenesisEpochProof(value) {
-    const epochProof = safeDecodeEpochProof(value);
+    const epochProof = safeDecodeEpochProofV1(value);
     if (!epochProof || epochProof.app.length !== 0) return false;
 
     const proofProposal = safeDecodeProofProposal(epochProof.pd);

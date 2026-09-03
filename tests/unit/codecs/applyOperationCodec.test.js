@@ -2,18 +2,20 @@ import test from 'brittle';
 import b4a from 'b4a';
 
 import applyOperationsGenerated from '../../../src/codecs/apply/applyOperations.generated.cjs';
+import consensusV1Generated from '../../../src/codecs/consensus/v1/consensusV1.generated.cjs';
 import {
-    decodeEpochProof,
-    encodeEpochProof,
+    decodeEpochProofV1,
+    encodeEpochProofV1,
     normalizeIncomingMessage,
-    safeDecodeEpochProof,
+    safeDecodeEpochProofV1,
     safeDecodeApplyOperation,
-    safeEncodeEpochProof,
+    safeEncodeEpochProofV1,
     safeEncodeApplyOperation,
 } from '../../../src/codecs/apply/applyOperationCodec.js';
 import fixtures from '../../fixtures/applyOperation.fixtures.js';
 
-const { Operation, SetEpochOperation } = applyOperationsGenerated.apply.operations;
+const { Operation } = applyOperationsGenerated.apply.operations;
+const { EpochProofV1 } = consensusV1Generated.common.consensus;
 
 const APPLY_TO_OBJECT_OPTIONS = Object.freeze({
     enums: Number,
@@ -44,7 +46,7 @@ const applyPayloads = new Map([
     ['transferPartial', fixtures.validPartialTransferOperation],
     ['balanceInitialization', fixtures.validBalanceInitOperation],
     ['disableInitialization', fixtures.validDisableInitialization],
-    ['setEpoch', fixtures.validSetEpochOperation],
+    ['setEpoch', getValidSetEpochOperation()],
 ]);
 
 const APPLY_PAYLOAD_KEYS = Object.freeze(['txo', 'tro', 'aco', 'cao', 'rao', 'bdo', 'bio', 'seo']);
@@ -113,10 +115,24 @@ const shuffleObject = (obj) => {
     return shuffled;
 }
 
-const getValidEpochProof = () => ({
-    pd: b4a.from(fixtures.validSetEpochOperation.seo.pd),
-    app: fixtures.validSetEpochOperation.seo.app.map(approval => b4a.from(approval))
-});
+function getValidEpochProof() {
+    return {
+        pd: b4a.from(fixtures.validSetEpochOperation.seo.pd),
+        app: fixtures.validSetEpochOperation.seo.app.map(approval => b4a.from(approval))
+    };
+}
+
+function getValidSetEpochOperation() {
+    const epochProof = getValidEpochProof();
+
+    return {
+        ...fixtures.validSetEpochOperation,
+        seo: {
+            sv: b4a.from([0x01]),
+            data: b4a.from(EpochProofV1.encode(epochProof).finish())
+        }
+    };
+}
 
 test('Apply generated codec encodes and decodes operation payloads', t => {
     for (const [key, payload] of applyPayloads) {
@@ -226,55 +242,55 @@ test('normalizeIncomingMessage decodes buffers and JSON buffers', t => {
     t.is(normalizeIncomingMessage({ type: 'nope', data: [] }), null);
 });
 
-test('EpochProof codec encodes and decodes SetEpochOperation wire payload', t => {
+test('EpochProofV1 codec encodes and decodes EpochProofV1 wire payload', t => {
     const epochProof = getValidEpochProof();
-    const encoded = encodeEpochProof(epochProof);
-    const decodedWirePayload = SetEpochOperation.toObject(
-        SetEpochOperation.decode(encoded),
+    const encoded = encodeEpochProofV1(epochProof);
+    const decodedWirePayload = EpochProofV1.toObject(
+        EpochProofV1.decode(encoded),
         APPLY_TO_OBJECT_OPTIONS
     );
-    const decodedEpochProof = decodeEpochProof(encoded);
+    const decodedEpochProof = decodeEpochProofV1(encoded);
 
     t.ok(b4a.isBuffer(encoded) && encoded.length > 0);
     t.alike(decodedWirePayload, epochProof);
     t.alike(decodedEpochProof, epochProof);
 });
 
-test('EpochProof codec rejects non-record payloads', t => {
+test('EpochProofV1 codec rejects non-record payloads', t => {
     t.exception(
-        () => encodeEpochProof([]),
-        /EpochProof payload must be an object/
+        () => encodeEpochProofV1([]),
+        /EpochProofV1 payload must be an object/
     );
 
     t.exception(
-        () => encodeEpochProof(b4a.from([0x01])),
-        /EpochProof payload must be an object/
+        () => encodeEpochProofV1(b4a.from([0x01])),
+        /EpochProofV1 payload must be an object/
     );
 });
 
-test('EpochProof safe helpers encode and decode valid payloads', t => {
+test('EpochProofV1 safe helpers encode and decode valid payloads', t => {
     const epochProof = getValidEpochProof();
-    const encoded = safeEncodeEpochProof(epochProof);
-    const decoded = safeDecodeEpochProof(encoded);
+    const encoded = safeEncodeEpochProofV1(epochProof);
+    const decoded = safeDecodeEpochProofV1(encoded);
 
     t.ok(b4a.isBuffer(encoded) && encoded.length > 0);
     t.alike(decoded, epochProof);
 });
 
-test('EpochProof safe helpers handle invalid payloads', t => {
+test('EpochProofV1 safe helpers handle invalid payloads', t => {
     withConsoleLogMuted(() => {
-        const proofData = b4a.from(fixtures.validSetEpochOperation.seo.pd);
+        const proofData = getValidEpochProof().pd;
 
-        t.is(safeEncodeEpochProof(null).length, 0);
-        t.is(safeEncodeEpochProof({ pd: proofData, app: null }).length, 0);
-        t.is(safeEncodeEpochProof({ pd: b4a.alloc(0), app: [] }).length, 0);
-        t.is(safeEncodeEpochProof({ pd: proofData, app: [b4a.alloc(0)] }).length, 0);
-        t.is(safeEncodeEpochProof({ data: proofData, approvals: [] }).length, 0);
+        t.is(safeEncodeEpochProofV1(null).length, 0);
+        t.is(safeEncodeEpochProofV1({ pd: proofData, app: null }).length, 0);
+        t.is(safeEncodeEpochProofV1({ pd: b4a.alloc(0), app: [] }).length, 0);
+        t.is(safeEncodeEpochProofV1({ pd: proofData, app: [b4a.alloc(0)] }).length, 0);
+        t.is(safeEncodeEpochProofV1({ data: proofData, approvals: [] }).length, 0);
 
-        t.is(safeDecodeEpochProof(null), null);
-        t.is(safeDecodeEpochProof({}), null);
-        t.is(safeDecodeEpochProof('not-a-buffer'), null);
-        t.is(safeDecodeEpochProof(b4a.alloc(0)), null);
-        t.is(safeDecodeEpochProof(b4a.from([0x0F])), null);
+        t.is(safeDecodeEpochProofV1(null), null);
+        t.is(safeDecodeEpochProofV1({}), null);
+        t.is(safeDecodeEpochProofV1('not-a-buffer'), null);
+        t.is(safeDecodeEpochProofV1(b4a.alloc(0)), null);
+        t.is(safeDecodeEpochProofV1(b4a.from([0x0F])), null);
     });
 });

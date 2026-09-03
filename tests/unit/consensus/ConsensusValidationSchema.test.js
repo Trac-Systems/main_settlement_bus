@@ -5,13 +5,12 @@ import ConsensusValidationSchema from '../../../src/core/consensus/v1/validators
 import {V1ConsensusProtocolError} from '../../../src/core/consensus/v1/V1ConsensusProtocolError.js';
 import {
     ConsensusOperationType,
-    ConsensusProtocolVersion,
     ConsensusResultCode,
     NetworkResultCode,
     VDF_DIFFICULTY_SIZE,
     VDF_PROOF_BYTE_LENGTHS
 } from '../../../src/utils/constants.js';
-import {uint8ToBuffer, uint16ToBuffer, uint64ToBuffer} from '../../../src/utils/buffer.js';
+import {uint16ToBuffer, uint64ToBuffer} from '../../../src/utils/buffer.js';
 import {config} from '../../helpers/config.js';
 
 const makeProofProposalPayload = (epoch, proofProposalOverrides = {}) => ({
@@ -19,7 +18,6 @@ const makeProofProposalPayload = (epoch, proofProposalOverrides = {}) => ({
     session_id: 'session',
     timestamp: 1,
     proof_proposal: {
-        protocol_version: uint8ToBuffer(ConsensusProtocolVersion.V1),
         network_id: uint16ToBuffer(0xFFFF),
         epoch,
         previous_epoch_record_hash: b4a.alloc(32, 1),

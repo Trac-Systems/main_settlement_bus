@@ -3,8 +3,9 @@ import b4a from 'b4a';
 import tracCryptoApi from 'trac-crypto-api';
 import { CustomEventType, EntryType } from '../../../../../src/utils/constants.js';
 import {
+    encodeEpochProofV1,
     encodeApplyOperation,
-    safeDecodeEpochProof
+    safeDecodeEpochProofV1
 } from '../../../../../src/codecs/apply/applyOperationCodec.js';
 import {
     VDF_DIFFICULTY,
@@ -32,13 +33,44 @@ test('State.apply SET_EPOCH rejects malformed nested proof bytes without epoch s
     const context = await setupSetEpochScenario(t);
     const payload = await buildSetEpochPayload(context, { approverNodes: [] });
     const operation = decodeSetEpochPayload(payload);
-    operation.seo.pd = b4a.from([0xff]);
+    operation.seo.data = b4a.from([0xff]);
 
     await applyRejectedEpoch(
         t,
         context,
         encodeApplyOperation(operation),
-        'schema-invalid proof data'
+        'undecodable epoch data'
+    );
+});
+
+test('State.apply SET_EPOCH rejects unsupported epoch schema version without epoch side effects', async t => {
+    const context = await setupSetEpochScenario(t);
+    const payload = await buildSetEpochPayload(context, { approverNodes: [] });
+    const operation = decodeSetEpochPayload(payload);
+    operation.seo.sv = b4a.from([0xff]);
+
+    await applyRejectedEpoch(
+        t,
+        context,
+        encodeApplyOperation(operation),
+        'unsupported epoch schema version'
+    );
+});
+
+test('State.apply SET_EPOCH rejects decoded V1 data that fails schema validation', async t => {
+    const context = await setupSetEpochScenario(t);
+    const payload = await buildSetEpochPayload(context, { approverNodes: [] });
+    const operation = decodeSetEpochPayload(payload);
+    operation.seo.data = encodeEpochProofV1({
+        pd: b4a.from([0xff]),
+        app: []
+    });
+
+    await applyRejectedEpoch(
+        t,
+        context,
+        encodeApplyOperation(operation),
+        'schema-invalid V1 epoch data'
     );
 });
 
@@ -102,11 +134,13 @@ test('State.apply SET_EPOCH success changes exactly the pointer, forward hash, a
     t.ok(b4a.equals(reverseEntry?.value, expected.encodedProof), 'reverse record stores the exact submitted proof and approvals');
     t.ok(b4a.equals(await tracCryptoApi.hash.blake3Safe(reverseEntry.value), forwardEntry.value), 'forward and reverse records are cryptographically linked');
 
-    const decodedStoredProof = safeDecodeEpochProof(reverseEntry.value);
+    const decodedStoredProof = safeDecodeEpochProofV1(reverseEntry.value);
     const submittedOperation = decodeSetEpochPayload(payload);
+    const submittedEpochProof = safeDecodeEpochProofV1(submittedOperation.seo.data);
     t.ok(decodedStoredProof, 'stored epoch proof decodes');
-    t.ok(b4a.equals(decodedStoredProof.pd, submittedOperation.seo.pd), 'stored proof data is byte-exact');
-    t.alike(decodedStoredProof.app, submittedOperation.seo.app, 'stored approvals are byte-exact and keep their order');
+    t.ok(submittedEpochProof, 'submitted epoch proof decodes');
+    t.ok(b4a.equals(decodedStoredProof.pd, submittedEpochProof.pd), 'stored proof data is byte-exact');
+    t.alike(decodedStoredProof.app, submittedEpochProof.app, 'stored approvals are byte-exact and keep their order');
     t.is(events.length, 1, 'success emits EPOCH_CREATED once');
 });
 

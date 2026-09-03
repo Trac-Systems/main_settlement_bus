@@ -2,18 +2,16 @@ import b4a from 'b4a';
 
 import {
     ConsensusConfigSchemaVersion,
-    ConsensusProtocolVersion,
     HASH_BYTE_LENGTH,
     SIGNATURE_BYTE_LENGTH,
     VDF_PROOF_BYTE_LENGTHS,
 } from '../../../utils/constants.js';
 import {
-    safeUint8ToBuffer,
     safeUint16ToBuffer,
     safeWriteUInt32BE,
 } from '../../../utils/buffer.js';
 import { safeDecodeVersionedConsensusConfig } from './consensusConfig.js';
-import { safeEncodeEpochProof } from '../../../codecs/apply/applyOperationCodec.js';
+import { safeEncodeEpochProofV1 } from '../../../codecs/apply/applyOperationCodec.js';
 import { safeEncodeProofProposal } from '../../../codecs/consensus/v1/consensusV1OperationCodec.js';
 import { addressToBuffer } from './address.js';
 
@@ -58,14 +56,12 @@ async function createVdfV1GenesisEpochProof(config, proposerAddress, configData)
         return null;
     }
 
-    const protocolVersion = safeUint8ToBuffer(ConsensusProtocolVersion.V1);
     const networkId = safeUint16ToBuffer(config.networkId);
     const difficulty = safeWriteUInt32BE(configData.difficulty);
     const discriminantBitSize = safeUint16ToBuffer(configData.discriminantBitSize);
     const proofByteLength = VDF_PROOF_BYTE_LENGTHS[configData.discriminantBitSize];
 
     if (
-        protocolVersion.length === 0 ||
         networkId.length === 0 ||
         difficulty.length === 0 ||
         discriminantBitSize.length === 0 ||
@@ -75,7 +71,6 @@ async function createVdfV1GenesisEpochProof(config, proposerAddress, configData)
     }
 
     const proofData = {
-        protocol_version: protocolVersion,
         network_id: networkId,
         epoch: b4a.alloc(8, 0),
         previous_epoch_record_hash: b4a.alloc(HASH_BYTE_LENGTH, 0),
@@ -96,7 +91,7 @@ async function createVdfV1GenesisEpochProof(config, proposerAddress, configData)
         app: []
     }
 
-    const encodedEpochProof = safeEncodeEpochProof(genesisEpochProof);
+    const encodedEpochProof = safeEncodeEpochProofV1(genesisEpochProof);
     if (encodedEpochProof.length === 0) {
         return null;
     }

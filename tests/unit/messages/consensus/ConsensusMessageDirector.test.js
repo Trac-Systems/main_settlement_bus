@@ -63,7 +63,6 @@ test('ConsensusMessageDirector builds proof proposal and verifies signature', as
     t.ok(Number.isSafeInteger(payload.timestamp) && payload.timestamp > 0);
 
     const proofProposal = payload.proof_proposal;
-    t.alike(proofProposal.protocol_version, protocolVersionBuffer);
     t.alike(proofProposal.network_id, networkIdBuffer);
     t.alike(proofProposal.epoch, epochBuffer);
     t.alike(proofProposal.previous_epoch_record_hash, previousEpochRecordHash);
@@ -74,7 +73,7 @@ test('ConsensusMessageDirector builds proof proposal and verifies signature', as
     t.ok(b4a.isBuffer(proofProposal.signature));
 
     const message = createMessage(
-        proofProposal.protocol_version,
+        protocolVersionBuffer,
         proofProposal.network_id,
         proofProposal.epoch,
         proofProposal.previous_epoch_record_hash,
