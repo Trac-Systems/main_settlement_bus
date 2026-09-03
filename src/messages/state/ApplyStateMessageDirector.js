@@ -1,4 +1,6 @@
-import { OperationType } from '../../utils/constants.js';
+import { ConsensusConfigSchemaVersion, OperationType } from '../../utils/constants.js';
+import { encodeEpochProofV1 } from '../../codecs/apply/applyOperationCodec.js';
+import { uint8ToBuffer } from '../../utils/buffer.js';
 
 /**
  * Director that orchestrates ApplyStateMessageBuilder for partial and complete messages.
@@ -521,13 +523,15 @@ class ApplyStateMessageDirector {
      */
     async buildCompleteSetEpochMessage(invokerAddress, proofData, approvals) {
         if (!this.#builder) throw new Error('Builder has not been set.');
+        const schemaVersion = uint8ToBuffer(ConsensusConfigSchemaVersion.VDF_V1);
+        const epochData = encodeEpochProofV1({ pd: proofData, app: approvals });
+
         await this.#builder
             .setPhase('complete')
             .setOutput('buffer')
             .setOperationType(OperationType.SET_EPOCH)
             .setAddress(invokerAddress)
-            .setProofData(proofData)
-            .setApprovals(approvals)
+            .setEpochData(schemaVersion, epochData)
             .build();
         return this.#builder.getPayload();
     }
