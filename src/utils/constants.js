@@ -219,7 +219,6 @@ export const UINT16_MAX = 0xFFFF;
 export const UINT32_MAX = 0xFFFFFFFF;
 
 // consensus
-export const PROTOCOL_VERSION_BYTE_LENGTH = 1; // 1 BYTE 0-255
 export const NETWORK_ID_BYTE_LENGTH = 2; // 2 BYTES - UINT16
 export const EPOCH_BYTE_LENGTH = 8; // 8 BYTES - UINT64
 export const VDF_DIFFICULTY_SIZE = 4; // 4 BYTES - UINT32

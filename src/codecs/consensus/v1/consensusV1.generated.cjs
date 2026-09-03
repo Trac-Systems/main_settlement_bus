@@ -426,7 +426,6 @@ $root.consensus = (function() {
              * Properties of a ProofProposal.
              * @memberof consensus.v1
              * @interface IProofProposal
-             * @property {Uint8Array|null} [protocol_version] ProofProposal protocol_version
              * @property {Uint8Array|null} [network_id] ProofProposal network_id
              * @property {Uint8Array|null} [epoch] ProofProposal epoch
              * @property {Uint8Array|null} [previous_epoch_record_hash] ProofProposal previous_epoch_record_hash
@@ -451,14 +450,6 @@ $root.consensus = (function() {
                         if (properties[keys[i]] != null)
                             this[keys[i]] = properties[keys[i]];
             }
-
-            /**
-             * ProofProposal protocol_version.
-             * @member {Uint8Array} protocol_version
-             * @memberof consensus.v1.ProofProposal
-             * @instance
-             */
-            ProofProposal.prototype.protocol_version = $util.newBuffer([]);
 
             /**
              * ProofProposal network_id.
@@ -548,24 +539,22 @@ $root.consensus = (function() {
             ProofProposal.encode = function encode(message, writer) {
                 if (!writer)
                     writer = $Writer.create();
-                if (message.protocol_version != null && Object.hasOwnProperty.call(message, "protocol_version"))
-                    writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.protocol_version);
                 if (message.network_id != null && Object.hasOwnProperty.call(message, "network_id"))
-                    writer.uint32(/* id 2, wireType 2 =*/18).bytes(message.network_id);
+                    writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.network_id);
                 if (message.epoch != null && Object.hasOwnProperty.call(message, "epoch"))
-                    writer.uint32(/* id 3, wireType 2 =*/26).bytes(message.epoch);
+                    writer.uint32(/* id 2, wireType 2 =*/18).bytes(message.epoch);
                 if (message.previous_epoch_record_hash != null && Object.hasOwnProperty.call(message, "previous_epoch_record_hash"))
-                    writer.uint32(/* id 4, wireType 2 =*/34).bytes(message.previous_epoch_record_hash);
+                    writer.uint32(/* id 3, wireType 2 =*/26).bytes(message.previous_epoch_record_hash);
                 if (message.proposer != null && Object.hasOwnProperty.call(message, "proposer"))
-                    writer.uint32(/* id 5, wireType 2 =*/42).bytes(message.proposer);
+                    writer.uint32(/* id 4, wireType 2 =*/34).bytes(message.proposer);
                 if (message.difficulty != null && Object.hasOwnProperty.call(message, "difficulty"))
-                    writer.uint32(/* id 6, wireType 2 =*/50).bytes(message.difficulty);
+                    writer.uint32(/* id 5, wireType 2 =*/42).bytes(message.difficulty);
                 if (message.discriminant_bit_size != null && Object.hasOwnProperty.call(message, "discriminant_bit_size"))
-                    writer.uint32(/* id 7, wireType 2 =*/58).bytes(message.discriminant_bit_size);
+                    writer.uint32(/* id 6, wireType 2 =*/50).bytes(message.discriminant_bit_size);
                 if (message.proof != null && Object.hasOwnProperty.call(message, "proof"))
-                    writer.uint32(/* id 8, wireType 2 =*/66).bytes(message.proof);
+                    writer.uint32(/* id 7, wireType 2 =*/58).bytes(message.proof);
                 if (message.signature != null && Object.hasOwnProperty.call(message, "signature"))
-                    writer.uint32(/* id 9, wireType 2 =*/74).bytes(message.signature);
+                    writer.uint32(/* id 8, wireType 2 =*/66).bytes(message.signature);
                 return writer;
             };
 
@@ -603,38 +592,34 @@ $root.consensus = (function() {
                         break;
                     switch (tag >>> 3) {
                     case 1: {
-                            message.protocol_version = reader.bytes();
-                            break;
-                        }
-                    case 2: {
                             message.network_id = reader.bytes();
                             break;
                         }
-                    case 3: {
+                    case 2: {
                             message.epoch = reader.bytes();
                             break;
                         }
-                    case 4: {
+                    case 3: {
                             message.previous_epoch_record_hash = reader.bytes();
                             break;
                         }
-                    case 5: {
+                    case 4: {
                             message.proposer = reader.bytes();
                             break;
                         }
-                    case 6: {
+                    case 5: {
                             message.difficulty = reader.bytes();
                             break;
                         }
-                    case 7: {
+                    case 6: {
                             message.discriminant_bit_size = reader.bytes();
                             break;
                         }
-                    case 8: {
+                    case 7: {
                             message.proof = reader.bytes();
                             break;
                         }
-                    case 9: {
+                    case 8: {
                             message.signature = reader.bytes();
                             break;
                         }
@@ -673,9 +658,6 @@ $root.consensus = (function() {
             ProofProposal.verify = function verify(message) {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
-                if (message.protocol_version != null && message.hasOwnProperty("protocol_version"))
-                    if (!(message.protocol_version && typeof message.protocol_version.length === "number" || $util.isString(message.protocol_version)))
-                        return "protocol_version: buffer expected";
                 if (message.network_id != null && message.hasOwnProperty("network_id"))
                     if (!(message.network_id && typeof message.network_id.length === "number" || $util.isString(message.network_id)))
                         return "network_id: buffer expected";
@@ -715,11 +697,6 @@ $root.consensus = (function() {
                 if (object instanceof $root.consensus.v1.ProofProposal)
                     return object;
                 var message = new $root.consensus.v1.ProofProposal();
-                if (object.protocol_version != null)
-                    if (typeof object.protocol_version === "string")
-                        $util.base64.decode(object.protocol_version, message.protocol_version = $util.newBuffer($util.base64.length(object.protocol_version)), 0);
-                    else if (object.protocol_version.length >= 0)
-                        message.protocol_version = object.protocol_version;
                 if (object.network_id != null)
                     if (typeof object.network_id === "string")
                         $util.base64.decode(object.network_id, message.network_id = $util.newBuffer($util.base64.length(object.network_id)), 0);
@@ -778,13 +755,6 @@ $root.consensus = (function() {
                 var object = {};
                 if (options.defaults) {
                     if (options.bytes === String)
-                        object.protocol_version = "";
-                    else {
-                        object.protocol_version = [];
-                        if (options.bytes !== Array)
-                            object.protocol_version = $util.newBuffer(object.protocol_version);
-                    }
-                    if (options.bytes === String)
                         object.network_id = "";
                     else {
                         object.network_id = [];
@@ -841,8 +811,6 @@ $root.consensus = (function() {
                             object.signature = $util.newBuffer(object.signature);
                     }
                 }
-                if (message.protocol_version != null && message.hasOwnProperty("protocol_version"))
-                    object.protocol_version = options.bytes === String ? $util.base64.encode(message.protocol_version, 0, message.protocol_version.length) : options.bytes === Array ? Array.prototype.slice.call(message.protocol_version) : message.protocol_version;
                 if (message.network_id != null && message.hasOwnProperty("network_id"))
                     object.network_id = options.bytes === String ? $util.base64.encode(message.network_id, 0, message.network_id.length) : options.bytes === Array ? Array.prototype.slice.call(message.network_id) : message.network_id;
                 if (message.epoch != null && message.hasOwnProperty("epoch"))

@@ -1,4 +1,4 @@
-import {ConsensusOperationType, ConsensusProtocolVersion} from '../../../utils/constants.js';
+import {ConsensusOperationType} from '../../../utils/constants.js';
 
 /**
  * Director for v1 consensus protocol messages.
@@ -40,7 +40,6 @@ class ConsensusMessageDirector {
             .setType(ConsensusOperationType.PROOF_PROPOSAL)
             .setSessionId(sessionId)
             .setTimestamp()
-            .setProtocolVersion(ConsensusProtocolVersion.V1)
             .setNetworkId(networkId)
             .setEpoch(epoch)
             .setPreviousEpochRecordHash(previousEpochRecordHash)
@@ -85,7 +84,6 @@ class ConsensusMessageDirector {
             .setType(ConsensusOperationType.PROOF_PROPOSAL_APPROVAL)
             .setSessionId(sessionId)
             .setTimestamp()
-            .setProtocolVersion(ConsensusProtocolVersion.V1)
             .setNetworkId(networkId)
             .setEpoch(epoch)
             .setPreviousEpochRecordHash(previousEpochRecordHash)

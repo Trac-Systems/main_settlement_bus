@@ -10,7 +10,6 @@ import {
     EPOCH_BYTE_LENGTH,
     HASH_BYTE_LENGTH,
     NETWORK_ID_BYTE_LENGTH,
-    PROTOCOL_VERSION_BYTE_LENGTH,
     SIGNATURE_BYTE_LENGTH,
     SET_EPOCH_DATA_MAX_SIZE,
     VDF_DIFFICULTY_SIZE,
@@ -27,7 +26,6 @@ const stateValidationSchema = new StateValidationSchema(config);
 const UNKNOWN_PROTOBUF_FIELD = b4a.from([0x9a, 0x06, 0x01, 0xff]);
 
 const PROOF_DATA_FIELD_RULES = Object.freeze([
-    {name: 'protocol_version', length: PROTOCOL_VERSION_BYTE_LENGTH},
     {name: 'network_id', length: NETWORK_ID_BYTE_LENGTH},
     {name: 'epoch', length: EPOCH_BYTE_LENGTH},
     {name: 'previous_epoch_record_hash', length: HASH_BYTE_LENGTH},

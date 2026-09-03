@@ -10,7 +10,6 @@ import {
     BOOTSTRAP_BYTE_LENGTH,
     CHANNEL_BYTE_LENGTH,
     AMOUNT_BYTE_LENGTH,
-    PROTOCOL_VERSION_BYTE_LENGTH,
     NETWORK_ID_BYTE_LENGTH,
     EPOCH_BYTE_LENGTH,
     VDF_DIFFICULTY_SIZE,
@@ -49,7 +48,6 @@ class StateValidationSchema {
         this.#config = config
 
         this.#proofDataFields = Object.freeze([
-            {name: 'protocol_version', length: PROTOCOL_VERSION_BYTE_LENGTH},
             {name: 'network_id', length: NETWORK_ID_BYTE_LENGTH},
             {name: 'epoch', length: EPOCH_BYTE_LENGTH},
             {name: 'previous_epoch_record_hash', length: HASH_BYTE_LENGTH},

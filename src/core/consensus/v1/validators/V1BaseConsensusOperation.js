@@ -3,11 +3,12 @@ import _ from "lodash";
 
 import {
     ConsensusOperationType,
+    ConsensusProtocolVersion,
     ConsensusResultCode
 } from "../../../../utils/constants.js";
 import {V1ConsensusProtocolError} from "../V1ConsensusProtocolError.js";
 import tracCryptoApi from "trac-crypto-api";
-import {createMessage} from "../../../../utils/buffer.js";
+import {createMessage, uint8ToBuffer} from "../../../../utils/buffer.js";
 import {bufferToAddress} from "../../../state/utils/address.js";
 import b4a from "b4a";
 
@@ -91,17 +92,17 @@ class V1BaseConsensusOperation {
     }
 
     /**
-     * Builds canonical VDF challenge data from proof proposal fields 1 through 7.
+     * Builds canonical VDF challenge data for a consensus v1 proof proposal.
      *
-     * The message contains protocol version, network id, epoch, previous epoch
-     * record hash, proposer address, difficulty, and discriminant bit size in protocol order.
+     * The message contains the fixed v1 domain separator followed by network id,
+     * epoch, previous epoch record hash, proposer address, difficulty, and discriminant bit size.
      *
      * @param {object} proofProposal Decoded proof proposal.
      * @returns {Buffer} Canonically encoded challenge data.
      */
     buildProofProposalChallengeData(proofProposal) {
         return createMessage(
-            proofProposal.protocol_version,
+            uint8ToBuffer(ConsensusProtocolVersion.V1),
             proofProposal.network_id,
             proofProposal.epoch,
             proofProposal.previous_epoch_record_hash,

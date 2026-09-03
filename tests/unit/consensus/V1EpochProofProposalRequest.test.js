@@ -133,7 +133,6 @@ async function buildProofProposalPayload(wallet, {
         .setType(ConsensusOperationType.PROOF_PROPOSAL)
         .setSessionId('session')
         .setTimestamp()
-        .setProtocolVersion(ConsensusProtocolVersion.V1)
         .setNetworkId(config.networkId)
         .setEpoch(epoch)
         .setPreviousEpochRecordHash(previousEpochRecordHash)
@@ -227,26 +226,6 @@ test('V1EpochProofProposalRequest rejects when the local node is not an indexer'
     );
 });
 
-test('V1EpochProofProposalRequest rejects unsupported proof proposal protocol version', async t => {
-    const wallet = await createWallet();
-    const validator = new V1EpochProofProposalRequest(config, createState());
-    const payload = await buildProofProposalPayload(wallet);
-    const fakePayload = {
-        ...payload,
-        proof_proposal: {
-            ...payload.proof_proposal,
-            protocol_version: b4a.from([2])
-        }
-    };
-
-    await assertProtocolError(
-        t,
-        async () => validator.validate(fakePayload, {remotePublicKey: wallet.publicKey}),
-        ConsensusResultCode.BAD_PROTOCOL_VERSION,
-        'Unsupported proof proposal protocol version'
-    );
-});
-
 test('V1EpochProofProposalRequest rejects consensus config mismatch', async t => {
     const wallet = await createWallet();
     const payload = await buildProofProposalPayload(wallet);
@@ -270,14 +249,14 @@ test('V1EpochProofProposalRequest rejects consensus config mismatch', async t =>
     }
 });
 
-test('V1EpochProofProposalRequest builds proof proposal challenge data from fields one through seven', async t => {
+test('V1EpochProofProposalRequest builds proof proposal challenge data with the V1 domain separator', async t => {
     const wallet = await createWallet();
     const validator = new V1EpochProofProposalRequest(config, createState());
     const payload = await buildProofProposalPayload(wallet);
     const proofProposal = payload.proof_proposal;
     const challengeData = validator.buildProofProposalChallengeData(proofProposal);
     const expectedChallengeData = createMessage(
-        proofProposal.protocol_version,
+        uint8ToBuffer(ConsensusProtocolVersion.V1),
         proofProposal.network_id,
         proofProposal.epoch,
         proofProposal.previous_epoch_record_hash,
