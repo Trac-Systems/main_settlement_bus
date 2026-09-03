@@ -18,6 +18,7 @@ import {
     VDF_PROOF_BYTE_LENGTHS,
     CONSENSUS_CONFIG_SCHEMA_VERSION_BYTE_LENGTH,
     CONSENSUS_CONFIG_DATA_MAX_SIZE,
+    SET_EPOCH_DATA_MAX_SIZE,
 } from '../../../utils/constants.js';
 import {
     decodeProofProposalApproval,
@@ -36,6 +37,7 @@ class StateValidationSchema {
     #validateTransferOperationSchema;
     #validateBalanceInitializationSchema;
     #validateSetEpochOperationSchema;
+    #validateEpochProofV1Schema;
     #validateConsensusControlOperationSchema;
     #proofDataFields;
     #config;
@@ -325,6 +327,7 @@ class StateValidationSchema {
         this.#validateTransferOperationSchema = this.#compileTransferOperationSchema();
         this.#validateBalanceInitializationSchema = this.#compileBalanceInitializationSchema();
         this.#validateSetEpochOperationSchema = this.#compileSetEpochOperationSchema();
+        this.#validateEpochProofV1Schema = this.#compileEpochProofV1Schema();
         this.#validateConsensusControlOperationSchema = this.#compileConsensusControlOperationSchema();
 
     }
@@ -681,12 +684,16 @@ class StateValidationSchema {
                 strict: true,
                 type: 'object',
                 props: {
-                    pd: {type: 'proof_data', required: true}, // proof data
-                    app: {
-                        type: 'array',
-                        required: true,
-                        items: {type: 'proof_proposal_approval'}
-                    }, // approvals
+                    sv: {
+                        type: 'buffer',
+                        length: CONSENSUS_CONFIG_SCHEMA_VERSION_BYTE_LENGTH,
+                        required: true
+                    },
+                    data: {
+                        type: 'buffer_max_length',
+                        maxLength: SET_EPOCH_DATA_MAX_SIZE,
+                        required: true
+                    }
                 },
             }
         };
@@ -695,6 +702,23 @@ class StateValidationSchema {
 
     validateSetEpochOperation(op) {
         return this.#validateSetEpochOperationSchema(op) === true;
+    }
+
+    #compileEpochProofV1Schema() {
+        const schema = {
+            $$strict: true,
+            pd: {type: 'proof_data', required: true},
+            app: {
+                type: 'array',
+                required: true,
+                items: {type: 'proof_proposal_approval'}
+            }
+        };
+        return this.#validator.compile(schema);
+    }
+
+    validateEpochProofV1(epochProof) {
+        return this.#validateEpochProofV1Schema(epochProof) === true;
     }
 
     #compileConsensusControlOperationSchema() {
