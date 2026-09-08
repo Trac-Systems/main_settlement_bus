@@ -21,7 +21,6 @@ import {
 import { safeDecodeProofProposal } from '../../../../../src/codecs/consensus/v1/consensusV1OperationCodec.js';
 import {
     AUTOBASE_VALUE_ENCODING,
-    ConsensusProtocolVersion,
     EntryType,
     HASH_BYTE_LENGTH,
     SIGNATURE_BYTE_LENGTH,
@@ -29,7 +28,6 @@ import {
 } from '../../../../../src/utils/constants.js';
 import {
     safeReadUint32BE,
-    safeUint8ToBuffer,
     uint16ToBuffer,
     uint32ToBuffer
 } from '../../../../../src/utils/buffer.js';
@@ -202,13 +200,6 @@ export async function assertGenesisInitialized(
     t.ok(proofProposal, 'stored genesis proof proposal decodes');
     if (!proofProposal) return;
 
-    t.ok(
-        b4a.equals(
-            proofProposal.protocol_version,
-            safeUint8ToBuffer(ConsensusProtocolVersion.V1)
-        ),
-        'genesis proof uses consensus protocol version 1'
-    );
     t.ok(
         b4a.equals(proofProposal.network_id, uint16ToBuffer(config.networkId)),
         'genesis proof stores the configured network id'

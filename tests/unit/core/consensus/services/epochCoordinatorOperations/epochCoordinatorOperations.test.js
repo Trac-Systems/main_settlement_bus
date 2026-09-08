@@ -255,7 +255,7 @@ nodeOnlyTest('buildSetEpochPayload encodes proof + approvals into the applied pa
             encodeProofProposalApproval: sinon.stub().returns(b4a.alloc(1)),
         },
     });
-    const proofProposal = { protocol_version: 1, network_id: 1, epoch: 2, previous_epoch_record_hash: b4a.alloc(32), difficulty: b4a.alloc(4), discriminant_bit_size: b4a.alloc(2), proof: b4a.alloc(516), signature: b4a.alloc(64) };
+    const proofProposal = { network_id: 1, epoch: 2, previous_epoch_record_hash: b4a.alloc(32), difficulty: b4a.alloc(4), discriminant_bit_size: b4a.alloc(2), proof: b4a.alloc(516), signature: b4a.alloc(64) };
     const signatures = [{ signature: b4a.alloc(64), approver: b4a.alloc(21) }];
 
     const payload = await make().buildSetEpochPayload(proofProposal, signatures);
@@ -274,7 +274,7 @@ nodeOnlyTest('buildSetEpochPayload does not append to state', async t => {
             encodeProofProposalApproval: sinon.stub().returns(b4a.alloc(1)),
         },
     });
-    const proofProposal = { protocol_version: 1, network_id: 1, epoch: 2, previous_epoch_record_hash: b4a.alloc(32), difficulty: b4a.alloc(4), discriminant_bit_size: b4a.alloc(2), proof: b4a.alloc(516), signature: b4a.alloc(64) };
+    const proofProposal = { network_id: 1, epoch: 2, previous_epoch_record_hash: b4a.alloc(32), difficulty: b4a.alloc(4), discriminant_bit_size: b4a.alloc(2), proof: b4a.alloc(516), signature: b4a.alloc(64) };
 
     await make({ state }).buildSetEpochPayload(proofProposal, []);
 

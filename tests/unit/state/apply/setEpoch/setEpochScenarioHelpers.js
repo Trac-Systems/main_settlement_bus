@@ -139,9 +139,9 @@ export async function buildSetEpochPayload(context, {
     const difficulty = uint32ToBuffer(vdfDifficulty);
     const discriminantBitSize = uint16ToBuffer(vdfDiscriminantSize);
 
-    // Must match the 7-field challenge State#handleApplySetEpochOperation reconstructs
-    // (protocol_version, network_id, epoch, previous_epoch_record_hash, proposer,
-    // difficulty, discriminant_bit_size)
+    // Must match the challenge State#handleApplySetEpochOperation reconstructs:
+    // the fixed V1 domain separator followed by network_id, epoch,
+    // previous_epoch_record_hash, proposer, difficulty and discriminant_bit_size.
     // - the VDF proof is only valid against this exact canonical challenge, not the raw previous hash alone.
     const challengeData = createMessage(
         uint8ToBuffer(ConsensusProtocolVersion.V1),

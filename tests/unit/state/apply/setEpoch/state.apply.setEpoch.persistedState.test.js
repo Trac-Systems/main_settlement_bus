@@ -1,7 +1,7 @@
 import { test } from 'brittle';
 import b4a from 'b4a';
 import { EntryType } from '../../../../../src/utils/constants.js';
-import { uint16ToBuffer, uint8ToBuffer } from '../../../../../src/utils/buffer.js';
+import { uint16ToBuffer } from '../../../../../src/utils/buffer.js';
 import { config } from '../../../../helpers/config.js';
 import {
     VDF_DIFFICULTY,
@@ -88,14 +88,6 @@ for (const testCase of persistedStateCases) {
         await runRejectedSetEpochCase(t, { overrides: testCase.overrides });
     });
 }
-
-test('State.apply SET_EPOCH proposal context: rejects an unsupported protocol version', async t => {
-    await runRejectedSetEpochCase(t, {
-        mutatePayload: payload => mutateProofProposal(payload, proofProposal => {
-            proofProposal.protocol_version = uint8ToBuffer(0xff);
-        })
-    });
-});
 
 test('State.apply SET_EPOCH proposal context: rejects a different network id', async t => {
     const differentNetworkId = config.networkId === 0xffff

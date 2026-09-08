@@ -91,17 +91,16 @@ class V1BaseConsensusOperation {
     }
 
     /**
-     * Builds canonical VDF challenge data from proof proposal fields 1 through 7.
+     * Builds canonical VDF challenge data for a consensus v1 proof proposal.
      *
-     * The message contains protocol version, network id, epoch, previous epoch
-     * record hash, proposer address, difficulty, and discriminant bit size in protocol order.
+     * Concatenates fields 1 through 6: network id, epoch, previous epoch record hash,
+     * proposer address, difficulty, and discriminant bit size.
      *
      * @param {object} proofProposal Decoded proof proposal.
      * @returns {Buffer} Canonically encoded challenge data.
      */
     buildProofProposalChallengeData(proofProposal) {
         return createMessage(
-            proofProposal.protocol_version,
             proofProposal.network_id,
             proofProposal.epoch,
             proofProposal.previous_epoch_record_hash,

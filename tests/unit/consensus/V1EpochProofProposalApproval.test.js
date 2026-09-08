@@ -10,7 +10,6 @@ import {bufferToAddress} from '../../../src/core/state/utils/address.js';
 import {encodeProofProposalApproval} from '../../../src/codecs/consensus/v1/consensusV1OperationCodec.js';
 import {
     ConsensusOperationType,
-    ConsensusProtocolVersion,
     ConsensusResultCode,
     VDF_DIFFICULTY_SIZE,
     VDF_PROOF_BYTE_LENGTHS
@@ -38,7 +37,6 @@ async function buildProofProposalPayload(proposerWallet) {
         .setType(ConsensusOperationType.PROOF_PROPOSAL)
         .setSessionId('session')
         .setTimestamp()
-        .setProtocolVersion(ConsensusProtocolVersion.V1)
         .setNetworkId(1)
         .setEpoch(1)
         .setPreviousEpochRecordHash(previousEpochRecordHash)
@@ -59,7 +57,6 @@ async function buildProofProposalApprovalPayload(approverWallet, proofProposalPa
         .setType(ConsensusOperationType.PROOF_PROPOSAL_APPROVAL)
         .setSessionId(proofProposalPayload.session_id)
         .setTimestamp()
-        .setProtocolVersion(proofProposal.protocol_version[0])
         .setNetworkId(proofProposal.network_id.readUInt16BE(0))
         .setEpoch(Number(proofProposal.epoch.readBigUInt64BE(0)))
         .setPreviousEpochRecordHash(proofProposal.previous_epoch_record_hash)
