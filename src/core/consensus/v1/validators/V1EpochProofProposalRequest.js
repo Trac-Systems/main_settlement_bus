@@ -23,7 +23,7 @@ class V1EpochProofProposalRequest extends V1BaseConsensusOperation {
     /**
      * Validates a complete incoming epoch proof proposal request.
      *
-     * Checks the payload schema, network id, proposer identity,
+     * Checks the payload schema, active consensus version, network id, proposer identity,
      * proposal signature, proposer indexer membership, next epoch number,
      * previous epoch record hash, consensus configuration, and VDF proof.
      *
@@ -40,41 +40,19 @@ class V1EpochProofProposalRequest extends V1BaseConsensusOperation {
                 payload.proof_proposal.proposer,
                 connection.remotePublicKey
             );
+            await this.validateProofProposalConfig(payload.proof_proposal);
             await this.validateSignature(payload, connection.remotePublicKey, undefined, ConsensusResultCode.PROPOSAL_SIGNATURE_INVALID);
             await this.validateAddressIsIndexer(connection.remotePublicKey);
             this.validateLocalNodeIsIndexer();
             const currentEpoch = await this._state.requireCurrentEpoch();
             this.validateIncomingEpoch(payload.proof_proposal, currentEpoch);
             await this.validatePreviousEpochRecordHash(payload.proof_proposal, currentEpoch);
-            await this.validateProofProposalConfig(payload.proof_proposal);
             await this.validateProofProposalVdfProof(payload.proof_proposal);
+
+            // The signed config may have changed during VDF verification.
+            await this.validateProofProposalConfig(payload.proof_proposal);
             return true;
         });
-    }
-
-    /**
-     * Validates that the proof proposal VDF parameters match signed consensus state.
-     *
-     * @param {object} proofProposal Decoded proof proposal.
-     * @returns {Promise<void>}
-     * @throws {V1ConsensusProtocolError} When the proposal parameters do not match consensus state.
-     */
-    async validateProofProposalConfig(proofProposal) {
-        const consensusConfig = await this._state.requireSignedConsensusConfig();
-
-        const difficulty = proofProposal.difficulty.readUInt32BE(0);
-        const discriminantBitSize =
-            proofProposal.discriminant_bit_size.readUInt16BE(0);
-
-        if (
-            difficulty !== consensusConfig.configData.difficulty ||
-            discriminantBitSize !== consensusConfig.configData.discriminantBitSize
-        ) {
-            throw new V1ConsensusProtocolError(
-                ConsensusResultCode.CONSENSUS_CONFIG_MISMATCH,
-                'Proof proposal does not match the current consensus configuration.'
-            );
-        }
     }
 
     /**

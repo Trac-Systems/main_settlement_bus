@@ -3556,10 +3556,43 @@ class State extends ReadyResource {
             return Status.FAILURE;
         }
 
-        const epochSchemaVersion = safeReadUint8(op.seo.sv);
-        let epochProof;
+        const currentConsensusConfigIndexBuffer = await this.#getEntryApply(EntryType.CONSENSUS_CONFIG_CURRENT, batch);
+        if (currentConsensusConfigIndexBuffer === null) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Consensus config is not initialized.", node.from.key)
+            return Status.FAILURE;
+        }
 
-        switch (epochSchemaVersion) {
+        if (currentConsensusConfigIndexBuffer.length !== CONSENSUS_CONFIG_INDEX_SIZE) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Consensus config data is malformed or corrupted.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const currentConsensusConfigIndex = safeReadUint32BE(currentConsensusConfigIndexBuffer);
+        const consensusConfigBuffer = await this.#getEntryApply(
+            EntryType.CONSENSUS_CONFIG_RECORD + currentConsensusConfigIndex,
+            batch
+        );
+        if (consensusConfigBuffer === null) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Consensus config record does not exist.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const consensusConfig = safeDecodeConsensusConfig(consensusConfigBuffer);
+        if (consensusConfig === null) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Failed to decode consensus config.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const consensusSchemaVersion = safeReadUint8(consensusConfig.sv);
+        const epochSchemaVersion = safeReadUint8(op.seo.sv);
+        if (consensusSchemaVersion !== epochSchemaVersion) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Epoch schema version does not match the current consensus config.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        // The active config selects the proof format, including earlier updates in this batch.
+        let epochProof;
+        switch (consensusSchemaVersion) {
             case ConsensusConfigSchemaVersion.VDF_V1:
                 epochProof = safeDecodeEpochProofV1(op.seo.data);
                 if (epochProof === null) {
@@ -3640,42 +3673,6 @@ class State extends ReadyResource {
         const currentEpochHash = await this.#getEntryApply(EntryType.EPOCH + currentEpochStr, batch);
         if (currentEpochHash === null || !b4a.equals(currentEpochHash, proofProposal.previous_epoch_record_hash)) {
             this.#safeLogApply(OperationType.SET_EPOCH, `Previous epoch record hash mismatch for epoch ${currentEpochStr}.`, node.from.key)
-            return Status.FAILURE;
-        }
-
-        const currentConsensusConfigIndexBuffer = await this.#getEntryApply(EntryType.CONSENSUS_CONFIG_CURRENT, batch);
-        if (currentConsensusConfigIndexBuffer === null) {
-            this.#safeLogApply(OperationType.SET_EPOCH, "Consensus config is not initialized.", node.from.key)
-            return Status.FAILURE;
-        }
-
-        if (currentConsensusConfigIndexBuffer.length !== CONSENSUS_CONFIG_INDEX_SIZE) {
-            this.#safeLogApply(OperationType.SET_EPOCH, "Consensus config data is malformed or corrupted.", node.from.key)
-            return Status.FAILURE;
-        }
-
-        const currentConsensusConfigIndex = safeReadUint32BE(currentConsensusConfigIndexBuffer);
-        const consensusConfigBuffer = await this.#getEntryApply(
-            EntryType.CONSENSUS_CONFIG_RECORD + currentConsensusConfigIndex,
-            batch
-        );
-        if (consensusConfigBuffer === null) {
-            this.#safeLogApply(OperationType.SET_EPOCH, "Consensus config record does not exist.", node.from.key)
-            return Status.FAILURE;
-        }
-
-        const consensusConfig = safeDecodeConsensusConfig(consensusConfigBuffer);
-        if (consensusConfig === null) {
-            this.#safeLogApply(OperationType.SET_EPOCH, "Failed to decode consensus config.", node.from.key)
-            return Status.FAILURE;
-        }
-        const consensusSchemaVersion = safeReadUint8(consensusConfig.sv);
-        if (consensusSchemaVersion !== ConsensusConfigSchemaVersion.VDF_V1) {
-            this.#safeLogApply(OperationType.SET_EPOCH, "Unsupported consensus config schema version.", node.from.key)
-            return Status.FAILURE;
-        }
-        if (consensusSchemaVersion !== epochSchemaVersion) {
-            this.#safeLogApply(OperationType.SET_EPOCH, "Epoch schema version does not match the current consensus config.", node.from.key)
             return Status.FAILURE;
         }
 
@@ -4808,19 +4805,47 @@ class State extends ReadyResource {
             return Status.IGNORE;
         }
 
-        const currentConsensusConfigBuffer = await this.#getEntryApply(EntryType.CONSENSUS_CONFIG_CURRENT, batch);
-        if (currentConsensusConfigBuffer === null) {
+        const currentConsensusConfigIndexBuffer = await this.#getEntryApply(EntryType.CONSENSUS_CONFIG_CURRENT, batch);
+        if (currentConsensusConfigIndexBuffer === null) {
             this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Initial consensus config has not been initialized yet", node.from.key)
             return Status.IGNORE;
         }
 
-        const currentConsensusConfigIndex = safeReadUint32BE(currentConsensusConfigBuffer);
+        if (currentConsensusConfigIndexBuffer.length !== CONSENSUS_CONFIG_INDEX_SIZE) {
+            this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Consensus config index is malformed or corrupted.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const currentConsensusConfigIndex = safeReadUint32BE(currentConsensusConfigIndexBuffer);
         if (currentConsensusConfigIndex === null) {
             this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG,"Failed to read current consensus config index from buffer", node.from.key)
             return Status.FAILURE;
         }
         if (currentConsensusConfigIndex === UINT32_MAX) {
             this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Consensus config index overflow.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const currentConsensusConfigBuffer = await this.#getEntryApply(
+            EntryType.CONSENSUS_CONFIG_RECORD + currentConsensusConfigIndex,
+            batch
+        );
+        const currentConsensusConfig = safeDecodeConsensusConfig(currentConsensusConfigBuffer);
+        if (currentConsensusConfig === null) {
+            this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Failed to decode current consensus config.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const currentSchemaVersion = safeReadUint8(currentConsensusConfig.sv);
+        const nextSchemaVersion = safeReadUint8(op.cco.cc.sv);
+        if (currentSchemaVersion === null || currentSchemaVersion === 0) {
+            this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Current consensus config schema version is invalid.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        // Same-version parameter changes are allowed; returning to an older consensus is not.
+        if (nextSchemaVersion < currentSchemaVersion) {
+            this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Consensus config schema version cannot decrease.", node.from.key)
             return Status.FAILURE;
         }
 

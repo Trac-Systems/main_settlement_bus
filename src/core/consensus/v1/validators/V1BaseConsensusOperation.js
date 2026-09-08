@@ -2,6 +2,7 @@ import ConsensusValidationSchema from "./ConsensusValidationSchema.js";
 import _ from "lodash";
 
 import {
+    ConsensusConfigSchemaVersion,
     ConsensusOperationType,
     ConsensusResultCode
 } from "../../../../utils/constants.js";
@@ -24,7 +25,7 @@ class V1BaseConsensusOperation {
      * @param {Config} config Application configuration. The base validator uses
      * `addressLength` for schemas and `addressPrefix` for address conversion.
      * @param {State} state Ledger state. It must expose `isIndexerAddress(address)`
-     * for indexer membership validation.
+     * and `requireSignedConsensusConfig()` for membership and consensus validation.
      * @throws {Error} When consensus schemas cannot be initialized from the configuration.
      */
     constructor(config, state) {
@@ -86,6 +87,36 @@ class V1BaseConsensusOperation {
             throw new V1ConsensusProtocolError(
                 ConsensusResultCode.SCHEMA_VALIDATION_FAILED,
                 'Payload is invalid.'
+            );
+        }
+    }
+
+    /**
+     * Requires active VDF V1 consensus and matching proof parameters in signed state.
+     * Used for both proposals and approvals, including replies to pending requests.
+     *
+     * @param {object} proofProposal Decoded proof proposal.
+     * @returns {Promise<void>}
+     * @throws {V1ConsensusProtocolError} When VDF V1 is inactive or the parameters differ.
+     */
+    async validateProofProposalConfig(proofProposal) {
+        const consensusConfig = await this._state.requireSignedConsensusConfig();
+        if (consensusConfig.schemaVersion !== ConsensusConfigSchemaVersion.VDF_V1) {
+            throw new V1ConsensusProtocolError(
+                ConsensusResultCode.CONSENSUS_CONFIG_MISMATCH,
+                'VDF V1 is not the active consensus.'
+            );
+        }
+
+        const difficulty = proofProposal.difficulty.readUInt32BE(0);
+        const discriminantBitSize = proofProposal.discriminant_bit_size.readUInt16BE(0);
+        if (
+            difficulty !== consensusConfig.configData.difficulty ||
+            discriminantBitSize !== consensusConfig.configData.discriminantBitSize
+        ) {
+            throw new V1ConsensusProtocolError(
+                ConsensusResultCode.CONSENSUS_CONFIG_MISMATCH,
+                'Proof proposal does not match the current consensus configuration.'
             );
         }
     }
