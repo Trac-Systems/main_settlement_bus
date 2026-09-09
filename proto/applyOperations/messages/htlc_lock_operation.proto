@@ -2,21 +2,24 @@ syntax = "proto3";
 
 package apply.operations;
 
-message HtlcLockData {
-    bytes hl = 1; // Hash Lock
-    bytes ra = 2; // Address of the refund
-    bytes ca = 3; // Address of the claimant
-    bytes ee = 4; // Expiration epoch
-}
-
 message HtlcLockOperation {
-    bytes tx      = 1; // Transaction hash (unique identifier for the transaction)
-    bytes txv     = 2; // Transaction expiration
-    bytes ld      = 3; // Lock Data
-    bytes am      = 6; // Amount of tokens to transfer
-    bytes in      = 8; // Nonce of the invoker (any account)
-    bytes is      = 9; // Signature of the invoker (any account)
-    bytes va      = 10; // Validator's address (optional)
-    bytes vn      = 11; // Validator's nonce  (optional)
-    bytes vs      = 12; // Validator's signature (optional)
+    bytes tx                      = 1;  // Transaction hash and lock identifier
+    bytes txv                     = 2;  // Transaction-validity state
+    bytes ca                      = 3;  // Address receiving the principal on claim
+    bytes ra                      = 4;  // Address receiving all escrowed TNK on refund
+    bytes am                      = 5;  // Principal amount paid to the claimant
+    bytes fa                      = 6;  // Additional fee amount reserved by the locker
+    optional bytes fr             = 7;  // Fee recipient; required when fa is non-zero
+    bytes hl                      = 8;  // SHA-256 hashlock
+    bytes re                      = 9;  // Refund epoch
+    bytes cc                      = 10; // Cross-chain counterparty commitment
+    optional bytes ph             = 11; // Opaque application policy hash
+    repeated bytes ss             = 12; // Signer public keys; locker is always index zero
+    bytes th                      = 13; // Required signature threshold
+    repeated bytes cs             = 14; // Cosigner signatures in relative ss order; omitted keys need no slot
+    bytes in                      = 15; // Nonce of the locker
+    bytes is                      = 16; // Mandatory locker signature
+    bytes va                      = 17; // Validator's address (optional)
+    bytes vn                      = 18; // Validator's nonce (optional)
+    bytes vs                      = 19; // Validator's signature (optional)
 }

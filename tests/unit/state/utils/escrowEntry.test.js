@@ -1,63 +1,156 @@
-import { test } from 'brittle';
+import {test} from 'brittle';
 import b4a from 'b4a';
-import { BALANCE_BYTE_LENGTH, EPOCH_BYTE_LENGTH } from '../../../../src/utils/constants.js';
-import { TRAC_HASH_SIZE, TRAC_PUB_KEY_SIZE } from 'trac-crypto-api/constants.js';
-import { NULL_BUFFER } from '../../../../src/utils/buffer.js';
-import { ESCROW_ENTRY_SIZE, Status, init, makeClaim, makeRefund } from '../../../../src/core/state/utils/escrowEntry.js';
-import { TEN_THOUSAND_VALUE, randomBuffer } from '../stateTestUtils.js';
+import tracCryptoApi from 'trac-crypto-api';
 
-const makeInputs = () => ({
-    lockId: randomBuffer(TRAC_HASH_SIZE), maker: randomBuffer(TRAC_PUB_KEY_SIZE), taker: randomBuffer(TRAC_PUB_KEY_SIZE),
-    lock: randomBuffer(TRAC_HASH_SIZE), nonce: randomBuffer(TRAC_HASH_SIZE), expiryEpoch: randomBuffer(EPOCH_BYTE_LENGTH), amount: TEN_THOUSAND_VALUE,
+import {
+    BALANCE_BYTE_LENGTH,
+    EPOCH_BYTE_LENGTH,
+    HASH_BYTE_LENGTH,
+    HTLC_LOCK_ID_BYTE_LENGTH,
+    HTLC_PREIMAGE_BYTE_LENGTH,
+    NONCE_BYTE_LENGTH,
+    PUBLIC_KEY_LENGTH,
+} from '../../../../src/utils/constants.js';
+import {bigIntToBuffer, NULL_BUFFER, uint64ToBuffer} from '../../../../src/utils/buffer.js';
+import {
+    decode,
+    ESCROW_ENTRY_SIZE,
+    ESCROW_ENTRY_VERSION,
+    Status,
+    init,
+    makeClaim,
+    makeRefund,
+} from '../../../../src/core/state/utils/escrowEntry.js';
+import {randomBuffer} from '../stateTestUtils.js';
+
+function makeInputs() {
+    const preimage = randomBuffer(HTLC_PREIMAGE_BYTE_LENGTH);
+    return {
+        lockId: randomBuffer(HTLC_LOCK_ID_BYTE_LENGTH),
+        locker: randomBuffer(PUBLIC_KEY_LENGTH),
+        claimRecipient: randomBuffer(PUBLIC_KEY_LENGTH),
+        refundRecipient: randomBuffer(PUBLIC_KEY_LENGTH),
+        amount: bigIntToBuffer(100n, BALANCE_BYTE_LENGTH),
+        feeAmount: bigIntToBuffer(5n, BALANCE_BYTE_LENGTH),
+        feeRecipient: randomBuffer(PUBLIC_KEY_LENGTH),
+        nonce: randomBuffer(NONCE_BYTE_LENGTH),
+        hashLock: tracCryptoApi.hash.sha256(preimage),
+        refundEpoch: uint64ToBuffer(100),
+        counterpartyHash: randomBuffer(HASH_BYTE_LENGTH),
+        policyHash: randomBuffer(HASH_BYTE_LENGTH),
+        preimage,
+    };
+}
+
+test('Escrow Entry - init and decode preserve all settlement fields', t => {
+    const inputs = makeInputs();
+    const entry = init(inputs);
+    const decoded = decode(entry);
+
+    t.is(entry.length, ESCROW_ENTRY_SIZE);
+    t.is(decoded.version, ESCROW_ENTRY_VERSION);
+    t.is(decoded.status, Status.PENDING);
+    for (const field of [
+        'lockId', 'locker', 'claimRecipient', 'refundRecipient', 'amount', 'feeAmount',
+        'feeRecipient', 'nonce', 'hashLock', 'refundEpoch', 'counterpartyHash', 'policyHash'
+    ]) {
+        t.ok(b4a.equals(decoded[field], inputs[field]), `${field} matches`);
+    }
+    t.is(decoded.preimage, null, 'preimage remains hidden until claim');
 });
 
-test('Escrow Entry - init encodes all fields and starts pending', t => {
+test('Escrow Entry - fee and policy fields have canonical empty representations', t => {
     const inputs = makeInputs();
-    const entry = init(inputs.lockId, inputs.maker, inputs.taker, inputs.lock, inputs.nonce, inputs.expiryEpoch, inputs.amount);
-    t.is(entry.length, ESCROW_ENTRY_SIZE, 'entry has the expected size');
-    t.ok(b4a.equals(entry.subarray(0, BALANCE_BYTE_LENGTH), inputs.amount), 'amount matches');
-    let offset = BALANCE_BYTE_LENGTH;
-    t.ok(b4a.equals(entry.subarray(offset, offset += TRAC_PUB_KEY_SIZE), inputs.maker), 'maker matches');
-    t.ok(b4a.equals(entry.subarray(offset, offset += TRAC_PUB_KEY_SIZE), inputs.taker), 'taker matches');
-    t.ok(b4a.equals(entry.subarray(offset, offset += TRAC_PUB_KEY_SIZE), inputs.maker), 'refund key matches maker');
-    t.ok(b4a.equals(entry.subarray(offset, offset += TRAC_HASH_SIZE), inputs.lockId), 'lock ID matches');
-    t.ok(b4a.equals(entry.subarray(offset, offset += TRAC_HASH_SIZE), inputs.nonce), 'nonce matches');
-    t.ok(b4a.equals(entry.subarray(offset, offset += TRAC_HASH_SIZE), inputs.lock), 'lock matches');
-    t.ok(b4a.equals(entry.subarray(offset, offset + EPOCH_BYTE_LENGTH), inputs.expiryEpoch), 'expiry epoch matches');
-    t.is(entry[ESCROW_ENTRY_SIZE - 1], Status.PENDING, 'status is pending');
+    inputs.feeAmount = b4a.alloc(BALANCE_BYTE_LENGTH);
+    delete inputs.feeRecipient;
+    delete inputs.policyHash;
+
+    const decoded = decode(init(inputs));
+    t.ok(decoded);
+    t.is(decoded.feeRecipient, null);
+    t.is(decoded.policyHash, null);
 });
 
-test('Escrow Entry - init rejects invalid field sizes', t => {
+test('Escrow Entry - init rejects invalid required fields and fee combinations', t => {
     const inputs = makeInputs();
-    const invalidFields = [['amount', BALANCE_BYTE_LENGTH], ['maker', TRAC_PUB_KEY_SIZE], ['taker', TRAC_PUB_KEY_SIZE], ['lockId', TRAC_HASH_SIZE], ['nonce', TRAC_HASH_SIZE], ['lock', TRAC_HASH_SIZE], ['expiryEpoch', EPOCH_BYTE_LENGTH]];
-    for (const [field, size] of invalidFields) {
-        const invalidInputs = { ...inputs, [field]: randomBuffer(size - 1) };
-        const entry = init(invalidInputs.lockId, invalidInputs.maker, invalidInputs.taker, invalidInputs.lock, invalidInputs.nonce, invalidInputs.expiryEpoch, invalidInputs.amount);
+    const fieldSizes = {
+        lockId: HTLC_LOCK_ID_BYTE_LENGTH,
+        locker: PUBLIC_KEY_LENGTH,
+        claimRecipient: PUBLIC_KEY_LENGTH,
+        refundRecipient: PUBLIC_KEY_LENGTH,
+        amount: BALANCE_BYTE_LENGTH,
+        feeAmount: BALANCE_BYTE_LENGTH,
+        nonce: NONCE_BYTE_LENGTH,
+        hashLock: HASH_BYTE_LENGTH,
+        refundEpoch: EPOCH_BYTE_LENGTH,
+        counterpartyHash: HASH_BYTE_LENGTH,
+    };
+
+    for (const [field, size] of Object.entries(fieldSizes)) {
+        const entry = init({...inputs, [field]: randomBuffer(size - 1)});
         t.ok(b4a.equals(entry, NULL_BUFFER), `${field} rejects an invalid buffer`);
     }
+
+    t.ok(b4a.equals(init({...inputs, amount: b4a.alloc(BALANCE_BYTE_LENGTH)}), NULL_BUFFER));
+
+    const missingFeeRecipient = {...inputs};
+    delete missingFeeRecipient.feeRecipient;
+    t.ok(b4a.equals(init(missingFeeRecipient), NULL_BUFFER));
+
+    t.ok(b4a.equals(init({
+        ...inputs,
+        feeAmount: b4a.alloc(BALANCE_BYTE_LENGTH)
+    }), NULL_BUFFER), 'zero fee rejects a fee recipient');
 });
 
-test('Escrow Entry - makeClaim pays the taker and clears the amount', t => {
+test('Escrow Entry - claim pays stored recipients and records the preimage before expiry', t => {
     const inputs = makeInputs();
-    const entry = init(inputs.lockId, inputs.maker, inputs.taker, inputs.lock, inputs.nonce, inputs.expiryEpoch, inputs.amount);
-    const result = makeClaim(entry);
-    t.ok(b4a.equals(result.publicKey, inputs.taker), 'claim recipient is the taker');
-    t.ok(b4a.equals(result.amount.value, inputs.amount), 'claimed amount matches');
-    t.ok(b4a.equals(entry.subarray(0, BALANCE_BYTE_LENGTH), b4a.alloc(BALANCE_BYTE_LENGTH)), 'amount is cleared');
-    t.is(entry[ESCROW_ENTRY_SIZE - 1], Status.CLAIMED, 'status is claimed');
-    t.is(result.entry, entry, 'settlement updates the original entry');
+    const entry = init(inputs);
+    const result = makeClaim(entry, inputs.preimage, uint64ToBuffer(99));
+    const claimed = decode(result.entry);
+
+    t.ok(b4a.equals(result.publicKey, inputs.claimRecipient));
+    t.ok(b4a.equals(result.amount.value, inputs.amount));
+    t.ok(b4a.equals(result.feePublicKey, inputs.feeRecipient));
+    t.ok(b4a.equals(result.feeAmount.value, inputs.feeAmount));
+    t.is(claimed.status, Status.CLAIMED);
+    t.ok(b4a.equals(claimed.preimage, inputs.preimage));
+    t.is(decode(entry).status, Status.PENDING, 'input entry is not mutated');
+    t.is(makeClaim(result.entry, inputs.preimage, uint64ToBuffer(99)), null, 'claim is one-shot');
+    t.is(makeRefund(result.entry, uint64ToBuffer(100)), null, 'claimed lock cannot be refunded');
 });
 
-test('Escrow Entry - makeRefund pays the maker and clears the amount', t => {
+test('Escrow Entry - claim enforces the hashlock and exclusive claim window', t => {
     const inputs = makeInputs();
-    const entry = init(inputs.lockId, inputs.maker, inputs.taker, inputs.lock, inputs.nonce, inputs.expiryEpoch, inputs.amount);
-    const result = makeRefund(entry);
-    t.ok(b4a.equals(result.publicKey, inputs.maker), 'refund recipient is the maker');
-    t.ok(b4a.equals(result.amount.value, inputs.amount), 'refunded amount matches');
-    t.is(entry[ESCROW_ENTRY_SIZE - 1], Status.REFUNDED, 'status is refunded');
+    const entry = init(inputs);
+
+    t.is(makeClaim(entry, randomBuffer(HASH_BYTE_LENGTH), uint64ToBuffer(99)), null);
+    t.is(makeClaim(entry, inputs.preimage, uint64ToBuffer(100)), null);
+    t.is(makeClaim(entry, inputs.preimage, uint64ToBuffer(101)), null);
 });
 
-test('Escrow Entry - settlement rejects invalid entries', t => {
-    t.is(makeClaim(randomBuffer(ESCROW_ENTRY_SIZE - 1)), null, 'claim rejects invalid entry');
-    t.is(makeRefund(null), null, 'refund rejects non-buffer entry');
+test('Escrow Entry - refund returns principal and surcharge at or after expiry', t => {
+    const inputs = makeInputs();
+    const entry = init(inputs);
+
+    t.is(makeRefund(entry, uint64ToBuffer(99)), null);
+
+    const result = makeRefund(entry, uint64ToBuffer(100));
+    t.ok(b4a.equals(result.publicKey, inputs.refundRecipient));
+    t.is(result.amount.asBigInt(), 105n);
+    t.is(decode(result.entry).status, Status.REFUNDED);
+    t.is(decode(entry).status, Status.PENDING, 'input entry is not mutated');
+    t.is(makeRefund(result.entry, uint64ToBuffer(101)), null, 'refund is one-shot');
+    t.is(makeClaim(result.entry, inputs.preimage, uint64ToBuffer(99)), null, 'refunded lock cannot be claimed');
+});
+
+test('Escrow Entry - decode and settlement reject malformed entries', t => {
+    const inputs = makeInputs();
+    const wrongVersion = init(inputs);
+    wrongVersion[0] = ESCROW_ENTRY_VERSION + 1;
+
+    t.is(decode(randomBuffer(ESCROW_ENTRY_SIZE - 1)), null);
+    t.is(decode(wrongVersion), null);
+    t.is(makeClaim(null, inputs.preimage, uint64ToBuffer(99)), null);
+    t.is(makeRefund(init(inputs), b4a.alloc(EPOCH_BYTE_LENGTH - 1)), null);
 });

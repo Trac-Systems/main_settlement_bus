@@ -572,17 +572,55 @@ class ApplyStateMessageDirector {
         return this.#builder.getPayload();
     }
 
-    async buildPartialHtlcLockOperationMessage(invokerAddress, txValidity, lockData, amount) {
+    /**
+     * Build a partial HTLC lock operation.
+     * The transaction hash produced by the builder is the lock identifier.
+     *
+     * @param {string|Buffer} invokerAddress Locker address.
+     * @param {string|Buffer} txValidity Current transaction-validity value.
+     * @param {object} lock Canonical HTLC lock terms and authorizations.
+     * @param {'json'|'buffer'} output Output format.
+     * @returns {Promise<object>}
+     */
+    async buildPartialHtlcLockOperationMessage(invokerAddress, txValidity, lock, output = 'buffer') {
         if (!this.#builder) throw new Error('Builder has not been set.');
-        await this.#builder
+        const {
+            claimAddress,
+            refundAddress,
+            amount,
+            feeAmount,
+            feeRecipient,
+            hashLock,
+            refundEpoch,
+            counterpartyHash,
+            policyHash,
+            signerSet,
+            threshold,
+            cosignerSignatures = [],
+            nonce
+        } = lock ?? {};
+
+        const builder = this.#builder
             .setPhase('partial')
-            .setOutput('buffer')
+            .setOutput(output)
             .setOperationType(OperationType.HTLC_LOCK)
             .setAddress(invokerAddress)
             .setTxValidity(txValidity)
-            .setHtlcLockData(lockData)
             .setAmount(amount)
-            .build();
+            .setHtlcClaimAddress(claimAddress)
+            .setHtlcRefundAddress(refundAddress)
+            .setHtlcFeeAmount(feeAmount)
+            .setHtlcFeeRecipient(feeRecipient)
+            .setHtlcHashLock(hashLock)
+            .setHtlcRefundEpoch(refundEpoch)
+            .setHtlcCounterpartyHash(counterpartyHash)
+            .setHtlcPolicyHash(policyHash)
+            .setHtlcSignerSet(signerSet)
+            .setHtlcThreshold(threshold)
+            .setHtlcCosignerSignatures(cosignerSignatures);
+
+        if (nonce !== undefined) builder.setNonce(nonce);
+        await builder.build();
         return this.#builder.getPayload();
     }
 
@@ -619,19 +657,36 @@ class ApplyStateMessageDirector {
         return this.#builder.getPayload();
     }
 
-    async buildCompleteHtlcLockOperationMessage(invokerAddress, txHash, txValidity, lockData, amount, incomingNonce, incomingSignature) {
+    /**
+     * Add validator metadata to an already validated partial HTLC lock operation.
+     *
+     * @param {string|Buffer} invokerAddress Locker address.
+     * @param {object} operation Decoded partial hlo payload.
+     * @returns {Promise<object>}
+     */
+    async buildCompleteHtlcLockOperationMessage(invokerAddress, operation) {
         if (!this.#builder) throw new Error('Builder has not been set.');
         await this.#builder
             .setPhase('complete')
             .setOutput('buffer')
             .setOperationType(OperationType.HTLC_LOCK)
             .setAddress(invokerAddress)
-            .setTxHash(txHash)
-            .setTxValidity(txValidity)
-            .setHtlcLockData(lockData)
-            .setAmount(amount)
-            .setIncomingNonce(incomingNonce)
-            .setIncomingSignature(incomingSignature)
+            .setTxHash(operation?.tx)
+            .setTxValidity(operation?.txv)
+            .setAmount(operation?.am)
+            .setHtlcClaimAddress(operation?.ca)
+            .setHtlcRefundAddress(operation?.ra)
+            .setHtlcFeeAmount(operation?.fa)
+            .setHtlcFeeRecipient(operation?.fr)
+            .setHtlcHashLock(operation?.hl)
+            .setHtlcRefundEpoch(operation?.re)
+            .setHtlcCounterpartyHash(operation?.cc)
+            .setHtlcPolicyHash(operation?.ph)
+            .setHtlcSignerSet(operation?.ss)
+            .setHtlcThreshold(operation?.th)
+            .setHtlcCosignerSignatures(operation?.cs)
+            .setIncomingNonce(operation?.in)
+            .setIncomingSignature(operation?.is)
             .build();
         return this.#builder.getPayload();
     }

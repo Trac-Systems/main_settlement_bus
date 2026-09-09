@@ -438,22 +438,27 @@ test('normalizeHtlcLockOperation normalizes hex strings and addresses', t => {
     const sender = randomAddress(config.addressPrefix);
     const refundAddress = randomAddress(config.addressPrefix);
     const claimantAddress = randomAddress(config.addressPrefix);
-    const lockData = b4a.concat([
-        toBuffer(hex('66', 32)),
-        addressToBuffer(refundAddress, config.addressPrefix),
-        addressToBuffer(claimantAddress, config.addressPrefix),
-        toBuffer(hex('77', 8))
-    ]).toString('hex');
+    const feeRecipient = randomAddress(config.addressPrefix);
     const payload = {
         type: OperationType.HTLC_LOCK,
         address: sender,
         hlo: {
             tx: hex('11', 32),
             txv: hex('22', 32),
-            ld: lockData,
+            ca: claimantAddress,
+            ra: refundAddress,
             am: hex('33', 16),
-            in: hex('44', 32),
-            is: hex('55', 64)
+            fa: hex('44', 16),
+            fr: feeRecipient,
+            hl: hex('55', 32),
+            re: hex('66', 8),
+            cc: hex('77', 32),
+            ph: hex('88', 32),
+            ss: [hex('99', 32), hex('aa', 32)],
+            th: '02',
+            cs: [hex('bb', 64)],
+            in: hex('cc', 32),
+            is: hex('dd', 64)
         }
     };
 
@@ -463,10 +468,20 @@ test('normalizeHtlcLockOperation normalizes hex strings and addresses', t => {
     t.ok(b4a.equals(normalized.address, addressToBuffer(sender, config.addressPrefix)));
     t.ok(b4a.equals(normalized.hlo.tx, toBuffer(hex('11', 32))));
     t.ok(b4a.equals(normalized.hlo.txv, toBuffer(hex('22', 32))));
-    t.ok(b4a.equals(normalized.hlo.ld, toBuffer(lockData)));
+    t.ok(b4a.equals(normalized.hlo.ca, addressToBuffer(claimantAddress, config.addressPrefix)));
+    t.ok(b4a.equals(normalized.hlo.ra, addressToBuffer(refundAddress, config.addressPrefix)));
     t.ok(b4a.equals(normalized.hlo.am, toBuffer(hex('33', 16))));
-    t.ok(b4a.equals(normalized.hlo.in, toBuffer(hex('44', 32))));
-    t.ok(b4a.equals(normalized.hlo.is, toBuffer(hex('55', 64))));
+    t.ok(b4a.equals(normalized.hlo.fa, toBuffer(hex('44', 16))));
+    t.ok(b4a.equals(normalized.hlo.fr, addressToBuffer(feeRecipient, config.addressPrefix)));
+    t.ok(b4a.equals(normalized.hlo.hl, toBuffer(hex('55', 32))));
+    t.ok(b4a.equals(normalized.hlo.re, toBuffer(hex('66', 8))));
+    t.ok(b4a.equals(normalized.hlo.cc, toBuffer(hex('77', 32))));
+    t.ok(b4a.equals(normalized.hlo.ph, toBuffer(hex('88', 32))));
+    t.ok(b4a.equals(normalized.hlo.ss[1], toBuffer(hex('aa', 32))));
+    t.ok(b4a.equals(normalized.hlo.th, toBuffer('02')));
+    t.ok(b4a.equals(normalized.hlo.cs[0], toBuffer(hex('bb', 64))));
+    t.ok(b4a.equals(normalized.hlo.in, toBuffer(hex('cc', 32))));
+    t.ok(b4a.equals(normalized.hlo.is, toBuffer(hex('dd', 64))));
 });
 
 test('normalizeDecodedPayloadForJson converts buffers to strings', t => {

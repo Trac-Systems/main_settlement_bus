@@ -216,8 +216,10 @@ export function normalizeHtlcLockOperation(payload, config) {
     if (
         type !== OperationType.HTLC_LOCK ||
         !address ||
-        !hlo.tx || !hlo.txv || !hlo.ld ||
-        !hlo.am || !hlo.in || !hlo.is
+        !hlo.tx || !hlo.txv || !hlo.ca || !hlo.ra ||
+        !hlo.am || !hlo.fa || !hlo.hl || !hlo.re || !hlo.cc ||
+        !Array.isArray(hlo.ss) || !hlo.th || !Array.isArray(hlo.cs) ||
+        !hlo.in || !hlo.is
     ) {
         throw new Error('Missing required fields in HTLC lock operation payload.');
     }
@@ -225,11 +227,21 @@ export function normalizeHtlcLockOperation(payload, config) {
     const normalizedHlo = {
         tx: normalizeHex(hlo.tx),
         txv: normalizeHex(hlo.txv),
-        ld: normalizeHex(hlo.ld),
+        ca: addressToBuffer(hlo.ca, config.addressPrefix),
+        ra: addressToBuffer(hlo.ra, config.addressPrefix),
         am: normalizeHex(hlo.am),
+        fa: normalizeHex(hlo.fa),
+        hl: normalizeHex(hlo.hl),
+        re: normalizeHex(hlo.re),
+        cc: normalizeHex(hlo.cc),
+        ss: hlo.ss.map(normalizeHex),
+        th: normalizeHex(hlo.th),
+        cs: hlo.cs.map(normalizeHex),
         in: normalizeHex(hlo.in),
         is: normalizeHex(hlo.is)
     };
+    if (hlo.fr !== undefined) normalizedHlo.fr = addressToBuffer(hlo.fr, config.addressPrefix);
+    if (hlo.ph !== undefined) normalizedHlo.ph = normalizeHex(hlo.ph);
 
     return {
         type,

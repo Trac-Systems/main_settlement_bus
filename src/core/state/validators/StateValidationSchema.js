@@ -17,7 +17,10 @@ import {
     CONSENSUS_CONFIG_SCHEMA_VERSION_BYTE_LENGTH,
     CONSENSUS_CONFIG_DATA_MAX_SIZE,
     HTLC_LOCK_ID_BYTE_LENGTH,
+    HTLC_MAX_SIGNERS,
     HTLC_PREIMAGE_BYTE_LENGTH,
+    HTLC_THRESHOLD_BYTE_LENGTH,
+    PUBLIC_KEY_LENGTH,
 } from '../../../utils/constants.js';
 import {
     decodeProofProposalApproval,
@@ -25,9 +28,6 @@ import {
     encodeProofProposalApproval,
     encodeProofProposal
 } from '../../../codecs/consensus/v1/consensusV1OperationCodec.js';
-import applyOperationsGenerated from '../../../codecs/apply/applyOperations.generated.cjs';
-
-const { HtlcLockData } = applyOperationsGenerated.apply.operations;
 class StateValidationSchema {
     #validator;
     #validateCoreAdminOperationSchema;
@@ -70,7 +70,6 @@ class StateValidationSchema {
                 emptyBuffer: "The '{field}' field must not be an empty Buffer!",
                 proofData: "The '{field}' field must be an encoded ProofProposal buffer.",
                 proofProposalApproval: "The '{field}' field must be an encoded ProofProposalApproval buffer.",
-                htlcLockData: "The '{field}' field must be a serialized HtlcLockData buffer.",
             },
         });
         const isBuffer = b4a.isBuffer;
@@ -289,76 +288,6 @@ class StateValidationSchema {
                     `
             };
         });
-
-        this.#validator.add("htlc_lock_data", function ({messages, index}, _path, _context) {
-            const htlcLockDataFields = [
-                {name: 'hl', length: HASH_BYTE_LENGTH},
-                {name: 'ra', length: addressLength},
-                {name: 'ca', length: addressLength},
-                {name: 'ee', length: EPOCH_BYTE_LENGTH},
-            ];
-            _context.customs[index] = {
-                decode: value => HtlcLockData.decode(value),
-                encode: value => HtlcLockData.encode(value).finish(),
-                equals,
-                isBuffer,
-                fields: htlcLockDataFields
-            };
-
-            return {
-                source: `
-                    const htlcRule = context.customs[${index}];
-                    if (!htlcRule.isBuffer(value) || value.length === 0) {
-                        ${this.makeError({type: "htlcLockData", actual: "value", messages})}
-                        return value;
-                    }
-
-                    const expectedLength = htlcRule.fields.reduce((total, field) => total + field.length, 0);
-                    const isSerialized = value.length === expectedLength;
-                    let lockData;
-                    if (!isSerialized) {
-                        try {
-                            lockData = htlcRule.decode(value);
-                        } catch {
-                            ${this.makeError({type: "htlcLockData", actual: "value", messages})}
-                            return value;
-                        }
-                    }
-
-                    let offset = 0;
-                    const reencodedInput = {};
-                    for (const field of htlcRule.fields) {
-                        const fieldValue = isSerialized
-                            ? value.subarray(offset, offset + field.length)
-                            : lockData[field.name];
-                        if (!htlcRule.isBuffer(fieldValue) || fieldValue.length !== field.length) {
-                            ${this.makeError({type: "htlcLockData", actual: "value", messages})}
-                            return value;
-                        }
-                        offset += field.length;
-                        let fieldIsZeroFilled = true;
-                        for (let i = 0; i < fieldValue.length; i++) {
-                            if (fieldValue[i] !== 0) {
-                                fieldIsZeroFilled = false;
-                                break;
-                            }
-                        }
-                        if (fieldIsZeroFilled) {
-                            ${this.makeError({type: "htlcLockData", actual: "value", messages})}
-                            return value;
-                        }
-                        reencodedInput[field.name] = fieldValue;
-                    }
-
-                    if (!isSerialized && !htlcRule.equals(value, htlcRule.encode(reencodedInput))) {
-                        ${this.makeError({type: "htlcLockData", actual: "value", messages})}
-                    }
-
-                    return value;
-                `
-            };
-        });
-
 
         this.#validateCoreAdminOperationSchema = this.#compileCoreAdminOperationSchema();
         this.#validateAdminControlOperationSchema = this.#compileAdminControlOperationSchema();
@@ -817,13 +746,134 @@ class StateValidationSchema {
                 props: {
                     tx: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
                     txv: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
-                    ld: {type: 'htlc_lock_data', required: true},
-                    am: {type: 'buffer_amount', length: AMOUNT_BYTE_LENGTH, required: true},
+                    ca: {type: 'buffer', length: this.#config.addressLength, required: true},
+                    ra: {type: 'buffer', length: this.#config.addressLength, required: true},
+                    am: {type: 'buffer', length: AMOUNT_BYTE_LENGTH, required: true},
+                    fa: {type: 'buffer_amount', length: AMOUNT_BYTE_LENGTH, required: true},
+                    fr: {type: 'buffer', length: this.#config.addressLength, optional: true},
+                    hl: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
+                    re: {type: 'buffer', length: EPOCH_BYTE_LENGTH, required: true},
+                    cc: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
+                    ph: {type: 'buffer', length: HASH_BYTE_LENGTH, optional: true},
+                    ss: {
+                        type: 'array',
+                        min: 1,
+                        max: HTLC_MAX_SIGNERS,
+                        required: true,
+                        items: {type: 'buffer', length: PUBLIC_KEY_LENGTH}
+                    },
+                    th: {type: 'buffer', length: HTLC_THRESHOLD_BYTE_LENGTH, required: true},
+                    cs: {
+                        type: 'array',
+                        min: 0,
+                        max: HTLC_MAX_SIGNERS - 1,
+                        required: true,
+                        items: {type: 'buffer', length: SIGNATURE_BYTE_LENGTH}
+                    },
                     in: {type: 'buffer', length: NONCE_BYTE_LENGTH, required: true},
                     is: {type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true},
                     va: {type: 'buffer', length: this.#config.addressLength, optional: true},
                     vn: {type: 'buffer', length: NONCE_BYTE_LENGTH, optional: true},
                     vs: {type: 'buffer', length: SIGNATURE_BYTE_LENGTH, optional: true}
+                },
+                custom: (value, errors) => {
+                    if (!value || typeof value !== 'object') return value;
+
+                    const {fa, fr, ph, ss, th, cs, va, vn, vs} = value;
+                    if (fr === null || ph === null) {
+                        errors.push({
+                            type: 'buffer',
+                            field: 'hlo',
+                            message: 'Optional HTLC lock fields must be a Buffer or undefined'
+                        });
+                    }
+
+                    if (b4a.isBuffer(fa) && fa.length === AMOUNT_BYTE_LENGTH) {
+                        const feeIsZero = fa.every(byte => byte === 0);
+                        if (feeIsZero === (fr !== undefined)) {
+                            errors.push({
+                                type: 'conditionalDependency',
+                                field: 'hlo.fr',
+                                message: 'Fee recipient must be present exactly when the HTLC fee amount is non-zero'
+                            });
+                        }
+                    }
+
+                    if (Array.isArray(ss)) {
+                        const uniqueSignerKeys = new Set();
+                        for (let index = 0; index < ss.length; index++) {
+                            const signer = ss[index];
+                            if (!b4a.isBuffer(signer) || signer.length !== PUBLIC_KEY_LENGTH) continue;
+
+                            const signerHex = signer.toString('hex');
+                            if (uniqueSignerKeys.has(signerHex)) {
+                                errors.push({
+                                    type: 'duplicateSigner',
+                                    field: 'hlo.ss',
+                                    message: 'HTLC signer set must not contain duplicate public keys'
+                                });
+                                break;
+                            }
+                            uniqueSignerKeys.add(signerHex);
+
+                            if (
+                                index > 1 &&
+                                b4a.isBuffer(ss[index - 1]) &&
+                                ss[index - 1].length === PUBLIC_KEY_LENGTH &&
+                                b4a.compare(ss[index - 1], signer) >= 0
+                            ) {
+                                errors.push({
+                                    type: 'signerOrder',
+                                    field: 'hlo.ss',
+                                    message: 'HTLC cosigner public keys must be sorted by raw bytes'
+                                });
+                                break;
+                            }
+                        }
+                    }
+
+                    if (b4a.isBuffer(th) && th.length === HTLC_THRESHOLD_BYTE_LENGTH && Array.isArray(ss)) {
+                        const threshold = th.readUInt8(0);
+                        if (threshold < 1 || threshold > ss.length) {
+                            errors.push({
+                                type: 'threshold',
+                                field: 'hlo.th',
+                                message: 'HTLC threshold must be between one and the signer-set size'
+                            });
+                        } else if (Array.isArray(cs) && 1 + cs.length < threshold) {
+                            errors.push({
+                                type: 'threshold',
+                                field: 'hlo.cs',
+                                message: 'HTLC signatures do not satisfy the declared threshold'
+                            });
+                        }
+                    }
+
+                    if (Array.isArray(cs) && Array.isArray(ss) && cs.length > ss.length - 1) {
+                        errors.push({
+                            type: 'signatureCount',
+                            field: 'hlo.cs',
+                            message: 'HTLC cosigner signatures cannot outnumber the cosigner keys'
+                        });
+                    }
+
+                    const validatorFieldsPresent = [va, vn, vs].filter(field => field !== undefined).length;
+                    if (validatorFieldsPresent > 0 && validatorFieldsPresent < 3) {
+                        errors.push({
+                            type: 'conditionalDependency',
+                            field: 'hlo',
+                            message: 'Fields "va", "vn", and "vs" must all be present if any one is provided'
+                        });
+                    }
+                    if (va === null || vn === null || vs === null) {
+                        errors.push({
+                            type: 'buffer',
+                            field: 'hlo',
+                            message: 'Validator fields cannot be null, must be a Buffer or undefined'
+                        });
+                    }
+
+                    return value;
                 }
             }
         };
