@@ -8,6 +8,7 @@ import {bufferToBigInt} from "../../../../../utils/amountSerialization.js";
 import {FEE} from "../../../../state/utils/transaction.js";
 import * as operationsUtils from '../../../../../utils/applyOperations.js';
 import {V1ProtocolError} from '../../v1/V1ProtocolError.js';
+import {createHtlcLockSigningMessage} from '../../../../../utils/htlcLock.js';
 
 const MAX_AMOUNT = BigInt('0xffffffffffffffffffffffffffffffff');
 const FEE_BIGINT = bufferToBigInt(FEE);
@@ -131,15 +132,6 @@ class PartialOperationValidator {
                     operation.in,
                     OperationType.TRANSFER
                 ];
-            case OperationType.HTLC_LOCK:
-                return [
-                    this.#config.networkId,
-                    operation.txv,
-                    operation.ld,
-                    operation.am,
-                    operation.in,
-                    OperationType.HTLC_LOCK
-                ];
             default:
                 throw new V1ProtocolError(
                     ResultCode.OPERATION_TYPE_UNKNOWN,
@@ -154,9 +146,9 @@ class PartialOperationValidator {
 
         const incomingPublicKey = tracCryptoApi.address.decodeSafe(bufferToAddress(payload.address, this.#config.addressPrefix));
         const incomingSignature = operation.is;
-        const messageComponents = this.#getMessageComponents(payload);
-
-        const message = createMessage(...messageComponents);
+        const message = payload.type === OperationType.HTLC_LOCK
+            ? createHtlcLockSigningMessage(this.#config.networkId, payload.address, operation)
+            : createMessage(...this.#getMessageComponents(payload));
         const messageHash = await tracCryptoApi.hash.blake3(message);
         const payloadHash = operation.tx;
         if (!b4a.equals(payloadHash, messageHash)) {

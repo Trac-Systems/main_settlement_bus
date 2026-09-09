@@ -9,6 +9,7 @@ async function runTests() {
     await import('./networkV1OperationCodec.test.js');
     await import('./consensusV1OperationCodec.test.js');
     await import('./vdfConfigCodec.test.js');
+    await import('./escrowEntryCodec.test.js');
     test.resume();
 }
 
