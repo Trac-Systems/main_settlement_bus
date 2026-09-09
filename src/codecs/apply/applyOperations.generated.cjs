@@ -4440,6 +4440,25 @@ $root.apply = (function() {
              * Properties of a HtlcLockOperation.
              * @memberof apply.operations
              * @interface IHtlcLockOperation
+             * @property {Uint8Array|null} [tx] HtlcLockOperation tx
+             * @property {Uint8Array|null} [txv] HtlcLockOperation txv
+             * @property {Uint8Array|null} [ca] HtlcLockOperation ca
+             * @property {Uint8Array|null} [ra] HtlcLockOperation ra
+             * @property {Uint8Array|null} [am] HtlcLockOperation am
+             * @property {Uint8Array|null} [fa] HtlcLockOperation fa
+             * @property {Uint8Array|null} [fr] HtlcLockOperation fr
+             * @property {Uint8Array|null} [hl] HtlcLockOperation hl
+             * @property {Uint8Array|null} [re] HtlcLockOperation re
+             * @property {Uint8Array|null} [cc] HtlcLockOperation cc
+             * @property {Uint8Array|null} [ph] HtlcLockOperation ph
+             * @property {Array.<Uint8Array>|null} [ss] HtlcLockOperation ss
+             * @property {Uint8Array|null} [th] HtlcLockOperation th
+             * @property {Array.<Uint8Array>|null} [cs] HtlcLockOperation cs
+             * @property {Uint8Array|null} ["in"] HtlcLockOperation in
+             * @property {Uint8Array|null} [is] HtlcLockOperation is
+             * @property {Uint8Array|null} [va] HtlcLockOperation va
+             * @property {Uint8Array|null} [vn] HtlcLockOperation vn
+             * @property {Uint8Array|null} [vs] HtlcLockOperation vs
              */
 
             /**
@@ -4451,11 +4470,180 @@ $root.apply = (function() {
              * @param {apply.operations.IHtlcLockOperation=} [properties] Properties to set
              */
             function HtlcLockOperation(properties) {
+                this.ss = [];
+                this.cs = [];
                 if (properties)
                     for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
                         if (properties[keys[i]] != null)
                             this[keys[i]] = properties[keys[i]];
             }
+
+            /**
+             * HtlcLockOperation tx.
+             * @member {Uint8Array} tx
+             * @memberof apply.operations.HtlcLockOperation
+             * @instance
+             */
+            HtlcLockOperation.prototype.tx = $util.newBuffer([]);
+
+            /**
+             * HtlcLockOperation txv.
+             * @member {Uint8Array} txv
+             * @memberof apply.operations.HtlcLockOperation
+             * @instance
+             */
+            HtlcLockOperation.prototype.txv = $util.newBuffer([]);
+
+            /**
+             * HtlcLockOperation ca.
+             * @member {Uint8Array} ca
+             * @memberof apply.operations.HtlcLockOperation
+             * @instance
+             */
+            HtlcLockOperation.prototype.ca = $util.newBuffer([]);
+
+            /**
+             * HtlcLockOperation ra.
+             * @member {Uint8Array} ra
+             * @memberof apply.operations.HtlcLockOperation
+             * @instance
+             */
+            HtlcLockOperation.prototype.ra = $util.newBuffer([]);
+
+            /**
+             * HtlcLockOperation am.
+             * @member {Uint8Array} am
+             * @memberof apply.operations.HtlcLockOperation
+             * @instance
+             */
+            HtlcLockOperation.prototype.am = $util.newBuffer([]);
+
+            /**
+             * HtlcLockOperation fa.
+             * @member {Uint8Array} fa
+             * @memberof apply.operations.HtlcLockOperation
+             * @instance
+             */
+            HtlcLockOperation.prototype.fa = $util.newBuffer([]);
+
+            /**
+             * HtlcLockOperation fr.
+             * @member {Uint8Array|null|undefined} fr
+             * @memberof apply.operations.HtlcLockOperation
+             * @instance
+             */
+            HtlcLockOperation.prototype.fr = null;
+
+            /**
+             * HtlcLockOperation hl.
+             * @member {Uint8Array} hl
+             * @memberof apply.operations.HtlcLockOperation
+             * @instance
+             */
+            HtlcLockOperation.prototype.hl = $util.newBuffer([]);
+
+            /**
+             * HtlcLockOperation re.
+             * @member {Uint8Array} re
+             * @memberof apply.operations.HtlcLockOperation
+             * @instance
+             */
+            HtlcLockOperation.prototype.re = $util.newBuffer([]);
+
+            /**
+             * HtlcLockOperation cc.
+             * @member {Uint8Array} cc
+             * @memberof apply.operations.HtlcLockOperation
+             * @instance
+             */
+            HtlcLockOperation.prototype.cc = $util.newBuffer([]);
+
+            /**
+             * HtlcLockOperation ph.
+             * @member {Uint8Array|null|undefined} ph
+             * @memberof apply.operations.HtlcLockOperation
+             * @instance
+             */
+            HtlcLockOperation.prototype.ph = null;
+
+            /**
+             * HtlcLockOperation ss.
+             * @member {Array.<Uint8Array>} ss
+             * @memberof apply.operations.HtlcLockOperation
+             * @instance
+             */
+            HtlcLockOperation.prototype.ss = $util.emptyArray;
+
+            /**
+             * HtlcLockOperation th.
+             * @member {Uint8Array} th
+             * @memberof apply.operations.HtlcLockOperation
+             * @instance
+             */
+            HtlcLockOperation.prototype.th = $util.newBuffer([]);
+
+            /**
+             * HtlcLockOperation cs.
+             * @member {Array.<Uint8Array>} cs
+             * @memberof apply.operations.HtlcLockOperation
+             * @instance
+             */
+            HtlcLockOperation.prototype.cs = $util.emptyArray;
+
+            /**
+             * HtlcLockOperation in.
+             * @member {Uint8Array} in
+             * @memberof apply.operations.HtlcLockOperation
+             * @instance
+             */
+            HtlcLockOperation.prototype["in"] = $util.newBuffer([]);
+
+            /**
+             * HtlcLockOperation is.
+             * @member {Uint8Array} is
+             * @memberof apply.operations.HtlcLockOperation
+             * @instance
+             */
+            HtlcLockOperation.prototype.is = $util.newBuffer([]);
+
+            /**
+             * HtlcLockOperation va.
+             * @member {Uint8Array} va
+             * @memberof apply.operations.HtlcLockOperation
+             * @instance
+             */
+            HtlcLockOperation.prototype.va = $util.newBuffer([]);
+
+            /**
+             * HtlcLockOperation vn.
+             * @member {Uint8Array} vn
+             * @memberof apply.operations.HtlcLockOperation
+             * @instance
+             */
+            HtlcLockOperation.prototype.vn = $util.newBuffer([]);
+
+            /**
+             * HtlcLockOperation vs.
+             * @member {Uint8Array} vs
+             * @memberof apply.operations.HtlcLockOperation
+             * @instance
+             */
+            HtlcLockOperation.prototype.vs = $util.newBuffer([]);
+
+            // OneOf field names bound to virtual getters and setters
+            var $oneOfFields;
+
+            // Virtual OneOf for proto3 optional field
+            Object.defineProperty(HtlcLockOperation.prototype, "_fr", {
+                get: $util.oneOfGetter($oneOfFields = ["fr"]),
+                set: $util.oneOfSetter($oneOfFields)
+            });
+
+            // Virtual OneOf for proto3 optional field
+            Object.defineProperty(HtlcLockOperation.prototype, "_ph", {
+                get: $util.oneOfGetter($oneOfFields = ["ph"]),
+                set: $util.oneOfSetter($oneOfFields)
+            });
 
             /**
              * Creates a new HtlcLockOperation instance using the specified properties.
@@ -4481,6 +4669,46 @@ $root.apply = (function() {
             HtlcLockOperation.encode = function encode(message, writer) {
                 if (!writer)
                     writer = $Writer.create();
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
+                    writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.tx);
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
+                    writer.uint32(/* id 2, wireType 2 =*/18).bytes(message.txv);
+                if (message.ca != null && Object.hasOwnProperty.call(message, "ca"))
+                    writer.uint32(/* id 3, wireType 2 =*/26).bytes(message.ca);
+                if (message.ra != null && Object.hasOwnProperty.call(message, "ra"))
+                    writer.uint32(/* id 4, wireType 2 =*/34).bytes(message.ra);
+                if (message.am != null && Object.hasOwnProperty.call(message, "am"))
+                    writer.uint32(/* id 5, wireType 2 =*/42).bytes(message.am);
+                if (message.fa != null && Object.hasOwnProperty.call(message, "fa"))
+                    writer.uint32(/* id 6, wireType 2 =*/50).bytes(message.fa);
+                if (message.fr != null && Object.hasOwnProperty.call(message, "fr"))
+                    writer.uint32(/* id 7, wireType 2 =*/58).bytes(message.fr);
+                if (message.hl != null && Object.hasOwnProperty.call(message, "hl"))
+                    writer.uint32(/* id 8, wireType 2 =*/66).bytes(message.hl);
+                if (message.re != null && Object.hasOwnProperty.call(message, "re"))
+                    writer.uint32(/* id 9, wireType 2 =*/74).bytes(message.re);
+                if (message.cc != null && Object.hasOwnProperty.call(message, "cc"))
+                    writer.uint32(/* id 10, wireType 2 =*/82).bytes(message.cc);
+                if (message.ph != null && Object.hasOwnProperty.call(message, "ph"))
+                    writer.uint32(/* id 11, wireType 2 =*/90).bytes(message.ph);
+                if (message.ss != null && message.ss.length)
+                    for (var i = 0; i < message.ss.length; ++i)
+                        writer.uint32(/* id 12, wireType 2 =*/98).bytes(message.ss[i]);
+                if (message.th != null && Object.hasOwnProperty.call(message, "th"))
+                    writer.uint32(/* id 13, wireType 2 =*/106).bytes(message.th);
+                if (message.cs != null && message.cs.length)
+                    for (var i = 0; i < message.cs.length; ++i)
+                        writer.uint32(/* id 14, wireType 2 =*/114).bytes(message.cs[i]);
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
+                    writer.uint32(/* id 15, wireType 2 =*/122).bytes(message["in"]);
+                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
+                    writer.uint32(/* id 16, wireType 2 =*/130).bytes(message.is);
+                if (message.va != null && Object.hasOwnProperty.call(message, "va"))
+                    writer.uint32(/* id 17, wireType 2 =*/138).bytes(message.va);
+                if (message.vn != null && Object.hasOwnProperty.call(message, "vn"))
+                    writer.uint32(/* id 18, wireType 2 =*/146).bytes(message.vn);
+                if (message.vs != null && Object.hasOwnProperty.call(message, "vs"))
+                    writer.uint32(/* id 19, wireType 2 =*/154).bytes(message.vs);
                 return writer;
             };
 
@@ -4517,6 +4745,86 @@ $root.apply = (function() {
                     if (tag === error)
                         break;
                     switch (tag >>> 3) {
+                    case 1: {
+                            message.tx = reader.bytes();
+                            break;
+                        }
+                    case 2: {
+                            message.txv = reader.bytes();
+                            break;
+                        }
+                    case 3: {
+                            message.ca = reader.bytes();
+                            break;
+                        }
+                    case 4: {
+                            message.ra = reader.bytes();
+                            break;
+                        }
+                    case 5: {
+                            message.am = reader.bytes();
+                            break;
+                        }
+                    case 6: {
+                            message.fa = reader.bytes();
+                            break;
+                        }
+                    case 7: {
+                            message.fr = reader.bytes();
+                            break;
+                        }
+                    case 8: {
+                            message.hl = reader.bytes();
+                            break;
+                        }
+                    case 9: {
+                            message.re = reader.bytes();
+                            break;
+                        }
+                    case 10: {
+                            message.cc = reader.bytes();
+                            break;
+                        }
+                    case 11: {
+                            message.ph = reader.bytes();
+                            break;
+                        }
+                    case 12: {
+                            if (!(message.ss && message.ss.length))
+                                message.ss = [];
+                            message.ss.push(reader.bytes());
+                            break;
+                        }
+                    case 13: {
+                            message.th = reader.bytes();
+                            break;
+                        }
+                    case 14: {
+                            if (!(message.cs && message.cs.length))
+                                message.cs = [];
+                            message.cs.push(reader.bytes());
+                            break;
+                        }
+                    case 15: {
+                            message["in"] = reader.bytes();
+                            break;
+                        }
+                    case 16: {
+                            message.is = reader.bytes();
+                            break;
+                        }
+                    case 17: {
+                            message.va = reader.bytes();
+                            break;
+                        }
+                    case 18: {
+                            message.vn = reader.bytes();
+                            break;
+                        }
+                    case 19: {
+                            message.vs = reader.bytes();
+                            break;
+                        }
                     default:
                         reader.skipType(tag & 7);
                         break;
@@ -4552,6 +4860,76 @@ $root.apply = (function() {
             HtlcLockOperation.verify = function verify(message) {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
+                var properties = {};
+                if (message.tx != null && message.hasOwnProperty("tx"))
+                    if (!(message.tx && typeof message.tx.length === "number" || $util.isString(message.tx)))
+                        return "tx: buffer expected";
+                if (message.txv != null && message.hasOwnProperty("txv"))
+                    if (!(message.txv && typeof message.txv.length === "number" || $util.isString(message.txv)))
+                        return "txv: buffer expected";
+                if (message.ca != null && message.hasOwnProperty("ca"))
+                    if (!(message.ca && typeof message.ca.length === "number" || $util.isString(message.ca)))
+                        return "ca: buffer expected";
+                if (message.ra != null && message.hasOwnProperty("ra"))
+                    if (!(message.ra && typeof message.ra.length === "number" || $util.isString(message.ra)))
+                        return "ra: buffer expected";
+                if (message.am != null && message.hasOwnProperty("am"))
+                    if (!(message.am && typeof message.am.length === "number" || $util.isString(message.am)))
+                        return "am: buffer expected";
+                if (message.fa != null && message.hasOwnProperty("fa"))
+                    if (!(message.fa && typeof message.fa.length === "number" || $util.isString(message.fa)))
+                        return "fa: buffer expected";
+                if (message.fr != null && message.hasOwnProperty("fr")) {
+                    properties._fr = 1;
+                    if (!(message.fr && typeof message.fr.length === "number" || $util.isString(message.fr)))
+                        return "fr: buffer expected";
+                }
+                if (message.hl != null && message.hasOwnProperty("hl"))
+                    if (!(message.hl && typeof message.hl.length === "number" || $util.isString(message.hl)))
+                        return "hl: buffer expected";
+                if (message.re != null && message.hasOwnProperty("re"))
+                    if (!(message.re && typeof message.re.length === "number" || $util.isString(message.re)))
+                        return "re: buffer expected";
+                if (message.cc != null && message.hasOwnProperty("cc"))
+                    if (!(message.cc && typeof message.cc.length === "number" || $util.isString(message.cc)))
+                        return "cc: buffer expected";
+                if (message.ph != null && message.hasOwnProperty("ph")) {
+                    properties._ph = 1;
+                    if (!(message.ph && typeof message.ph.length === "number" || $util.isString(message.ph)))
+                        return "ph: buffer expected";
+                }
+                if (message.ss != null && message.hasOwnProperty("ss")) {
+                    if (!Array.isArray(message.ss))
+                        return "ss: array expected";
+                    for (var i = 0; i < message.ss.length; ++i)
+                        if (!(message.ss[i] && typeof message.ss[i].length === "number" || $util.isString(message.ss[i])))
+                            return "ss: buffer[] expected";
+                }
+                if (message.th != null && message.hasOwnProperty("th"))
+                    if (!(message.th && typeof message.th.length === "number" || $util.isString(message.th)))
+                        return "th: buffer expected";
+                if (message.cs != null && message.hasOwnProperty("cs")) {
+                    if (!Array.isArray(message.cs))
+                        return "cs: array expected";
+                    for (var i = 0; i < message.cs.length; ++i)
+                        if (!(message.cs[i] && typeof message.cs[i].length === "number" || $util.isString(message.cs[i])))
+                            return "cs: buffer[] expected";
+                }
+                if (message["in"] != null && message.hasOwnProperty("in"))
+                    if (!(message["in"] && typeof message["in"].length === "number" || $util.isString(message["in"])))
+                        return "in: buffer expected";
+                if (message.is != null && message.hasOwnProperty("is"))
+                    if (!(message.is && typeof message.is.length === "number" || $util.isString(message.is)))
+                        return "is: buffer expected";
+                if (message.va != null && message.hasOwnProperty("va"))
+                    if (!(message.va && typeof message.va.length === "number" || $util.isString(message.va)))
+                        return "va: buffer expected";
+                if (message.vn != null && message.hasOwnProperty("vn"))
+                    if (!(message.vn && typeof message.vn.length === "number" || $util.isString(message.vn)))
+                        return "vn: buffer expected";
+                if (message.vs != null && message.hasOwnProperty("vs"))
+                    if (!(message.vs && typeof message.vs.length === "number" || $util.isString(message.vs)))
+                        return "vs: buffer expected";
                 return null;
             };
 
@@ -4566,7 +4944,113 @@ $root.apply = (function() {
             HtlcLockOperation.fromObject = function fromObject(object) {
                 if (object instanceof $root.apply.operations.HtlcLockOperation)
                     return object;
-                return new $root.apply.operations.HtlcLockOperation();
+                var message = new $root.apply.operations.HtlcLockOperation();
+                if (object.tx != null)
+                    if (typeof object.tx === "string")
+                        $util.base64.decode(object.tx, message.tx = $util.newBuffer($util.base64.length(object.tx)), 0);
+                    else if (object.tx.length >= 0)
+                        message.tx = object.tx;
+                if (object.txv != null)
+                    if (typeof object.txv === "string")
+                        $util.base64.decode(object.txv, message.txv = $util.newBuffer($util.base64.length(object.txv)), 0);
+                    else if (object.txv.length >= 0)
+                        message.txv = object.txv;
+                if (object.ca != null)
+                    if (typeof object.ca === "string")
+                        $util.base64.decode(object.ca, message.ca = $util.newBuffer($util.base64.length(object.ca)), 0);
+                    else if (object.ca.length >= 0)
+                        message.ca = object.ca;
+                if (object.ra != null)
+                    if (typeof object.ra === "string")
+                        $util.base64.decode(object.ra, message.ra = $util.newBuffer($util.base64.length(object.ra)), 0);
+                    else if (object.ra.length >= 0)
+                        message.ra = object.ra;
+                if (object.am != null)
+                    if (typeof object.am === "string")
+                        $util.base64.decode(object.am, message.am = $util.newBuffer($util.base64.length(object.am)), 0);
+                    else if (object.am.length >= 0)
+                        message.am = object.am;
+                if (object.fa != null)
+                    if (typeof object.fa === "string")
+                        $util.base64.decode(object.fa, message.fa = $util.newBuffer($util.base64.length(object.fa)), 0);
+                    else if (object.fa.length >= 0)
+                        message.fa = object.fa;
+                if (object.fr != null)
+                    if (typeof object.fr === "string")
+                        $util.base64.decode(object.fr, message.fr = $util.newBuffer($util.base64.length(object.fr)), 0);
+                    else if (object.fr.length >= 0)
+                        message.fr = object.fr;
+                if (object.hl != null)
+                    if (typeof object.hl === "string")
+                        $util.base64.decode(object.hl, message.hl = $util.newBuffer($util.base64.length(object.hl)), 0);
+                    else if (object.hl.length >= 0)
+                        message.hl = object.hl;
+                if (object.re != null)
+                    if (typeof object.re === "string")
+                        $util.base64.decode(object.re, message.re = $util.newBuffer($util.base64.length(object.re)), 0);
+                    else if (object.re.length >= 0)
+                        message.re = object.re;
+                if (object.cc != null)
+                    if (typeof object.cc === "string")
+                        $util.base64.decode(object.cc, message.cc = $util.newBuffer($util.base64.length(object.cc)), 0);
+                    else if (object.cc.length >= 0)
+                        message.cc = object.cc;
+                if (object.ph != null)
+                    if (typeof object.ph === "string")
+                        $util.base64.decode(object.ph, message.ph = $util.newBuffer($util.base64.length(object.ph)), 0);
+                    else if (object.ph.length >= 0)
+                        message.ph = object.ph;
+                if (object.ss) {
+                    if (!Array.isArray(object.ss))
+                        throw TypeError(".apply.operations.HtlcLockOperation.ss: array expected");
+                    message.ss = [];
+                    for (var i = 0; i < object.ss.length; ++i)
+                        if (typeof object.ss[i] === "string")
+                            $util.base64.decode(object.ss[i], message.ss[i] = $util.newBuffer($util.base64.length(object.ss[i])), 0);
+                        else if (object.ss[i].length >= 0)
+                            message.ss[i] = object.ss[i];
+                }
+                if (object.th != null)
+                    if (typeof object.th === "string")
+                        $util.base64.decode(object.th, message.th = $util.newBuffer($util.base64.length(object.th)), 0);
+                    else if (object.th.length >= 0)
+                        message.th = object.th;
+                if (object.cs) {
+                    if (!Array.isArray(object.cs))
+                        throw TypeError(".apply.operations.HtlcLockOperation.cs: array expected");
+                    message.cs = [];
+                    for (var i = 0; i < object.cs.length; ++i)
+                        if (typeof object.cs[i] === "string")
+                            $util.base64.decode(object.cs[i], message.cs[i] = $util.newBuffer($util.base64.length(object.cs[i])), 0);
+                        else if (object.cs[i].length >= 0)
+                            message.cs[i] = object.cs[i];
+                }
+                if (object["in"] != null)
+                    if (typeof object["in"] === "string")
+                        $util.base64.decode(object["in"], message["in"] = $util.newBuffer($util.base64.length(object["in"])), 0);
+                    else if (object["in"].length >= 0)
+                        message["in"] = object["in"];
+                if (object.is != null)
+                    if (typeof object.is === "string")
+                        $util.base64.decode(object.is, message.is = $util.newBuffer($util.base64.length(object.is)), 0);
+                    else if (object.is.length >= 0)
+                        message.is = object.is;
+                if (object.va != null)
+                    if (typeof object.va === "string")
+                        $util.base64.decode(object.va, message.va = $util.newBuffer($util.base64.length(object.va)), 0);
+                    else if (object.va.length >= 0)
+                        message.va = object.va;
+                if (object.vn != null)
+                    if (typeof object.vn === "string")
+                        $util.base64.decode(object.vn, message.vn = $util.newBuffer($util.base64.length(object.vn)), 0);
+                    else if (object.vn.length >= 0)
+                        message.vn = object.vn;
+                if (object.vs != null)
+                    if (typeof object.vs === "string")
+                        $util.base64.decode(object.vs, message.vs = $util.newBuffer($util.base64.length(object.vs)), 0);
+                    else if (object.vs.length >= 0)
+                        message.vs = object.vs;
+                return message;
             };
 
             /**
@@ -4578,8 +5062,172 @@ $root.apply = (function() {
              * @param {$protobuf.IConversionOptions} [options] Conversion options
              * @returns {Object.<string,*>} Plain object
              */
-            HtlcLockOperation.toObject = function toObject() {
-                return {};
+            HtlcLockOperation.toObject = function toObject(message, options) {
+                if (!options)
+                    options = {};
+                var object = {};
+                if (options.arrays || options.defaults) {
+                    object.ss = [];
+                    object.cs = [];
+                }
+                if (options.defaults) {
+                    if (options.bytes === String)
+                        object.tx = "";
+                    else {
+                        object.tx = [];
+                        if (options.bytes !== Array)
+                            object.tx = $util.newBuffer(object.tx);
+                    }
+                    if (options.bytes === String)
+                        object.txv = "";
+                    else {
+                        object.txv = [];
+                        if (options.bytes !== Array)
+                            object.txv = $util.newBuffer(object.txv);
+                    }
+                    if (options.bytes === String)
+                        object.ca = "";
+                    else {
+                        object.ca = [];
+                        if (options.bytes !== Array)
+                            object.ca = $util.newBuffer(object.ca);
+                    }
+                    if (options.bytes === String)
+                        object.ra = "";
+                    else {
+                        object.ra = [];
+                        if (options.bytes !== Array)
+                            object.ra = $util.newBuffer(object.ra);
+                    }
+                    if (options.bytes === String)
+                        object.am = "";
+                    else {
+                        object.am = [];
+                        if (options.bytes !== Array)
+                            object.am = $util.newBuffer(object.am);
+                    }
+                    if (options.bytes === String)
+                        object.fa = "";
+                    else {
+                        object.fa = [];
+                        if (options.bytes !== Array)
+                            object.fa = $util.newBuffer(object.fa);
+                    }
+                    if (options.bytes === String)
+                        object.hl = "";
+                    else {
+                        object.hl = [];
+                        if (options.bytes !== Array)
+                            object.hl = $util.newBuffer(object.hl);
+                    }
+                    if (options.bytes === String)
+                        object.re = "";
+                    else {
+                        object.re = [];
+                        if (options.bytes !== Array)
+                            object.re = $util.newBuffer(object.re);
+                    }
+                    if (options.bytes === String)
+                        object.cc = "";
+                    else {
+                        object.cc = [];
+                        if (options.bytes !== Array)
+                            object.cc = $util.newBuffer(object.cc);
+                    }
+                    if (options.bytes === String)
+                        object.th = "";
+                    else {
+                        object.th = [];
+                        if (options.bytes !== Array)
+                            object.th = $util.newBuffer(object.th);
+                    }
+                    if (options.bytes === String)
+                        object["in"] = "";
+                    else {
+                        object["in"] = [];
+                        if (options.bytes !== Array)
+                            object["in"] = $util.newBuffer(object["in"]);
+                    }
+                    if (options.bytes === String)
+                        object.is = "";
+                    else {
+                        object.is = [];
+                        if (options.bytes !== Array)
+                            object.is = $util.newBuffer(object.is);
+                    }
+                    if (options.bytes === String)
+                        object.va = "";
+                    else {
+                        object.va = [];
+                        if (options.bytes !== Array)
+                            object.va = $util.newBuffer(object.va);
+                    }
+                    if (options.bytes === String)
+                        object.vn = "";
+                    else {
+                        object.vn = [];
+                        if (options.bytes !== Array)
+                            object.vn = $util.newBuffer(object.vn);
+                    }
+                    if (options.bytes === String)
+                        object.vs = "";
+                    else {
+                        object.vs = [];
+                        if (options.bytes !== Array)
+                            object.vs = $util.newBuffer(object.vs);
+                    }
+                }
+                if (message.tx != null && message.hasOwnProperty("tx"))
+                    object.tx = options.bytes === String ? $util.base64.encode(message.tx, 0, message.tx.length) : options.bytes === Array ? Array.prototype.slice.call(message.tx) : message.tx;
+                if (message.txv != null && message.hasOwnProperty("txv"))
+                    object.txv = options.bytes === String ? $util.base64.encode(message.txv, 0, message.txv.length) : options.bytes === Array ? Array.prototype.slice.call(message.txv) : message.txv;
+                if (message.ca != null && message.hasOwnProperty("ca"))
+                    object.ca = options.bytes === String ? $util.base64.encode(message.ca, 0, message.ca.length) : options.bytes === Array ? Array.prototype.slice.call(message.ca) : message.ca;
+                if (message.ra != null && message.hasOwnProperty("ra"))
+                    object.ra = options.bytes === String ? $util.base64.encode(message.ra, 0, message.ra.length) : options.bytes === Array ? Array.prototype.slice.call(message.ra) : message.ra;
+                if (message.am != null && message.hasOwnProperty("am"))
+                    object.am = options.bytes === String ? $util.base64.encode(message.am, 0, message.am.length) : options.bytes === Array ? Array.prototype.slice.call(message.am) : message.am;
+                if (message.fa != null && message.hasOwnProperty("fa"))
+                    object.fa = options.bytes === String ? $util.base64.encode(message.fa, 0, message.fa.length) : options.bytes === Array ? Array.prototype.slice.call(message.fa) : message.fa;
+                if (message.fr != null && message.hasOwnProperty("fr")) {
+                    object.fr = options.bytes === String ? $util.base64.encode(message.fr, 0, message.fr.length) : options.bytes === Array ? Array.prototype.slice.call(message.fr) : message.fr;
+                    if (options.oneofs)
+                        object._fr = "fr";
+                }
+                if (message.hl != null && message.hasOwnProperty("hl"))
+                    object.hl = options.bytes === String ? $util.base64.encode(message.hl, 0, message.hl.length) : options.bytes === Array ? Array.prototype.slice.call(message.hl) : message.hl;
+                if (message.re != null && message.hasOwnProperty("re"))
+                    object.re = options.bytes === String ? $util.base64.encode(message.re, 0, message.re.length) : options.bytes === Array ? Array.prototype.slice.call(message.re) : message.re;
+                if (message.cc != null && message.hasOwnProperty("cc"))
+                    object.cc = options.bytes === String ? $util.base64.encode(message.cc, 0, message.cc.length) : options.bytes === Array ? Array.prototype.slice.call(message.cc) : message.cc;
+                if (message.ph != null && message.hasOwnProperty("ph")) {
+                    object.ph = options.bytes === String ? $util.base64.encode(message.ph, 0, message.ph.length) : options.bytes === Array ? Array.prototype.slice.call(message.ph) : message.ph;
+                    if (options.oneofs)
+                        object._ph = "ph";
+                }
+                if (message.ss && message.ss.length) {
+                    object.ss = [];
+                    for (var j = 0; j < message.ss.length; ++j)
+                        object.ss[j] = options.bytes === String ? $util.base64.encode(message.ss[j], 0, message.ss[j].length) : options.bytes === Array ? Array.prototype.slice.call(message.ss[j]) : message.ss[j];
+                }
+                if (message.th != null && message.hasOwnProperty("th"))
+                    object.th = options.bytes === String ? $util.base64.encode(message.th, 0, message.th.length) : options.bytes === Array ? Array.prototype.slice.call(message.th) : message.th;
+                if (message.cs && message.cs.length) {
+                    object.cs = [];
+                    for (var j = 0; j < message.cs.length; ++j)
+                        object.cs[j] = options.bytes === String ? $util.base64.encode(message.cs[j], 0, message.cs[j].length) : options.bytes === Array ? Array.prototype.slice.call(message.cs[j]) : message.cs[j];
+                }
+                if (message["in"] != null && message.hasOwnProperty("in"))
+                    object["in"] = options.bytes === String ? $util.base64.encode(message["in"], 0, message["in"].length) : options.bytes === Array ? Array.prototype.slice.call(message["in"]) : message["in"];
+                if (message.is != null && message.hasOwnProperty("is"))
+                    object.is = options.bytes === String ? $util.base64.encode(message.is, 0, message.is.length) : options.bytes === Array ? Array.prototype.slice.call(message.is) : message.is;
+                if (message.va != null && message.hasOwnProperty("va"))
+                    object.va = options.bytes === String ? $util.base64.encode(message.va, 0, message.va.length) : options.bytes === Array ? Array.prototype.slice.call(message.va) : message.va;
+                if (message.vn != null && message.hasOwnProperty("vn"))
+                    object.vn = options.bytes === String ? $util.base64.encode(message.vn, 0, message.vn.length) : options.bytes === Array ? Array.prototype.slice.call(message.vn) : message.vn;
+                if (message.vs != null && message.hasOwnProperty("vs"))
+                    object.vs = options.bytes === String ? $util.base64.encode(message.vs, 0, message.vs.length) : options.bytes === Array ? Array.prototype.slice.call(message.vs) : message.vs;
+                return object;
             };
 
             /**

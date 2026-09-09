@@ -1,11 +1,19 @@
 import b4a from 'b4a';
 import tracCryptoApi from 'trac-crypto-api';
 
-import { createMessage, toHex } from '../../utils/buffer.js';
+import { createMessage, isZeroBuffer, toHex, uint8ToBuffer } from '../../utils/buffer.js';
 import {
+    AMOUNT_BYTE_LENGTH,
+    EPOCH_BYTE_LENGTH,
+    HASH_BYTE_LENGTH,
     HTLC_LOCK_ID_BYTE_LENGTH,
+    HTLC_MAX_SIGNERS,
     HTLC_PREIMAGE_BYTE_LENGTH,
-    OperationType
+    HTLC_THRESHOLD_BYTE_LENGTH,
+    NONCE_BYTE_LENGTH,
+    OperationType,
+    PUBLIC_KEY_LENGTH,
+    SIGNATURE_BYTE_LENGTH,
 } from '../../utils/constants.js';
 import { addressToBuffer, bufferToAddress } from '../../core/state/utils/address.js';
 import { isAddressValid } from "../../core/state/utils/address.js";
@@ -24,6 +32,10 @@ import {
 } from '../../utils/applyOperations.js';
 import { decodeConsensusConfig } from '../../codecs/apply/applyOperationCodec.js';
 import { isHexString } from '../../utils/helpers.js';
+import {
+    createHtlcLockSigningMessage,
+    verifyOrderedHtlcCosignerSignatures
+} from '../../utils/htlcLock.js';
 
 // Single use per transaction: reuse of this instance needs mutex/queue or fail-fast and can delay validation or break validation rule.
 // A fresh instance is effectively zero-cost, so no reset() is provided.
@@ -50,7 +62,19 @@ class ApplyStateMessageBuilder {
     #incomingNonce;
     #incomingSignature;
     #incomingWriterKey;
+    #htlcCosignerSignatures = [];
+    #htlcClaimAddress;
+    #htlcCounterpartyHash;
+    #htlcFeeAmount;
+    #htlcFeeRecipient;
+    #htlcHashLock;
+    #htlcPolicyHash;
+    #htlcRefundAddress;
+    #htlcRefundEpoch;
+    #htlcSignerSet;
+    #htlcThreshold;
     #msbBootstrap;
+    #nonce;
     #operationType;
     #output;
     #payload;
@@ -187,12 +211,106 @@ class ApplyStateMessageBuilder {
     }
 
     setAmount(amount) {
-        this.#amount = this.#normalizeHexBuffer(amount, 16, 'Amount');
+        this.#amount = this.#normalizeHexBuffer(amount, AMOUNT_BYTE_LENGTH, 'Amount');
         return this;
     }
 
     setProofData(proofData) {
         this.#proofData = this.#normalizeBytesBuffer(proofData, 'Proof data');
+        return this;
+    }
+
+    setNonce(nonce) {
+        this.#nonce = this.#normalizeHexBuffer(nonce, NONCE_BYTE_LENGTH, 'Nonce');
+        return this;
+    }
+
+    setHtlcClaimAddress(address) {
+        const addressBuffer = this.#normalizeAddress(address);
+        if (!addressBuffer) throw new Error('HTLC claim address must be a valid TRAC address.');
+        this.#htlcClaimAddress = addressBuffer;
+        return this;
+    }
+
+    setHtlcRefundAddress(address) {
+        const addressBuffer = this.#normalizeAddress(address);
+        if (!addressBuffer) throw new Error('HTLC refund address must be a valid TRAC address.');
+        this.#htlcRefundAddress = addressBuffer;
+        return this;
+    }
+
+    setHtlcFeeAmount(amount) {
+        this.#htlcFeeAmount = this.#normalizeHexBuffer(amount, AMOUNT_BYTE_LENGTH, 'HTLC fee amount');
+        return this;
+    }
+
+    setHtlcFeeRecipient(address) {
+        if (address === undefined || address === null) {
+            this.#htlcFeeRecipient = undefined;
+            return this;
+        }
+        const addressBuffer = this.#normalizeAddress(address);
+        if (!addressBuffer) throw new Error('HTLC fee recipient must be a valid TRAC address.');
+        this.#htlcFeeRecipient = addressBuffer;
+        return this;
+    }
+
+    setHtlcHashLock(hashLock) {
+        this.#htlcHashLock = this.#normalizeHexBuffer(hashLock, HASH_BYTE_LENGTH, 'HTLC hashlock');
+        return this;
+    }
+
+    setHtlcRefundEpoch(refundEpoch) {
+        this.#htlcRefundEpoch = this.#normalizeHexBuffer(refundEpoch, EPOCH_BYTE_LENGTH, 'HTLC refund epoch');
+        return this;
+    }
+
+    setHtlcCounterpartyHash(counterpartyHash) {
+        this.#htlcCounterpartyHash = this.#normalizeHexBuffer(
+            counterpartyHash,
+            HASH_BYTE_LENGTH,
+            'HTLC counterparty commitment'
+        );
+        return this;
+    }
+
+    setHtlcPolicyHash(policyHash) {
+        if (policyHash === undefined || policyHash === null) {
+            this.#htlcPolicyHash = undefined;
+            return this;
+        }
+        this.#htlcPolicyHash = this.#normalizeHexBuffer(policyHash, HASH_BYTE_LENGTH, 'HTLC policy hash');
+        return this;
+    }
+
+    setHtlcSignerSet(signerSet) {
+        if (!Array.isArray(signerSet) || signerSet.length < 1 || signerSet.length > HTLC_MAX_SIGNERS) {
+            throw new Error(`HTLC signer set must contain between 1 and ${HTLC_MAX_SIGNERS} public keys.`);
+        }
+        this.#htlcSignerSet = signerSet.map((signer, index) => {
+            const publicKey = this.#normalizeHexBuffer(signer, PUBLIC_KEY_LENGTH, `HTLC signer ${index}`);
+            if (isZeroBuffer(publicKey)) throw new Error(`HTLC signer ${index} must not be zero-filled.`);
+            return publicKey;
+        });
+        return this;
+    }
+
+    setHtlcThreshold(threshold) {
+        this.#htlcThreshold = Number.isInteger(threshold)
+            ? uint8ToBuffer(threshold)
+            : this.#normalizeHexBuffer(threshold, HTLC_THRESHOLD_BYTE_LENGTH, 'HTLC threshold');
+        return this;
+    }
+
+    setHtlcCosignerSignatures(signatures = []) {
+        if (!Array.isArray(signatures) || signatures.length > HTLC_MAX_SIGNERS - 1) {
+            throw new Error(`HTLC cosigner signatures must be an array with at most ${HTLC_MAX_SIGNERS - 1} entries.`);
+        }
+        this.#htlcCosignerSignatures = signatures.map((signature, index) => this.#normalizeHexBuffer(
+            signature,
+            SIGNATURE_BYTE_LENGTH,
+            `HTLC cosigner signature ${index}`
+        ));
         return this;
     }
 
@@ -323,6 +441,87 @@ class ApplyStateMessageBuilder {
         return addressToBuffer(address, this.#config.addressPrefix);
     }
 
+    #getHtlcLockFields() {
+        this.#requireFields([
+            [this.#txValidity, 'Transaction validity'],
+            [this.#htlcClaimAddress, 'HTLC claim address'],
+            [this.#htlcRefundAddress, 'HTLC refund address'],
+            [this.#amount, 'Amount'],
+            [this.#htlcFeeAmount, 'HTLC fee amount'],
+            [this.#htlcHashLock, 'HTLC hashlock'],
+            [this.#htlcRefundEpoch, 'HTLC refund epoch'],
+            [this.#htlcCounterpartyHash, 'HTLC counterparty commitment'],
+            [this.#htlcSignerSet, 'HTLC signer set'],
+            [this.#htlcThreshold, 'HTLC threshold']
+        ]);
+
+        const feeIsZero = this.#htlcFeeAmount.every(byte => byte === 0);
+        if (feeIsZero && this.#htlcFeeRecipient) {
+            throw new Error('HTLC fee recipient must be omitted when the fee amount is zero.');
+        }
+        if (!feeIsZero && !this.#htlcFeeRecipient) {
+            throw new Error('HTLC fee recipient must be set when the fee amount is non-zero.');
+        }
+
+        const lockerAddress = bufferToAddress(this.#address, this.#config.addressPrefix);
+        const lockerPublicKey = tracCryptoApi.address.decodeSafe(lockerAddress);
+        if (!b4a.isBuffer(lockerPublicKey) || !b4a.equals(lockerPublicKey, this.#htlcSignerSet[0])) {
+            throw new Error('HTLC signer zero must be the locker identified by the operation address.');
+        }
+
+        const signerKeys = new Set();
+        for (let index = 0; index < this.#htlcSignerSet.length; index++) {
+            const signerKey = toHex(this.#htlcSignerSet[index]);
+            if (signerKeys.has(signerKey)) {
+                throw new Error('HTLC signer set must not contain duplicate public keys.');
+            }
+            signerKeys.add(signerKey);
+
+            if (index > 1 && b4a.compare(this.#htlcSignerSet[index - 1], this.#htlcSignerSet[index]) >= 0) {
+                throw new Error('HTLC cosigner public keys must be sorted by raw bytes.');
+            }
+        }
+
+        const threshold = this.#htlcThreshold.readUInt8(0);
+        if (threshold < 1 || threshold > this.#htlcSignerSet.length) {
+            throw new Error('HTLC threshold must be between one and the signer-set size.');
+        }
+
+        if (this.#htlcCosignerSignatures.length > this.#htlcSignerSet.length - 1) {
+            throw new Error('HTLC cosigner signatures cannot outnumber the cosigner keys.');
+        }
+
+        if (1 + this.#htlcCosignerSignatures.length < threshold) {
+            throw new Error('HTLC signatures do not satisfy the declared signature threshold.');
+        }
+
+        return {
+            txv: this.#txValidity,
+            ca: this.#htlcClaimAddress,
+            ra: this.#htlcRefundAddress,
+            am: this.#amount,
+            fa: this.#htlcFeeAmount,
+            ...(this.#htlcFeeRecipient && {fr: this.#htlcFeeRecipient}),
+            hl: this.#htlcHashLock,
+            re: this.#htlcRefundEpoch,
+            cc: this.#htlcCounterpartyHash,
+            ...(this.#htlcPolicyHash && {ph: this.#htlcPolicyHash}),
+            ss: this.#htlcSignerSet,
+            th: this.#htlcThreshold,
+            cs: this.#htlcCosignerSignatures
+        };
+    }
+
+    #validateHtlcLockSignatures(tx, lockerSignature) {
+        if (!tracCryptoApi.signature.verify(lockerSignature, tx, this.#htlcSignerSet[0])) {
+            throw new Error('HTLC locker signature is invalid.');
+        }
+
+        if (!verifyOrderedHtlcCosignerSignatures(this.#htlcCosignerSignatures, tx, this.#htlcSignerSet)) {
+            throw new Error('HTLC cosigner signatures are invalid or not in signer-set order.');
+        }
+    }
+
     async #buildPartialBody() {
         if (!isRoleAccess(this.#operationType) && !isTransaction(this.#operationType) &&
             !isBootstrapDeployment(this.#operationType) && !isTransfer(this.#operationType) &&
@@ -330,11 +529,22 @@ class ApplyStateMessageBuilder {
             throw new Error(`Operation type ${this.#operationType} is not supported for partial build.`);
         }
 
-        const nonce = tracCryptoApi.nonce.generate();
+        const nonce = this.#nonce ?? tracCryptoApi.nonce.generate();
         let msg;
+        let htlcLockFields;
 
         switch (this.#operationType) {
             case OperationType.HTLC_LOCK:
+                if (this.#htlcCosignerSignatures.length > 0 && !this.#nonce) {
+                    throw new Error('HTLC nonce must be supplied when the lock includes cosigner signatures.');
+                }
+                htlcLockFields = this.#getHtlcLockFields();
+                msg = createHtlcLockSigningMessage(
+                    this.#config.networkId,
+                    this.#address,
+                    {...htlcLockFields, in: nonce}
+                );
+                break;
             case OperationType.HTLC_REFUND:
                 return {};
             case OperationType.HTLC_CLAIM:
@@ -424,6 +634,10 @@ class ApplyStateMessageBuilder {
         const tx = await tracCryptoApi.hash.blake3(msg);
         const signature = this.#wallet.sign(tx);
 
+        if (this.#operationType === OperationType.HTLC_LOCK) {
+            this.#validateHtlcLockSignatures(tx, signature);
+        }
+
         if (isBootstrapDeployment(this.#operationType)) {
             return {
                 tx,
@@ -461,6 +675,14 @@ class ApplyStateMessageBuilder {
                 txv: this.#txValidity,
                 to: this.#incomingAddress,
                 am: this.#amount,
+                in: nonce,
+                is: signature
+            };
+        }
+        if (this.#operationType === OperationType.HTLC_LOCK) {
+            return {
+                tx,
+                ...htlcLockFields,
                 in: nonce,
                 is: signature
             };
@@ -512,9 +734,35 @@ class ApplyStateMessageBuilder {
 
         const nonce = tracCryptoApi.nonce.generate();
         let msg;
+        let htlcLockFields;
 
         switch (this.#operationType) {
             case OperationType.HTLC_LOCK:
+                this.#requireFields([
+                    [this.#txHash, 'Transaction hash'],
+                    [this.#incomingNonce, 'Incoming nonce'],
+                    [this.#incomingSignature, 'Incoming signature']
+                ]);
+                htlcLockFields = this.#getHtlcLockFields();
+                {
+                    const incomingMessage = createHtlcLockSigningMessage(
+                        this.#config.networkId,
+                        this.#address,
+                        {...htlcLockFields, in: this.#incomingNonce}
+                    );
+                    const incomingHash = await tracCryptoApi.hash.blake3(incomingMessage);
+                    if (!b4a.equals(incomingHash, this.#txHash)) {
+                        throw new Error('Regenerated HTLC lock transaction does not match the incoming hash.');
+                    }
+                    this.#validateHtlcLockSignatures(this.#txHash, this.#incomingSignature);
+                }
+                msg = createMessage(
+                    this.#config.networkId,
+                    this.#txHash,
+                    nonce,
+                    this.#operationType
+                );
+                break;
             case OperationType.HTLC_REFUND:
                 return {};
             case OperationType.ADD_ADMIN:
@@ -727,6 +975,17 @@ class ApplyStateMessageBuilder {
                 vs: signature
             };
         }
+        if (this.#operationType === OperationType.HTLC_LOCK) {
+            return {
+                tx: this.#txHash,
+                ...htlcLockFields,
+                in: this.#incomingNonce,
+                is: this.#incomingSignature,
+                va: validatorAddress,
+                vn: nonce,
+                vs: signature
+            };
+        }
         if (isBalanceInitialization(this.#operationType)) {
             return {
                 tx,
@@ -809,6 +1068,28 @@ class ApplyStateMessageBuilder {
                         is: toHex(body.is)
                     }
                 };
+            case 'hlo': {
+                const htlcLock = {
+                    tx: toHex(body.tx),
+                    txv: toHex(body.txv),
+                    ca: bufferToAddress(body.ca, this.#config.addressPrefix),
+                    ra: bufferToAddress(body.ra, this.#config.addressPrefix),
+                    am: toHex(body.am),
+                    fa: toHex(body.fa),
+                    hl: toHex(body.hl),
+                    re: toHex(body.re),
+                    cc: toHex(body.cc),
+                    ss: body.ss.map(toHex),
+                    th: toHex(body.th),
+                    cs: body.cs.map(toHex),
+                    in: toHex(body.in),
+                    is: toHex(body.is)
+                };
+                if (body.fr) htlcLock.fr = bufferToAddress(body.fr, this.#config.addressPrefix);
+                if (body.ph) htlcLock.ph = toHex(body.ph);
+
+                return {...base, hlo: htlcLock};
+            }
             default:
                 throw new Error(`JSON output is not supported for payload ${this.#payloadKey}.`);
         }

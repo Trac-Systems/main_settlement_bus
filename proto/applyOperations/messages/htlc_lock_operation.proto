@@ -2,4 +2,24 @@ syntax = "proto3";
 
 package apply.operations;
 
-message HtlcLockOperation {}
+message HtlcLockOperation {
+    bytes tx                      = 1;  // Transaction hash and lock identifier
+    bytes txv                     = 2;  // Transaction-validity state
+    bytes ca                      = 3;  // Address receiving the principal on claim
+    bytes ra                      = 4;  // Address receiving all escrowed TNK on refund
+    bytes am                      = 5;  // Principal amount paid to the claimant
+    bytes fa                      = 6;  // Additional fee amount reserved by the locker
+    optional bytes fr             = 7;  // Fee recipient; required when fa is non-zero
+    bytes hl                      = 8;  // SHA-256 hashlock
+    bytes re                      = 9;  // Refund epoch
+    bytes cc                      = 10; // Cross-chain counterparty commitment
+    optional bytes ph             = 11; // Opaque application policy hash
+    repeated bytes ss             = 12; // Signer public keys; locker is always index zero
+    bytes th                      = 13; // Required signature threshold
+    repeated bytes cs             = 14; // Cosigner signatures in relative ss order; omitted keys need no slot
+    bytes in                      = 15; // Nonce of the locker
+    bytes is                      = 16; // Mandatory locker signature
+    bytes va                      = 17; // Validator's address (optional)
+    bytes vn                      = 18; // Validator's nonce (optional)
+    bytes vs                      = 19; // Validator's signature (optional)
+}

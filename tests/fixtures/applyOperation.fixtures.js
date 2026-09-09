@@ -1,5 +1,5 @@
 import b4a from 'b4a';
-import { OperationType } from '../../src/utils/constants.js';
+import { HASH_BYTE_LENGTH, OperationType } from '../../src/utils/constants.js';
 import { addressToBuffer } from '../../src/core/state/utils/address.js';
 import { config } from '../helpers/config.js';
 import { asAddress } from '../helpers/address.js';
@@ -306,6 +306,35 @@ const validHtlcClaimOperation = {
     }
 };
 
+const validHtlcLockOperation = {
+    type: OperationType.HTLC_LOCK,
+    address: addressToBuffer(asAddress('544514242356432739de9af71deb8d526fb03d6c5c15e0a934d9a20b6710e2fe'), config.addressPrefix),
+    hlo: {
+        tx: b4a.alloc(HASH_BYTE_LENGTH, 0x01),
+        txv: b4a.alloc(HASH_BYTE_LENGTH, 0x02),
+        ca: addressToBuffer(asAddress('3801ebd1f12462ad335b821807c9d87e4f20d57505222284b2634a7e8e5edac2'), config.addressPrefix),
+        ra: addressToBuffer(asAddress('544514242356432739de9af71deb8d526fb03d6c5c15e0a934d9a20b6710e2fe'), config.addressPrefix),
+        am: b4a.from('00000000000000000000000000000064', 'hex'),
+        fa: b4a.from('00000000000000000000000000000005', 'hex'),
+        fr: addressToBuffer(asAddress('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'), config.addressPrefix),
+        hl: b4a.alloc(HASH_BYTE_LENGTH, 0x03),
+        re: b4a.from('0000000000000064', 'hex'),
+        cc: b4a.alloc(HASH_BYTE_LENGTH, 0x04),
+        ph: b4a.alloc(HASH_BYTE_LENGTH, 0x05),
+        ss: [
+            b4a.from('544514242356432739de9af71deb8d526fb03d6c5c15e0a934d9a20b6710e2fe', 'hex'),
+            b4a.alloc(HASH_BYTE_LENGTH, 0xaa)
+        ],
+        th: b4a.from([2]),
+        cs: [b4a.alloc(64, 0x06)],
+        in: b4a.alloc(HASH_BYTE_LENGTH, 0x07),
+        is: b4a.alloc(64, 0x08),
+        va: addressToBuffer(asAddress('3300cf88d57280a0a403d931971fd60546c781f8cb8d6d1dad635a8b28db7970'), config.addressPrefix),
+        vn: b4a.alloc(HASH_BYTE_LENGTH, 0x09),
+        vs: b4a.alloc(64, 0x0a)
+    }
+};
+
 const invalidPayloads = [
     null,
     undefined,
@@ -410,6 +439,7 @@ export default {
     validCompleteBootstrapDeployment,
     validSetEpochOperation,
     validHtlcClaimOperation,
+    validHtlcLockOperation,
     invalidPayloads,
     invalidPayloadWithMultipleOneOfKeys
 };

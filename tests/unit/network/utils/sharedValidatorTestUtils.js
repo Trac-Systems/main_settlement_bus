@@ -9,6 +9,7 @@ import { safeEncodeApplyOperation } from '../../../../src/codecs/apply/applyOper
 import { operationToPayload } from '../../../../src/utils/applyOperations.js';
 import { $TNK } from '../../../../src/core/state/utils/balance.js';
 import { OperationType } from '../../../../src/utils/constants.js';
+import {bigIntToBuffer, uint64ToBuffer} from '../../../../src/utils/buffer.js';
 import { config } from '../../../helpers/config.js';
 import { createState as createBaseState } from './createState.js';
 import {
@@ -115,6 +116,30 @@ export async function buildTransactionPayload(
 export async function buildTransferPayload(wallet, recipientAddress, amount, txValidity = DEFAULT_TX_VALIDITY) {
     return applyStateMessageFactory(wallet, config)
         .buildPartialTransferOperationMessage(wallet.address, recipientAddress, amount, txValidity, 'buffer');
+}
+
+export async function buildHtlcLockPayload(
+    wallet,
+    claimAddress,
+    txValidity = DEFAULT_TX_VALIDITY,
+    overrides = {}
+) {
+    return applyStateMessageFactory(wallet, config).buildPartialHtlcLockOperationMessage(
+        wallet.address,
+        txValidity,
+        {
+            claimAddress,
+            refundAddress: wallet.address,
+            amount: bigIntToBuffer(1n),
+            feeAmount: b4a.alloc(16),
+            hashLock: b4a.alloc(32, 0x66),
+            refundEpoch: uint64ToBuffer(100),
+            counterpartyHash: b4a.alloc(32, 0x77),
+            signerSet: [wallet.publicKey],
+            threshold: 1,
+            ...overrides
+        }
+    );
 }
 
 export function getOperationBody(payload) {

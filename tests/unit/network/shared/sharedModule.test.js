@@ -7,6 +7,7 @@ async function runSharedNetworkTests() {
     await import('./validators/PartialBootstrapDeploymentValidator.test.js');
     await import('./validators/PartialTransactionValidator.test.js');
     await import('./validators/PartialTransferValidator.test.js');
+    await import('./validators/PartialHtlcValidator.test.js');
     test.resume();
 }
 

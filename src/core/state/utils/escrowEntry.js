@@ -1,93 +1,212 @@
-import b4a from 'b4a'
-import { BALANCE_BYTE_LENGTH, EPOCH_BYTE_LENGTH } from '../../../utils/constants.js';
-import { isBufferValid } from '../../../utils/buffer.js';
-import { NULL_BUFFER } from '../../../utils/buffer.js';
-import { TRAC_PUB_KEY_SIZE, TRAC_HASH_SIZE } from 'trac-crypto-api/constants.js';
-import { toBalance } from './balance.js';
+import b4a from 'b4a';
+import tracCryptoApi from 'trac-crypto-api';
 
-export const ESCROW_ENTRY_SIZE = 1 + BALANCE_BYTE_LENGTH + TRAC_PUB_KEY_SIZE + TRAC_PUB_KEY_SIZE + TRAC_PUB_KEY_SIZE + TRAC_HASH_SIZE + TRAC_HASH_SIZE + TRAC_HASH_SIZE + EPOCH_BYTE_LENGTH;
+import {
+    BALANCE_BYTE_LENGTH,
+    EPOCH_BYTE_LENGTH,
+    HASH_BYTE_LENGTH,
+    HTLC_LOCK_ID_BYTE_LENGTH,
+    HTLC_PREIMAGE_BYTE_LENGTH,
+    NONCE_BYTE_LENGTH,
+    PUBLIC_KEY_LENGTH,
+} from '../../../utils/constants.js';
+import {isBufferValid, isZeroBuffer, NULL_BUFFER} from '../../../utils/buffer.js';
+import {toBalance} from './balance.js';
 
-const TAKER_OFFSET = BALANCE_BYTE_LENGTH + TRAC_PUB_KEY_SIZE;
-const REFUND_OFFSET = TAKER_OFFSET + TRAC_PUB_KEY_SIZE;
-const STATUS_OFFSET = ESCROW_ENTRY_SIZE - 1;
+export const ESCROW_ENTRY_VERSION = 1;
+
 export const Status = Object.freeze({
     PENDING: 0,
     CLAIMED: 1,
     REFUNDED: 2,
 });
 
-export function init(lockId, maker, taker, lock, nonce, expiryEpoch, amount) {
-    if (!isBufferValid(amount, BALANCE_BYTE_LENGTH) ||
-        !isBufferValid(maker, TRAC_PUB_KEY_SIZE) ||
-        !isBufferValid(taker, TRAC_PUB_KEY_SIZE) ||
-        !isBufferValid(lockId, TRAC_HASH_SIZE) ||
-        !isBufferValid(nonce, TRAC_HASH_SIZE) ||
-        !isBufferValid(lock, TRAC_HASH_SIZE) ||
-        !isBufferValid(expiryEpoch, EPOCH_BYTE_LENGTH)) {
-        return NULL_BUFFER;
-    }
+const FIELD_LAYOUT = Object.freeze([
+    ['version', 1],
+    ['status', 1],
+    ['amount', BALANCE_BYTE_LENGTH],
+    ['feeAmount', BALANCE_BYTE_LENGTH],
+    ['locker', PUBLIC_KEY_LENGTH],
+    ['claimRecipient', PUBLIC_KEY_LENGTH],
+    ['refundRecipient', PUBLIC_KEY_LENGTH],
+    ['feeRecipient', PUBLIC_KEY_LENGTH],
+    ['lockId', HTLC_LOCK_ID_BYTE_LENGTH],
+    ['nonce', NONCE_BYTE_LENGTH],
+    ['hashLock', HASH_BYTE_LENGTH],
+    ['preimage', HTLC_PREIMAGE_BYTE_LENGTH],
+    ['counterpartyHash', HASH_BYTE_LENGTH],
+    ['policyHash', HASH_BYTE_LENGTH],
+    ['refundEpoch', EPOCH_BYTE_LENGTH],
+]);
+
+const fieldOffsets = {};
+let encodedSize = 0;
+for (const [name, size] of FIELD_LAYOUT) {
+    fieldOffsets[name] = encodedSize;
+    encodedSize += size;
+}
+
+export const ESCROW_ENTRY_SIZE = encodedSize;
+const ZERO_PUBLIC_KEY = b4a.alloc(PUBLIC_KEY_LENGTH);
+const ZERO_HASH = b4a.alloc(HASH_BYTE_LENGTH);
+
+function copyField(entry, name) {
+    const [, size] = FIELD_LAYOUT.find(([fieldName]) => fieldName === name);
+    const offset = fieldOffsets[name];
+    return b4a.from(entry.subarray(offset, offset + size));
+}
+
+function writeField(entry, name, value) {
+    b4a.copy(value, entry, fieldOffsets[name]);
+}
+
+function isRequiredBuffer(value, size) {
+    return isBufferValid(value, size) && !isZeroBuffer(value);
+}
+
+function isValidStatus(status) {
+    return Object.values(Status).includes(status);
+}
+
+/**
+ * Encodes the minimum state needed to settle an HTLC lock. The full signer set
+ * and signatures remain available in the lock transaction identified by lockId.
+ */
+export function init({
+    lockId,
+    locker,
+    claimRecipient,
+    refundRecipient,
+    amount,
+    feeAmount,
+    feeRecipient,
+    nonce,
+    hashLock,
+    refundEpoch,
+    counterpartyHash,
+    policyHash,
+} = {}) {
+    const feeIsZero = isBufferValid(feeAmount, BALANCE_BYTE_LENGTH) && isZeroBuffer(feeAmount);
+    const requiredFieldsAreValid =
+        isRequiredBuffer(lockId, HTLC_LOCK_ID_BYTE_LENGTH) &&
+        isRequiredBuffer(locker, PUBLIC_KEY_LENGTH) &&
+        isRequiredBuffer(claimRecipient, PUBLIC_KEY_LENGTH) &&
+        isRequiredBuffer(refundRecipient, PUBLIC_KEY_LENGTH) &&
+        isRequiredBuffer(amount, BALANCE_BYTE_LENGTH) &&
+        isBufferValid(feeAmount, BALANCE_BYTE_LENGTH) &&
+        isRequiredBuffer(nonce, NONCE_BYTE_LENGTH) &&
+        isRequiredBuffer(hashLock, HASH_BYTE_LENGTH) &&
+        isRequiredBuffer(refundEpoch, EPOCH_BYTE_LENGTH) &&
+        isRequiredBuffer(counterpartyHash, HASH_BYTE_LENGTH);
+    const feeFieldsAreValid = feeIsZero
+        ? feeRecipient === undefined
+        : isRequiredBuffer(feeRecipient, PUBLIC_KEY_LENGTH);
+    const policyHashIsValid = policyHash === undefined || isRequiredBuffer(policyHash, HASH_BYTE_LENGTH);
+
+    if (!requiredFieldsAreValid || !feeFieldsAreValid || !policyHashIsValid) return NULL_BUFFER;
+
+    const escrowTotal = toBalance(amount)?.add(toBalance(feeAmount));
+    if (!escrowTotal) return NULL_BUFFER;
 
     try {
-        const escrowEntry = b4a.alloc(ESCROW_ENTRY_SIZE);
-        let offset = 0;
-
-        b4a.copy(amount, escrowEntry, offset);
-        offset += BALANCE_BYTE_LENGTH;
-
-        b4a.copy(maker, escrowEntry, offset);
-        offset += TRAC_PUB_KEY_SIZE;
-
-        b4a.copy(taker, escrowEntry, offset);
-        offset += TRAC_PUB_KEY_SIZE;
-        // maker is also the refund. The ledger structure can change independently.
-        b4a.copy(maker, escrowEntry, offset);
-        offset += TRAC_PUB_KEY_SIZE;
-
-        b4a.copy(lockId, escrowEntry, offset);
-        offset += TRAC_HASH_SIZE;
-
-        b4a.copy(nonce, escrowEntry, offset);
-        offset += TRAC_HASH_SIZE;
-
-        b4a.copy(lock, escrowEntry, offset);
-        offset += TRAC_HASH_SIZE;
-
-        b4a.copy(expiryEpoch, escrowEntry, offset);
-        offset += EPOCH_BYTE_LENGTH;
-
-        escrowEntry[offset] = Status.PENDING;
-
-        return escrowEntry;
+        const entry = b4a.alloc(ESCROW_ENTRY_SIZE);
+        entry[fieldOffsets.version] = ESCROW_ENTRY_VERSION;
+        entry[fieldOffsets.status] = Status.PENDING;
+        writeField(entry, 'amount', amount);
+        writeField(entry, 'feeAmount', feeAmount);
+        writeField(entry, 'locker', locker);
+        writeField(entry, 'claimRecipient', claimRecipient);
+        writeField(entry, 'refundRecipient', refundRecipient);
+        writeField(entry, 'feeRecipient', feeRecipient ?? ZERO_PUBLIC_KEY);
+        writeField(entry, 'lockId', lockId);
+        writeField(entry, 'nonce', nonce);
+        writeField(entry, 'hashLock', hashLock);
+        writeField(entry, 'preimage', ZERO_HASH);
+        writeField(entry, 'counterpartyHash', counterpartyHash);
+        writeField(entry, 'policyHash', policyHash ?? ZERO_HASH);
+        writeField(entry, 'refundEpoch', refundEpoch);
+        return entry;
     } catch {
         return NULL_BUFFER;
     }
 }
 
-function makeSettlement(escrowEntry, publicKeyOffset, status) {
-    try {
-        if (!isBufferValid(escrowEntry, ESCROW_ENTRY_SIZE)) {
-            return null;
-        }
+export function decode(entry) {
+    if (!isBufferValid(entry, ESCROW_ENTRY_SIZE)) return null;
 
-        const amount = b4a.alloc(BALANCE_BYTE_LENGTH);
-        const publicKey = b4a.alloc(TRAC_PUB_KEY_SIZE);
+    const version = entry[fieldOffsets.version];
+    const status = entry[fieldOffsets.status];
+    if (version !== ESCROW_ENTRY_VERSION || !isValidStatus(status)) return null;
 
-        b4a.copy(escrowEntry, amount, 0, 0, BALANCE_BYTE_LENGTH);
-        b4a.copy(escrowEntry, publicKey, 0, publicKeyOffset, publicKeyOffset + TRAC_PUB_KEY_SIZE);
+    const feeRecipient = copyField(entry, 'feeRecipient');
+    const preimage = copyField(entry, 'preimage');
+    const policyHash = copyField(entry, 'policyHash');
 
-        b4a.fill(escrowEntry, 0, 0, BALANCE_BYTE_LENGTH);
-        escrowEntry[STATUS_OFFSET] = status;
+    return {
+        version,
+        status,
+        amount: copyField(entry, 'amount'),
+        feeAmount: copyField(entry, 'feeAmount'),
+        locker: copyField(entry, 'locker'),
+        claimRecipient: copyField(entry, 'claimRecipient'),
+        refundRecipient: copyField(entry, 'refundRecipient'),
+        feeRecipient: isZeroBuffer(feeRecipient) ? null : feeRecipient,
+        lockId: copyField(entry, 'lockId'),
+        nonce: copyField(entry, 'nonce'),
+        hashLock: copyField(entry, 'hashLock'),
+        preimage: isZeroBuffer(preimage) ? null : preimage,
+        counterpartyHash: copyField(entry, 'counterpartyHash'),
+        policyHash: isZeroBuffer(policyHash) ? null : policyHash,
+        refundEpoch: copyField(entry, 'refundEpoch'),
+    };
+}
 
-        return { publicKey, amount: toBalance(amount), entry: escrowEntry };
-    } catch {
+export function makeClaim(entry, preimage, currentEpoch) {
+    const escrow = decode(entry);
+    if (
+        !escrow ||
+        escrow.status !== Status.PENDING ||
+        !isRequiredBuffer(preimage, HTLC_PREIMAGE_BYTE_LENGTH) ||
+        !isBufferValid(currentEpoch, EPOCH_BYTE_LENGTH) ||
+        b4a.compare(currentEpoch, escrow.refundEpoch) >= 0 ||
+        !b4a.equals(tracCryptoApi.hash.sha256(preimage), escrow.hashLock)
+    ) {
         return null;
     }
+
+    const updatedEntry = b4a.from(entry);
+    updatedEntry[fieldOffsets.status] = Status.CLAIMED;
+    writeField(updatedEntry, 'preimage', preimage);
+
+    return {
+        publicKey: escrow.claimRecipient,
+        amount: toBalance(escrow.amount),
+        feePublicKey: escrow.feeRecipient,
+        feeAmount: toBalance(escrow.feeAmount),
+        entry: updatedEntry,
+    };
 }
 
-export function makeClaim(escrowEntry) {
-    return makeSettlement(escrowEntry, TAKER_OFFSET, Status.CLAIMED);
-}
+export function makeRefund(entry, currentEpoch) {
+    const escrow = decode(entry);
+    if (
+        !escrow ||
+        escrow.status !== Status.PENDING ||
+        !isBufferValid(currentEpoch, EPOCH_BYTE_LENGTH) ||
+        b4a.compare(currentEpoch, escrow.refundEpoch) < 0
+    ) {
+        return null;
+    }
 
-export function makeRefund(escrowEntry) {
-    return makeSettlement(escrowEntry, REFUND_OFFSET, Status.REFUNDED);
+    const refundAmount = toBalance(escrow.amount)?.add(toBalance(escrow.feeAmount));
+    if (!refundAmount) return null;
+
+    const updatedEntry = b4a.from(entry);
+    updatedEntry[fieldOffsets.status] = Status.REFUNDED;
+
+    return {
+        publicKey: escrow.refundRecipient,
+        amount: refundAmount,
+        entry: updatedEntry,
+    };
 }
