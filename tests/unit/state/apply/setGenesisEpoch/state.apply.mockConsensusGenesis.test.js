@@ -4,10 +4,10 @@ import tracCryptoApi from 'trac-crypto-api';
 import { setupStateNetwork } from '../../../../helpers/StateNetworkFactory.js';
 import { seedBootstrapIndexer } from '../../../../helpers/autobaseTestHelpers.js';
 import { config } from '../../../../helpers/config.js';
+import { loadStateWithMockConsensus } from '../../../../helpers/mockConsensusState.js';
 import { buildAddAdminRequesterPayload } from '../addAdmin/addAdminScenarioHelpers.js';
 import { snapshotEpochLedger } from '../setEpoch/setEpochHandlerBranchTestHelpers.js';
 import { createGenesisEpochProof } from '../../../../../src/core/state/utils/epochProof.js';
-import { validateConsensusConfig } from '../../../../../src/core/state/utils/consensusConfig.js';
 import {
     decodeConsensusConfig,
     encodeConsensusConfig,
@@ -26,22 +26,17 @@ if (typeof globalThis.Bare !== 'undefined') {
     });
 } else {
     test('State.apply initializes and replays an opaque V2 genesis without using VDF', async t => {
-        const { default: esmock } = await import('esmock');
         const initialConfig = { sv: b4a.from([2]), cd: b4a.from([2, 42]) };
         const encodedInitialConfig = encodeConsensusConfig(initialConfig);
         const genesisCalls = [];
         let vdfCalls = 0;
 
+        // Simulate a future State build with a private V2 config-validator case.
         // Only the config format and genesis factory are synthetic. This tests
         // that apply stores opaque genesis bytes, not the production V2 registry.
         // Authorization, signatures, hashing, ledger writes and replay are real.
-        const StateWithV2 = await esmock('../../../../../src/core/state/State.js', {
-            '../../../../../src/core/state/utils/consensusConfig.js': {
-                validateConsensusConfig: value => value.sv[0] === 2
-                    ? b4a.equals(value.cd, initialConfig.cd)
-                    : validateConsensusConfig(value),
-            },
-            '../../../../../src/core/state/utils/epochProof.js': {
+        const StateWithV2 = await loadStateWithMockConsensus({
+            './utils/epochProof.js': {
                 createGenesisEpochProof: async (proposerAddress, encodedConfig, networkConfig) => {
                     if (decodeConsensusConfig(encodedConfig).sv[0] !== 2) {
                         vdfCalls++;
@@ -57,7 +52,10 @@ if (typeof globalThis.Bare !== 'undefined') {
                     ]);
                 },
             },
-        });
+        }, `
+            case 2:
+                return b4a.equals(consensusConfig.cd, b4a.from([2, 42]));
+        `);
         const context = await setupStateNetwork({
             nodes: 2,
             stateClass: StateWithV2,

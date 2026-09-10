@@ -51,7 +51,7 @@ export const isConsensusTransitionAllowed = (currentVersion, nextVersion, transi
     return currentVersion === nextVersion || transitions[currentVersion].includes(nextVersion);
 };
 
-/** Validates config data for an implemented version, independently of migration rules. */
+/** Off-chain config validation. State.apply keeps its consensus-critical checks separately. */
 export const validateConsensusConfig = (consensusConfig) => {
     if (!isBufferValid(consensusConfig?.sv, CONSENSUS_CONFIG_SCHEMA_VERSION_BYTE_LENGTH)) {
         return false;

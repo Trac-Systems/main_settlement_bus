@@ -4,7 +4,6 @@ import Corestore from 'corestore';
 import {
     decodeVersionedConsensusConfig,
     isConsensusTransitionAllowed,
-    validateConsensusConfig,
 } from '../../../../../src/core/state/utils/consensusConfig.js';
 import {
     decodeConsensusConfig,
@@ -19,6 +18,7 @@ import {
     replicateAndSync,
 } from '../../../../helpers/autobaseTestHelpers.js';
 import { config, overrideConfig } from '../../../../helpers/config.js';
+import { loadStateWithMockConsensus } from '../../../../helpers/mockConsensusState.js';
 import { testKeyPair1 } from '../../../../fixtures/apply.fixtures.js';
 import {
     appendAndUpdate,
@@ -38,6 +38,7 @@ import {
     snapshotView,
 } from '../setEpoch/setEpochHandlerBranchTestHelpers.js';
 
+// Simulate a future State build with extra private config-validator cases.
 // Only the config formats and the transition table are synthetic. State.apply,
 // transaction signatures, replay protection and the no-downgrade guard are real.
 const transitions = { 1: [2], 2: [3], 3: [] };
@@ -45,18 +46,9 @@ let futureStateClass;
 
 async function getFutureStateClass() {
     if (!futureStateClass) {
-        const { default: esmock } = await import('esmock');
-        futureStateClass = await esmock('../../../../../src/core/state/State.js', {
-            '../../../../../src/core/state/utils/consensusConfig.js': {
+        futureStateClass = await loadStateWithMockConsensus({
+            './utils/consensusConfig.js': {
                 isConsensusTransitionAllowed: (from, to) => isConsensusTransitionAllowed(from, to, transitions),
-                validateConsensusConfig: value => {
-                    const version = value.sv[0];
-                    if (version === 2 || version === 3) {
-                        return b4a.equals(value.cd, b4a.from([version, 1])) ||
-                            b4a.equals(value.cd, b4a.from([version, 2]));
-                    }
-                    return validateConsensusConfig(value);
-                },
                 decodeVersionedConsensusConfig: encoded => {
                     const value = decodeConsensusConfig(encoded);
                     const version = value.sv[0];
@@ -69,7 +61,12 @@ async function getFutureStateClass() {
                     return decodeVersionedConsensusConfig(encoded);
                 },
             },
-        });
+        }, `
+            case 2:
+            case 3:
+                return b4a.equals(consensusConfig.cd, b4a.from([consensusConfig.sv[0], 1])) ||
+                    b4a.equals(consensusConfig.cd, b4a.from([consensusConfig.sv[0], 2]));
+        `);
     }
     return futureStateClass;
 }

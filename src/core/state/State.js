@@ -9,6 +9,7 @@ import {
     AUTOBASE_VALUE_ENCODING,
     BATCH_SIZE,
     CONSENSUS_CONFIG_INDEX_SIZE,
+    CONSENSUS_CONFIG_SCHEMA_VERSION_BYTE_LENGTH,
     ConsensusConfigSchemaVersion,
     CustomEventType,
     EntryType,
@@ -19,7 +20,8 @@ import {
     HYPERBEE_VALUE_ENCODING,
     OperationType,
     TRAC_NAMESPACE,
-    UINT32_MAX
+    UINT32_MAX,
+    VDF_PROOF_BYTE_LENGTHS
 } from '../../utils/constants.js';
 import {isHexString, isTransactionRecordPut, sleep} from '../../utils/helpers.js';
 import tracCryptoApi from 'trac-crypto-api';
@@ -37,6 +39,7 @@ import {
     deepCopyBuffer,
     incrementBuffer,
     isBufferValid,
+    isZeroBuffer,
     NULL_BUFFER,
     safeReadUint32BE,
     safeReadUint8,
@@ -71,8 +74,7 @@ import PQueue from 'p-queue';
 import {createGenesisEpochProof} from './utils/epochProof.js';
 import {
     decodeVersionedConsensusConfig,
-    isConsensusTransitionAllowed,
-    validateConsensusConfig
+    isConsensusTransitionAllowed
 } from './utils/consensusConfig.js';
 import {safeDecodeVdfConfig} from '../../codecs/consensus/v1/vdfConfigCodec.js';
 import _ from 'lodash';
@@ -4489,6 +4491,24 @@ class State extends ReadyResource {
         };
     }
 
+    #validateConsensusConfigApply(consensusConfig) {
+        if (!isBufferValid(consensusConfig?.sv, CONSENSUS_CONFIG_SCHEMA_VERSION_BYTE_LENGTH)) {
+            return false;
+        }
+
+        switch (safeReadUint8(consensusConfig.sv)) {
+            case ConsensusConfigSchemaVersion.VDF_V1: {
+                const configData = safeDecodeVdfConfig(consensusConfig.cd);
+                if (configData === null) return false;
+
+                return !isZeroBuffer(configData.difficulty) &&
+                    Object.hasOwn(VDF_PROOF_BYTE_LENGTHS, configData.discriminantBitSize.readUInt16BE(0));
+            }
+            default:
+                return false;
+        }
+    }
+
     async #handleApplySetGenesisEpoch(op, view, base, node, batch) {
         if (!this.#stateValidationSchema.validateConsensusControlOperation(op)) {
             this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Contract schema validation failed.", node.from.key)
@@ -4546,7 +4566,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         }
 
-        if (!validateConsensusConfig(op.cco.cc)) {
+        if (!this.#validateConsensusConfigApply(op.cco.cc)) {
             this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Consensus config validation failed.", node.from.key);
             return Status.FAILURE;
         }
@@ -4749,7 +4769,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         }
 
-        if (!validateConsensusConfig(op.cco.cc)) {
+        if (!this.#validateConsensusConfigApply(op.cco.cc)) {
             this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Consensus config validation failed.", node.from.key);
             return Status.FAILURE;
         }
