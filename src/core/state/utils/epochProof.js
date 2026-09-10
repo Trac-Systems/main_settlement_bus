@@ -15,7 +15,7 @@ import {
     safeWriteUInt32BE,
 } from '../../../utils/buffer.js';
 
-// Keep historical generators so replay can reproduce each network's genesis.
+// Apply-only genesis formats. Preserve existing factories for historical replay.
 const GENESIS_EPOCH_FACTORIES = Object.freeze({
     [ConsensusConfigSchemaVersion.VDF_V1]: createVdfV1GenesisEpochProof,
 });

@@ -1,10 +1,7 @@
 import test from 'brittle';
 import b4a from 'b4a';
 import Corestore from 'corestore';
-import {
-    decodeVersionedConsensusConfig,
-    isConsensusTransitionAllowed,
-} from '../../../../../src/core/state/utils/consensusConfig.js';
+import { decodeVersionedConsensusConfig } from '../../../../../src/utils/consensusConfig.js';
 import {
     decodeConsensusConfig,
     encodeApplyOperation,
@@ -39,16 +36,14 @@ import {
 } from '../setEpoch/setEpochHandlerBranchTestHelpers.js';
 
 // Simulate a future State build with extra private config-validator cases.
-// Only the config formats and the transition table are synthetic. State.apply,
+// Only the config formats are synthetic. State.apply,
 // transaction signatures, replay protection and the no-downgrade guard are real.
-const transitions = { 1: [2], 2: [3], 3: [] };
 let futureStateClass;
 
 async function getFutureStateClass() {
     if (!futureStateClass) {
         futureStateClass = await loadStateWithMockConsensus({
-            './utils/consensusConfig.js': {
-                isConsensusTransitionAllowed: (from, to) => isConsensusTransitionAllowed(from, to, transitions),
+            '../../utils/consensusConfig.js': {
                 decodeVersionedConsensusConfig: encoded => {
                     const value = decodeConsensusConfig(encoded);
                     const version = value.sv[0];
@@ -125,7 +120,7 @@ async function appendInOneApplyBatch(t, base, payloads) {
 
 if (typeof globalThis.Bare !== 'undefined') {
     test('Synthetic State consensus migrations require Node module mocking', t => {
-        t.pass('the pure transition rules and real VDF tests also run in Bare');
+        t.pass('real VDF config and epoch tests also run in Bare');
     });
 } else {
     test('State.apply accepts VDF before a migration in the same batch', async t => {
@@ -160,7 +155,7 @@ if (typeof globalThis.Bare !== 'undefined') {
 
     for (const scenario of [
         { name: 'malformed V2 config', version: 2, parameter: 3, error: 'Consensus config validation failed.' },
-        { name: 'unregistered V1 to V3 transition', version: 3, parameter: 1, error: 'Consensus config transition is not supported.' },
+        { name: 'unsupported V4 config', version: 4, parameter: 1, error: 'Consensus config validation failed.' },
     ]) {
         test(`State.apply leaves no partial migration writes after ${scenario.name} and accepts the next VDF`, async t => {
             const context = await setup(t);
@@ -343,20 +338,39 @@ if (typeof globalThis.Bare !== 'undefined') {
         t.alike(await snapshotEpochLedger(reader), genesis, 'replayed genesis has the original hash');
     });
 
-    test('State.apply rejects an unregistered forward edge despite a valid target format', async t => {
+    test('State.apply upgrades directly from V1 to V3, rejects lower versions and accepts V3 parameter updates', async t => {
         const context = await setup(t);
         const base = context.adminBootstrap.base;
-        const skip = await buildUpgrade(context, 3);
-        const logs = await captureErrors(() => appendAndUpdate(base, skip));
-        assertLog(t, logs, 'Consensus config transition is not supported.');
-        await assertCurrentConfigId(t, base, 0);
-        await assertConfigRecordMissing(t, base, 1);
-        await assertOperationRecorded(t, base, skip, false);
-
-        const upgrade2 = await buildUpgrade(context, 2);
-        await appendAndUpdate(base, upgrade2);
+        const genesis = await snapshotEpochLedger(base);
+        const initialConfig = await readConfig(base, 0);
+        const upgrade3 = await buildUpgrade(context, 3);
+        await appendAndUpdate(base, upgrade3);
         await assertCurrentConfigId(t, base, 1);
-        await assertOperationRecorded(t, base, upgrade2, true);
+        await assertOperationRecorded(t, base, upgrade3, true);
+        t.is(decodeConsensusConfig(await readConfig(base, 1)).sv[0], 3, 'V3 is active without an intermediate V2 record');
+        const afterUpgrade = await snapshotView(base);
+
+        for (const version of [1, 2]) {
+            const downgrade = version === 1
+                ? await buildSetConsensusConfigPayload(context)
+                : await buildUpgrade(context, version);
+            const logs = await captureErrors(() => appendAndUpdate(base, downgrade));
+            assertLog(t, logs, 'Consensus config schema version cannot decrease.');
+            await assertOperationRecorded(t, base, downgrade, false);
+            t.alike(await snapshotView(base), afterUpgrade, `V3 to V${version} leaves the entire view unchanged`);
+        }
+
+        const update3 = await buildUpgrade(context, 3, 2);
+        await appendAndUpdate(base, update3);
+        await assertCurrentConfigId(t, base, 2);
+        await assertOperationRecorded(t, base, update3, true);
+        t.alike(decodeConsensusConfig(await readConfig(base, 2)), { sv: b4a.from([3]), cd: b4a.from([3, 2]) },
+            'a parameter update changes data but keeps the active version at V3');
+        t.alike(await readConfig(base, 0), initialConfig, 'the direct upgrade preserves the initial config');
+        t.alike(await snapshotEpochLedger(base), genesis, 'the direct upgrade and parameter update preserve genesis');
+
+        await captureErrors(() => context.sync());
+        t.alike(await snapshotView(context.peers[1].base), await snapshotView(base), 'replay preserves the direct upgrade and parameter update');
     });
 
     test('State.apply rejects a forged version/config and still accepts a correctly signed migration', async t => {
@@ -404,7 +418,7 @@ if (typeof globalThis.Bare !== 'undefined') {
         t.alike(await snapshotEpochLedger(base), epochState);
     });
 
-    test('State.apply replays historical VDF but rejects pending and relabeled VDF after migration', async t => {
+    test('State.apply replays historical VDF but rejects V1 and V2 epoch envelopes when V3 is active', async t => {
         const context = await setup(t);
         const base = context.adminBootstrap.base;
         await appendAndUpdate(base, await buildSetConsensusConfigPayload(context, {
@@ -417,15 +431,22 @@ if (typeof globalThis.Bare !== 'undefined') {
         t.is(await getCurrentEpoch(base), 1n, 'VDF is accepted before migration');
         const epochState = await snapshotEpochLedger(base);
         const pendingVdf = await buildSetEpochPayload(context, { ...proofOptions, epoch: 2n });
-        const upgrade = await buildUpgrade(context, 2);
+        const upgrade = await buildUpgrade(context, 3);
 
         const logs = await captureErrors(() => appendInOneApplyBatch(t, base, [upgrade, pendingVdf]));
         assertLog(t, logs, 'Epoch schema version does not match the current consensus config.');
         await assertCurrentConfigId(t, base, 2);
+        t.is(decodeConsensusConfig(await readConfig(base, 2)).sv[0], 3, 'only V3 is active after the config update');
         t.alike(await snapshotEpochLedger(base), epochState, 'pending VDF is not written after the config update');
 
+        // No V2 proof implementation is needed: reject its envelope before decoding data.
         const relabeled = safeDecodeApplyOperation(pendingVdf);
         relabeled.seo.sv = b4a.from([2]);
+        const staleV2Logs = await captureErrors(() => appendAndUpdate(base, encodeApplyOperation(relabeled)));
+        assertLog(t, staleV2Logs, 'Epoch schema version does not match the current consensus config.');
+        t.alike(await snapshotEpochLedger(base), epochState, 'V2 cannot append an epoch while V3 is active');
+
+        relabeled.seo.sv = b4a.from([3]);
         const relabelLogs = await captureErrors(() => appendAndUpdate(base, encodeApplyOperation(relabeled)));
         assertLog(t, relabelLogs, 'Unsupported epoch schema version.');
         t.alike(await snapshotEpochLedger(base), epochState, 'unknown proof formats never fall back to VDF');

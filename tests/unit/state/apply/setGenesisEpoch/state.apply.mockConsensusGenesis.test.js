@@ -7,11 +7,7 @@ import { config } from '../../../../helpers/config.js';
 import { loadStateWithMockConsensus } from '../../../../helpers/mockConsensusState.js';
 import { buildAddAdminRequesterPayload } from '../addAdmin/addAdminScenarioHelpers.js';
 import { snapshotEpochLedger } from '../setEpoch/setEpochHandlerBranchTestHelpers.js';
-import { createGenesisEpochProof } from '../../../../../src/core/state/utils/epochProof.js';
-import {
-    decodeConsensusConfig,
-    encodeConsensusConfig,
-} from '../../../../../src/codecs/apply/applyOperationCodec.js';
+import { decodeConsensusConfig, encodeConsensusConfig } from '../../../../../src/codecs/apply/applyOperationCodec.js';
 import { EntryType } from '../../../../../src/utils/constants.js';
 import { uint16ToBuffer } from '../../../../../src/utils/buffer.js';
 import {
@@ -38,9 +34,10 @@ if (typeof globalThis.Bare !== 'undefined') {
         const StateWithV2 = await loadStateWithMockConsensus({
             './utils/epochProof.js': {
                 createGenesisEpochProof: async (proposerAddress, encodedConfig, networkConfig) => {
-                    if (decodeConsensusConfig(encodedConfig).sv[0] !== 2) {
+                    const consensusConfig = decodeConsensusConfig(encodedConfig);
+                    if (consensusConfig.sv[0] !== 2) {
                         vdfCalls++;
-                        return createGenesisEpochProof(proposerAddress, encodedConfig, networkConfig);
+                        throw new Error('V2 genesis must not request the VDF genesis generator.');
                     }
 
                     genesisCalls.push({ proposerAddress, encodedConfig, networkId: networkConfig.networkId });
@@ -48,8 +45,14 @@ if (typeof globalThis.Bare !== 'undefined') {
                         b4a.from('mock-consensus-v2:genesis:'),
                         uint16ToBuffer(networkConfig.networkId),
                         b4a.from(proposerAddress),
-                        decodeConsensusConfig(encodedConfig).cd,
+                        consensusConfig.cd,
                     ]);
+                },
+            },
+            '../../codecs/consensus/v1/vdfConfigCodec.js': {
+                safeDecodeVdfConfig: () => {
+                    vdfCalls++;
+                    throw new Error('V2 genesis must not enter VDF config validation or generation.');
                 },
             },
         }, `

@@ -72,10 +72,7 @@ import deploymentEntryUtils from './utils/deploymentEntry.js';
 import remote from 'hypercore/lib/fully-remote-proof.js'
 import PQueue from 'p-queue';
 import {createGenesisEpochProof} from './utils/epochProof.js';
-import {
-    decodeVersionedConsensusConfig,
-    isConsensusTransitionAllowed
-} from './utils/consensusConfig.js';
+import {decodeVersionedConsensusConfig} from '../../utils/consensusConfig.js';
 import {safeDecodeVdfConfig} from '../../codecs/consensus/v1/vdfConfigCodec.js';
 import _ from 'lodash';
 import {StateEventQueue} from './StateEventQueue.js';
@@ -4663,7 +4660,7 @@ class State extends ReadyResource {
             this.#config
         );
 
-        if (genesisEpoch === null) {
+        if (!b4a.isBuffer(genesisEpoch) || genesisEpoch.length === 0) {
             this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Could not initialize genesis epoch", node.from.key)
             return Status.FAILURE;
         }
@@ -4858,11 +4855,6 @@ class State extends ReadyResource {
         // Same-version parameter changes are allowed; returning to an older consensus is not.
         if (nextSchemaVersion < currentSchemaVersion) {
             this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Consensus config schema version cannot decrease.", node.from.key)
-            return Status.FAILURE;
-        }
-
-        if (!isConsensusTransitionAllowed(currentSchemaVersion, nextSchemaVersion)) {
-            this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Consensus config transition is not supported.", node.from.key)
             return Status.FAILURE;
         }
 
