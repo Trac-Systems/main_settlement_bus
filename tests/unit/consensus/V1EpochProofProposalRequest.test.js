@@ -22,7 +22,7 @@ import {
 } from '../../../src/utils/buffer.js';
 import {
     ConsensusOperationType,
-    ConsensusProtocolVersion,
+    ConsensusConfigSchemaVersion,
     ConsensusResultCode,
     VDF_PROOF_BYTE_LENGTHS
 } from '../../../src/utils/constants.js';
@@ -48,6 +48,7 @@ function createState({
     currentEpochHash = defaultPreviousEpochRecordHash,
     vdfDifficulty = TEST_VDF_PARAMS.vdfDifficulty,
     vdfDiscriminantSize = TEST_VDF_PARAMS.vdfDiscriminantSize,
+    schemaVersion = ConsensusConfigSchemaVersion.VDF_V1,
     isIndexer = true,
     localIsIndexer = true
 } = {}) {
@@ -55,7 +56,7 @@ function createState({
         requireCurrentEpoch: async () => currentEpoch,
         requireEpoch: async () => currentEpochHash,
         requireSignedConsensusConfig: async () => ({
-            schemaVersion: 1,
+            schemaVersion,
             configData: {
                 difficulty: vdfDifficulty,
                 discriminantBitSize: vdfDiscriminantSize
@@ -80,9 +81,9 @@ async function buildGenesisEpochHash(wallet, vdfParams = TEST_VDF_PARAMS) {
         cd: vdfParamsEntry
     });
     const genesisEpoch = await createGenesisEpochProof(
-        config,
         wallet.address,
-        encodedConsensusConfig
+        encodedConsensusConfig,
+        config
     );
 
     return await tracCryptoApi.hash.blake3(genesisEpoch);
@@ -112,14 +113,12 @@ async function buildProofProposalPayload(wallet, {
     vdfParams = TEST_VDF_PARAMS
 } = {}) {
     const builder = new ConsensusMessageBuilder(wallet, config);
-    const protocolVersion = uint8ToBuffer(ConsensusProtocolVersion.V1);
     const networkId = uint16ToBuffer(config.networkId);
     const epochBuffer = uint64ToBuffer(epoch);
     const proposer = addressToBuffer(wallet.address, config.addressPrefix);
     const difficulty = uint32ToBuffer(vdfParams.vdfDifficulty);
     const discriminantBitSize = uint16ToBuffer(vdfParams.vdfDiscriminantSize);
     const challengeData = createMessage(
-        protocolVersion,
         networkId,
         epochBuffer,
         previousEpochRecordHash,
@@ -196,7 +195,7 @@ test('V1EpochProofProposalRequest validates proof proposal signature', async t =
     await validator.validate(payload, {remotePublicKey: wallet.publicKey});
 
     t.is(currentEpochReads, 1);
-    t.is(vdfParamsReads, 1);
+    t.is(vdfParamsReads, 2, 'checks signed config before and after asynchronous validation');
     t.pass();
 });
 
@@ -249,14 +248,46 @@ test('V1EpochProofProposalRequest rejects consensus config mismatch', async t =>
     }
 });
 
-test('V1EpochProofProposalRequest builds proof proposal challenge data with the V1 domain separator', async t => {
+test('V1EpochProofProposalRequest rejects VDF after the active consensus version changes', async t => {
+    const wallet = await createWallet();
+    const payload = await buildProofProposalPayload(wallet);
+    for (const schemaVersion of [2, 255]) {
+        const validator = new V1EpochProofProposalRequest(config, createState({ schemaVersion }));
+        await assertProtocolError(
+            t,
+            () => validator.validate(payload, { remotePublicKey: wallet.publicKey }),
+            ConsensusResultCode.CONSENSUS_CONFIG_MISMATCH,
+            'VDF V1 is not the active consensus.'
+        );
+    }
+});
+
+test('V1EpochProofProposalRequest rejects a config change during asynchronous validation', async t => {
+    const wallet = await createWallet();
+    const payload = await buildProofProposalPayload(wallet);
+    for (const update of [{ schemaVersion: 2 }, { vdfDifficulty: TEST_VDF_PARAMS.vdfDifficulty + 1 }]) {
+        const state = createState();
+        const initialConfig = await state.requireSignedConsensusConfig();
+        const updatedConfig = await createState(update).requireSignedConsensusConfig();
+        let reads = 0;
+        state.requireSignedConsensusConfig = async () => ++reads === 1 ? initialConfig : updatedConfig;
+        const validator = new V1EpochProofProposalRequest(config, state);
+        await assertProtocolError(
+            t,
+            () => validator.validate(payload, { remotePublicKey: wallet.publicKey }),
+            ConsensusResultCode.CONSENSUS_CONFIG_MISMATCH
+        );
+        t.is(reads, 2, 'the final signed config check rejects a now-stale proof');
+    }
+});
+
+test('V1EpochProofProposalRequest builds challenge data from the six proposal fields', async t => {
     const wallet = await createWallet();
     const validator = new V1EpochProofProposalRequest(config, createState());
     const payload = await buildProofProposalPayload(wallet);
     const proofProposal = payload.proof_proposal;
     const challengeData = validator.buildProofProposalChallengeData(proofProposal);
     const expectedChallengeData = createMessage(
-        uint8ToBuffer(ConsensusProtocolVersion.V1),
         proofProposal.network_id,
         proofProposal.epoch,
         proofProposal.previous_epoch_record_hash,

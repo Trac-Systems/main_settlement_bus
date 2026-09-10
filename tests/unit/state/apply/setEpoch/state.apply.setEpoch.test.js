@@ -37,9 +37,10 @@ test('State.apply SET_EPOCH: proposer alone satisfies quorum when it is the sole
 
     const decodedStoredProof = safeDecodeEpochProofV1(storedProof.value);
     const decodedPayload = decodeSetEpochPayload(payload);
+    const submittedProof = safeDecodeEpochProofV1(decodedPayload.seo.data);
     t.ok(decodedStoredProof, 'stored epoch proof decodes');
-    t.ok(b4a.equals(decodedStoredProof.pd, decodedPayload.seo.pd), 'stored proof data matches the submitted proposal');
-    t.is(decodedStoredProof.app.length, decodedPayload.seo.app.length, 'stored approvals count matches the submitted proposal');
+    t.ok(b4a.equals(decodedStoredProof.pd, submittedProof.pd), 'stored proof data matches the submitted proposal');
+    t.is(decodedStoredProof.app.length, submittedProof.app.length, 'stored approvals count matches the submitted proposal');
 });
 
 test('State.apply SET_EPOCH: rejects a previous_epoch_record_hash mismatch', async t => {

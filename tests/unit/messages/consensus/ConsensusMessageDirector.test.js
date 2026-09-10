@@ -9,14 +9,12 @@ import ConsensusMessageDirector from '../../../../src/messages/consensus/v1/Cons
 import {addressToBuffer} from '../../../../src/core/state/utils/address.js';
 import {
     createMessage,
-    uint8ToBuffer,
     uint16ToBuffer,
     uint64ToBuffer,
     uint32ToBuffer
 } from '../../../../src/utils/buffer.js';
 import {
     ConsensusOperationType,
-    ConsensusProtocolVersion,
     ConsensusResultCode,
     VDF_PROOF_BYTE_LENGTHS
 } from '../../../../src/utils/constants.js';
@@ -39,7 +37,6 @@ test('ConsensusMessageDirector builds proof proposal and verifies signature', as
     const sessionId = uuidv7();
     const networkId = 67;
     const epoch = 2;
-    const protocolVersionBuffer = uint8ToBuffer(ConsensusProtocolVersion.V1);
     const networkIdBuffer = uint16ToBuffer(networkId);
     const epochBuffer = uint64ToBuffer(epoch);
     const previousEpochRecordHash = b4a.alloc(32, 1);
@@ -73,7 +70,6 @@ test('ConsensusMessageDirector builds proof proposal and verifies signature', as
     t.ok(b4a.isBuffer(proofProposal.signature));
 
     const message = createMessage(
-        protocolVersionBuffer,
         proofProposal.network_id,
         proofProposal.epoch,
         proofProposal.previous_epoch_record_hash,
@@ -93,7 +89,6 @@ test('ConsensusMessageDirector builds proof proposal response and verifies signa
     const sessionId = uuidv7();
     const networkId = 67;
     const epoch = 2;
-    const protocolVersionBuffer = uint8ToBuffer(ConsensusProtocolVersion.V1);
     const networkIdBuffer = uint16ToBuffer(networkId);
     const epochBuffer = uint64ToBuffer(epoch);
     const previousEpochRecordHash = b4a.alloc(32, 1);
@@ -127,7 +122,6 @@ test('ConsensusMessageDirector builds proof proposal response and verifies signa
     t.ok(b4a.isBuffer(proofProposalResponse.response_sig));
 
     const approvalMessage = createMessage(
-        protocolVersionBuffer,
         networkIdBuffer,
         epochBuffer,
         previousEpochRecordHash,

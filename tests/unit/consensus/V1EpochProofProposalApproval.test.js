@@ -9,6 +9,7 @@ import {V1ConsensusProtocolError} from '../../../src/core/consensus/v1/V1Consens
 import {bufferToAddress} from '../../../src/core/state/utils/address.js';
 import {encodeProofProposalApproval} from '../../../src/codecs/consensus/v1/consensusV1OperationCodec.js';
 import {
+    ConsensusConfigSchemaVersion,
     ConsensusOperationType,
     ConsensusResultCode,
     VDF_DIFFICULTY_SIZE,
@@ -23,7 +24,14 @@ const difficulty = b4a.alloc(VDF_DIFFICULTY_SIZE, 2);
 const discriminantBitSize = uint16ToBuffer(2048);
 const proof = b4a.alloc(VDF_PROOF_BYTE_LENGTHS[2048], 4);
 const state = {
-    isIndexerAddress: async () => true
+    isIndexerAddress: async () => true,
+    requireSignedConsensusConfig: async () => ({
+        schemaVersion: ConsensusConfigSchemaVersion.VDF_V1,
+        configData: {
+            difficulty: difficulty.readUInt32BE(0),
+            discriminantBitSize: discriminantBitSize.readUInt16BE(0),
+        },
+    }),
 };
 
 async function createWallet(keyPair) {
@@ -131,6 +139,7 @@ test('V1EpochProofProposalApproval rejects approver that is not an indexer', asy
     const proposerWallet = await createWallet(testKeyPair1);
     const approverWallet = await createWallet(testKeyPair2);
     const validator = new V1EpochProofProposalApproval(config, {
+        ...state,
         isIndexerAddress: async () => false
     });
     const proofProposalPayload = await buildProofProposalPayload(proposerWallet);
@@ -303,6 +312,7 @@ test('V1EpochProofProposalApproval wraps state failures as protocol errors', asy
     const approverWallet = await createWallet(testKeyPair2);
     const stateError = new Error('Indexer state is unavailable.');
     const validator = new V1EpochProofProposalApproval(config, {
+        ...state,
         isIndexerAddress: async () => {
             throw stateError;
         }
@@ -323,4 +333,66 @@ test('V1EpochProofProposalApproval wraps state failures as protocol errors', asy
         t.is(error.message, 'Indexer state is unavailable.');
         t.is(error.cause, stateError);
     }
+});
+
+test('V1EpochProofProposalApproval rejects VDF approvals after a consensus upgrade', async t => {
+    const proposerWallet = await createWallet(testKeyPair1);
+    const approverWallet = await createWallet(testKeyPair2);
+    const proposal = await buildProofProposalPayload(proposerWallet);
+    const approval = await buildProofProposalApprovalPayload(approverWallet, proposal);
+    const initialConfig = await state.requireSignedConsensusConfig();
+    for (const schemaVersion of [2, 255]) {
+        const validator = new V1EpochProofProposalApproval(config, {
+            ...state,
+            requireSignedConsensusConfig: async () => ({ ...initialConfig, schemaVersion }),
+        });
+        await assertProtocolError(
+            t,
+            () => validator.validate(approval, { remotePublicKey: approverWallet.publicKey }, proposal.proof_proposal),
+            ConsensusResultCode.CONSENSUS_CONFIG_MISMATCH,
+            'VDF V1 is not the active consensus.'
+        );
+    }
+});
+
+test('V1EpochProofProposalApproval rejects a config change while validating a pending approval', async t => {
+    const proposerWallet = await createWallet(testKeyPair1);
+    const approverWallet = await createWallet(testKeyPair2);
+    const proposal = await buildProofProposalPayload(proposerWallet);
+    const approval = await buildProofProposalApprovalPayload(approverWallet, proposal);
+    const initialConfig = await state.requireSignedConsensusConfig();
+    const updatedConfigs = [
+        { ...initialConfig, schemaVersion: 2 },
+        { ...initialConfig, configData: { ...initialConfig.configData, difficulty: initialConfig.configData.difficulty + 1 } },
+    ];
+    for (const updatedConfig of updatedConfigs) {
+        let reads = 0;
+        const validator = new V1EpochProofProposalApproval(config, {
+            ...state,
+            requireSignedConsensusConfig: async () => ++reads === 1 ? initialConfig : updatedConfig,
+        });
+        await assertProtocolError(
+            t,
+            () => validator.validate(approval, { remotePublicKey: approverWallet.publicKey }, proposal.proof_proposal),
+            ConsensusResultCode.CONSENSUS_CONFIG_MISMATCH
+        );
+        t.is(reads, 2, 'late approval is checked again against signed config');
+    }
+});
+
+test('V1EpochProofProposalApproval fails closed when signed config is unavailable', async t => {
+    const proposerWallet = await createWallet(testKeyPair1);
+    const approverWallet = await createWallet(testKeyPair2);
+    const proposal = await buildProofProposalPayload(proposerWallet);
+    const approval = await buildProofProposalApprovalPayload(approverWallet, proposal);
+    const validator = new V1EpochProofProposalApproval(config, {
+        ...state,
+        requireSignedConsensusConfig: async () => { throw new Error('Signed config is unavailable.'); },
+    });
+    await assertProtocolError(
+        t,
+        () => validator.validate(approval, { remotePublicKey: approverWallet.publicKey }, proposal.proof_proposal),
+        ConsensusResultCode.UNEXPECTED_ERROR,
+        'Signed config is unavailable.'
+    );
 });

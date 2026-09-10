@@ -116,10 +116,10 @@ const shuffleObject = (obj) => {
 }
 
 function getValidEpochProof() {
-    return {
-        pd: b4a.from(fixtures.validSetEpochOperation.seo.pd),
-        app: fixtures.validSetEpochOperation.seo.app.map(approval => b4a.from(approval))
-    };
+    return EpochProofV1.toObject(
+        EpochProofV1.decode(fixtures.validSetEpochOperation.seo.data),
+        APPLY_TO_OBJECT_OPTIONS
+    );
 }
 
 function getValidSetEpochOperation() {

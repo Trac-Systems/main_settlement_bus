@@ -12,11 +12,10 @@ import { config } from '../../helpers/config.js';
 import { testKeyPair2 } from '../../fixtures/apply.fixtures.js';
 import { addressToBuffer } from '../../../src/core/state/utils/address.js';
 import { encodeProofProposalApproval } from '../../../src/codecs/consensus/v1/consensusV1OperationCodec.js';
-import {createMessage, uint8ToBuffer, uint32ToBuffer} from '../../../src/utils/buffer.js';
+import {createMessage, uint32ToBuffer} from '../../../src/utils/buffer.js';
 import {
     CustomEventType,
     ConsensusOperationType,
-    ConsensusProtocolVersion,
     ConsensusResultCode
 } from '../../../src/utils/constants.js';
 
@@ -118,7 +117,6 @@ function callNames(calls) {
 
 async function verifyProofProposalApprovalSignature(proofProposal, approval, publicKey) {
     const message = createMessage(
-        uint8ToBuffer(ConsensusProtocolVersion.V1),
         proofProposal.network_id,
         proofProposal.epoch,
         proofProposal.previous_epoch_record_hash,

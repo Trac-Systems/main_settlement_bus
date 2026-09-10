@@ -12,13 +12,11 @@ import {
 } from '../../../../src/codecs/consensus/v1/consensusV1OperationCodec.js';
 import {
     createMessage,
-    uint8ToBuffer,
     uint16ToBuffer,
     uint64ToBuffer, uint32ToBuffer
 } from '../../../../src/utils/buffer.js';
 import {
     ConsensusOperationType,
-    ConsensusProtocolVersion,
     ConsensusResultCode,
     NetworkResultCode
 } from '../../../../src/utils/constants.js';
@@ -70,7 +68,6 @@ test('ConsensusMessageBuilder builds proof proposal and verifies signature', asy
     t.ok(b4a.isBuffer(proofProposal.signature));
 
     const msg = createMessage(
-        uint8ToBuffer(ConsensusProtocolVersion.V1),
         proofProposal.network_id,
         proofProposal.epoch,
         proofProposal.previous_epoch_record_hash,
@@ -120,7 +117,6 @@ test('ConsensusMessageBuilder iterates proof proposal response ConsensusResultCo
             t.ok(b4a.isBuffer(payload.proof_proposal_response.approval.approval_sig));
 
             const approvalMessage = createMessage(
-                uint8ToBuffer(ConsensusProtocolVersion.V1),
                 proofProposalFixture.network_id,
                 proofProposalFixture.epoch,
                 proofProposalFixture.previous_epoch_record_hash,
@@ -234,7 +230,6 @@ test('ConsensusMessageBuilder encodes scalar number fields at byte-width boundar
         t.is(proofProposal.epoch.readBigUInt64BE(0), BigInt(testCase.epoch));
 
         const msg = createMessage(
-            uint8ToBuffer(ConsensusProtocolVersion.V1),
             proofProposal.network_id,
             proofProposal.epoch,
             proofProposal.previous_epoch_record_hash,
@@ -443,7 +438,6 @@ test('ConsensusMessageBuilder signs non-zero network id and uint64 epochs withou
     t.alike(proofProposal.epoch, epochBuffer);
 
     const signedMessage = createMessage(
-        uint8ToBuffer(ConsensusProtocolVersion.V1),
         proofProposal.network_id,
         proofProposal.epoch,
         proofProposal.previous_epoch_record_hash,
@@ -457,7 +451,6 @@ test('ConsensusMessageBuilder signs non-zero network id and uint64 epochs withou
     t.ok(wallet.verify(proofProposal.signature, signedHash, wallet.publicKey));
 
     const legacyMessage = createMessage(
-        ConsensusProtocolVersion.V1,
         networkId,
         epoch,
         proofProposalFixture.previous_epoch_record_hash,

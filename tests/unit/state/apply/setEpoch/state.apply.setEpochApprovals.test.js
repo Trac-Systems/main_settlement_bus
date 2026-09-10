@@ -72,10 +72,8 @@ test('State.apply SET_EPOCH approvals: accepts excess valid approvals and stores
     const receivedOrder = [indexers[4], indexers[2], indexers[3], indexers[1]];
     const payload = await buildSetEpochPayload(context, { approverNodes: receivedOrder });
     const submittedOperation = decodeSetEpochPayload(payload);
-    const submittedProof = safeEncodeEpochProofV1({
-        pd: submittedOperation.seo.pd,
-        app: submittedOperation.seo.app
-    });
+    const decodedSubmittedProof = safeDecodeEpochProofV1(submittedOperation.seo.data);
+    const submittedProof = safeEncodeEpochProofV1(decodedSubmittedProof);
 
     await applySetEpochWithIndexers(context, payload, indexers);
 
@@ -92,7 +90,7 @@ test('State.apply SET_EPOCH approvals: accepts excess valid approvals and stores
 
     const decodedStoredProof = safeDecodeEpochProofV1(stored.value);
     t.is(decodedStoredProof?.app.length, receivedOrder.length, 'all excess approvals are retained');
-    for (const [index, submittedApproval] of submittedOperation.seo.app.entries()) {
+    for (const [index, submittedApproval] of decodedSubmittedProof.app.entries()) {
         t.ok(
             b4a.equals(decodedStoredProof.app[index], submittedApproval),
             `approval ${index} remains in its received position`

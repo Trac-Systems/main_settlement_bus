@@ -46,7 +46,8 @@ export class StateNetworkFactory {
         stateOptions = {},
         autobaseOptions = {},
         open = defaultOpenHyperbeeView,
-        seedIndexers = true
+        seedIndexers = true,
+        stateClass = State
     } = {}) {
         if (nodes < 1) throw new Error('StateNetworkFactory requires at least one node');
         this.#options = {
@@ -55,7 +56,8 @@ export class StateNetworkFactory {
             stateOptions,
             autobaseOptions,
             open,
-            seedIndexers
+            seedIndexers,
+            stateClass
         };
     }
 
@@ -85,7 +87,7 @@ export class StateNetworkFactory {
     }
 
     async #initialize() {
-        const { nodes, valueEncoding, stateOptions, autobaseOptions, open, seedIndexers } = this.#options;
+        const { nodes, valueEncoding, stateOptions, autobaseOptions, open, seedIndexers, stateClass } = this.#options;
 
         const stateStores = await createStores(nodes, this.#harness);
         const { bases } = await create(nodes, this.#harness, {
@@ -108,7 +110,7 @@ export class StateNetworkFactory {
             const mnemonic = i === 0 ? testKeyPair1.mnemonic : null;
             const wallet = await createWallet(mnemonic);
             const stateConfig = overrideConfig({ ...stateOptions, bootstrap: bootstrapKey })
-            const state = new State(stateStores[i].session(), wallet, stateConfig);
+            const state = new stateClass(stateStores[i].session(), wallet, stateConfig);
 
             bases[i]._handlers.apply = state.applyHandler;
             descriptors.push({

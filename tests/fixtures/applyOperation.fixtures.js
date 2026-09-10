@@ -4,6 +4,7 @@ import { addressToBuffer } from '../../src/core/state/utils/address.js';
 import { config } from '../helpers/config.js';
 import { asAddress } from '../helpers/address.js';
 import { proofProposalApproval, proofProposalData } from '../helpers/proofProposal.js';
+import { encodeEpochProofV1 } from '../../src/codecs/apply/applyOperationCodec.js';
 
 const validTransferOperation = {
     type: OperationType.TRANSFER,
@@ -285,11 +286,14 @@ const validSetEpochOperation = {
     type: OperationType.SET_EPOCH,
     address: addressToBuffer(asAddress('3801ebd1f12462ad335b821807c9d87e4f20d57505222284b2634a7e8e5edac2'), config.addressPrefix),
     seo: {
-        pd: proofProposalData(),
-        app: [
-            proofProposalApproval(0x15, 0x16),
-            proofProposalApproval(0x17, 0x18)
-        ]
+        sv: b4a.from([1]),
+        data: encodeEpochProofV1({
+            pd: proofProposalData(),
+            app: [
+                proofProposalApproval(0x15, 0x16),
+                proofProposalApproval(0x17, 0x18)
+            ]
+        })
     }
 };
 
