@@ -1,34 +1,35 @@
 import b4a from 'b4a';
 
 import {
-    ConsensusConfigSchemaVersion,
     HASH_BYTE_LENGTH,
     SIGNATURE_BYTE_LENGTH,
     VDF_PROOF_BYTE_LENGTHS,
+    ConsensusConfigSchemaVersion
 } from '../../../utils/constants.js';
+import {safeDecodeVersionedConsensusConfig} from './consensusConfig.js';
+import {safeEncodeEpochProofV1} from '../../../codecs/apply/applyOperationCodec.js';
+import {safeEncodeProofProposal} from '../../../codecs/consensus/v1/consensusV1OperationCodec.js';
+import {addressToBuffer} from './address.js';
 import {
     safeUint16ToBuffer,
     safeWriteUInt32BE,
 } from '../../../utils/buffer.js';
-import { safeDecodeVersionedConsensusConfig } from './consensusConfig.js';
-import { safeEncodeEpochProofV1 } from '../../../codecs/apply/applyOperationCodec.js';
-import { safeEncodeProofProposal } from '../../../codecs/consensus/v1/consensusV1OperationCodec.js';
-import { addressToBuffer } from './address.js';
 
+// Keep historical generators so replay can reproduce each network's genesis.
 const GENESIS_EPOCH_FACTORIES = Object.freeze({
     [ConsensusConfigSchemaVersion.VDF_V1]: createVdfV1GenesisEpochProof,
 });
 
 /**
- * Creates epoch zero using the implementation selected by the stored consensus
- * config schema version.
+ * Creates epoch zero using the initial config carried by SET_GENESIS_EPOCH,
+ * not the latest signed config. SET_CONSENSUS_CONFIG must not recreate genesis.
  *
- * @param {Config} config Application configuration.
  * @param {string} proposerAddress Genesis proposer address.
- * @param {Buffer} encodedConsensusConfig Encoded versioned consensus config.
+ * @param {Buffer} encodedConsensusConfig Encoded initial consensus config.
+ * @param {Config} config Application configuration.
  * @returns {Promise<Buffer|null>} Encoded genesis epoch proof or null on failure.
  */
-export async function createGenesisEpochProof(config, proposerAddress, encodedConsensusConfig) {
+export async function createGenesisEpochProof(proposerAddress, encodedConsensusConfig, config) {
     const consensusConfig = safeDecodeVersionedConsensusConfig(encodedConsensusConfig);
     if (consensusConfig === null) {
         return null;
@@ -39,18 +40,25 @@ export async function createGenesisEpochProof(config, proposerAddress, encodedCo
         return null;
     }
 
-    return await createForSchema(config, proposerAddress, consensusConfig.configData);
+    const genesisEpoch = await createForSchema(config, proposerAddress, consensusConfig.configData);
+    if (!b4a.isBuffer(genesisEpoch) || genesisEpoch.length === 0) {
+        return null;
+    }
+
+    return genesisEpoch;
 }
+
 
 /**
  * Creates the VDF v1 representation of epoch zero.
+ * Keep this encoding unchanged: historical replay must reproduce the same hash.
  *
  * @param {Config} config Application configuration.
  * @param {string} proposerAddress Genesis proposer address.
  * @param {{difficulty: number, discriminantBitSize: number}} configData VDF v1 config.
  * @returns {Promise<Buffer|null>} Encoded epoch proof or null on validation failure.
  */
-async function createVdfV1GenesisEpochProof(config, proposerAddress, configData) {
+export async function createVdfV1GenesisEpochProof(config, proposerAddress, configData) {
     const proposer = addressToBuffer(proposerAddress, config.addressPrefix);
     if (proposer.length === 0) {
         return null;
@@ -60,7 +68,6 @@ async function createVdfV1GenesisEpochProof(config, proposerAddress, configData)
     const difficulty = safeWriteUInt32BE(configData.difficulty);
     const discriminantBitSize = safeUint16ToBuffer(configData.discriminantBitSize);
     const proofByteLength = VDF_PROOF_BYTE_LENGTHS[configData.discriminantBitSize];
-
     if (
         networkId.length === 0 ||
         difficulty.length === 0 ||
