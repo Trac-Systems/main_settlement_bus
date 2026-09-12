@@ -1,4 +1,4 @@
-import { ConsensusConfigSchemaVersion, OperationType } from '../../utils/constants.js';
+import { ConsensusVersion, OperationType } from '../../utils/constants.js';
 import { encodeEpochProofV1 } from '../../codecs/apply/applyOperationCodec.js';
 import { uint8ToBuffer } from '../../utils/buffer.js';
 
@@ -523,7 +523,7 @@ class ApplyStateMessageDirector {
      */
     async buildCompleteSetEpochMessage(invokerAddress, proofData, approvals) {
         if (!this.#builder) throw new Error('Builder has not been set.');
-        const schemaVersion = uint8ToBuffer(ConsensusConfigSchemaVersion.VDF_V1);
+        const schemaVersion = uint8ToBuffer(ConsensusVersion.VDF_V1);
         const epochData = encodeEpochProofV1({ pd: proofData, app: approvals });
 
         await this.#builder

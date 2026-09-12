@@ -22,7 +22,7 @@ import {
 } from '../../../src/utils/buffer.js';
 import {
     ConsensusOperationType,
-    ConsensusConfigSchemaVersion,
+    ConsensusVersion,
     ConsensusResultCode,
     VDF_PROOF_BYTE_LENGTHS
 } from '../../../src/utils/constants.js';
@@ -48,7 +48,7 @@ function createState({
     currentEpochHash = defaultPreviousEpochRecordHash,
     vdfDifficulty = TEST_VDF_PARAMS.vdfDifficulty,
     vdfDiscriminantSize = TEST_VDF_PARAMS.vdfDiscriminantSize,
-    schemaVersion = ConsensusConfigSchemaVersion.VDF_V1,
+    schemaVersion = ConsensusVersion.VDF_V1,
     isIndexer = true,
     localIsIndexer = true
 } = {}) {

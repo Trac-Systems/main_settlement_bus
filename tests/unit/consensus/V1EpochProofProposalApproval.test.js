@@ -9,7 +9,7 @@ import {V1ConsensusProtocolError} from '../../../src/core/consensus/v1/V1Consens
 import {bufferToAddress} from '../../../src/core/state/utils/address.js';
 import {encodeProofProposalApproval} from '../../../src/codecs/consensus/v1/consensusV1OperationCodec.js';
 import {
-    ConsensusConfigSchemaVersion,
+    ConsensusVersion,
     ConsensusOperationType,
     ConsensusResultCode,
     VDF_DIFFICULTY_SIZE,
@@ -26,7 +26,7 @@ const proof = b4a.alloc(VDF_PROOF_BYTE_LENGTHS[2048], 4);
 const state = {
     isIndexerAddress: async () => true,
     requireSignedConsensusConfig: async () => ({
-        schemaVersion: ConsensusConfigSchemaVersion.VDF_V1,
+        schemaVersion: ConsensusVersion.VDF_V1,
         configData: {
             difficulty: difficulty.readUInt32BE(0),
             discriminantBitSize: discriminantBitSize.readUInt16BE(0),

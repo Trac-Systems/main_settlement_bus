@@ -8,7 +8,7 @@ import {
     decodeEpochProofV1,
     encodeConsensusConfig
 } from '../../../../src/codecs/apply/applyOperationCodec.js';
-import { ConsensusConfigSchemaVersion, OperationType } from '../../../../src/utils/constants.js';
+import { ConsensusVersion, OperationType } from '../../../../src/utils/constants.js';
 import { config } from '../../../helpers/config.js';
 import { testKeyPair1 } from '../../../fixtures/apply.fixtures.js';
 import {
@@ -35,7 +35,7 @@ test('ApplyStateMessageDirector builds complete set epoch message', async t => {
     t.alike(Object.keys(payload).sort(), ['address', 'seo', 'type']);
     t.alike(Object.keys(payload.seo).sort(), ['data', 'sv']);
     t.is(payload.seo.sv.length, 1);
-    t.is(payload.seo.sv.readUInt8(0), ConsensusConfigSchemaVersion.VDF_V1);
+    t.is(payload.seo.sv.readUInt8(0), ConsensusVersion.VDF_V1);
 
     const epochProof = decodeEpochProofV1(payload.seo.data);
     t.ok(b4a.equals(epochProof.pd, proofData));

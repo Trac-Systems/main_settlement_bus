@@ -10,7 +10,7 @@ import {
     BATCH_SIZE,
     CONSENSUS_CONFIG_INDEX_SIZE,
     CONSENSUS_CONFIG_SCHEMA_VERSION_BYTE_LENGTH,
-    ConsensusConfigSchemaVersion,
+    ConsensusVersion,
     CustomEventType,
     EntryType,
     EPOCH_BYTE_LENGTH,
@@ -3587,7 +3587,7 @@ class State extends ReadyResource {
 
         // Use the config at this point in replay, including earlier updates in this batch.
         switch (consensusSchemaVersion) {
-            case ConsensusConfigSchemaVersion.VDF_V1:
+            case ConsensusVersion.VDF_V1:
                 return await this.#applyVdfV1Epoch(op, consensusConfig, base, node, batch);
             default:
                 this.#safeLogApply(OperationType.SET_EPOCH, "Unsupported epoch schema version.", node.from.key)
@@ -4501,7 +4501,7 @@ class State extends ReadyResource {
         }
 
         switch (safeReadUint8(consensusConfig.sv)) {
-            case ConsensusConfigSchemaVersion.VDF_V1: {
+            case ConsensusVersion.VDF_V1: {
                 const configData = safeDecodeVdfConfig(consensusConfig.cd);
                 if (configData === null) return false;
 

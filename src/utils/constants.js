@@ -230,9 +230,9 @@ export const VDF_PROOF_BYTE_LENGTHS = Object.freeze({
     4096: 1028
 });
 
-// These permanent IDs also select the SET_EPOCH proof format.
+// These permanent consensus IDs select the config, SET_EPOCH and genesis formats.
 // Assign higher IDs to new versions; parameter updates retain the current ID.
-export const ConsensusConfigSchemaVersion = Object.freeze({
+export const ConsensusVersion = Object.freeze({
     VDF_V1: 1,
 });
 

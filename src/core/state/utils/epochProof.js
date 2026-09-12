@@ -4,7 +4,7 @@ import {
     HASH_BYTE_LENGTH,
     SIGNATURE_BYTE_LENGTH,
     VDF_PROOF_BYTE_LENGTHS,
-    ConsensusConfigSchemaVersion
+    ConsensusVersion
 } from '../../../utils/constants.js';
 import {
     safeDecodeConsensusConfig,
@@ -18,7 +18,7 @@ import {safeUint16ToBuffer} from '../../../utils/buffer.js';
 
 // Apply-only genesis formats. Preserve existing factories for historical replay.
 const GENESIS_EPOCH_FACTORIES = Object.freeze({
-    [ConsensusConfigSchemaVersion.VDF_V1]: createVdfV1GenesisEpochProof,
+    [ConsensusVersion.VDF_V1]: createVdfV1GenesisEpochProof,
 });
 
 /**

@@ -2,7 +2,7 @@ import { decodeConsensusConfig } from '../codecs/apply/applyOperationCodec.js';
 import { decodeVdfConfig, safeDecodeVdfConfig } from '../codecs/consensus/v1/vdfConfigCodec.js';
 import {
     CONSENSUS_CONFIG_SCHEMA_VERSION_BYTE_LENGTH,
-    ConsensusConfigSchemaVersion,
+    ConsensusVersion,
     VDF_PROOF_BYTE_LENGTHS,
 } from './constants.js';
 import { isBufferValid, isZeroBuffer, safeReadUint8 } from './buffer.js';
@@ -20,7 +20,7 @@ const decodeVdfV1ConfigData = (encodedConfigData) => {
 };
 
 const CONSENSUS_CONFIG_DECODERS = Object.freeze({
-    [ConsensusConfigSchemaVersion.VDF_V1]: decodeVdfV1ConfigData,
+    [ConsensusVersion.VDF_V1]: decodeVdfV1ConfigData,
 });
 
 export const validateConsensusConfig = (consensusConfig) => {
@@ -29,7 +29,7 @@ export const validateConsensusConfig = (consensusConfig) => {
     }
 
     switch (safeReadUint8(consensusConfig.sv)) {
-        case ConsensusConfigSchemaVersion.VDF_V1: {
+        case ConsensusVersion.VDF_V1: {
             const configData = safeDecodeVdfConfig(consensusConfig.cd);
             if (configData === null) return false;
 

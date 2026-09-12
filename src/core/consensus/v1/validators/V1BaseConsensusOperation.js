@@ -2,7 +2,7 @@ import ConsensusValidationSchema from "./ConsensusValidationSchema.js";
 import _ from "lodash";
 
 import {
-    ConsensusConfigSchemaVersion,
+    ConsensusVersion,
     ConsensusOperationType,
     ConsensusResultCode
 } from "../../../../utils/constants.js";
@@ -101,7 +101,7 @@ class V1BaseConsensusOperation {
      */
     async validateProofProposalConfig(proofProposal) {
         const consensusConfig = await this._state.requireSignedConsensusConfig();
-        if (consensusConfig.schemaVersion !== ConsensusConfigSchemaVersion.VDF_V1) {
+        if (consensusConfig.schemaVersion !== ConsensusVersion.VDF_V1) {
             throw new V1ConsensusProtocolError(
                 ConsensusResultCode.CONSENSUS_CONFIG_MISMATCH,
                 'VDF V1 is not the active consensus.'
