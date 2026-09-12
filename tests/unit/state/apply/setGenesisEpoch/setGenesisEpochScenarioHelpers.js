@@ -10,6 +10,7 @@ import {
 import { applyStateMessageFactory } from '../../../../../src/messages/state/applyStateMessageFactory.js';
 import {
     safeDecodeApplyOperation,
+    safeDecodeEpochRecord,
     safeDecodeEpochProofV1,
     safeEncodeApplyOperation,
     safeEncodeConsensusConfig
@@ -191,7 +192,12 @@ export async function assertGenesisInitialized(
         'epoch zero points to the stored genesis proof'
     );
 
-    const epochProof = safeDecodeEpochProofV1(epochProofEntry.value);
+    const epochRecord = safeDecodeEpochRecord(epochProofEntry.value);
+    t.ok(epochRecord, 'stored genesis epoch record decodes');
+    if (!epochRecord) return;
+    t.alike(epochRecord.sv, operation.cco.cc.sv, 'genesis record stores the initial consensus version');
+
+    const epochProof = safeDecodeEpochProofV1(epochRecord.data);
     t.ok(epochProof, 'stored genesis epoch proof decodes');
     if (!epochProof) return;
     t.is(epochProof.app.length, 0, 'genesis epoch proof has no approvals');
@@ -416,7 +422,7 @@ export async function applyWithGenesisEpochHashFailure(context, payload) {
     let injected = false;
 
     tracCryptoApi.hash.blake3Safe = async (value, ...args) => {
-        if (!injected && isEncodedGenesisEpochProof(value)) {
+        if (!injected && isEncodedGenesisEpochRecord(value)) {
             injected = true;
             return b4a.alloc(0);
         }
@@ -427,6 +433,28 @@ export async function applyWithGenesisEpochHashFailure(context, payload) {
         await appendAndUpdate(context.adminBootstrap.base, payload);
     } finally {
         tracCryptoApi.hash.blake3Safe = originalBlake3Safe;
+    }
+
+    return injected;
+}
+
+export async function applyWithGenesisEpochRecordEncodingFailure(context, payload) {
+    const originalFrom = b4a.from;
+    let injected = false;
+
+    b4a.from = (value, ...args) => {
+        const encodedValue = originalFrom(value, ...args);
+        if (!injected && isEncodedGenesisEpochRecord(encodedValue)) {
+            injected = true;
+            throw new Error('forced genesis epoch record encoding failure');
+        }
+        return encodedValue;
+    };
+
+    try {
+        await appendAndUpdate(context.adminBootstrap.base, payload);
+    } finally {
+        b4a.from = originalFrom;
     }
 
     return injected;
@@ -503,4 +531,9 @@ function isEncodedGenesisEpochProof(value) {
 
     const proofProposal = safeDecodeProofProposal(epochProof.pd);
     return proofProposal !== null;
+}
+
+function isEncodedGenesisEpochRecord(value) {
+    const record = safeDecodeEpochRecord(value);
+    return record !== null && record.sv[0] === 1 && isEncodedGenesisEpochProof(record.data);
 }

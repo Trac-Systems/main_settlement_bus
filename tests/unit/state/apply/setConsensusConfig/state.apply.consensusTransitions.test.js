@@ -4,6 +4,8 @@ import Corestore from 'corestore';
 import { decodeVersionedConsensusConfig } from '../../../../../src/utils/consensusConfig.js';
 import {
     decodeConsensusConfig,
+    decodeEpochRecord,
+    decodeEpochProofV1,
     encodeApplyOperation,
     safeDecodeApplyOperation,
 } from '../../../../../src/codecs/apply/applyOperationCodec.js';
@@ -141,8 +143,8 @@ if (typeof globalThis.Bare !== 'undefined') {
         await appendInOneApplyBatch(t, base, [epoch, upgrade]);
 
         t.is(await getCurrentEpoch(base), 1n, 'VDF is accepted while V1 is still active');
-        t.alike((await base.view.get(expected.forwardKey))?.value, expected.proofHash);
-        t.alike((await base.view.get(expected.reverseKey))?.value, expected.encodedProof);
+        t.alike((await base.view.get(expected.forwardKey))?.value, expected.recordHash);
+        t.alike((await base.view.get(expected.reverseKey))?.value, expected.encodedRecord);
         await assertCurrentConfigId(t, base, 2);
         t.is(decodeConsensusConfig(await readConfig(base, 2)).sv[0], 2, 'V2 becomes active after the epoch');
         await assertOperationRecorded(t, base, upgrade, true);
@@ -183,8 +185,8 @@ if (typeof globalThis.Bare !== 'undefined') {
             t.is(await getCurrentEpoch(base), 1n, 'VDF remains active after the rejected migration');
             const expectedView = new Map(before);
             expectedView.set(EntryType.EPOCH_CURRENT, expected.currentEpoch.toString('hex'));
-            expectedView.set(expected.forwardKey, expected.proofHash.toString('hex'));
-            expectedView.set(expected.reverseKey, expected.encodedProof.toString('hex'));
+            expectedView.set(expected.forwardKey, expected.recordHash.toString('hex'));
+            expectedView.set(expected.reverseKey, expected.encodedRecord.toString('hex'));
             t.alike(await snapshotView(base), expectedView, 'only the accepted epoch changes the view');
 
             await context.sync();
@@ -438,6 +440,13 @@ if (typeof globalThis.Bare !== 'undefined') {
         await assertCurrentConfigId(t, base, 2);
         t.is(decodeConsensusConfig(await readConfig(base, 2)).sv[0], 3, 'only V3 is active after the config update');
         t.alike(await snapshotEpochLedger(base), epochState, 'pending VDF is not written after the config update');
+
+        const historicalHash = (await base.view.get(EntryType.EPOCH + '1')).value;
+        const historicalRecord = decodeEpochRecord((await base.view.get(EntryType.EPOCH_HASH + historicalHash.toString('hex'))).value);
+        t.is(historicalRecord.sv[0], 1, 'the historical record selects V1 independently of the active V3 config');
+        const historicalProof = historicalRecord.sv[0] === 1 ? decodeEpochProofV1(historicalRecord.data) : null;
+        t.alike(historicalProof, decodeEpochProofV1(safeDecodeApplyOperation(historicalVdf).seo.data),
+            'historical proof decoding uses the version stored with the record');
 
         // No V2 proof implementation is needed: reject its envelope before decoding data.
         const relabeled = safeDecodeApplyOperation(pendingVdf);

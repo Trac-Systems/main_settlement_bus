@@ -5,7 +5,9 @@ import { CustomEventType, EntryType } from '../../../../../src/utils/constants.j
 import {
     encodeEpochProofV1,
     encodeApplyOperation,
-    safeDecodeEpochProofV1
+    safeDecodeEpochProofV1,
+    decodeEpochRecord,
+    encodeEpochRecord
 } from '../../../../../src/codecs/apply/applyOperationCodec.js';
 import {
     VDF_DIFFICULTY,
@@ -18,7 +20,8 @@ import {
 import {
     appendCapturingEpochEvents,
     appendWithEpochProofEncodingFailure,
-    appendWithEpochProofHashFailure,
+    appendWithEpochRecordEncodingFailure,
+    appendWithEpochRecordHashFailure,
     applyRejectedEpoch,
     changedViewKeys,
     expectedEpochWrites,
@@ -130,11 +133,13 @@ test('State.apply SET_EPOCH success changes exactly the pointer, forward hash, a
     const forwardEntry = await base.view.get(expected.forwardKey);
     const reverseEntry = await base.view.get(expected.reverseKey);
     t.ok(b4a.equals(currentEpochEntry?.value, expected.currentEpoch), 'current epoch stores canonical uint64 bytes');
-    t.ok(b4a.equals(forwardEntry?.value, expected.proofHash), 'forward record stores the epoch proof hash');
-    t.ok(b4a.equals(reverseEntry?.value, expected.encodedProof), 'reverse record stores the exact submitted proof and approvals');
+    t.ok(b4a.equals(forwardEntry?.value, expected.recordHash), 'forward record stores the hash of the complete versioned record');
+    t.ok(b4a.equals(reverseEntry?.value, expected.encodedRecord), 'reverse record stores the version and canonical proof with approvals');
     t.ok(b4a.equals(await tracCryptoApi.hash.blake3Safe(reverseEntry.value), forwardEntry.value), 'forward and reverse records are cryptographically linked');
 
-    const decodedStoredProof = safeDecodeEpochProofV1(reverseEntry.value);
+    const storedRecord = decodeEpochRecord(reverseEntry.value);
+    t.alike(storedRecord.sv, b4a.from([1]), 'stored record preserves its own proof format version');
+    const decodedStoredProof = safeDecodeEpochProofV1(storedRecord.data);
     const submittedOperation = decodeSetEpochPayload(payload);
     const submittedEpochProof = safeDecodeEpochProofV1(submittedOperation.seo.data);
     t.ok(decodedStoredProof, 'stored epoch proof decodes');
@@ -142,6 +147,30 @@ test('State.apply SET_EPOCH success changes exactly the pointer, forward hash, a
     t.ok(b4a.equals(decodedStoredProof.pd, submittedEpochProof.pd), 'stored proof data is byte-exact');
     t.alike(decodedStoredProof.app, submittedEpochProof.app, 'stored approvals are byte-exact and keep their order');
     t.is(events.length, 1, 'success emits EPOCH_CREATED once');
+});
+
+test('State.apply SET_EPOCH canonicalizes inner protobuf bytes before encoding and hashing the stored record', async t => {
+    const context = await setupSetEpochScenario(t);
+    const base = context.adminBootstrap.base;
+    const payload = await buildSetEpochPayload(context, { approverNodes: [] });
+    const expected = await expectedEpochWrites(payload);
+    const operation = decodeSetEpochPayload(payload);
+    // Unknown field 15 changes the incoming bytes without changing the decoded V1 proof.
+    operation.seo.data = b4a.concat([operation.seo.data, b4a.from([0x78, 0x01])]);
+    t.alike(safeDecodeEpochProofV1(operation.seo.data), safeDecodeEpochProofV1(expected.encodedProof),
+        'noncanonical bytes decode to the original signed proof and approvals');
+    const noncanonicalRecordHash = await tracCryptoApi.hash.blake3Safe(encodeEpochRecord(operation.seo));
+    t.absent(b4a.equals(noncanonicalRecordHash, expected.recordHash), 'hashing the unnormalized data would produce a different record hash');
+
+    const events = await appendCapturingEpochEvents(context, encodeApplyOperation(operation));
+
+    t.alike((await base.view.get(expected.forwardKey))?.value, expected.recordHash,
+        'the accepted epoch uses the same hash as canonical input');
+    t.alike((await base.view.get(expected.reverseKey))?.value, expected.encodedRecord,
+        'the stored record contains canonical inner bytes, without the unknown field');
+    t.is(await base.view.get(EntryType.EPOCH_HASH + noncanonicalRecordHash.toString('hex')), null,
+        'the noncanonical record is never stored');
+    t.is(events.length, 1, 'the normalized epoch is accepted once');
 });
 
 test('State.apply SET_EPOCH commits when an EPOCH_CREATED listener throws', async t => {
@@ -159,8 +188,8 @@ test('State.apply SET_EPOCH commits when an EPOCH_CREATED listener throws', asyn
     const forwardEntry = await base.view.get(expected.forwardKey);
     const reverseEntry = await base.view.get(expected.reverseKey);
     t.ok(b4a.equals(currentEpochEntry?.value, expected.currentEpoch), 'current epoch still commits');
-    t.ok(b4a.equals(forwardEntry?.value, expected.proofHash), 'forward epoch record still commits');
-    t.ok(b4a.equals(reverseEntry?.value, expected.encodedProof), 'reverse epoch proof still commits');
+    t.ok(b4a.equals(forwardEntry?.value, expected.recordHash), 'forward epoch record still commits');
+    t.ok(b4a.equals(reverseEntry?.value, expected.encodedRecord), 'reverse epoch record still commits');
 });
 
 test('State.apply SET_EPOCH isolates persisted state from EPOCH_CREATED payload mutations', async t => {
@@ -184,30 +213,41 @@ test('State.apply SET_EPOCH isolates persisted state from EPOCH_CREATED payload 
         'listener mutates the emitted buffer'
     );
     t.ok(b4a.equals(currentEpochEntry?.value, expected.currentEpoch), 'current epoch remains canonical');
-    t.ok(b4a.equals(forwardEntry?.value, expected.proofHash), 'forward epoch record remains correct');
-    t.ok(b4a.equals(reverseEntry?.value, expected.encodedProof), 'reverse epoch proof remains correct');
+    t.ok(b4a.equals(forwardEntry?.value, expected.recordHash), 'forward epoch record remains correct');
+    t.ok(b4a.equals(reverseEntry?.value, expected.encodedRecord), 'reverse epoch record remains correct');
 });
 
-nodeOnlyTest('State.apply SET_EPOCH encoding failure leaves all epoch records atomic and emits no event', async t => {
+nodeOnlyTest('State.apply SET_EPOCH inner proof encoding failure leaves all epoch records atomic and emits no event', async t => {
     const context = await setupSetEpochScenario(t);
     const payload = await buildSetEpochPayload(context, { approverNodes: [] });
     const before = await snapshotEpochLedger(context.adminBootstrap.base);
     const { events, injected } = await appendWithEpochProofEncodingFailure(context, payload);
     const after = await snapshotEpochLedger(context.adminBootstrap.base);
 
-    t.ok(injected, 'final epoch-proof encoding failure was injected');
+    t.ok(injected, 'inner epoch-proof encoding failure was injected');
     t.alike(after, before, 'encoding failure leaves pointer and forward/reverse records unchanged');
     t.is(events.length, 0, 'encoding failure does not emit EPOCH_CREATED');
+});
+
+nodeOnlyTest('State.apply SET_EPOCH record encoding failure leaves the entire view unchanged and emits no event', async t => {
+    const context = await setupSetEpochScenario(t);
+    const payload = await buildSetEpochPayload(context, { approverNodes: [] });
+    const before = await snapshotView(context.adminBootstrap.base);
+    const { events, injected } = await appendWithEpochRecordEncodingFailure(context, payload);
+
+    t.ok(injected, 'outer versioned record encoding failure was injected');
+    t.alike(await snapshotView(context.adminBootstrap.base), before, 'record encoding failure causes no partial writes');
+    t.is(events.length, 0, 'record encoding failure does not emit EPOCH_CREATED');
 });
 
 nodeOnlyTest('State.apply SET_EPOCH final hash failure leaves all epoch records atomic and emits no event', async t => {
     const context = await setupSetEpochScenario(t);
     const payload = await buildSetEpochPayload(context, { approverNodes: [] });
     const before = await snapshotEpochLedger(context.adminBootstrap.base);
-    const { events, injected } = await appendWithEpochProofHashFailure(context, payload);
+    const { events, injected } = await appendWithEpochRecordHashFailure(context, payload);
     const after = await snapshotEpochLedger(context.adminBootstrap.base);
 
-    t.ok(injected, 'final epoch-proof hash failure was injected');
+    t.ok(injected, 'hash failure for the complete versioned record was injected');
     t.alike(after, before, 'hash failure leaves pointer and forward/reverse records unchanged');
     t.is(events.length, 0, 'hash failure does not emit EPOCH_CREATED');
 });

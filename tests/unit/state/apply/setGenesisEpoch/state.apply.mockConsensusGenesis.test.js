@@ -7,7 +7,12 @@ import { config } from '../../../../helpers/config.js';
 import { loadStateWithMockConsensus } from '../../../../helpers/mockConsensusState.js';
 import { buildAddAdminRequesterPayload } from '../addAdmin/addAdminScenarioHelpers.js';
 import { snapshotEpochLedger } from '../setEpoch/setEpochHandlerBranchTestHelpers.js';
-import { decodeConsensusConfig, encodeConsensusConfig } from '../../../../../src/codecs/apply/applyOperationCodec.js';
+import {
+    decodeConsensusConfig,
+    encodeConsensusConfig,
+    decodeEpochRecord,
+    encodeEpochRecord,
+} from '../../../../../src/codecs/apply/applyOperationCodec.js';
 import { EntryType } from '../../../../../src/utils/constants.js';
 import { uint16ToBuffer } from '../../../../../src/utils/buffer.js';
 import {
@@ -41,12 +46,13 @@ if (typeof globalThis.Bare !== 'undefined') {
                     }
 
                     genesisCalls.push({ proposerAddress, encodedConfig, networkId: networkConfig.networkId });
-                    return b4a.concat([
+                    const data = b4a.concat([
                         b4a.from('mock-consensus-v2:genesis:'),
                         uint16ToBuffer(networkConfig.networkId),
                         b4a.from(proposerAddress),
                         consensusConfig.cd,
                     ]);
+                    return encodeEpochRecord({ sv: consensusConfig.sv, data });
                 },
             },
             '../../codecs/consensus/v1/vdfConfigCodec.js': {
@@ -75,12 +81,13 @@ if (typeof globalThis.Bare !== 'undefined') {
         });
         await appendAndUpdate(base, payload);
 
-        const expectedGenesis = b4a.concat([
+        const expectedData = b4a.concat([
             b4a.from('mock-consensus-v2:genesis:'),
             uint16ToBuffer(config.networkId),
             b4a.from(wallet.address),
             initialConfig.cd,
         ]);
+        const expectedGenesis = encodeEpochRecord({ sv: initialConfig.sv, data: expectedData });
         const expectedHash = await tracCryptoApi.hash.blake3Safe(expectedGenesis);
         const expectedEpochState = {
             currentEpoch: b4a.alloc(8).toString('hex'),
@@ -91,7 +98,12 @@ if (typeof globalThis.Bare !== 'undefined') {
         t.is(genesisCalls.length, 1, 'the bootstrap applies the V2 genesis once');
         t.is(vdfCalls, 0, 'initial V2 config never delegates to the VDF genesis generator');
         t.alike(await snapshotEpochLedger(base, 0n), expectedEpochState,
-            'epoch zero stores the distinct V2 bytes under their real content hash');
+            'epoch zero stores the versioned V2 record under its complete content hash');
+        const storedGenesis = await base.view.get(EntryType.EPOCH_HASH + expectedHash.toString('hex'));
+        t.alike(decodeEpochRecord(storedGenesis.value), { sv: initialConfig.sv, data: expectedData },
+            'the stored genesis identifies its V2 format without decoding the opaque data');
+        const innerHash = await tracCryptoApi.hash.blake3Safe(expectedData);
+        t.absent(b4a.equals(innerHash, expectedHash), 'the genesis hash includes the version envelope');
         t.alike((await base.view.get(EntryType.CONSENSUS_CONFIG_CURRENT))?.value, b4a.alloc(4),
             'the initial V2 config is record zero, not record two');
         t.alike((await base.view.get(EntryType.CONSENSUS_CONFIG_RECORD + 0))?.value, encodedInitialConfig,

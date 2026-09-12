@@ -25,6 +25,7 @@ import {
     applyWithEntryOverrides,
     applyWithGenesisEpochEncodingFailure,
     applyWithGenesisEpochHashFailure,
+    applyWithGenesisEpochRecordEncodingFailure,
     applyWithMessageConstructionFailure,
     assertGenesisInitialized,
     assertGenesisUninitialized,
@@ -495,7 +496,7 @@ for (const [label, overridesFactory] of [
     });
 }
 
-test('State.apply SET_GENESIS_EPOCH fails when final epoch proof encoding fails', async t => {
+test('State.apply SET_GENESIS_EPOCH fails when inner epoch proof encoding fails', async t => {
     const context = await setupSetGenesisEpochScenario(t);
     const payload = await buildSetGenesisEpochPayload(context);
     const { logs, result } = captureApplyErrors(() =>
@@ -508,7 +509,20 @@ test('State.apply SET_GENESIS_EPOCH fails when final epoch proof encoding fails'
     assertLog(t, logs, 'Could not initialize genesis epoch');
 });
 
-test('State.apply SET_GENESIS_EPOCH fails when final epoch proof hashing fails', async t => {
+test('State.apply SET_GENESIS_EPOCH fails when outer epoch record encoding fails', async t => {
+    const context = await setupSetGenesisEpochScenario(t);
+    const payload = await buildSetGenesisEpochPayload(context);
+    const { logs, result } = captureApplyErrors(() =>
+        applyWithGenesisEpochRecordEncodingFailure(context, payload)
+    );
+    const injected = await result;
+
+    t.ok(injected, 'safeEncodeEpochRecord failure was injected');
+    await assertSetGenesisEpochFailureState(t, context, payload, { skipSync: true });
+    assertLog(t, logs, 'Could not initialize genesis epoch');
+});
+
+test('State.apply SET_GENESIS_EPOCH fails when the entire epoch record cannot be hashed', async t => {
     const context = await setupSetGenesisEpochScenario(t);
     const payload = await buildSetGenesisEpochPayload(context);
     const events = [];
@@ -521,7 +535,7 @@ test('State.apply SET_GENESIS_EPOCH fails when final epoch proof hashing fails',
     );
     const injected = await result;
 
-    t.ok(injected, 'genesis epoch proof hash failure was injected');
+    t.ok(injected, 'versioned genesis epoch record hash failure was injected');
     await assertSetGenesisEpochFailureState(t, context, payload, { skipSync: true });
     t.is(events.length, 0, 'hash failure does not emit GENESIS_EPOCH_CREATED');
     assertLog(t, logs, 'Failed to hash genesis epoch proof.');

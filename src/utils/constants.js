@@ -21,7 +21,7 @@ export const EntryType = Object.freeze({
     LICENSE_INDEX: 'li/',
     EPOCH_CURRENT: '/epoch/current',
     EPOCH: `/epoch/`,              // Epoch hashes are stored under `/epoch/<n>`
-    EPOCH_HASH: `/epochHash/`,     // Epoch proof payloads are stored under `/epochHash/<epochHashHex>`
+    EPOCH_HASH: `/epochHash/`,     // Versioned epoch records are stored under `/epochHash/<epochHashHex>`
     CONSENSUS_CONFIG_CURRENT: '/consensus/config/current',
     CONSENSUS_CONFIG_RECORD: '/consensus/config/record/',
 
@@ -58,10 +58,6 @@ export const ConsensusOperationType = Object.freeze({
     UNSPECIFIED: ConsensusMessageType.MESSAGE_TYPE_UNSPECIFIED,
     PROOF_PROPOSAL: ConsensusMessageType.MESSAGE_TYPE_PROOF_PROPOSAL,
     PROOF_PROPOSAL_APPROVAL: ConsensusMessageType.MESSAGE_TYPE_PROOF_PROPOSAL_APPROVAL
-});
-
-export const ConsensusProtocolVersion = Object.freeze({
-    V1: 1,
 });
 
 export const ConsensusResultCode = Object.freeze({

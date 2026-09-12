@@ -16,7 +16,9 @@ import {
 } from './setEpochApprovalsScenarioHelpers.js';
 import {
     safeDecodeEpochProofV1,
-    safeEncodeEpochProofV1
+    safeEncodeEpochProofV1,
+    decodeEpochRecord,
+    encodeEpochRecord
 } from '../../../../../src/codecs/apply/applyOperationCodec.js';
 import { safeDecodeProofProposal } from '../../../../../src/codecs/consensus/v1/consensusV1OperationCodec.js';
 import { EntryType } from '../../../../../src/utils/constants.js';
@@ -36,7 +38,9 @@ test('State.apply SET_EPOCH approvals: accepts exact quorum from five indexers',
     const stored = await context.adminBootstrap.base.view.get(
         EntryType.EPOCH_HASH + epochHash.toString('hex')
     );
-    const proof = safeDecodeEpochProofV1(stored?.value);
+    const record = decodeEpochRecord(stored.value);
+    t.alike(record.sv, b4a.from([1]), 'the stored approvals belong to a V1 epoch record');
+    const proof = safeDecodeEpochProofV1(record.data);
     t.ok(proof, 'exact-quorum approvals store a decodable epoch proof');
     t.is(proof?.app.length, 2, 'stored proof contains exactly the two required external approvals');
     const proofProposal = safeDecodeProofProposal(proof?.pd);
@@ -74,6 +78,7 @@ test('State.apply SET_EPOCH approvals: accepts excess valid approvals and stores
     const submittedOperation = decodeSetEpochPayload(payload);
     const decodedSubmittedProof = safeDecodeEpochProofV1(submittedOperation.seo.data);
     const submittedProof = safeEncodeEpochProofV1(decodedSubmittedProof);
+    const expectedRecord = encodeEpochRecord({ sv: submittedOperation.seo.sv, data: submittedProof });
 
     await applySetEpochWithIndexers(context, payload, indexers);
 
@@ -84,11 +89,11 @@ test('State.apply SET_EPOCH approvals: accepts excess valid approvals and stores
     );
     t.ok(stored, 'epoch proof with excess approvals is stored');
     t.ok(
-        b4a.equals(stored.value, submittedProof),
-        'stored epoch proof is byte-for-byte identical to the received proposal and approval order'
+        b4a.equals(stored.value, expectedRecord),
+        'stored versioned record preserves the received proposal and approval order'
     );
 
-    const decodedStoredProof = safeDecodeEpochProofV1(stored.value);
+    const decodedStoredProof = safeDecodeEpochProofV1(decodeEpochRecord(stored.value).data);
     t.is(decodedStoredProof?.app.length, receivedOrder.length, 'all excess approvals are retained');
     for (const [index, submittedApproval] of decodedSubmittedProof.app.entries()) {
         t.ok(

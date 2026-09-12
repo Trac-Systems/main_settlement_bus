@@ -4,7 +4,8 @@ import { createWallet, eventFlush } from '../../../../helpers/autobaseTestHelper
 import {
     encodeApplyOperation,
     decodeEpochProofV1,
-    safeEncodeEpochProofV1
+    safeEncodeEpochProofV1,
+    encodeEpochRecord
 } from '../../../../../src/codecs/apply/applyOperationCodec.js';
 import {
     encodeProofProposalApproval,
@@ -120,7 +121,8 @@ export function tamperApprovalSignature(payload, approvalIndex = 0) {
 export async function assertEpochUnchangedAfterRejectedApprovals(t, base, payload, description) {
     const operation = decodeSetEpochPayload(payload);
     const encodedEpochProof = safeEncodeEpochProofV1(decodeEpochProofV1(operation.seo.data));
-    const epochProofHash = await tracCryptoApi.hash.blake3(encodedEpochProof);
+    const encodedRecord = encodeEpochRecord({ sv: operation.seo.sv, data: encodedEpochProof });
+    const recordHash = await tracCryptoApi.hash.blake3(encodedRecord);
 
     t.is(await getCurrentEpoch(base), 0n, `${description}: current epoch remains unchanged`);
     t.absent(
@@ -128,7 +130,7 @@ export async function assertEpochUnchangedAfterRejectedApprovals(t, base, payloa
         `${description}: next-epoch forward record is absent`
     );
     t.absent(
-        await base.view.get(EntryType.EPOCH_HASH + epochProofHash.toString('hex')),
+        await base.view.get(EntryType.EPOCH_HASH + recordHash.toString('hex')),
         `${description}: submitted proof reverse record is absent`
     );
 }

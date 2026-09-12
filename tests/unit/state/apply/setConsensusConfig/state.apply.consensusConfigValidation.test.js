@@ -1,5 +1,7 @@
 import test from 'brittle';
+import tracCryptoApi from 'trac-crypto-api';
 import { EntryType } from '../../../../../src/utils/constants.js';
+import { decodeEpochRecord } from '../../../../../src/codecs/apply/applyOperationCodec.js';
 import {
     appendAndUpdate,
     assertCurrentConfigId,
@@ -56,12 +58,19 @@ if (typeof globalThis.Bare !== 'undefined') {
         await assertGenesisInitialized(t, base, genesis);
         // Baseline VDF encoding: network 918, bootstrap mnemonic fixture,
         // difficulty 55,000,000 and 2048-bit discriminant. Do not derive this
-        // expected hash through a genesis generator during the test.
-        const genesisHash = '85783ed15286fbff54bfb29a328401899009f32fc1cfe3c2bd4ee0e141202273';
+        // expected hash through a genesis generator during the test. The inner
+        // proof stays unchanged; the epoch hash now includes its version envelope.
+        const genesisHash = 'f5b9f177a3eba84e5f6cd203c244cef9de11d6e15c1ad746ba77c652852b494c';
         t.is((await base.view.get(EntryType.EPOCH + '0'))?.value.toString('hex'), genesisHash,
-            'apply preserves the baseline VDF genesis hash');
-        t.is((await base.view.get(EntryType.EPOCH_HASH + genesisHash))?.value.length, 711,
-            'apply preserves the baseline VDF genesis encoding length');
+            'apply hashes the canonical versioned VDF genesis record');
+        const genesisEntry = await base.view.get(EntryType.EPOCH_HASH + genesisHash);
+        t.is(genesisEntry?.value.length, 717, 'apply stores the canonical VDF genesis record length');
+        const genesisRecord = decodeEpochRecord(genesisEntry.value);
+        t.is(genesisRecord.sv[0], 1, 'the stored genesis identifies its VDF V1 format');
+        t.is(genesisRecord.data.length, 711, 'the inner VDF genesis length stays unchanged');
+        t.is((await tracCryptoApi.hash.blake3(genesisRecord.data)).toString('hex'),
+            '85783ed15286fbff54bfb29a328401899009f32fc1cfe3c2bd4ee0e141202273',
+            'the inner VDF genesis bytes stay unchanged');
         await context.sync();
         await assertGenesisInitialized(t, context.peers[1].base, genesis);
 

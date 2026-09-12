@@ -32,7 +32,8 @@ import {
     safeDecodeConsensusConfig,
     safeDecodeEpochProofV1,
     safeEncodeConsensusConfig,
-    safeEncodeEpochProofV1
+    safeEncodeEpochProofV1,
+    safeEncodeEpochRecord
 } from '../../codecs/apply/applyOperationCodec.js';
 import {
     createMessage,
@@ -282,12 +283,12 @@ class State extends ReadyResource {
     }
 
     /**
-     * Reads the encoded epoch proof stored under `/epochHash/<epochHash>`.
-     * Returns opaque bytes; their format belongs to the consensus that created
-     * the epoch, which may differ from the currently active consensus.
+     * Reads the encoded epoch record stored under `/epochHash/<epochHash>`.
+     * Decode its { sv, data } envelope with decodeEpochRecord, then decode data
+     * according to the stored sv, not the currently active consensus version.
      *
      * @param {Buffer|string} epochHash Epoch hash as a buffer or hex string.
-     * @returns {Promise<Buffer|null>} Encoded epoch proof, or `null` when it is not stored.
+     * @returns {Promise<Buffer|null>} Encoded epoch record, or `null` when it is not stored.
      * @throws {Error} When epoch hash is missing.
      */
     async getEpochProof(epochHash) {
@@ -300,10 +301,10 @@ class State extends ReadyResource {
     }
 
     /**
-     * Reads the required encoded epoch proof stored under `/epochHash/<epochHash>`.
+     * Reads the required encoded { sv, data } epoch record under `/epochHash/<epochHash>`.
      *
      * @param {Buffer|string} epochHash Epoch hash as a buffer or hex string.
-     * @returns {Promise<Buffer>} Encoded epoch proof.
+     * @returns {Promise<Buffer>} Encoded epoch record.
      * @throws {Error} When epoch hash is missing or the epoch proof is not stored.
      */
     async requireEpochProof(epochHash) {
@@ -3612,14 +3613,14 @@ class State extends ReadyResource {
         if (requesterAddressString === null) {
             this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Requester address is invalid.", node.from.key)
             return Status.FAILURE;
-        };
+        }
 
         // validate requester public key
         const requesterPublicKey = tracCryptoApi.address.decodeSafe(requesterAddressString);
         if (b4a.equals(requesterPublicKey, NULL_BUFFER)) {
             this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Failed to decode requester public key.", node.from.key)
             return Status.FAILURE;
-        };
+        }
 
         const proofProposal = safeDecodeProofProposal(encodedProofProposal);
         if (proofProposal === null) {
@@ -3766,7 +3767,13 @@ class State extends ReadyResource {
             return Status.FAILURE;
         }
 
-        const epochProofHash = await tracCryptoApi.hash.blake3Safe(encodedEpochProof);
+        const encodedEpochRecord = safeEncodeEpochRecord({ sv: op.seo.sv, data: encodedEpochProof });
+        if (encodedEpochRecord.length === 0) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Failed to encode epoch record.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const epochProofHash = await tracCryptoApi.hash.blake3Safe(encodedEpochRecord);
         if (!isBufferValid(epochProofHash, HASH_BYTE_LENGTH)) {
             this.#safeLogApply(OperationType.SET_EPOCH, "Failed to hash epoch proof.", node.from.key)
             return Status.FAILURE;
@@ -3774,7 +3781,7 @@ class State extends ReadyResource {
 
         await batch.put(EntryType.EPOCH_CURRENT, nextEpochBuffer);
         await batch.put(EntryType.EPOCH + nextEpochStr, epochProofHash);
-        await batch.put(EntryType.EPOCH_HASH + epochProofHash.toString('hex'), encodedEpochProof);
+        await batch.put(EntryType.EPOCH_HASH + epochProofHash.toString('hex'), encodedEpochRecord);
 
         if (this.#config.enableTxApplyLogs) {
             console.info(`Epoch ${nextEpochStr} committed. proposer:approvals - ${proposerAddress}:${encodedApprovals.length + 1}`); // We should account for the proposer approval too, hence the '+ 1' at the end

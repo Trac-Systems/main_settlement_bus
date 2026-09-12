@@ -2,7 +2,7 @@ import b4a from 'b4a';
 import applyOperationsGenerated from './applyOperations.generated.cjs';
 import consensusV1Generated from '../consensus/v1/consensusV1.generated.cjs';
 import _ from 'lodash';
-const { Operation, ConsensusControlOperation } = applyOperationsGenerated.apply.operations;
+const { Operation, SetEpochOperation, ConsensusControlOperation } = applyOperationsGenerated.apply.operations;
 const { EpochProofV1 } = consensusV1Generated.common.consensus;
 
 // Options for converting protobuf messages to plain objects, ensuring that bytes are returned as Buffers and enums as numbers.
@@ -95,6 +95,79 @@ export const normalizeIncomingMessage = (message) => {
     }
 
     return null;
+};
+
+const validateEpochRecord = (payload) => {
+    if (!_.isPlainObject(payload)) {
+        throw new Error('Epoch record must be an object.');
+    }
+
+    const { sv, data } = payload;
+    if (!b4a.isBuffer(sv) || sv.length !== 1 || sv[0] === 0) {
+        throw new Error('Epoch record schema version must be a non-zero one-byte buffer.');
+    }
+    if (!b4a.isBuffer(data) || data.length === 0) {
+        throw new Error('Epoch record data must be a non-empty buffer.');
+    }
+
+    return { sv, data };
+};
+
+/**
+ * Encodes an epoch record using the SET_EPOCH payload wire format, not a full operation.
+ * The versioned data stays opaque; consensus validation belongs to apply.
+ *
+ * @param {{sv: Buffer, data: Buffer}} payload Epoch record.
+ * @returns {Buffer} Canonically encoded epoch record.
+ */
+export const encodeEpochRecord = (payload) => {
+    const epochRecord = validateEpochRecord(payload);
+    const error = SetEpochOperation.verify(epochRecord);
+    if (error) throw new Error(error);
+    return b4a.from(SetEpochOperation.encode(epochRecord).finish());
+};
+
+/**
+ * Decodes an epoch record independently of the currently active consensus.
+ *
+ * @param {Buffer} payload Encoded epoch record.
+ * @returns {{sv: Buffer, data: Buffer}} Epoch record with opaque versioned data.
+ */
+export const decodeEpochRecord = (payload) => {
+    if (!b4a.isBuffer(payload)) {
+        throw new Error('Encoded epoch record must be a buffer.');
+    }
+
+    return validateEpochRecord(
+        SetEpochOperation.toObject(
+            SetEpochOperation.decode(payload),
+            APPLY_TO_OBJECT_OPTIONS
+        )
+    );
+};
+
+/**
+ * @param {*} payload Epoch record to encode.
+ * @returns {Buffer} Encoded epoch record, or an empty buffer on failure.
+ */
+export const safeEncodeEpochRecord = (payload) => {
+    try {
+        return encodeEpochRecord(payload);
+    } catch {
+        return b4a.alloc(0);
+    }
+};
+
+/**
+ * @param {*} payload Encoded epoch record.
+ * @returns {{sv: Buffer, data: Buffer}|null} Epoch record, or null on failure.
+ */
+export const safeDecodeEpochRecord = (payload) => {
+    try {
+        return decodeEpochRecord(payload);
+    } catch {
+        return null;
+    }
 };
 
 const validateEpochProofV1 = (payload) => {
