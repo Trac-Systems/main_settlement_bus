@@ -1,0 +1,7 @@
+syntax = "proto3";
+package common.consensus;
+
+message EpochProofV1 {
+    bytes          pd  = 1; // proof data that actually contains challenge + proof + sig of the proposer
+    repeated bytes app = 2; // Array of approvals that signed proof data
+}

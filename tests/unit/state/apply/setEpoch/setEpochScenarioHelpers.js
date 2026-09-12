@@ -16,7 +16,7 @@ import {
     encodeProofProposalApproval
 } from '../../../../../src/codecs/consensus/v1/consensusV1OperationCodec.js';
 import { addressToBuffer } from '../../../../../src/core/state/utils/address.js';
-import { EntryType, ConsensusResultCode, ConsensusProtocolVersion } from '../../../../../src/utils/constants.js';
+import { EntryType, ConsensusResultCode } from '../../../../../src/utils/constants.js';
 import { uint16ToBuffer, uint32ToBuffer, uint64ToBuffer, uint8ToBuffer, createMessage } from '../../../../../src/utils/buffer.js';
 import { config } from '../../../../helpers/config.js';
 
@@ -139,12 +139,11 @@ export async function buildSetEpochPayload(context, {
     const difficulty = uint32ToBuffer(vdfDifficulty);
     const discriminantBitSize = uint16ToBuffer(vdfDiscriminantSize);
 
-    // Must match the 7-field challenge State#handleApplySetEpochOperation reconstructs
-    // (protocol_version, network_id, epoch, previous_epoch_record_hash, proposer,
-    // difficulty, discriminant_bit_size)
+    // Must match the challenge State#handleApplySetEpochOperation reconstructs:
+    // network_id, epoch,
+    // previous_epoch_record_hash, proposer, difficulty and discriminant_bit_size.
     // - the VDF proof is only valid against this exact canonical challenge, not the raw previous hash alone.
     const challengeData = createMessage(
-        uint8ToBuffer(ConsensusProtocolVersion.V1),
         uint16ToBuffer(config.networkId),
         uint64ToBuffer(epoch),
         prevHash,

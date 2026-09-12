@@ -31,7 +31,6 @@ import { isHexString } from '../../utils/helpers.js';
 class ApplyStateMessageBuilder {
     #address;
     #amount;
-    #approvals;
     #built = false;
     #channel;
     #contentHash;
@@ -49,11 +48,12 @@ class ApplyStateMessageBuilder {
     #payload;
     #payloadKey;
     #phase;
-    #proofData;
     #txHash;
     #txValidity;
     #wallet;
     #writingKey;
+    #epochData;
+    #epochSchemaVersion;
 
     constructor(wallet, config) {
         this.#config = config;
@@ -166,19 +166,9 @@ class ApplyStateMessageBuilder {
         return this;
     }
 
-    setProofData(proofData) {
-        this.#proofData = this.#normalizeBytesBuffer(proofData, 'Proof data');
-        return this;
-    }
-
-    setApprovals(approvals) {
-        if (!Array.isArray(approvals)) {
-            throw new Error('Approvals must be an array.');
-        }
-
-        this.#approvals = approvals.map((approval, index) => {
-            return this.#normalizeBytesBuffer(approval, `Approval ${index}`);
-        });
+    setEpochData(schemaVersion, data) {
+        this.#epochSchemaVersion = this.#normalizeHexBuffer(schemaVersion, 1, 'Epoch schema version');
+        this.#epochData = this.#normalizeBytesBuffer(data, 'Epoch data');
         return this;
     }
 
@@ -428,12 +418,12 @@ class ApplyStateMessageBuilder {
     async #buildCompleteBody() {
         if (isSetEpoch(this.#operationType)) {
             this.#requireFields([
-                [this.#proofData, 'Proof data'],
-                [this.#approvals, 'Approvals']
+                [this.#epochSchemaVersion, 'Epoch schema version'],
+                [this.#epochData, 'Epoch data']
             ]);
             return {
-                pd: this.#proofData,
-                app: this.#approvals
+                sv: this.#epochSchemaVersion,
+                data: this.#epochData
             };
         }
 

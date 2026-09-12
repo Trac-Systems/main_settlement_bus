@@ -14,7 +14,7 @@ import {
     BALANCE_MIGRATION_SLEEP_INTERVAL,
     WHITELIST_MIGRATION_DIR,
     OperationType,
-    ConsensusConfigSchemaVersion,
+    ConsensusVersion,
     MAX_VDF_DIFFICULTY,
     VDF_PROOF_BYTE_LENGTHS
 } from "./utils/constants.js";
@@ -1156,7 +1156,7 @@ export class MainSettlementBus extends ReadyResource {
 
         let encodedConfigData;
         switch (schemaVersion) {
-            case ConsensusConfigSchemaVersion.VDF_V1:
+            case ConsensusVersion.VDF_V1:
                 encodedConfigData = this.#encodeVdfV1ConfigData(configData);
                 break;
             default:

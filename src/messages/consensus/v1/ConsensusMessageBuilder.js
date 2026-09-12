@@ -4,12 +4,10 @@ import { encodeProofProposalApproval } from '../../../codecs/consensus/v1/consen
 import { addressToBuffer, isAddressValid } from "../../../core/state/utils/address.js";
 import {
     ConsensusOperationType,
-    ConsensusProtocolVersion,
     ConsensusResultCode
 } from '../../../utils/constants.js';
 import {
     createMessage,
-    uint8ToBuffer,
     uint16ToBuffer,
     uint64ToBuffer, uint32ToBuffer
 } from "../../../utils/buffer.js";
@@ -21,7 +19,6 @@ class ConsensusMessageBuilder {
     #type;
     #session_id;
     #timestamp;
-    #protocol_version;
     #network_id;
     #epoch;
     #previous_epoch_record_hash;
@@ -101,16 +98,6 @@ class ConsensusMessageBuilder {
         return this;
     }
 
-    setProtocolVersion(protocolVersion) {
-        const value = uint8ToBuffer(protocolVersion);
-        if (!Object.values(ConsensusProtocolVersion).includes(protocolVersion)) {
-            throw new Error(`Unsupported consensus protocol version: ${protocolVersion}`);
-        }
-
-        this.#protocol_version = value;
-        return this;
-    }
-
     setNetworkId(networkId) {
         const value = uint16ToBuffer(networkId);
         if (networkId === 0) {
@@ -186,7 +173,6 @@ class ConsensusMessageBuilder {
 
     #buildUnsignedProofProposal() {
         return {
-            protocol_version: this.#validateBuffer(this.#protocol_version, 'Protocol version'),
             network_id: this.#validateBuffer(this.#network_id, 'Network id'),
             epoch: this.#validateBuffer(this.#epoch, 'Epoch'),
             previous_epoch_record_hash: this.#validateBuffer(this.#previous_epoch_record_hash, 'Previous epoch record hash'),
@@ -218,7 +204,6 @@ class ConsensusMessageBuilder {
 
     async #hashProofProposal(proofProposal) {
         return await tracCryptoApi.hash.blake3(createMessage(
-            proofProposal.protocol_version,
             proofProposal.network_id,
             proofProposal.epoch,
             proofProposal.previous_epoch_record_hash,
@@ -231,7 +216,6 @@ class ConsensusMessageBuilder {
 
     async #hashProofProposalApproval(proofProposal, approver, requesterProofSignature) {
         return await tracCryptoApi.hash.blake3(createMessage(
-            proofProposal.protocol_version,
             proofProposal.network_id,
             proofProposal.epoch,
             proofProposal.previous_epoch_record_hash,

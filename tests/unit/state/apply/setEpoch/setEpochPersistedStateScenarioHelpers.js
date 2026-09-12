@@ -1,7 +1,9 @@
 import b4a from 'b4a';
 import {
     encodeApplyOperation,
-    encodeConsensusConfig
+    encodeConsensusConfig,
+    decodeEpochProofV1,
+    encodeEpochProofV1
 } from '../../../../../src/codecs/apply/applyOperationCodec.js';
 import {
     encodeProofProposal,
@@ -21,13 +23,15 @@ import {
 
 export function mutateProofProposal(payload, mutate) {
     const operation = decodeSetEpochPayload(payload);
-    const proofProposal = safeDecodeProofProposal(operation?.seo?.pd);
+    const epochProof = decodeEpochProofV1(operation.seo.data);
+    const proofProposal = safeDecodeProofProposal(epochProof.pd);
     if (proofProposal === null) {
         throw new Error('SET_EPOCH test fixture contains an invalid proof proposal.');
     }
 
     mutate(proofProposal);
-    operation.seo.pd = encodeProofProposal(proofProposal);
+    epochProof.pd = encodeProofProposal(proofProposal);
+    operation.seo.data = encodeEpochProofV1(epochProof);
     return encodeApplyOperation(operation);
 }
 

@@ -21,7 +21,7 @@ export const EntryType = Object.freeze({
     LICENSE_INDEX: 'li/',
     EPOCH_CURRENT: '/epoch/current',
     EPOCH: `/epoch/`,              // Epoch hashes are stored under `/epoch/<n>`
-    EPOCH_HASH: `/epochHash/`,     // Epoch proof payloads are stored under `/epochHash/<epochHashHex>`
+    EPOCH_HASH: `/epochHash/`,     // Versioned epoch records are stored under `/epochHash/<epochHashHex>`
     CONSENSUS_CONFIG_CURRENT: '/consensus/config/current',
     CONSENSUS_CONFIG_RECORD: '/consensus/config/record/',
 
@@ -58,10 +58,6 @@ export const ConsensusOperationType = Object.freeze({
     UNSPECIFIED: ConsensusMessageType.MESSAGE_TYPE_UNSPECIFIED,
     PROOF_PROPOSAL: ConsensusMessageType.MESSAGE_TYPE_PROOF_PROPOSAL,
     PROOF_PROPOSAL_APPROVAL: ConsensusMessageType.MESSAGE_TYPE_PROOF_PROPOSAL_APPROVAL
-});
-
-export const ConsensusProtocolVersion = Object.freeze({
-    V1: 1,
 });
 
 export const ConsensusResultCode = Object.freeze({
@@ -219,7 +215,6 @@ export const UINT16_MAX = 0xFFFF;
 export const UINT32_MAX = 0xFFFFFFFF;
 
 // consensus
-export const PROTOCOL_VERSION_BYTE_LENGTH = 1; // 1 BYTE 0-255
 export const NETWORK_ID_BYTE_LENGTH = 2; // 2 BYTES - UINT16
 export const EPOCH_BYTE_LENGTH = 8; // 8 BYTES - UINT64
 export const VDF_DIFFICULTY_SIZE = 4; // 4 BYTES - UINT32
@@ -228,13 +223,16 @@ export const MAX_VDF_DIFFICULTY = UINT32_MAX;
 export const CONSENSUS_CONFIG_INDEX_SIZE = 4 // 4 BYTES - UINT32
 export const CONSENSUS_CONFIG_SCHEMA_VERSION_BYTE_LENGTH = 1;
 export const CONSENSUS_CONFIG_DATA_MAX_SIZE = 3072; // 3 KiB
+export const SET_EPOCH_DATA_MAX_SIZE = 3072; // 3 KiB
 export const VDF_PROOF_BYTE_LENGTHS = Object.freeze({
     1024: 260,
     2048: 516,
     4096: 1028
 });
 
-export const ConsensusConfigSchemaVersion = Object.freeze({
+// These permanent consensus IDs select the config, SET_EPOCH and genesis formats.
+// Assign higher IDs to new versions; parameter updates retain the current ID.
+export const ConsensusVersion = Object.freeze({
     VDF_V1: 1,
 });
 

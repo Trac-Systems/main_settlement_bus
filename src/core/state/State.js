@@ -9,8 +9,8 @@ import {
     AUTOBASE_VALUE_ENCODING,
     BATCH_SIZE,
     CONSENSUS_CONFIG_INDEX_SIZE,
-    ConsensusConfigSchemaVersion,
-    ConsensusProtocolVersion,
+    CONSENSUS_CONFIG_SCHEMA_VERSION_BYTE_LENGTH,
+    ConsensusVersion,
     CustomEventType,
     EntryType,
     EPOCH_BYTE_LENGTH,
@@ -28,11 +28,12 @@ import tracCryptoApi from 'trac-crypto-api';
 import {verifyWesolowski} from '@tracsystems/trac-vdf';
 import StateValidationSchema from './validators/StateValidationSchema.js';
 import {
-    decodeConsensusConfig,
     safeDecodeApplyOperation,
     safeDecodeConsensusConfig,
+    safeDecodeEpochProofV1,
     safeEncodeConsensusConfig,
-    safeEncodeEpochProof
+    safeEncodeEpochProofV1,
+    safeEncodeEpochRecord
 } from '../../codecs/apply/applyOperationCodec.js';
 import {
     createMessage,
@@ -72,7 +73,8 @@ import deploymentEntryUtils from './utils/deploymentEntry.js';
 import remote from 'hypercore/lib/fully-remote-proof.js'
 import PQueue from 'p-queue';
 import {createGenesisEpochProof} from './utils/epochProof.js';
-import {decodeVdfConfig, safeDecodeVdfConfig,} from '../../codecs/consensus/v1/vdfConfigCodec.js';
+import {decodeVersionedConsensusConfig} from '../../utils/consensusConfig.js';
+import {safeDecodeVdfConfig} from '../../codecs/consensus/v1/vdfConfigCodec.js';
 import _ from 'lodash';
 import {StateEventQueue} from './StateEventQueue.js';
 
@@ -191,6 +193,12 @@ class State extends ReadyResource {
         });
     }
 
+    #emitEvent(event, ...args) {
+        try {
+            this.emit(event, ...args)
+        } catch (_ignored) { }
+    }
+
     isWritable() {
         return this.#base.writable;
     }
@@ -275,10 +283,12 @@ class State extends ReadyResource {
     }
 
     /**
-     * Reads the encoded epoch proof stored under `/epochHash/<epochHash>`.
+     * Reads the encoded epoch record stored under `/epochHash/<epochHash>`.
+     * Decode its { sv, data } envelope with decodeEpochRecord, then decode data
+     * according to the stored sv, not the currently active consensus version.
      *
      * @param {Buffer|string} epochHash Epoch hash as a buffer or hex string.
-     * @returns {Promise<Buffer|null>} Encoded epoch proof, or `null` when it is not stored.
+     * @returns {Promise<Buffer|null>} Encoded epoch record, or `null` when it is not stored.
      * @throws {Error} When epoch hash is missing.
      */
     async getEpochProof(epochHash) {
@@ -291,10 +301,10 @@ class State extends ReadyResource {
     }
 
     /**
-     * Reads the required encoded epoch proof stored under `/epochHash/<epochHash>`.
+     * Reads the required encoded { sv, data } epoch record under `/epochHash/<epochHash>`.
      *
      * @param {Buffer|string} epochHash Epoch hash as a buffer or hex string.
-     * @returns {Promise<Buffer>} Encoded epoch proof.
+     * @returns {Promise<Buffer>} Encoded epoch record.
      * @throws {Error} When epoch hash is missing or the epoch proof is not stored.
      */
     async requireEpochProof(epochHash) {
@@ -682,22 +692,7 @@ class State extends ReadyResource {
             throw new Error(`Consensus config record ${currentConfigIndex} does not exist.`);
         }
 
-        const consensusConfig = decodeConsensusConfig(encodedConsensusConfig);
-        const schemaVersion = consensusConfig.sv.readUInt8(0);
-        switch (schemaVersion) {
-            case ConsensusConfigSchemaVersion.VDF_V1: {
-                const decodedVdfConfig = decodeVdfConfig(consensusConfig.cd);
-                return {
-                    schemaVersion,
-                    configData: {
-                        difficulty: decodedVdfConfig.difficulty.readUInt32BE(0),
-                        discriminantBitSize: decodedVdfConfig.discriminantBitSize.readUInt16BE(0),
-                    }
-                };
-            }
-            default:
-                throw new Error(`Unsupported consensus config schema version: ${schemaVersion}.`);
-        }
+        return decodeVersionedConsensusConfig(encodedConsensusConfig);
     }
 
     async requireSignedConsensusConfig() {
@@ -3384,7 +3379,7 @@ class State extends ReadyResource {
         if (b4a.equals(requesterPublicKey, NULL_BUFFER)) {
             this.#safeLogApply(OperationType.TRANSFER, "Error while decoding requester public key.", node.from.key)
             return Status.FAILURE;
-        };
+        }
 
         // recreate requester message
         const requesterMessage = createMessage(
@@ -3554,23 +3549,80 @@ class State extends ReadyResource {
         if (!this.#stateValidationSchema.validateSetEpochOperation(op)) {
             this.#safeLogApply(OperationType.SET_EPOCH, "Contract schema validation failed.", node.from.key)
             return Status.FAILURE;
-        };
+        }
+
+        const currentConsensusConfigIndexBuffer = await this.#getEntryApply(EntryType.CONSENSUS_CONFIG_CURRENT, batch);
+        if (currentConsensusConfigIndexBuffer === null) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Consensus config is not initialized.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        if (currentConsensusConfigIndexBuffer.length !== CONSENSUS_CONFIG_INDEX_SIZE) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Consensus config data is malformed or corrupted.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const currentConsensusConfigIndex = safeReadUint32BE(currentConsensusConfigIndexBuffer);
+        const consensusConfigBuffer = await this.#getEntryApply(
+            EntryType.CONSENSUS_CONFIG_RECORD + currentConsensusConfigIndex,
+            batch
+        );
+        if (consensusConfigBuffer === null) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Consensus config record does not exist.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const consensusConfig = safeDecodeConsensusConfig(consensusConfigBuffer);
+        if (consensusConfig === null) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Failed to decode consensus config.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const consensusSchemaVersion = safeReadUint8(consensusConfig.sv);
+        const epochSchemaVersion = safeReadUint8(op.seo.sv);
+        if (consensusSchemaVersion !== epochSchemaVersion) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Epoch schema version does not match the current consensus config.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        // Use the config at this point in replay, including earlier updates in this batch.
+        switch (consensusSchemaVersion) {
+            case ConsensusVersion.VDF_V1:
+                return await this.#applyVdfV1Epoch(op, consensusConfig, base, node, batch);
+            default:
+                this.#safeLogApply(OperationType.SET_EPOCH, "Unsupported epoch schema version.", node.from.key)
+                return Status.FAILURE;
+        }
+    }
+
+    async #applyVdfV1Epoch(op, consensusConfig, base, node, batch) {
+        const epochProof = safeDecodeEpochProofV1(op.seo.data);
+        if (epochProof === null) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Failed to decode epoch data.", node.from.key)
+            return Status.FAILURE;
+        }
+        if (!this.#stateValidationSchema.validateEpochProofV1(epochProof)) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Epoch data schema validation failed.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const { pd: encodedProofProposal, app: encodedApprovals } = epochProof;
 
         const requesterAddressBuffer = op.address;
         const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer, this.#config.addressPrefix);
         if (requesterAddressString === null) {
             this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Requester address is invalid.", node.from.key)
             return Status.FAILURE;
-        };
+        }
 
         // validate requester public key
         const requesterPublicKey = tracCryptoApi.address.decodeSafe(requesterAddressString);
         if (b4a.equals(requesterPublicKey, NULL_BUFFER)) {
             this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Failed to decode requester public key.", node.from.key)
             return Status.FAILURE;
-        };
+        }
 
-        const proofProposal = safeDecodeProofProposal(op.seo.pd);
+        const proofProposal = safeDecodeProofProposal(encodedProofProposal);
         if (proofProposal === null) {
             this.#safeLogApply(OperationType.SET_EPOCH, "Failed to decode proof proposal.", node.from.key)
             return Status.FAILURE;
@@ -3609,11 +3661,6 @@ class State extends ReadyResource {
             return Status.FAILURE;
         }
 
-        if (proofProposal.protocol_version[0] !== ConsensusProtocolVersion.V1) {
-            this.#safeLogApply(OperationType.SET_EPOCH, "Unsupported proof proposal protocol version.", node.from.key)
-            return Status.FAILURE;
-        }
-
         const expectedNetworkId = uint16ToBuffer(this.#config.networkId);
         if (!b4a.equals(proofProposal.network_id, expectedNetworkId)) {
             this.#safeLogApply(OperationType.SET_EPOCH, "Invalid proof proposal network id.", node.from.key)
@@ -3623,38 +3670,6 @@ class State extends ReadyResource {
         const currentEpochHash = await this.#getEntryApply(EntryType.EPOCH + currentEpochStr, batch);
         if (currentEpochHash === null || !b4a.equals(currentEpochHash, proofProposal.previous_epoch_record_hash)) {
             this.#safeLogApply(OperationType.SET_EPOCH, `Previous epoch record hash mismatch for epoch ${currentEpochStr}.`, node.from.key)
-            return Status.FAILURE;
-        }
-
-        const currentConsensusConfigIndexBuffer = await this.#getEntryApply(EntryType.CONSENSUS_CONFIG_CURRENT, batch);
-        if (currentConsensusConfigIndexBuffer === null) {
-            this.#safeLogApply(OperationType.SET_EPOCH, "Consensus config is not initialized.", node.from.key)
-            return Status.FAILURE;
-        }
-
-        if (currentConsensusConfigIndexBuffer.length !== CONSENSUS_CONFIG_INDEX_SIZE) {
-            this.#safeLogApply(OperationType.SET_EPOCH, "Consensus config data is malformed or corrupted.", node.from.key)
-            return Status.FAILURE;
-        }
-
-        const currentConsensusConfigIndex = safeReadUint32BE(currentConsensusConfigIndexBuffer);
-        const consensusConfigBuffer = await this.#getEntryApply(
-            EntryType.CONSENSUS_CONFIG_RECORD + currentConsensusConfigIndex,
-            batch
-        );
-        if (consensusConfigBuffer === null) {
-            this.#safeLogApply(OperationType.SET_EPOCH, "Consensus config record does not exist.", node.from.key)
-            return Status.FAILURE;
-        }
-
-        const consensusConfig = safeDecodeConsensusConfig(consensusConfigBuffer);
-        if (consensusConfig === null) {
-            this.#safeLogApply(OperationType.SET_EPOCH, "Failed to decode consensus config.", node.from.key)
-            return Status.FAILURE;
-        }
-        const schemaVersion = safeReadUint8(consensusConfig.sv);
-        if (schemaVersion !== ConsensusConfigSchemaVersion.VDF_V1) {
-            this.#safeLogApply(OperationType.SET_EPOCH, "Unsupported consensus config schema version.", node.from.key)
             return Status.FAILURE;
         }
 
@@ -3690,7 +3705,7 @@ class State extends ReadyResource {
 
         const indexerCount = indexers.length;
         const quorumThreshold = indexerCount <= 2 ? 1 : Math.floor(indexerCount / 2) + 1;
-        const approvalCount = 1 + op.seo.app.length; // proposer plus submitted approvals (proposer's own verified signature counts as one approval)
+        const approvalCount = 1 + encodedApprovals.length; // proposer plus submitted approvals (proposer's own verified signature counts as one approval)
 
         if (approvalCount < quorumThreshold) {
             this.#safeLogApply(OperationType.SET_EPOCH, `Insufficient submitted approvals for quorum. Required ${quorumThreshold}, got ${approvalCount}.`, node.from.key)
@@ -3698,7 +3713,6 @@ class State extends ReadyResource {
         }
 
         const challengeData = createMessage(
-            proofProposal.protocol_version,
             proofProposal.network_id,
             proofProposal.epoch,
             proofProposal.previous_epoch_record_hash,
@@ -3720,7 +3734,7 @@ class State extends ReadyResource {
         }
 
         const approvalErrorMessage = await this.#validateEpochApprovals(
-            op.seo.app,
+            encodedApprovals,
             indexerAddresses,
             proposerAddress,
             challengeData,
@@ -3747,13 +3761,19 @@ class State extends ReadyResource {
             return Status.FAILURE;
         }
 
-        const encodedEpochProof = safeEncodeEpochProof({ pd: op.seo.pd, app: op.seo.app });
+        const encodedEpochProof = safeEncodeEpochProofV1(epochProof);
         if (encodedEpochProof.length === 0) {
             this.#safeLogApply(OperationType.SET_EPOCH, "Failed to encode epoch proof.", node.from.key)
             return Status.FAILURE;
         }
 
-        const epochProofHash = await tracCryptoApi.hash.blake3Safe(encodedEpochProof);
+        const encodedEpochRecord = safeEncodeEpochRecord({ sv: op.seo.sv, data: encodedEpochProof });
+        if (encodedEpochRecord.length === 0) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Failed to encode epoch record.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const epochProofHash = await tracCryptoApi.hash.blake3Safe(encodedEpochRecord);
         if (!isBufferValid(epochProofHash, HASH_BYTE_LENGTH)) {
             this.#safeLogApply(OperationType.SET_EPOCH, "Failed to hash epoch proof.", node.from.key)
             return Status.FAILURE;
@@ -3761,10 +3781,10 @@ class State extends ReadyResource {
 
         await batch.put(EntryType.EPOCH_CURRENT, nextEpochBuffer);
         await batch.put(EntryType.EPOCH + nextEpochStr, epochProofHash);
-        await batch.put(EntryType.EPOCH_HASH + epochProofHash.toString('hex'), encodedEpochProof);
+        await batch.put(EntryType.EPOCH_HASH + epochProofHash.toString('hex'), encodedEpochRecord);
 
         if (this.#config.enableTxApplyLogs) {
-            console.info(`Epoch ${nextEpochStr} committed. proposer:approvals - ${proposerAddress}:${op.seo.app.length + 1}`); // We should account for the proposer approval too, hence the '+ 1' at the end
+            console.info(`Epoch ${nextEpochStr} committed. proposer:approvals - ${proposerAddress}:${encodedApprovals.length + 1}`); // We should account for the proposer approval too, hence the '+ 1' at the end
         }
 
         this.#emitEvent(CustomEventType.EPOCH_CREATED, { epoch: b4a.from(nextEpochBuffer), proposerAddress }); // notify epoch committed
@@ -3996,6 +4016,7 @@ class State extends ReadyResource {
             return null
         }
     }
+
     async #isValidatorValidApply(validatorEntryBuffer, node, op) {
         // TODO: Maybe we should transfer all validator checks to this function (address, pubKey, signature, etc)
         if (validatorEntryBuffer === null) {
@@ -4321,12 +4342,6 @@ class State extends ReadyResource {
         return { newLicenseLength, decodedNewLicenseLength };
     }
 
-    #emitEvent(event, ...args) {
-        try {
-            this.emit(event, ...args)
-        } catch (_ignored) { }
-    }
-
     async #transferFeeTxOperation(requesterAddressString, validatorAddressString, validatorEntryBuffer, subnetworkCreatorAddressString, feeAmount, batch, node) {
         if (!requesterAddressString ||
             !validatorAddressString ||
@@ -4480,6 +4495,24 @@ class State extends ReadyResource {
         };
     }
 
+    #validateConsensusConfigApply(consensusConfig) {
+        if (!isBufferValid(consensusConfig?.sv, CONSENSUS_CONFIG_SCHEMA_VERSION_BYTE_LENGTH)) {
+            return false;
+        }
+
+        switch (safeReadUint8(consensusConfig.sv)) {
+            case ConsensusVersion.VDF_V1: {
+                const configData = safeDecodeVdfConfig(consensusConfig.cd);
+                if (configData === null) return false;
+
+                return !isZeroBuffer(configData.difficulty) &&
+                    Object.hasOwn(VDF_PROOF_BYTE_LENGTHS, configData.discriminantBitSize.readUInt16BE(0));
+            }
+            default:
+                return false;
+        }
+    }
+
     async #handleApplySetGenesisEpoch(op, view, base, node, batch) {
         if (!this.#stateValidationSchema.validateConsensusControlOperation(op)) {
             this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Contract schema validation failed.", node.from.key)
@@ -4629,12 +4662,12 @@ class State extends ReadyResource {
 
 
         const genesisEpoch = await createGenesisEpochProof(
-            this.#config,
             requesterAddressString,
-            encodedConsensusConfig
+            encodedConsensusConfig,
+            this.#config
         );
 
-        if (genesisEpoch === null) {
+        if (!b4a.isBuffer(genesisEpoch) || genesisEpoch.length === 0) {
             this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Could not initialize genesis epoch", node.from.key)
             return Status.FAILURE;
         }
@@ -4666,7 +4699,7 @@ class State extends ReadyResource {
             genesisEpoch
         );
 
-        // initialize consensus config schema V1 and make record 0 current
+        // Record 0 preserves the initial config, including the genesis format version.
         await batch.put(
             EntryType.CONSENSUS_CONFIG_CURRENT,
             safeWriteUInt32BE(0)
@@ -4788,19 +4821,47 @@ class State extends ReadyResource {
             return Status.IGNORE;
         }
 
-        const currentConsensusConfigBuffer = await this.#getEntryApply(EntryType.CONSENSUS_CONFIG_CURRENT, batch);
-        if (currentConsensusConfigBuffer === null) {
+        const currentConsensusConfigIndexBuffer = await this.#getEntryApply(EntryType.CONSENSUS_CONFIG_CURRENT, batch);
+        if (currentConsensusConfigIndexBuffer === null) {
             this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Initial consensus config has not been initialized yet", node.from.key)
             return Status.IGNORE;
         }
 
-        const currentConsensusConfigIndex = safeReadUint32BE(currentConsensusConfigBuffer);
+        if (currentConsensusConfigIndexBuffer.length !== CONSENSUS_CONFIG_INDEX_SIZE) {
+            this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Consensus config index is malformed or corrupted.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const currentConsensusConfigIndex = safeReadUint32BE(currentConsensusConfigIndexBuffer);
         if (currentConsensusConfigIndex === null) {
             this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG,"Failed to read current consensus config index from buffer", node.from.key)
             return Status.FAILURE;
         }
         if (currentConsensusConfigIndex === UINT32_MAX) {
             this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Consensus config index overflow.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const currentConsensusConfigBuffer = await this.#getEntryApply(
+            EntryType.CONSENSUS_CONFIG_RECORD + currentConsensusConfigIndex,
+            batch
+        );
+        const currentConsensusConfig = safeDecodeConsensusConfig(currentConsensusConfigBuffer);
+        if (currentConsensusConfig === null) {
+            this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Failed to decode current consensus config.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const currentSchemaVersion = safeReadUint8(currentConsensusConfig.sv);
+        const nextSchemaVersion = safeReadUint8(op.cco.cc.sv);
+        if (currentSchemaVersion === null || currentSchemaVersion === 0) {
+            this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Current consensus config schema version is invalid.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        // Same-version parameter changes are allowed; returning to an older consensus is not.
+        if (nextSchemaVersion < currentSchemaVersion) {
+            this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Consensus config schema version cannot decrease.", node.from.key)
             return Status.FAILURE;
         }
 
@@ -4818,7 +4879,7 @@ class State extends ReadyResource {
         await batch.put(txHashHexString, node.value);
 
         if (this.#config.enableTxApplyLogs) {
-            console.info(`VDF params updated addr:wk:tx - ${requesterAddressString}:${decodedAdminEntry.wk.toString('hex')}:${txHashHexString}`);
+            console.info(`Consensus config updated addr:wk:tx - ${requesterAddressString}:${decodedAdminEntry.wk.toString('hex')}:${txHashHexString}`);
         }
 
         postApplyEvents.push({
@@ -4826,33 +4887,6 @@ class State extends ReadyResource {
         });
 
         return Status.SUCCESS;
-    }
-
-    #validateConsensusConfigApply(consensusConfig) {
-        let isValid =  false
-        const schemaVersion = safeReadUint8(consensusConfig.sv);
-
-        if (schemaVersion ===  null) {
-            return isValid;
-        }
-
-        switch (schemaVersion) {
-            case ConsensusConfigSchemaVersion.VDF_V1: {
-                const configData = safeDecodeVdfConfig(consensusConfig.cd);
-                const discriminantBitSize = configData?.discriminantBitSize.readUInt16BE(0);
-                if (
-                    configData !== null &&
-                    !isZeroBuffer(configData.difficulty) &&
-                    Object.hasOwn(VDF_PROOF_BYTE_LENGTHS, discriminantBitSize)
-                ) {
-                    isValid = true;
-                }
-                break;
-            }
-            default:
-                break;
-        }
-        return isValid;
     }
 
 }

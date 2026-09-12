@@ -9,7 +9,7 @@ import {
     setupSetEpochScenario
 } from './setEpochScenarioHelpers.js';
 import { EntryType, CustomEventType } from '../../../../../src/utils/constants.js';
-import { safeDecodeEpochProof } from '../../../../../src/codecs/apply/applyOperationCodec.js';
+import { decodeEpochRecord, safeDecodeEpochProofV1 } from '../../../../../src/codecs/apply/applyOperationCodec.js';
 import { uint64ToBuffer } from '../../../../../src/utils/buffer.js';
 
 test('State.apply SET_EPOCH: proposer alone satisfies quorum when it is the sole indexer, and commits the epoch', async t => {
@@ -35,11 +35,14 @@ test('State.apply SET_EPOCH: proposer alone satisfies quorum when it is the sole
     const storedProof = await adminNode.base.view.get(EntryType.EPOCH_HASH + epochHash.toString('hex'));
     t.ok(storedProof, 'epoch proof is stored under its hash');
 
-    const decodedStoredProof = safeDecodeEpochProof(storedProof.value);
+    const storedRecord = decodeEpochRecord(storedProof.value);
+    t.alike(storedRecord.sv, b4a.from([1]), 'stored epoch record identifies the V1 proof format');
+    const decodedStoredProof = safeDecodeEpochProofV1(storedRecord.data);
     const decodedPayload = decodeSetEpochPayload(payload);
+    const submittedProof = safeDecodeEpochProofV1(decodedPayload.seo.data);
     t.ok(decodedStoredProof, 'stored epoch proof decodes');
-    t.ok(b4a.equals(decodedStoredProof.pd, decodedPayload.seo.pd), 'stored proof data matches the submitted proposal');
-    t.is(decodedStoredProof.app.length, decodedPayload.seo.app.length, 'stored approvals count matches the submitted proposal');
+    t.ok(b4a.equals(decodedStoredProof.pd, submittedProof.pd), 'stored proof data matches the submitted proposal');
+    t.is(decodedStoredProof.app.length, submittedProof.app.length, 'stored approvals count matches the submitted proposal');
 });
 
 test('State.apply SET_EPOCH: rejects a previous_epoch_record_hash mismatch', async t => {

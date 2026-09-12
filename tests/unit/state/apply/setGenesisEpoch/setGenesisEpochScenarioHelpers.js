@@ -10,7 +10,8 @@ import {
 import { applyStateMessageFactory } from '../../../../../src/messages/state/applyStateMessageFactory.js';
 import {
     safeDecodeApplyOperation,
-    safeDecodeEpochProof,
+    safeDecodeEpochRecord,
+    safeDecodeEpochProofV1,
     safeEncodeApplyOperation,
     safeEncodeConsensusConfig
 } from '../../../../../src/codecs/apply/applyOperationCodec.js';
@@ -21,7 +22,6 @@ import {
 import { safeDecodeProofProposal } from '../../../../../src/codecs/consensus/v1/consensusV1OperationCodec.js';
 import {
     AUTOBASE_VALUE_ENCODING,
-    ConsensusProtocolVersion,
     EntryType,
     HASH_BYTE_LENGTH,
     SIGNATURE_BYTE_LENGTH,
@@ -29,7 +29,6 @@ import {
 } from '../../../../../src/utils/constants.js';
 import {
     safeReadUint32BE,
-    safeUint8ToBuffer,
     uint16ToBuffer,
     uint32ToBuffer
 } from '../../../../../src/utils/buffer.js';
@@ -193,7 +192,12 @@ export async function assertGenesisInitialized(
         'epoch zero points to the stored genesis proof'
     );
 
-    const epochProof = safeDecodeEpochProof(epochProofEntry.value);
+    const epochRecord = safeDecodeEpochRecord(epochProofEntry.value);
+    t.ok(epochRecord, 'stored genesis epoch record decodes');
+    if (!epochRecord) return;
+    t.alike(epochRecord.sv, operation.cco.cc.sv, 'genesis record stores the initial consensus version');
+
+    const epochProof = safeDecodeEpochProofV1(epochRecord.data);
     t.ok(epochProof, 'stored genesis epoch proof decodes');
     if (!epochProof) return;
     t.is(epochProof.app.length, 0, 'genesis epoch proof has no approvals');
@@ -202,13 +206,6 @@ export async function assertGenesisInitialized(
     t.ok(proofProposal, 'stored genesis proof proposal decodes');
     if (!proofProposal) return;
 
-    t.ok(
-        b4a.equals(
-            proofProposal.protocol_version,
-            safeUint8ToBuffer(ConsensusProtocolVersion.V1)
-        ),
-        'genesis proof uses consensus protocol version 1'
-    );
     t.ok(
         b4a.equals(proofProposal.network_id, uint16ToBuffer(config.networkId)),
         'genesis proof stores the configured network id'
@@ -425,7 +422,7 @@ export async function applyWithGenesisEpochHashFailure(context, payload) {
     let injected = false;
 
     tracCryptoApi.hash.blake3Safe = async (value, ...args) => {
-        if (!injected && isEncodedGenesisEpochProof(value)) {
+        if (!injected && isEncodedGenesisEpochRecord(value)) {
             injected = true;
             return b4a.alloc(0);
         }
@@ -436,6 +433,28 @@ export async function applyWithGenesisEpochHashFailure(context, payload) {
         await appendAndUpdate(context.adminBootstrap.base, payload);
     } finally {
         tracCryptoApi.hash.blake3Safe = originalBlake3Safe;
+    }
+
+    return injected;
+}
+
+export async function applyWithGenesisEpochRecordEncodingFailure(context, payload) {
+    const originalFrom = b4a.from;
+    let injected = false;
+
+    b4a.from = (value, ...args) => {
+        const encodedValue = originalFrom(value, ...args);
+        if (!injected && isEncodedGenesisEpochRecord(encodedValue)) {
+            injected = true;
+            throw new Error('forced genesis epoch record encoding failure');
+        }
+        return encodedValue;
+    };
+
+    try {
+        await appendAndUpdate(context.adminBootstrap.base, payload);
+    } finally {
+        b4a.from = originalFrom;
     }
 
     return injected;
@@ -507,9 +526,14 @@ function buffersHaveSameBytes(left, right) {
 }
 
 function isEncodedGenesisEpochProof(value) {
-    const epochProof = safeDecodeEpochProof(value);
+    const epochProof = safeDecodeEpochProofV1(value);
     if (!epochProof || epochProof.app.length !== 0) return false;
 
     const proofProposal = safeDecodeProofProposal(epochProof.pd);
     return proofProposal !== null;
+}
+
+function isEncodedGenesisEpochRecord(value) {
+    const record = safeDecodeEpochRecord(value);
+    return record !== null && record.sv[0] === 1 && isEncodedGenesisEpochProof(record.data);
 }

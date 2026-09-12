@@ -3,7 +3,9 @@ import tracCryptoApi from 'trac-crypto-api';
 import { createWallet, eventFlush } from '../../../../helpers/autobaseTestHelpers.js';
 import {
     encodeApplyOperation,
-    safeEncodeEpochProof
+    decodeEpochProofV1,
+    safeEncodeEpochProofV1,
+    encodeEpochRecord
 } from '../../../../../src/codecs/apply/applyOperationCodec.js';
 import {
     encodeProofProposalApproval,
@@ -95,30 +97,32 @@ export async function applySetEpochWithIndexers(context, payload, indexerActors)
 
 export function duplicateFirstApproval(payload) {
     const operation = decodeSetEpochPayload(payload);
-    operation.seo.app = [
-        operation.seo.app[0],
-        b4a.from(operation.seo.app[0])
+    const epochProof = decodeEpochProofV1(operation.seo.data);
+    epochProof.app = [
+        epochProof.app[0],
+        b4a.from(epochProof.app[0])
     ];
+    operation.seo.data = safeEncodeEpochProofV1(epochProof);
     return encodeApplyOperation(operation);
 }
 
 export function tamperApprovalSignature(payload, approvalIndex = 0) {
     const operation = decodeSetEpochPayload(payload);
-    const approval = safeDecodeProofProposalApproval(operation.seo.app[approvalIndex]);
+    const epochProof = decodeEpochProofV1(operation.seo.data);
+    const approval = safeDecodeProofProposalApproval(epochProof.app[approvalIndex]);
     if (!approval) throw new Error(`Approval ${approvalIndex} could not be decoded.`);
 
     approval.approval_sig = b4a.alloc(64, 0x11);
-    operation.seo.app[approvalIndex] = encodeProofProposalApproval(approval);
+    epochProof.app[approvalIndex] = encodeProofProposalApproval(approval);
+    operation.seo.data = safeEncodeEpochProofV1(epochProof);
     return encodeApplyOperation(operation);
 }
 
 export async function assertEpochUnchangedAfterRejectedApprovals(t, base, payload, description) {
     const operation = decodeSetEpochPayload(payload);
-    const encodedEpochProof = safeEncodeEpochProof({
-        pd: operation.seo.pd,
-        app: operation.seo.app
-    });
-    const epochProofHash = await tracCryptoApi.hash.blake3(encodedEpochProof);
+    const encodedEpochProof = safeEncodeEpochProofV1(decodeEpochProofV1(operation.seo.data));
+    const encodedRecord = encodeEpochRecord({ sv: operation.seo.sv, data: encodedEpochProof });
+    const recordHash = await tracCryptoApi.hash.blake3(encodedRecord);
 
     t.is(await getCurrentEpoch(base), 0n, `${description}: current epoch remains unchanged`);
     t.absent(
@@ -126,7 +130,7 @@ export async function assertEpochUnchangedAfterRejectedApprovals(t, base, payloa
         `${description}: next-epoch forward record is absent`
     );
     t.absent(
-        await base.view.get(EntryType.EPOCH_HASH + epochProofHash.toString('hex')),
+        await base.view.get(EntryType.EPOCH_HASH + recordHash.toString('hex')),
         `${description}: submitted proof reverse record is absent`
     );
 }

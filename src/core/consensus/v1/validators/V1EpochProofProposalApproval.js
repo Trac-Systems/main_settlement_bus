@@ -12,7 +12,7 @@ class V1EpochProofProposalApproval extends V1BaseConsensusOperation {
      * @param {Config} config Application configuration. Approval validation uses
      * `addressLength` for schemas and `addressPrefix` for approver addresses.
      * @param {State} state Ledger state. It must expose
-     * `isIndexerAddress(address)` for approver membership validation.
+     * `isIndexerAddress(address)` and `requireSignedConsensusConfig()`.
      * @throws {Error} When consensus schemas cannot be initialized from the configuration.
      */
     constructor(config, state) {
@@ -24,7 +24,8 @@ class V1EpochProofProposalApproval extends V1BaseConsensusOperation {
      *
      * Checks the response schema and signature, requires an OK result, verifies
      * that the approver belongs to the remote public key, verifies the approval
-     * signature against the original proposal, and checks indexer membership.
+     * signature against the original proposal, and checks indexer membership
+     * and the active consensus config.
      *
      * @param {object} payload Decoded proof proposal approval payload.
      * @param {object} connection Peer connection containing `remotePublicKey`.
@@ -39,6 +40,7 @@ class V1EpochProofProposalApproval extends V1BaseConsensusOperation {
             await this.#validateResponseSignature(payload, connection.remotePublicKey);
             const resultCode = payload.proof_proposal_response.result;
             this.#validateIfResultCodeIsOk(resultCode);
+            await this.validateProofProposalConfig(proofProposal);
             const approval = payload.proof_proposal_response.approval;
             this.assertAddressWithRemotePublicKey(
                 approval.approver,
@@ -46,6 +48,9 @@ class V1EpochProofProposalApproval extends V1BaseConsensusOperation {
             );
             await this.validateSignature(payload, connection.remotePublicKey, proofProposal, ConsensusResultCode.APPROVAL_SIGNATURE_INVALID);
             await this.validateAddressIsIndexer(connection.remotePublicKey);
+
+            // Reject late approvals if the signed config changed while validating them.
+            await this.validateProofProposalConfig(proofProposal);
             return true;
         });
     }

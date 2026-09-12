@@ -36,10 +36,11 @@ export const UPDATED_DISCRIMINANT_BIT_SIZE = 4096;
 
 export async function setupSetConsensusConfigScenario(
     t,
-    { initializeGenesis = true, nodes = 2 } = {}
+    { initializeGenesis = true, nodes = 2, stateClass } = {}
 ) {
     const context = await setupStateNetwork({
         nodes,
+        stateClass,
         valueEncoding: AUTOBASE_VALUE_ENCODING,
         open: defaultOpenHyperbeeView,
         stateOptions: { enableTxApplyLogs: false }

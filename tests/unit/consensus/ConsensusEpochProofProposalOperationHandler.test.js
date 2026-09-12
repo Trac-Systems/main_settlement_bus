@@ -117,7 +117,6 @@ function callNames(calls) {
 
 async function verifyProofProposalApprovalSignature(proofProposal, approval, publicKey) {
     const message = createMessage(
-        proofProposal.protocol_version,
         proofProposal.network_id,
         proofProposal.epoch,
         proofProposal.previous_epoch_record_hash,
