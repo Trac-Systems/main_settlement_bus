@@ -19,10 +19,6 @@ import {
     setupTransferScenario
 } from '../../state/apply/transfer/transferScenarioHelpers.js';
 
-if (typeof setTimeout !== "undefined" && typeof setTimeout.restore === "function") setTimeout.restore();
-if (typeof setInterval !== "undefined" && typeof setInterval.restore === "function") setInterval.restore();
-sinon.restore(); 
-
 const CONFIG_DEFAULT = { enableWallet: true, txPoolSize: 10, processIntervalMs: 50 };
 const CONFIG_TX_POOL_INCREASE = { enableWallet: true, txPoolSize: 100, processIntervalMs: 50 };
 

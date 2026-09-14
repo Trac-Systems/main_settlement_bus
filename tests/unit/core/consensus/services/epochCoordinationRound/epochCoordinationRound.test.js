@@ -2,7 +2,6 @@ import test from 'brittle';
 import sinon from 'sinon';
 import b4a from 'b4a';
 import {
-    ConsensusProtocolVersion,
     ConsensusResultCode,
     CustomEventType,
 } from '../../../../../../src/utils/constants.js';
@@ -11,7 +10,6 @@ import {
     uint16ToBuffer,
     uint32ToBuffer,
     uint64ToBuffer,
-    uint8ToBuffer,
 } from '../../../../../../src/utils/buffer.js';
 import { EpochCoordinationRound } from '../../../../../../src/core/consensus/services/EpochCoordinationRound.js';
 import { addressToBuffer } from '../../../../../../src/core/state/utils/address.js';
@@ -206,7 +204,6 @@ test('builds the VDF challenge with the signed difficulty and discriminant size'
     await context.runRound();
 
     const expectedChallenge = createMessage(
-        uint8ToBuffer(ConsensusProtocolVersion.V1),
         uint16ToBuffer(context.config.networkId),
         uint64ToBuffer(currentEpoch + 1n),
         currentEpochHash,

@@ -4,7 +4,9 @@ import tracCryptoApi from 'trac-crypto-api';
 import { WalletProvider } from 'trac-wallet';
 import ApplyStateMessageBuilder from '../../../../src/messages/state/ApplyStateMessageBuilder.js';
 import {
+    decodeEpochProofV1,
     encodeConsensusConfig,
+    encodeEpochProofV1,
     safeDecodeApplyOperation,
     safeEncodeApplyOperation,
 } from '../../../../src/codecs/apply/applyOperationCodec.js';
@@ -532,11 +534,13 @@ test('ApplyStateMessageBuilder complete transfer operation (tro)', async t => {
 
 test('ApplyStateMessageBuilder complete set epoch operation (seo)', async t => {
     const wallet = await createWallet(testKeyPair1.mnemonic);
+    const schemaVersion = b4a.from([0x01]);
     const proofData = proofProposalData();
     const approvals = [
         approval(0x15, 0x16),
         approval(0x17, 0x18)
     ];
+    const epochData = encodeEpochProofV1({ pd: proofData, app: approvals });
 
     const builder = new ApplyStateMessageBuilder(wallet, config);
     await builder
@@ -544,8 +548,7 @@ test('ApplyStateMessageBuilder complete set epoch operation (seo)', async t => {
         .setOutput('buffer')
         .setOperationType(OperationType.SET_EPOCH)
         .setAddress(wallet.address)
-        .setProofData(proofData)
-        .setApprovals(approvals)
+        .setEpochData(schemaVersion, epochData)
         .build();
 
     const payload = builder.getPayload();
@@ -553,21 +556,22 @@ test('ApplyStateMessageBuilder complete set epoch operation (seo)', async t => {
     expectAddressBuffer(t, payload.address, 'address');
     t.ok(b4a.equals(payload.address, addressToBuffer(wallet.address, config.addressPrefix)));
     expectPayloadKeys(t, payload, 'seo');
-    expectKeys(t, payload.seo, ['pd', 'app'], 'seo');
-    t.ok(b4a.isBuffer(payload.seo.pd), 'seo.pd type');
-    t.alike(payload.seo.app.map(approval => approval.length), approvals.map(approval => approval.length));
-    t.ok(b4a.equals(payload.seo.pd, proofData));
-    t.ok(b4a.equals(payload.seo.app[0], approvals[0]));
-    t.ok(b4a.equals(payload.seo.app[1], approvals[1]));
+    expectKeys(t, payload.seo, ['sv', 'data'], 'seo');
+    expectBufferField(t, payload.seo.sv, 1, 'seo.sv');
+    t.ok(b4a.isBuffer(payload.seo.data), 'seo.data type');
+    t.ok(b4a.equals(payload.seo.sv, schemaVersion));
+    t.ok(b4a.equals(payload.seo.data, epochData));
 });
 
 test('ApplyStateMessageBuilder complete set epoch operation codec roundtrip', async t => {
     const wallet = await createWallet(testKeyPair1.mnemonic);
+    const schemaVersion = b4a.from([0x01]);
     const proofData = proofProposalData();
     const approvals = [
         approval(0x35, 0x36),
         approval(0x37, 0x38)
     ];
+    const epochData = encodeEpochProofV1({ pd: proofData, app: approvals });
 
     const builder = new ApplyStateMessageBuilder(wallet, config);
     await builder
@@ -575,8 +579,7 @@ test('ApplyStateMessageBuilder complete set epoch operation codec roundtrip', as
         .setOutput('buffer')
         .setOperationType(OperationType.SET_EPOCH)
         .setAddress(wallet.address)
-        .setProofData(proofData)
-        .setApprovals(approvals)
+        .setEpochData(schemaVersion, epochData)
         .build();
 
     const payload = builder.getPayload();
@@ -588,11 +591,15 @@ test('ApplyStateMessageBuilder complete set epoch operation codec roundtrip', as
     t.is(decoded.type, OperationType.SET_EPOCH);
     t.ok(b4a.equals(decoded.address, addressToBuffer(wallet.address, config.addressPrefix)));
     t.alike(Object.keys(decoded).sort(), ['address', 'seo', 'type']);
-    t.alike(Object.keys(decoded.seo).sort(), ['app', 'pd']);
-    t.ok(b4a.equals(decoded.seo.pd, proofData));
-    t.is(decoded.seo.app.length, approvals.length);
-    t.ok(b4a.equals(decoded.seo.app[0], approvals[0]));
-    t.ok(b4a.equals(decoded.seo.app[1], approvals[1]));
+    t.alike(Object.keys(decoded.seo).sort(), ['data', 'sv']);
+    t.ok(b4a.equals(decoded.seo.sv, schemaVersion));
+    t.ok(b4a.equals(decoded.seo.data, epochData));
+
+    const decodedEpochProof = decodeEpochProofV1(decoded.seo.data);
+    t.ok(b4a.equals(decodedEpochProof.pd, proofData));
+    t.is(decodedEpochProof.app.length, approvals.length);
+    t.ok(b4a.equals(decodedEpochProof.app[0], approvals[0]));
+    t.ok(b4a.equals(decodedEpochProof.app[1], approvals[1]));
 });
 
 test('ApplyStateMessageBuilder complete set genesis epoch operation (cco)', async t => {

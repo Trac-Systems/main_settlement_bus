@@ -1,7 +1,9 @@
 import b4a from 'b4a';
 import applyOperationsGenerated from './applyOperations.generated.cjs';
+import consensusV1Generated from '../consensus/v1/consensusV1.generated.cjs';
 import _ from 'lodash';
 const { Operation, SetEpochOperation, ConsensusControlOperation } = applyOperationsGenerated.apply.operations;
+const { EpochProofV1 } = consensusV1Generated.common.consensus;
 
 // Options for converting protobuf messages to plain objects, ensuring that bytes are returned as Buffers and enums as numbers.
 const APPLY_TO_OBJECT_OPTIONS = Object.freeze({
@@ -95,24 +97,97 @@ export const normalizeIncomingMessage = (message) => {
     return null;
 };
 
-const getValidatedEpochProofPayload = (payload) => {
+const validateEpochRecord = (payload) => {
     if (!_.isPlainObject(payload)) {
-        throw new Error('EpochProof payload must be an object.');
+        throw new Error('Epoch record must be an object.');
+    }
+
+    const { sv, data } = payload;
+    if (!b4a.isBuffer(sv) || sv.length !== 1 || sv[0] === 0) {
+        throw new Error('Epoch record schema version must be a non-zero one-byte buffer.');
+    }
+    if (!b4a.isBuffer(data) || data.length === 0) {
+        throw new Error('Epoch record data must be a non-empty buffer.');
+    }
+
+    return { sv, data };
+};
+
+/**
+ * Encodes an epoch record using the SET_EPOCH payload wire format, not a full operation.
+ * The versioned data stays opaque; consensus validation belongs to apply.
+ *
+ * @param {{sv: Buffer, data: Buffer}} payload Epoch record.
+ * @returns {Buffer} Canonically encoded epoch record.
+ */
+export const encodeEpochRecord = (payload) => {
+    const epochRecord = validateEpochRecord(payload);
+    const error = SetEpochOperation.verify(epochRecord);
+    if (error) throw new Error(error);
+    return b4a.from(SetEpochOperation.encode(epochRecord).finish());
+};
+
+/**
+ * Decodes an epoch record independently of the currently active consensus.
+ *
+ * @param {Buffer} payload Encoded epoch record.
+ * @returns {{sv: Buffer, data: Buffer}} Epoch record with opaque versioned data.
+ */
+export const decodeEpochRecord = (payload) => {
+    if (!b4a.isBuffer(payload)) {
+        throw new Error('Encoded epoch record must be a buffer.');
+    }
+
+    return validateEpochRecord(
+        SetEpochOperation.toObject(
+            SetEpochOperation.decode(payload),
+            APPLY_TO_OBJECT_OPTIONS
+        )
+    );
+};
+
+/**
+ * @param {*} payload Epoch record to encode.
+ * @returns {Buffer} Encoded epoch record, or an empty buffer on failure.
+ */
+export const safeEncodeEpochRecord = (payload) => {
+    try {
+        return encodeEpochRecord(payload);
+    } catch {
+        return b4a.alloc(0);
+    }
+};
+
+/**
+ * @param {*} payload Encoded epoch record.
+ * @returns {{sv: Buffer, data: Buffer}|null} Epoch record, or null on failure.
+ */
+export const safeDecodeEpochRecord = (payload) => {
+    try {
+        return decodeEpochRecord(payload);
+    } catch {
+        return null;
+    }
+};
+
+const validateEpochProofV1 = (payload) => {
+    if (!_.isPlainObject(payload)) {
+        throw new Error('EpochProofV1 payload must be an object.');
     }
 
     const { pd, app } = payload;
 
     if (!b4a.isBuffer(pd) || pd.length === 0) {
-        throw new Error('EpochProof pd must be a non-empty buffer.');
+        throw new Error('EpochProofV1 pd must be a non-empty buffer.');
     }
 
     if (!Array.isArray(app)) {
-        throw new Error('EpochProof app must be an array.');
+        throw new Error('EpochProofV1 app must be an array.');
     }
 
     for (const [index, approval] of app.entries()) {
         if (!b4a.isBuffer(approval) || approval.length === 0) {
-            throw new Error(`EpochProof app ${index} must be a non-empty buffer.`);
+            throw new Error(`EpochProofV1 app ${index} must be a non-empty buffer.`);
         }
     }
 
@@ -120,61 +195,61 @@ const getValidatedEpochProofPayload = (payload) => {
 }
 
 /**
- * Encodes an EpochProof using the SetEpochOperation wire format.
+ * Encodes an EpochProofV1.
  *
  * @param {{pd: Buffer, app: Buffer[]}} payload - Epoch proof payload.
- * @returns {Buffer} Encoded EpochProof.
+ * @returns {Buffer} Encoded EpochProofV1.
  */
-export const encodeEpochProof = (payload) => {
-    const setEpochPayload = getValidatedEpochProofPayload(payload);
-    const error = SetEpochOperation.verify(setEpochPayload);
+export const encodeEpochProofV1 = (payload) => {
+    const epochProof = validateEpochProofV1(payload);
+    const error = EpochProofV1.verify(epochProof);
     if (error) throw new Error(error);
-    return b4a.from(SetEpochOperation.encode(setEpochPayload).finish());
+    return b4a.from(EpochProofV1.encode(epochProof).finish());
 }
 
 /**
- * Decodes an EpochProof encoded with the SetEpochOperation wire format.
+ * Decodes an EpochProofV1.
  *
- * @param {Buffer} payload - Encoded EpochProof buffer.
- * @returns {{pd: Buffer, app: Buffer[]}} Decoded EpochProof.
+ * @param {Buffer} payload - Encoded EpochProofV1 buffer.
+ * @returns {{pd: Buffer, app: Buffer[]}} Decoded EpochProofV1.
  */
-export const decodeEpochProof = (payload) => {
-    return getValidatedEpochProofPayload(
-        SetEpochOperation.toObject(
-            SetEpochOperation.decode(payload),
+export const decodeEpochProofV1 = (payload) => {
+    return validateEpochProofV1(
+        EpochProofV1.toObject(
+            EpochProofV1.decode(payload),
             APPLY_TO_OBJECT_OPTIONS
         )
     );
 }
 
 /**
- * Safely encodes an EpochProof. Returns an empty buffer when the payload is invalid.
+ * Safely encodes an EpochProofV1. Returns an empty buffer when the payload is invalid.
  *
- * @param {*} payload - Input expected to match EpochProof.
- * @returns {Buffer} Encoded EpochProof or an empty buffer.
+ * @param {*} payload - Input expected to match EpochProofV1.
+ * @returns {Buffer} Encoded EpochProofV1 or an empty buffer.
  */
-export const safeEncodeEpochProof = (payload) => {
+export const safeEncodeEpochProofV1 = (payload) => {
     try {
-        return encodeEpochProof(payload);
+        return encodeEpochProofV1(payload);
     } catch (error) {
-        console.log("safeEncodeEpochProof error:", error.message);
+        console.log("safeEncodeEpochProofV1 error:", error.message);
     }
 
     return b4a.alloc(0);
 }
 
 /**
- * Safely decodes an EpochProof. Returns null when the input is invalid.
+ * Safely decodes an EpochProofV1. Returns null when the input is invalid.
  *
- * @param {*} payload - Encoded EpochProof buffer.
- * @returns {{pd: Buffer, app: Buffer[]}|null} Decoded EpochProof or null.
+ * @param {*} payload - Encoded EpochProofV1 buffer.
+ * @returns {{pd: Buffer, app: Buffer[]}|null} Decoded EpochProofV1 or null.
  */
-export const safeDecodeEpochProof = (payload) => {
+export const safeDecodeEpochProofV1 = (payload) => {
     try {
         if (!b4a.isBuffer(payload)) return null;
-        return decodeEpochProof(payload);
+        return decodeEpochProofV1(payload);
     } catch (error) {
-        console.log("safeDecodeEpochProof error:", error.message);
+        console.log("safeDecodeEpochProofV1 error:", error.message);
     }
 
     return null;

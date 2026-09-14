@@ -1,0 +1,132 @@
+import test from 'brittle';
+import b4a from 'b4a';
+import tracCryptoApi from 'trac-crypto-api';
+import { setupStateNetwork } from '../../../../helpers/StateNetworkFactory.js';
+import { seedBootstrapIndexer } from '../../../../helpers/autobaseTestHelpers.js';
+import { config } from '../../../../helpers/config.js';
+import { loadStateWithMockConsensus } from '../../../../helpers/mockConsensusState.js';
+import { buildAddAdminRequesterPayload } from '../addAdmin/addAdminScenarioHelpers.js';
+import { snapshotEpochLedger } from '../setEpoch/setEpochHandlerBranchTestHelpers.js';
+import {
+    decodeConsensusConfig,
+    encodeConsensusConfig,
+    decodeEpochRecord,
+    encodeEpochRecord,
+} from '../../../../../src/codecs/apply/applyOperationCodec.js';
+import { EntryType } from '../../../../../src/utils/constants.js';
+import { uint16ToBuffer } from '../../../../../src/utils/buffer.js';
+import {
+    appendAndUpdate,
+    assertOperationRecorded,
+    buildSetGenesisEpochPayload,
+} from './setGenesisEpochScenarioHelpers.js';
+
+if (typeof globalThis.Bare !== 'undefined') {
+    test('Synthetic consensus genesis requires Node module mocking', t => {
+        t.pass('real VDF genesis tests also run in Bare');
+    });
+} else {
+    test('State.apply initializes and replays an opaque V2 genesis without using VDF', async t => {
+        const initialConfig = { sv: b4a.from([2]), cd: b4a.from([2, 42]) };
+        const encodedInitialConfig = encodeConsensusConfig(initialConfig);
+        const genesisCalls = [];
+        let vdfCalls = 0;
+
+        // Simulate a future State build with a private V2 config-validator case.
+        // Only the config format and genesis factory are synthetic. This tests
+        // that apply stores opaque genesis bytes, not the production V2 registry.
+        // Authorization, signatures, hashing, ledger writes and replay are real.
+        const StateWithV2 = await loadStateWithMockConsensus({
+            './utils/epochProof.js': {
+                createGenesisEpochProof: async (proposerAddress, encodedConfig, networkConfig) => {
+                    const consensusConfig = decodeConsensusConfig(encodedConfig);
+                    if (consensusConfig.sv[0] !== 2) {
+                        vdfCalls++;
+                        throw new Error('V2 genesis must not request the VDF genesis generator.');
+                    }
+
+                    genesisCalls.push({ proposerAddress, encodedConfig, networkId: networkConfig.networkId });
+                    const data = b4a.concat([
+                        b4a.from('mock-consensus-v2:genesis:'),
+                        uint16ToBuffer(networkConfig.networkId),
+                        b4a.from(proposerAddress),
+                        consensusConfig.cd,
+                    ]);
+                    return encodeEpochRecord({ sv: consensusConfig.sv, data });
+                },
+            },
+            '../../codecs/consensus/v1/vdfConfigCodec.js': {
+                safeDecodeVdfConfig: () => {
+                    vdfCalls++;
+                    throw new Error('V2 genesis must not enter VDF config validation or generation.');
+                },
+            },
+        }, `
+            case 2:
+                return b4a.equals(consensusConfig.cd, b4a.from([2, 42]));
+        `);
+        const context = await setupStateNetwork({
+            nodes: 2,
+            stateClass: StateWithV2,
+            stateOptions: { enableTxApplyLogs: false },
+        });
+        t.teardown(() => context.teardown());
+        seedBootstrapIndexer(context);
+
+        const { base, wallet } = context.adminBootstrap;
+        await appendAndUpdate(base, await buildAddAdminRequesterPayload(context));
+        const payload = await buildSetGenesisEpochPayload(context, {
+            schemaVersion: 2,
+            configData: initialConfig.cd,
+        });
+        await appendAndUpdate(base, payload);
+
+        const expectedData = b4a.concat([
+            b4a.from('mock-consensus-v2:genesis:'),
+            uint16ToBuffer(config.networkId),
+            b4a.from(wallet.address),
+            initialConfig.cd,
+        ]);
+        const expectedGenesis = encodeEpochRecord({ sv: initialConfig.sv, data: expectedData });
+        const expectedHash = await tracCryptoApi.hash.blake3Safe(expectedGenesis);
+        const expectedEpochState = {
+            currentEpoch: b4a.alloc(8).toString('hex'),
+            targetEpoch: expectedHash.toString('hex'),
+            reverseEntries: [[EntryType.EPOCH_HASH + expectedHash.toString('hex'), expectedGenesis.toString('hex')]],
+        };
+
+        t.is(genesisCalls.length, 1, 'the bootstrap applies the V2 genesis once');
+        t.is(vdfCalls, 0, 'initial V2 config never delegates to the VDF genesis generator');
+        t.alike(await snapshotEpochLedger(base, 0n), expectedEpochState,
+            'epoch zero stores the versioned V2 record under its complete content hash');
+        const storedGenesis = await base.view.get(EntryType.EPOCH_HASH + expectedHash.toString('hex'));
+        t.alike(decodeEpochRecord(storedGenesis.value), { sv: initialConfig.sv, data: expectedData },
+            'the stored genesis identifies its V2 format without decoding the opaque data');
+        const innerHash = await tracCryptoApi.hash.blake3Safe(expectedData);
+        t.absent(b4a.equals(innerHash, expectedHash), 'the genesis hash includes the version envelope');
+        t.alike((await base.view.get(EntryType.CONSENSUS_CONFIG_CURRENT))?.value, b4a.alloc(4),
+            'the initial V2 config is record zero, not record two');
+        t.alike((await base.view.get(EntryType.CONSENSUS_CONFIG_RECORD + 0))?.value, encodedInitialConfig,
+            'record zero preserves the initial V2 config envelope');
+        await assertOperationRecorded(t, base, payload, true);
+
+        const reader = context.peers[1].base;
+        t.is(await reader.view.get(EntryType.EPOCH_CURRENT), null, 'the reader has not replayed genesis yet');
+        await context.sync();
+
+        t.is(genesisCalls.length, 2, 'the reader regenerates genesis while replaying the feed');
+        t.is(vdfCalls, 0, 'historical V2 replay does not fall back to VDF');
+        for (const call of genesisCalls) {
+            t.is(call.proposerAddress, wallet.address, 'genesis uses the original proposer on both nodes');
+            t.is(call.networkId, config.networkId, 'genesis uses the network id on both nodes');
+            t.alike(call.encodedConfig, encodedInitialConfig, 'genesis uses the config carried by the initial operation');
+        }
+        t.alike(await snapshotEpochLedger(reader, 0n), expectedEpochState,
+            'replay reproduces the same opaque genesis, hash and epoch pointer');
+        t.alike((await reader.view.get(EntryType.CONSENSUS_CONFIG_CURRENT))?.value, b4a.alloc(4),
+            'replay keeps the initial config record active');
+        t.alike((await reader.view.get(EntryType.CONSENSUS_CONFIG_RECORD + 0))?.value, encodedInitialConfig,
+            'replay preserves the initial V2 config bytes');
+        await assertOperationRecorded(t, reader, payload, true);
+    });
+}
