@@ -470,11 +470,12 @@ test("removes admin when threshold exceeded", async (t) => {
     const clock = sinon.useFakeTimers({ now: 0 });
 
     let removed = 0;
+    const removalOptions = [];
 
     const { network, config } = createBaseMocks({
         network: {
             validatorConnectionManager: {
-                remove: () => removed++,
+                remove: (_key, options) => { removed++; removalOptions.push(options); },
             },
         },
         config: { maxWritersForAdminIndexerConnection: 0 },
@@ -518,12 +519,41 @@ test("removes admin when threshold exceeded", async (t) => {
         await service.stopValidatorObserver(false);
 
         t.ok(removed >= 1);
+        t.ok(removalOptions.every(options => options?.endConnection === false), 'admin replication socket is preserved');
     } finally {
         clock.restore();
         sinon.restore();
         await cleanup(service);
     }
 });
+
+for (const missingValue of [null, b4a.alloc(1)]) {
+    test(`rediscovers a writer after its initially ${missingValue ? 'malformed' : 'missing'} identity arrives`, async t => {
+        const clock = sinon.useFakeTimers({ now: 1 });
+        const mocks = createWriterHistoryMocks([{ key: b4a.alloc(32, 7), value: { isRemoved: false } }]);
+        const readIdentity = mocks.state.getRegisteredWriterKey;
+        let available = false;
+        let lookups = 0;
+        mocks.state.getRegisteredWriterKey = async key => {
+            lookups++;
+            return available ? readIdentity(key) : missingValue;
+        };
+        const service = new ValidatorObserverService(mocks.network, mocks.state, 'self', mocks.config);
+        try {
+            await service.start();
+            await clock.tickAsync(10);
+            t.is(mocks.observations.attempts.length, 0);
+            available = true;
+            await clock.tickAsync(50);
+            t.ok(lookups >= 2, 'missing identity is read again on a later scan');
+            t.is(mocks.observations.attempts.length, 1, 'validator connects after the identity arrives');
+            t.is(mocks.observations.attempts[0]?.key, mocks.publicKeyHex);
+        } finally {
+            await cleanup(service);
+            clock.restore();
+        }
+    });
+}
 
 test("removes stale connections when writer is marked as removed", async (t) => {
     const clock = sinon.useFakeTimers({ now: 0 });

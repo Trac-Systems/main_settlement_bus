@@ -27,12 +27,11 @@ class V1BaseOperationHandler {
         const pendingRequestServiceEntry = this.#pendingRequestService.getPendingRequest(message.id);
         if (!pendingRequestServiceEntry) return false;
 
-        this.#pendingRequestService.stopPendingRequestTimeout(message.id);
+        // State/proof validation can wait for replication. Keep the request deadline active.
         await validator.validate(message, connection, pendingRequestServiceEntry);
 
         const resultCode = extractResultCode(message);
-        this.#pendingRequestService.resolvePendingRequest(message.id, resultCode);
-        return true;
+        return this.#pendingRequestService.resolvePendingRequest(message.id, resultCode);
     }
 
     handlePendingResponseError(messageId, connection, error, step) {

@@ -162,6 +162,55 @@ test('TransactionPoolService.addTransaction rejects duplicate txHash', t => {
     t.exception(() => service.addTransaction('tx-dup', b4a.from('bb', 'hex')), TransactionPoolAlreadyQueuedError);
 });
 
+test('TransactionPoolService keeps in-flight hashes reserved after the caller times out', async t => {
+    const clock = sinon.useFakeTimers({ now: 1 });
+    const txHash = 'a'.repeat(64);
+    const commits = new TransactionCommitService({ txCommitTimeout: 50 });
+    const state = createStateFixture();
+    let finishAppend;
+    state.appendWithProofOfPublication = () => new Promise(resolve => { finishAppend = resolve; });
+    const pool = new TransactionPoolService(state, 'validator', commits, config);
+    try {
+        const pending = commits.registerPendingCommit(txHash).catch(() => {});
+        pool.addTransaction(txHash, b4a.from('aa', 'hex'));
+        await pool.start();
+        await clock.tickAsync(60);
+        await pending;
+        t.is(pool.txPool.size(), 0, 'batch has left the waiting queue');
+        t.is(pool.hasTransaction(txHash), true, 'active append still reserves the hash');
+        t.exception(() => pool.addTransaction(txHash, b4a.from('aa', 'hex')), TransactionPoolAlreadyQueuedError);
+        finishAppend([{ txHash, proof: b4a.alloc(32, 1) }]);
+        await clock.tickAsync(1);
+        t.is(pool.hasTransaction(txHash), false, 'hash is released when processing settles');
+    } finally {
+        finishAppend?.([]);
+        await pool.stopPool(false);
+        commits.close();
+        clock.restore();
+    }
+});
+
+test('TransactionPoolService avoids writer scans while idle and for an ordinary writable validator', async t => {
+    const clock = sinon.useFakeTimers({ now: 1 });
+    const state = createStateFixture();
+    state.allowedToValidate = sinon.stub().resolves(true);
+    state.isAdminAllowedToValidate = sinon.stub().resolves(false);
+    const commits = { resolvePendingCommit() {}, rejectPendingCommit() {} };
+    const pool = new TransactionPoolService(state, 'validator', commits, config);
+    try {
+        await pool.start();
+        await clock.tickAsync(200);
+        t.is(state.allowedToValidate.callCount, 0, 'idle pool does not read validation state');
+        pool.addTransaction('a'.repeat(64), b4a.from('aa', 'hex'));
+        await clock.tickAsync(100);
+        t.is(state.allowedToValidate.callCount, 1);
+        t.is(state.isAdminAllowedToValidate.callCount, 0, 'ordinary writer bypasses admin writer-count scans');
+    } finally {
+        await pool.stopPool(false);
+        clock.restore();
+    }
+});
+
 test('TransactionPoolService rejects pending commit when proof is unavailable', async t => {
     const clock = sinon.useFakeTimers();
     const txHash = 'a'.repeat(64);
@@ -361,6 +410,7 @@ test('TransactionPoolService wraps worker errors from validation permission chec
     );
 
     try {
+        service.addTransaction('a'.repeat(64), b4a.from('aa', 'hex'));
         await service.start();
         
         for (let i = 0; i < 20; i++) {

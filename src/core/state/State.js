@@ -132,21 +132,35 @@ class State extends ReadyResource {
         return transactionUtils.FEE;
     }
 
-    async get(key) {
-        const result = await this.#base.view.get(key);
+    async get(key, options) {
+        const result = await this.#base.view.get(key, options);
         if (result === null) return null;
         return result.value;
     }
 
     async waitForUnsigned(txHash, timeout, interval = 200) {
-        const start = Date.now();
-        while (Date.now() - start < timeout) {
-            await sleep(interval);
-            const entry = await this.get(txHash);
-            if (entry) return true;
+        const deadline = Date.now() + timeout;
+        let stopped = false;
+        let timer;
+        const poll = async () => {
+            while (!stopped && Date.now() < deadline) {
+                await sleep(Math.min(interval, deadline - Date.now()));
+                if (stopped || Date.now() >= deadline) return false;
+                const entry = await this.get(txHash, { timeout: Math.max(1, deadline - Date.now()) });
+                if (entry) return true;
+            }
+            return false;
+        };
+        try {
+            // Bound the whole wait, including a get() blocked on missing replicated data.
+            return await Promise.race([
+                poll(),
+                new Promise(resolve => { timer = setTimeout(() => resolve(false), Math.max(0, timeout)); })
+            ]);
+        } finally {
+            stopped = true;
+            clearTimeout(timer);
         }
-
-        return false;
     }
 
     async getSigned(key) {
@@ -285,60 +299,87 @@ class State extends ReadyResource {
     }
 
     async append(payload) {
-        return this.#writeQueue.add(() => this.#base.append(payload));
+        return this.#writeQueue.add(() => this.#append(payload));
+    }
+
+    async #append(payload) {
+        const started = Date.now();
+        let stalled = false;
+        const timer = setTimeout(() => {
+            stalled = true;
+            console.error('State: append still pending', {
+                elapsedMs: Date.now() - started,
+                signedLength: this.#base.view?.core?.signedLength,
+                unsignedLength: this.#base.view?.core?.length,
+                queuedWrites: this.#writeQueue.size
+            });
+        }, this.#config.messageValidatorResponseTimeout);
+        try {
+            // A pending write must settle before another write starts; timing out cannot cancel it.
+            return await this.#base.append(payload);
+        } finally {
+            clearTimeout(timer);
+            if (stalled) console.error(`State: pending append settled after ${Date.now() - started} ms`);
+        }
     }
 
     async appendWithProofOfPublication(batch, batchTxHashes) {
-        return this.#writeQueue.add(async () => {
-
-            const core = this.#base.local;
-            const end = await this.#base.append(batch);
-            const start = end - batch.length;
-            const timestamp = new Date();
-            const snapshot = core.snapshot(); // consistent view while generating proofs.
-            await snapshot.ready();
-            // TODO: check state if specific tx has been appened THEN generate a proof.
-            try {
-                const receipts = [];
-                let failedProofs = 0;
-                for (let i = 0; i < batch.length; i++) {
-                    const blockNumber = start + i;
-                    const completeTx = batch[i];
-                    const txHash = batchTxHashes[i];
-
-                    let proof = null;
-                    let proofError = null;
-
-                    // wait:false makes get fail fast (null) instead of waiting for missing data/replication.
-                    const rawBlock = await snapshot.get(blockNumber, { raw: true, wait: false });
-                    if (!rawBlock) {
-                        proofError = `Missing raw block after append (block=${blockNumber}, start=${start}, end=${end})`;
-                        failedProofs++;
-                    } else {
-                        try {
-                            proof = await remote.proof(snapshot, { index: blockNumber, block: rawBlock });
-                        } catch (error) {
-                            proofError = `Proof generation failed (block=${blockNumber}, start=${start}, end=${end}): ${error?.message ?? 'unknown error'}`;
-                            failedProofs++;
-                        }
-                    }
-                    receipts.push({
-                        txHash,
-                        completeTx,
-                        proof,
-                        proofError,
-                        timestamp,
-                        blockNumber
-                    });
-                }
-                if (failedProofs > 0) {
-                    console.error(`appendWithProof completed with ${failedProofs} proof failures (batch=${batch.length})`);
-                }
-                return receipts;
-            } finally {
-                await snapshot.close();
-            }
+        const { end, timestamp, snapshot } = await this.#writeQueue.add(async () => {
+            const end = await this.#append(batch);
+            // Capture the snapshot while writes are serialized. Proof reads need no write lock.
+            return { end, timestamp: new Date(), snapshot: this.#base.local.snapshot() };
         });
+        const start = end - batch.length;
+        const receipts = batch.map((completeTx, i) => ({
+            txHash: batchTxHashes[i], completeTx, proof: null, proofError: null,
+            timestamp, blockNumber: start + i
+        }));
+        const timeout = this.#config.txCommitTimeout;
+        let stopped = false;
+        let timer;
+        let failure = `Proof generation timed out after ${timeout} ms`;
+
+        const generateProofs = async () => {
+            await snapshot.ready();
+            for (const receipt of receipts) {
+                if (stopped) return;
+                const { blockNumber } = receipt;
+                try {
+                    const rawBlock = await snapshot.get(blockNumber, { raw: true, wait: false });
+                    if (stopped) return;
+                    if (!rawBlock) {
+                        receipt.proofError = `Missing raw block after append (block=${blockNumber}, start=${start}, end=${end})`;
+                    } else {
+                        const proof = await remote.proof(snapshot, { index: blockNumber, block: rawBlock });
+                        if (stopped) return;
+                        receipt.proof = proof;
+                    }
+                } catch (error) {
+                    if (stopped) return;
+                    receipt.proofError = `Proof generation failed (block=${blockNumber}): ${error?.message ?? 'unknown error'}`;
+                }
+            }
+        };
+
+        try {
+            await Promise.race([
+                generateProofs(),
+                new Promise(resolve => { timer = setTimeout(resolve, timeout); })
+            ]);
+        } catch (error) {
+            failure = `Proof generation failed: ${error?.message ?? 'unknown error'}`;
+        } finally {
+            stopped = true;
+            clearTimeout(timer);
+            // Closing cancels snapshot reads. Cleanup must not hold up the next append.
+            snapshot.close().catch(error => console.error(`Proof snapshot close failed: ${error.message}`));
+        }
+        const failed = receipts.filter(receipt => !receipt.proof);
+        for (const receipt of failed) receipt.proofError ??= failure;
+        if (failed.length) {
+            console.error(`appendWithProof completed with ${failed.length} proof failures (batch=${batch.length}): ${failed[0].proofError}`);
+        }
+        return receipts;
     }
 
     async verifyProofOfPublication(proof) {

@@ -3,7 +3,7 @@ import sinon from 'sinon';
 import MessageOrchestrator from '../../../../src/core/network/services/MessageOrchestrator.js';
 import State from '../../../../src/core/state/State.js';
 import { OperationType, ResultCode } from '../../../../src/utils/constants.js';
-import { testKeyPair1, testKeyPair2 } from '../../../fixtures/apply.fixtures.js';
+import { testKeyPair1, testKeyPair2, testKeyPair3, testKeyPair4 } from '../../../fixtures/apply.fixtures.js';
 import { publicKeyToAddress } from '../../../../src/utils/helpers.js';
 import { ConnectionManagerError } from '../../../../src/core/network/services/ConnectionManager.js';
 import { PendingRequestServiceTimeoutError } from '../../../../src/core/network/services/PendingRequestService.js';
@@ -53,6 +53,16 @@ const createConnectionManager = ({
     getSentCount: sinon.stub().returns(sentCount),
 });
 
+const createRotatingConnectionManager = (options = {}) => {
+    let validators = options.connectedValidators ?? [VALIDATOR_KEY, testKeyPair3.publicKey, testKeyPair4.publicKey];
+    const connectionManager = createConnectionManager(options);
+    connectionManager.connectedValidators.callsFake(() => validators);
+    connectionManager.remove.callsFake(publicKey => {
+        validators = validators.filter(key => key !== publicKey);
+    });
+    return connectionManager;
+};
+
 hook('setup', () => {
     sinon.stub(console, 'log');
     sinon.stub(console, 'warn');
@@ -92,9 +102,40 @@ test('MessageOrchestrator.send V1 matrix: OK -> SUCCESS', async t => {
     t.is(connectionManager.remove.callCount, 0);
 });
 
-test('MessageOrchestrator.send V1 matrix: TIMEOUT -> ROTATE', async t => {
-    const connectionManager = createConnectionManager({
+for (const resultCode of [ResultCode.TIMEOUT, ResultCode.NODE_OVERLOADED, ResultCode.NODE_HAS_NO_WRITE_ACCESS, ResultCode.RATE_LIMITED]) {
+    test(`MessageOrchestrator.send retries temporary result ${resultCode} with another validator`, async t => {
+        const sendSingleMessage = sinon.stub();
+        sendSingleMessage.onFirstCall().resolves(resultCode);
+        sendSingleMessage.onSecondCall().resolves(ResultCode.OK);
+        const connectionManager = createRotatingConnectionManager({ sendSingleMessage });
+        const orchestrator = new MessageOrchestrator(connectionManager, { get: async () => null }, config);
+        const wallet = await createWallet(config);
+        const message = createTransferMessage(config, wallet);
+
+        orchestrator.setWallet(wallet);
+        const result = await orchestrator.send(message);
+
+        t.is(result, true);
+        t.is(sendSingleMessage.callCount, 2);
+        t.is(sendSingleMessage.firstCall.args[1], VALIDATOR_KEY);
+        t.is(sendSingleMessage.secondCall.args[1], testKeyPair3.publicKey);
+        t.is(connectionManager.remove.callCount, 1);
+        t.alike(connectionManager.remove.firstCall.args[1], { endConnection: resultCode === ResultCode.RATE_LIMITED });
+        t.is(connectionManager.incrementSentCount.callCount, 1);
+        t.is(connectionManager.incrementSentCount.firstCall.args[0], testKeyPair3.publicKey);
+        t.alike(
+            sendSingleMessage.secondCall.args[0].broadcast_transaction_request.data,
+            sendSingleMessage.firstCall.args[0].broadcast_transaction_request.data,
+            'retry preserves the encoded transaction'
+        );
+        t.not(sendSingleMessage.secondCall.args[0].id, sendSingleMessage.firstCall.args[0].id);
+    });
+}
+
+test('MessageOrchestrator.send returns false after a timeout when no other validators remain', async t => {
+    const connectionManager = createRotatingConnectionManager({
         sendSingleMessage: sinon.stub().resolves(ResultCode.TIMEOUT),
+        connectedValidators: [VALIDATOR_KEY],
     });
     const orchestrator = new MessageOrchestrator(connectionManager, { get: async () => null }, config);
     const wallet = await createWallet(config);
@@ -193,7 +234,51 @@ test('MessageOrchestrator.send removes validator when threshold reached on succe
     t.is(result, true);
     t.is(connectionManager.incrementSentCount.callCount, 1);
     t.is(connectionManager.remove.callCount, 1);
+    t.alike(connectionManager.remove.firstCall.args[1], { endConnection: false });
 });
+
+test('MessageOrchestrator.send legacy success rotation preserves the replication socket', async t => {
+    const connectionManager = createConnectionManager({ preferredProtocol: 'legacy', sentCount: config.messageThreshold });
+    const orchestrator = new MessageOrchestrator(connectionManager, { waitForUnsigned: async () => true }, config);
+    const wallet = await createWallet(config);
+    orchestrator.setWallet(wallet);
+
+    t.is(await orchestrator.send(createTransferMessage(config, wallet)), true);
+    t.alike(connectionManager.remove.firstCall.args, [VALIDATOR_KEY, { endConnection: false }]);
+});
+
+for (const code of [ResultCode.REQUESTER_NOT_FOUND, ResultCode.INSUFFICIENT_FEE_BALANCE, ResultCode.EXTERNAL_BOOTSTRAP_NOT_DEPLOYED]) {
+    test(`MessageOrchestrator.send preserves replication after state rejection ${code}`, async t => {
+        const connectionManager = createConnectionManager({ sendSingleMessage: sinon.stub().resolves(code) });
+        const orchestrator = new MessageOrchestrator(connectionManager, {}, config);
+        const wallet = await createWallet(config);
+        orchestrator.setWallet(wallet);
+
+        t.is(await orchestrator.send(createTransferMessage(config, wallet)), false);
+        t.is(connectionManager.sendSingleMessage.callCount, 1);
+        t.is(connectionManager.remove.callCount, 0);
+    });
+}
+
+for (const visible of [true, false]) {
+    test(`MessageOrchestrator.send recovers an accepted transaction without proof (visible: ${visible})`, async t => {
+        const sendSingleMessage = sinon.stub();
+        sendSingleMessage.onFirstCall().resolves(ResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE);
+        sendSingleMessage.onSecondCall().resolves(ResultCode.OK);
+        const connectionManager = createRotatingConnectionManager({ sendSingleMessage });
+        const state = { waitForUnsigned: sinon.stub().resolves(visible) };
+        const orchestrator = new MessageOrchestrator(connectionManager, state, config);
+        const wallet = await createWallet(config);
+        const message = createTransferMessage(config, wallet);
+        orchestrator.setWallet(wallet);
+
+        t.is(await orchestrator.send(message), true);
+        t.alike(state.waitForUnsigned.firstCall.args, [message.tro.tx, config.messageValidatorResponseTimeout]);
+        t.is(sendSingleMessage.callCount, visible ? 1 : 2);
+        t.is(connectionManager.remove.callCount, visible ? 0 : 1);
+        if (!visible) t.alike(connectionManager.remove.firstCall.args[1], { endConnection: false });
+    });
+}
 
 test('MessageOrchestrator.send retries on ConnectionManagerError without removing validator', async t => {
     const config = overrideConfig({ maxRetries: 2 });
@@ -273,10 +358,10 @@ test('MessageOrchestrator.send timeout split: pending timeout rejection goes thr
     t.is(connectionManager.remove.callCount, 1);
 });
 
-test('MessageOrchestrator.send timeout split: TIMEOUT result code stays in then path and does not retry', async t => {
-    const config = overrideConfig({ maxRetries: 2 });
+test('MessageOrchestrator.send stops temporary-failure retries at maxRetries with validators still available', async t => {
+    const config = overrideConfig({ maxRetries: 1 });
     const sendSingleMessage = sinon.stub().resolves(ResultCode.TIMEOUT);
-    const connectionManager = createConnectionManager({ sendSingleMessage });
+    const connectionManager = createRotatingConnectionManager({ sendSingleMessage });
     const orchestrator = new MessageOrchestrator(connectionManager, { get: async () => null }, config);
     const wallet = await createWallet(config);
     const message = createTransferMessage(config, wallet);
@@ -285,9 +370,32 @@ test('MessageOrchestrator.send timeout split: TIMEOUT result code stays in then 
     const result = await orchestrator.send(message);
 
     t.is(result, false);
-    t.is(sendSingleMessage.callCount, 1);
-    t.is(connectionManager.remove.callCount, 1);
+    t.is(sendSingleMessage.callCount, 2);
+    t.is(connectionManager.remove.callCount, 2);
+    t.alike(connectionManager.connectedValidators(), [testKeyPair4.publicKey]);
 });
+
+for (const visible of [true, false]) {
+    test(`MessageOrchestrator.send verifies an already-existing transaction after timeout retry (visible: ${visible})`, async t => {
+        const sendSingleMessage = sinon.stub();
+        sendSingleMessage.onFirstCall().resolves(ResultCode.TIMEOUT);
+        sendSingleMessage.onSecondCall().resolves(ResultCode.TX_ALREADY_EXISTS);
+        const connectionManager = createRotatingConnectionManager({ sendSingleMessage });
+        const state = { waitForUnsigned: sinon.stub().resolves(visible) };
+        const orchestrator = new MessageOrchestrator(connectionManager, state, config);
+        const wallet = await createWallet(config);
+        const message = createTransferMessage(config, wallet);
+
+        orchestrator.setWallet(wallet);
+        const result = await orchestrator.send(message);
+
+        t.is(result, visible);
+        t.is(sendSingleMessage.callCount, 2);
+        t.is(state.waitForUnsigned.callCount, 1);
+        t.alike(state.waitForUnsigned.firstCall.args, [message.tro.tx, config.messageValidatorResponseTimeout]);
+        t.is(connectionManager.incrementSentCount.callCount, 0);
+    });
+}
 
 test('MessageOrchestrator.send validation split: thrown validation error goes through catch', async t => {
     const config = overrideConfig({ maxRetries: 2 });
@@ -311,7 +419,7 @@ test('MessageOrchestrator.send validation split: thrown validation error goes th
 test('MessageOrchestrator.send validation split: non-OK result code stays in then and uses policy', async t => {
     const config = overrideConfig({ maxRetries: 2 });
     const sendSingleMessage = sinon.stub().resolves(ResultCode.SCHEMA_VALIDATION_FAILED);
-    const connectionManager = createConnectionManager({ sendSingleMessage });
+    const connectionManager = createRotatingConnectionManager({ sendSingleMessage });
     const orchestrator = new MessageOrchestrator(connectionManager, { get: async () => null }, config);
     const wallet = await createWallet(config);
     const message = createTransferMessage(config, wallet);
@@ -426,6 +534,25 @@ test('State.waitForUnsigned returns false on timeout', async t => {
         t.is(result, false);
         t.ok(state.get.callCount >= 1);
     } finally {
+        clock.restore();
+    }
+});
+
+test('State.waitForUnsigned deadline includes a stalled state read', async t => {
+    const clock = sinon.useFakeTimers({ now: 1 });
+    let finishRead;
+    const state = { get: sinon.stub().returns(new Promise(resolve => { finishRead = resolve; })) };
+    try {
+        const result = State.prototype.waitForUnsigned.call(state, 'tx-hash', 400);
+        await clock.tickAsync(401);
+        t.is(await result, false);
+        t.is(state.get.callCount, 1);
+        t.ok(state.get.firstCall.args[1].timeout <= 400);
+        finishRead(null);
+        await clock.tickAsync(1000);
+        t.is(state.get.callCount, 1, 'polling stops after the deadline even if the read finishes later');
+    } finally {
+        finishRead(null);
         clock.restore();
     }
 });
