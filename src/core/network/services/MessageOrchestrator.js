@@ -6,7 +6,7 @@ import {
     unsafeEncodeApplyOperation
 } from "../../../utils/protobuf/operationHelpers.js";
 import { normalizeMessageByOperationType } from "../../../utils/normalizers.js";
-import { resultToValidatorAction, SENDER_ACTION } from "../protocols/connectionPolicies.js";
+import { resultToValidatorAction, shouldEndConnection, SENDER_ACTION } from "../protocols/connectionPolicies.js";
 import { ConnectionManagerError } from './ConnectionManager.js';
 /**
  * MessageOrchestrator coordinates message submission, retry, and validator management.
@@ -18,12 +18,14 @@ class MessageOrchestrator {
     #idempotentSuccessCodes = new Set([
         ResultCode.TX_ALREADY_EXISTS,
         ResultCode.OPERATION_ALREADY_COMPLETED,
+        ResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE,
     ]);
     #retryableResultCodes = new Set([
         ResultCode.TIMEOUT,
         ResultCode.NODE_OVERLOADED,
         ResultCode.NODE_HAS_NO_WRITE_ACCESS,
         ResultCode.RATE_LIMITED,
+        ResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE,
     ]);
     /**
      * Attempts to send a message to validators with retries and state checks.
@@ -148,11 +150,13 @@ class MessageOrchestrator {
                                 //TODO: Create a function for action below, and replace it also in legacy flow.
                                 this.incrementSentCount(validatorPublicKey);
                                 if (this.shouldRemove(validatorPublicKey)) {
-                                    this.connectionManager.remove(validatorPublicKey);
+                                    this.connectionManager.remove(validatorPublicKey, { endConnection: false });
                                 }
                                 break;
                             case SENDER_ACTION.ROTATE:
-                                this.connectionManager.remove(validatorPublicKey);
+                                this.connectionManager.remove(validatorPublicKey, {
+                                    endConnection: shouldEndConnection(resultCode)
+                                });
                                 // Only temporary validator failures should retry the same transaction.
                                 if (this.#retryableResultCodes.has(resultCode)) {
                                     success = await this.send(message, retries + 1);
@@ -234,7 +238,7 @@ class MessageOrchestrator {
         if (appeared) {
             this.incrementSentCount(validatorPublicKey);
             if (this.shouldRemove(validatorPublicKey)) {
-                this.connectionManager.remove(validatorPublicKey);
+                this.connectionManager.remove(validatorPublicKey, { endConnection: false });
             }
             return true;
         }

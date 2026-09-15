@@ -2,6 +2,11 @@ import test from 'brittle';
 import V1BaseOperationHandler from '../../../../../src/core/network/protocols/v1/handlers/V1BaseOperationHandler.js';
 import {ResultCode} from '../../../../../src/utils/constants.js';
 import {V1ProtocolError} from '../../../../../src/core/network/protocols/v1/V1ProtocolError.js';
+import sinon from 'sinon';
+import PendingRequestService, { PendingRequestServiceTimeoutError } from '../../../../../src/core/network/services/PendingRequestService.js';
+import { NetworkOperationType } from '../../../../../src/utils/constants.js';
+import { overrideConfig } from '../../../../helpers/config.js';
+import { testKeyPair2 } from '../../../../fixtures/apply.fixtures.js';
 
 class MockRateLimiter {
     constructor() { this.called = false; }
@@ -21,7 +26,7 @@ class MockPendingReqService {
     }
     getPendingRequest(id) { return this.entries[id]; }
     stopPendingRequestTimeout(id) { this.stopped.push(id); }
-    resolvePendingRequest(id, code) { this.resolved.push({ id, code }); }
+    resolvePendingRequest(id, code) { this.resolved.push({ id, code }); return true; }
     rejectPendingRequest(id, err) {
         if (this.shouldReject) this.rejected.push({ id, err });
         return this.shouldReject;
@@ -64,7 +69,7 @@ test('resolvePendingResponse: pending request missing -> returns false', async (
     t.is(result, false, 'Should return false if the pending request does not exist');
 });
 
-test('resolvePendingResponse: valid pending response -> stops timeout and resolves request', async (t) => {
+test('resolvePendingResponse: valid pending response -> resolves request without disabling validation deadline', async (t) => {
     const pendingReq = new MockPendingReqService();
     pendingReq.entries['msg-123'] = { id: 'msg-123' };
 
@@ -83,9 +88,38 @@ test('resolvePendingResponse: valid pending response -> stops timeout and resolv
     );
 
     t.is(result, true, 'Should return true after resolving the request');
-    t.is(pendingReq.stopped[0], 'msg-123', 'Should stop the timeout');
+    t.alike(pendingReq.stopped, [], 'Timeout stays active until resolution');
     t.ok(validated, 'Should call validation');
     t.is(pendingReq.resolved[0].code, 'SUCCESS', 'Should extract resultCode and resolve');
+});
+
+test('resolvePendingResponse: stalled validation times out and a late result cannot resolve the request', async t => {
+    const config = overrideConfig({});
+    const clock = sinon.useFakeTimers({ now: 1 });
+    const service = new PendingRequestService(config);
+    const handler = new V1BaseOperationHandler(null, service, config);
+    let finishValidation;
+    try {
+        const request = {
+            id: 'validation-stall', type: NetworkOperationType.BROADCAST_TRANSACTION_REQUEST,
+            broadcast_transaction_request: { data: Buffer.from('aa', 'hex') }
+        };
+        let error;
+        const pending = service.registerPendingRequest(testKeyPair2.publicKey, request).catch(err => { error = err; });
+        const response = handler.resolvePendingResponse(request, {}, {
+            validate: () => new Promise(resolve => { finishValidation = resolve; })
+        }, () => ResultCode.OK);
+        await clock.tickAsync(config.pendingRequestTimeout + 1);
+        t.ok(error instanceof PendingRequestServiceTimeoutError, 'caller times out while validation is still waiting');
+        t.is(service.has(request.id), false);
+        finishValidation();
+        t.is(await response, false, 'late validation cannot turn the timeout into success');
+        await pending;
+    } finally {
+        finishValidation?.();
+        service.close();
+        clock.restore();
+    }
 });
 
 test('resolvePendingResponse: validator throws -> propagates validation error', async (t) => {

@@ -42,6 +42,19 @@ test('connectionPolicies keeps validator connection open for TIMEOUT responses',
     );
 });
 
+test('connectionPolicies keeps replication for temporary status and valid state rejections', t => {
+    for (const code of [
+        ResultCode.NODE_OVERLOADED, ResultCode.NODE_HAS_NO_WRITE_ACCESS,
+        ResultCode.TX_ALREADY_EXISTS, ResultCode.OPERATION_ALREADY_COMPLETED,
+        ResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE, ResultCode.REQUESTER_NOT_FOUND,
+        ResultCode.INSUFFICIENT_FEE_BALANCE, ResultCode.EXTERNAL_BOOTSTRAP_NOT_DEPLOYED
+    ]) {
+        t.is(shouldEndConnection(code), false, `keep socket for result ${code}`);
+    }
+    t.is(shouldEndConnection(ResultCode.SIGNATURE_INVALID), true);
+    t.is(shouldEndConnection(ResultCode.RATE_LIMITED), true);
+});
+
 test('connectionPolicies maps unknown result code to UNDEFINED', t => {
     t.is(
         resultToValidatorAction(999999),

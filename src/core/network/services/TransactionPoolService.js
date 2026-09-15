@@ -106,8 +106,9 @@ class TransactionPoolService {
     }
 
     async #processTransactions() {
+        if (this.#txPool.size() === 0) return;
         const canValidate = await this.#checkValidationPermissions();
-        if (!canValidate || this.#txPool.size() === 0) return;
+        if (!canValidate) return;
 
         const batchItems = this.#prepareBatch();
         const encodedBatch = batchItems.map(item => item.encodedTx);
@@ -153,13 +154,15 @@ class TransactionPoolService {
             console.error(
                 `TransactionPoolService: failed to process batch (size=${batchItems.length}): ${error?.message ?? 'unknown error'}`
             );
+        } finally {
+            for (const item of batchItems) this.#queuedTxHashes.delete(item.txHash);
         }
     }
 
     async #checkValidationPermissions() {
-        const isAdminAllowedToValidate = await this.state.isAdminAllowedToValidate();
         const isNodeAllowedToValidate = await this.state.allowedToValidate(this.#address);
-        return isNodeAllowedToValidate || isAdminAllowedToValidate;
+        if (isNodeAllowedToValidate) return true;
+        return this.state.isAdminAllowedToValidate();
     }
 
     #prepareBatch() {
@@ -168,7 +171,6 @@ class TransactionPoolService {
 
         for (let i = 0; i < batchSize; i++) {
             const tx = this.#txPool.shift();
-            this.#queuedTxHashes.delete(tx.txHash);
             batch.push(tx);
         }
         return batch;

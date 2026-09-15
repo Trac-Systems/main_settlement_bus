@@ -120,6 +120,7 @@ for (const resultCode of [ResultCode.TIMEOUT, ResultCode.NODE_OVERLOADED, Result
         t.is(sendSingleMessage.firstCall.args[1], VALIDATOR_KEY);
         t.is(sendSingleMessage.secondCall.args[1], testKeyPair3.publicKey);
         t.is(connectionManager.remove.callCount, 1);
+        t.alike(connectionManager.remove.firstCall.args[1], { endConnection: resultCode === ResultCode.RATE_LIMITED });
         t.is(connectionManager.incrementSentCount.callCount, 1);
         t.is(connectionManager.incrementSentCount.firstCall.args[0], testKeyPair3.publicKey);
         t.alike(
@@ -233,7 +234,51 @@ test('MessageOrchestrator.send removes validator when threshold reached on succe
     t.is(result, true);
     t.is(connectionManager.incrementSentCount.callCount, 1);
     t.is(connectionManager.remove.callCount, 1);
+    t.alike(connectionManager.remove.firstCall.args[1], { endConnection: false });
 });
+
+test('MessageOrchestrator.send legacy success rotation preserves the replication socket', async t => {
+    const connectionManager = createConnectionManager({ preferredProtocol: 'legacy', sentCount: config.messageThreshold });
+    const orchestrator = new MessageOrchestrator(connectionManager, { waitForUnsigned: async () => true }, config);
+    const wallet = await createWallet(config);
+    orchestrator.setWallet(wallet);
+
+    t.is(await orchestrator.send(createTransferMessage(config, wallet)), true);
+    t.alike(connectionManager.remove.firstCall.args, [VALIDATOR_KEY, { endConnection: false }]);
+});
+
+for (const code of [ResultCode.REQUESTER_NOT_FOUND, ResultCode.INSUFFICIENT_FEE_BALANCE, ResultCode.EXTERNAL_BOOTSTRAP_NOT_DEPLOYED]) {
+    test(`MessageOrchestrator.send preserves replication after state rejection ${code}`, async t => {
+        const connectionManager = createConnectionManager({ sendSingleMessage: sinon.stub().resolves(code) });
+        const orchestrator = new MessageOrchestrator(connectionManager, {}, config);
+        const wallet = await createWallet(config);
+        orchestrator.setWallet(wallet);
+
+        t.is(await orchestrator.send(createTransferMessage(config, wallet)), false);
+        t.is(connectionManager.sendSingleMessage.callCount, 1);
+        t.is(connectionManager.remove.callCount, 0);
+    });
+}
+
+for (const visible of [true, false]) {
+    test(`MessageOrchestrator.send recovers an accepted transaction without proof (visible: ${visible})`, async t => {
+        const sendSingleMessage = sinon.stub();
+        sendSingleMessage.onFirstCall().resolves(ResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE);
+        sendSingleMessage.onSecondCall().resolves(ResultCode.OK);
+        const connectionManager = createRotatingConnectionManager({ sendSingleMessage });
+        const state = { waitForUnsigned: sinon.stub().resolves(visible) };
+        const orchestrator = new MessageOrchestrator(connectionManager, state, config);
+        const wallet = await createWallet(config);
+        const message = createTransferMessage(config, wallet);
+        orchestrator.setWallet(wallet);
+
+        t.is(await orchestrator.send(message), true);
+        t.alike(state.waitForUnsigned.firstCall.args, [message.tro.tx, config.messageValidatorResponseTimeout]);
+        t.is(sendSingleMessage.callCount, visible ? 1 : 2);
+        t.is(connectionManager.remove.callCount, visible ? 0 : 1);
+        if (!visible) t.alike(connectionManager.remove.firstCall.args[1], { endConnection: false });
+    });
+}
 
 test('MessageOrchestrator.send retries on ConnectionManagerError without removing validator', async t => {
     const config = overrideConfig({ maxRetries: 2 });
@@ -489,6 +534,25 @@ test('State.waitForUnsigned returns false on timeout', async t => {
         t.is(result, false);
         t.ok(state.get.callCount >= 1);
     } finally {
+        clock.restore();
+    }
+});
+
+test('State.waitForUnsigned deadline includes a stalled state read', async t => {
+    const clock = sinon.useFakeTimers({ now: 1 });
+    let finishRead;
+    const state = { get: sinon.stub().returns(new Promise(resolve => { finishRead = resolve; })) };
+    try {
+        const result = State.prototype.waitForUnsigned.call(state, 'tx-hash', 400);
+        await clock.tickAsync(401);
+        t.is(await result, false);
+        t.is(state.get.callCount, 1);
+        t.ok(state.get.firstCall.args[1].timeout <= 400);
+        finishRead(null);
+        await clock.tickAsync(1000);
+        t.is(state.get.callCount, 1, 'polling stops after the deadline even if the read finishes later');
+    } finally {
+        finishRead(null);
         clock.restore();
     }
 });
