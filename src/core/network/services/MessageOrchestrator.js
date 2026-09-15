@@ -19,6 +19,12 @@ class MessageOrchestrator {
         ResultCode.TX_ALREADY_EXISTS,
         ResultCode.OPERATION_ALREADY_COMPLETED,
     ]);
+    #retryableResultCodes = new Set([
+        ResultCode.TIMEOUT,
+        ResultCode.NODE_OVERLOADED,
+        ResultCode.NODE_HAS_NO_WRITE_ACCESS,
+        ResultCode.RATE_LIMITED,
+    ]);
     /**
      * Attempts to send a message to validators with retries and state checks.
      * @param {ConnectionManager} connectionManager - The connection manager instance
@@ -147,6 +153,10 @@ class MessageOrchestrator {
                                 break;
                             case SENDER_ACTION.ROTATE:
                                 this.connectionManager.remove(validatorPublicKey);
+                                // Only temporary validator failures should retry the same transaction.
+                                if (this.#retryableResultCodes.has(resultCode)) {
+                                    success = await this.send(message, retries + 1);
+                                }
                                 break;
                             case SENDER_ACTION.NO_ROTATE:
                                 // ignore
