@@ -10,7 +10,8 @@ async function runTests() {
 
     await import('./check/check.test.js');
     await import('./deepEqualApplyPayload/deepEqualApplyPayload.test.js');
-    await import('./protobuf/operationHelpers.test.js');
+    await import('./protobuf/protobuf.test.js');
+    await import('./normalizers/normalizers.test.js');
     await import('./helpers/helpers.test.js');
     await import('./fileUtils/readAddressesFromWhitelistFile.test.js');
     await import('./fileUtils/readBalanceMigrationFile.test.js');
