@@ -59,6 +59,18 @@ class TransactionCommitService {
         return this.#pendingCommits.has(txHash);
     }
 
+    diagnostics() {
+        const now = Date.now();
+        let oldestAge = 0;
+        for (const entry of this.#pendingCommits.values()) {
+            oldestAge = Math.max(oldestAge, now - entry.createdAt);
+        }
+        return {
+            pending_commits: this.#pendingCommits.size,
+            pending_commits_oldest_age_ms: oldestAge,
+        };
+    }
+
     /*
         @returns {Promise}
     */
@@ -77,6 +89,7 @@ class TransactionCommitService {
 
         const entry = {
             txHash,
+            createdAt: Date.now(),
             timeoutMs,
             timeoutId: null,
             resolve: null,

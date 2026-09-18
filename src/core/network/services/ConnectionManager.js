@@ -1,7 +1,8 @@
 import b4a from 'b4a'
 import {EventType, ResultCode} from '../../../utils/constants.js';
-import {publicKeyToAddress} from "../../../utils/helpers.js";
+import {publicKeyToAddress, generateUUID} from "../../../utils/helpers.js";
 import {Logger} from "../../../utils/logger.js";
+import {getTelemetry} from "../../../utils/telemetry.js";
 /**
  * @typedef {import('hyperswarm').Connection} Connection
  */
@@ -20,6 +21,9 @@ class ConnectionManager {
     #healthCheckService
     #boundedHealthCheckHandler
     #logger
+    #telemetry
+    #poolVersion = 0
+    #emptySince = null
     // Note: #validators is using publicKey (Buffer) as key
     // As Buffers are objects, we will rely on internal conversions done by JS to compare them.
     // It would be better to handle these conversions manually by using hex strings as keys to avoid issues
@@ -32,6 +36,7 @@ class ConnectionManager {
         this.#maxValidators = config.maxValidators
         this.#boundedHealthCheckHandler = this.#healthCheckHandler.bind(this);
         this.#logger = new Logger(config)
+        this.#telemetry = getTelemetry(config)
     }
 
     /**
@@ -77,30 +82,40 @@ class ConnectionManager {
         }
 
         const connection = this.getConnection(publicKey);
+        const startedAt = Date.now();
+        const context = { validator: publicKey, validator_address: targetAddress, healthcheck_id: requestId, ...this.getConnectionDiagnostics(publicKey) };
         if (!connection || !connection.protocolSession || typeof connection.protocolSession.sendHealthCheck !== 'function') {
             this.#logger.debug(`healthCheck: missing protocol session, removing validator. Address = ${targetAddress}; Request ID = ${requestId}`);
             this.#stopHealthCheck(publicKey);
-            this.remove(publicKey);
+            this.#telemetry.emit('validator.healthcheck_failed', { ...context, reason: 'missing_protocol_session' }, 4);
+            this.remove(publicKey, { reason: 'missing_protocol_session', healthcheck_id: requestId, expectedConnection: connection });
             return;
         }
 
         let success = false;
+        let resultCode;
+        let errorType;
         try {
             this.#logger.debug(`healthCheck: sending liveness request. Address = ${targetAddress}; Request ID = ${requestId}`);
 
-            const resultCode = await connection.protocolSession.sendHealthCheck();
+            connection.protocolSession.setTelemetryContext?.(context);
+            resultCode = await connection.protocolSession.sendHealthCheck();
             success = resultCode === ResultCode.OK;
             if (!success) {
                 this.#logger.debug(`healthCheck: non-OK result code. Address = ${targetAddress}; Request ID = ${requestId}`);
             }
-        } catch {
+        } catch (error) {
+            errorType = error?.name ?? 'Error';
             success = false;
         }
 
         if (!success) {
             this.#logger.debug(`healthCheck: liveness request failed, removing validator. Address = ${targetAddress}; Request ID = ${requestId}`);
-            this.remove(publicKey);
-            this.#stopHealthCheck(publicKey);
+            const reason = resultCode === ResultCode.TIMEOUT || errorType === 'PendingRequestServiceTimeoutError'
+                ? 'healthcheck_timeout' : 'healthcheck_rejected';
+            const failure = { reason, healthcheck_id: requestId, result_code: resultCode, error_type: errorType, duration_ms: Date.now() - startedAt };
+            this.#telemetry.emit('validator.healthcheck_failed', { ...context, ...failure }, 4);
+            this.remove(publicKey, { ...failure, expectedConnection: connection });
         } else {
             this.#logger.debug(`healthCheck: success. Address = ${targetAddress}; Request ID = ${requestId}`);
         }
@@ -164,7 +179,7 @@ class ConnectionManager {
      * @param {Object} connection - The connection object associated with the validator
      * @returns {Boolean} - Returns true if the validator was added or updated, false otherwise
      */
-    addValidator(publicKey, connection) {
+    addValidator(publicKey, connection, context = {}) {
         let publicKeyHex = this.#toHexString(publicKey);
         if (this.maxConnectionsReached()) {
             this.#logger.debug('addValidator: max connections reached.');
@@ -173,11 +188,11 @@ class ConnectionManager {
         this.#logger.debug(`addValidator: adding validator ${publicKeyToAddress(publicKeyHex, this.#config)}`);
         if (!this.exists(publicKeyHex)) {
             this.#logger.debug(`addValidator: appending validator ${publicKeyToAddress(publicKeyHex, this.#config)}`);
-            this.#append(publicKeyHex, connection);
+            this.#append(publicKeyHex, connection, context);
             return true;
         } else if (!this.connected(publicKeyHex)) {
             this.#logger.debug(`addValidator: updating validator ${publicKeyToAddress(publicKeyHex, this.#config)}`);
-            this.#update(publicKeyHex, connection);
+            this.#update(publicKeyHex, connection, context);
             return true;
         }
         this.#logger.debug(`addValidator: didn't add validator ${publicKeyToAddress(publicKeyHex, this.#config)}`);
@@ -189,13 +204,32 @@ class ConnectionManager {
      * @param {String | Buffer} publicKey - The public key hex string of the validator to remove
      * @param {object} [options]
      * @param {boolean} [options.endConnection=true] - Whether to close the underlying socket.
+     * @param {string} [options.reason='unspecified'] - The initiating operation's removal reason.
+     * @param {Object} [options.expectedConnection] - Ignore a late callback from a replaced socket.
      */
-    remove(publicKey, { endConnection = true } = {}) {
+    remove(publicKey, { endConnection = true, reason = 'unspecified', expectedConnection, ...context } = {}) {
         this.#logger.debug(`remove: removing validator ${publicKeyToAddress(publicKey, this.#config)}`);
         const publicKeyHex = this.#toHexString(publicKey);
+        const tracked = this.#validators.get(publicKeyHex);
+        if (expectedConnection && tracked?.connection !== expectedConnection) return;
         this.#stopHealthCheck(publicKeyHex);
         if (this.exists(publicKeyHex)) {
             const entry = this.#validators.get(publicKeyHex);
+            const poolBefore = this.connectionCount();
+            const diagnostics = this.getConnectionDiagnostics(publicKeyHex);
+            // Remove before ending the socket: end() may synchronously emit close.
+            this.#validators.delete(publicKeyHex);
+            this.#poolVersion++;
+            const poolAfter = this.connectionCount();
+            this.#telemetry.emit('validator.removed', {
+                ...context, ...diagnostics, validator: publicKeyHex, reason,
+                end_connection: endConnection, pool_before: poolBefore, pool_after: poolAfter,
+                pool_version: this.#poolVersion
+            }, reason === 'message_threshold' || reason === 'shutdown' ? 6 : 4);
+            if (poolBefore > 0 && poolAfter === 0) {
+                this.#emptySince = Date.now();
+                this.#telemetry.emit('validator.pool_empty', { reason, pool_version: this.#poolVersion }, reason === 'shutdown' ? 6 : 4);
+            }
             if (endConnection && entry && entry.connection && typeof entry.connection.end === 'function') {
                 try {
                     entry.connection.end();
@@ -205,10 +239,22 @@ class ConnectionManager {
                     // TODO: Consider logging these errors here in verbose mode
                 }
             }
-            this.#logger.debug(`remove: removing validator from map: ${publicKeyToAddress(publicKeyHex, this.#config)}. Map size before removal: ${this.#validators.size}.`);
-            this.#validators.delete(publicKeyHex);
             this.#logger.debug(`remove: validator removed successfully. Map size is now ${this.#validators.size}.`);
         }
+    }
+
+    get poolVersion() {
+        return this.#poolVersion;
+    }
+
+    getConnectionDiagnostics(publicKey) {
+        const entry = this.#validators.get(this.#toHexString(publicKey));
+        if (!entry) return {};
+        return {
+            connection_id: entry.connectionId,
+            connection_age_ms: Date.now() - entry.connectedAt,
+            sent_count: entry.sent || 0
+        };
     }
 
     /**
@@ -317,7 +363,7 @@ class ConnectionManager {
      * @param {String|Buffer} publicKey - The public key hex string of the validator
      * @param {Object} connection - The connection object
      */
-    #append(publicKey, connection) {
+    #append(publicKey, connection, context) {
         this.#logger.debug(`#append: appending validator ${publicKeyToAddress(publicKey, this.#config)}`);
         const publicKeyHex = this.#toHexString(publicKey);
         if (this.#validators.has(publicKeyHex)) {
@@ -325,12 +371,7 @@ class ConnectionManager {
             this.#logger.debug(`#append: tried to append existing validator: ${publicKeyToAddress(publicKey, this.#config)}`);
             return;
         }
-        this.#validators.set(publicKeyHex, {connection, sent: 0});
-        connection.on('close', () => {
-            this.#logger.debug(`#append: connection closing for validator ${publicKeyToAddress(publicKey, this.#config)}`);
-            this.remove(publicKeyHex);
-            this.#logger.debug(`#append: connection closed for validator ${publicKeyToAddress(publicKey, this.#config)}`);
-        });
+        this.#trackConnection(publicKeyHex, connection, context);
     }
 
     /**
@@ -338,18 +379,42 @@ class ConnectionManager {
      * @param {String|Buffer} publicKey - The public key hex string of the validator
      * @param {Object} connection - The connection object
      */
-    #update(publicKey, connection) {
+    #update(publicKey, connection, context) {
         // Note: Is there a good reason for the function 'update' to exist separately from 'append'?
         // It seems that both could be merged into a single function that either adds or updates the entry.
         // It would be preferable to keep them separated though, but we would need to review all usages to ensure correctness.
         // Also, we should remove the 'else' branch below if we decide to keep 'update' and 'append' separated.
         const publicKeyHex = this.#toHexString(publicKey);
         this.#logger.debug(`#update: updating validator ${publicKeyToAddress(publicKey, this.#config)}`);
-        if (this.#validators.has(publicKeyHex)) {
-            this.#validators.get(publicKeyHex).connection = connection;
-        } else {
-            this.#validators.set(publicKeyHex, {connection, sent: 0});
+        this.#trackConnection(publicKeyHex, connection, context);
+    }
+
+    #trackConnection(publicKeyHex, connection, context) {
+        const poolBefore = this.connectionCount();
+        const entry = { connection, sent: this.#validators.get(publicKeyHex)?.sent ?? 0, connectionId: generateUUID(), connectedAt: Date.now() };
+        this.#validators.set(publicKeyHex, entry);
+        this.#poolVersion++;
+        this.#telemetry.emit('validator.connected', {
+            ...context, validator: publicKeyHex, connection_id: entry.connectionId,
+            protocol: connection.protocolSession?.preferredProtocol ?? 'unknown',
+            pool_before: poolBefore, pool_after: this.connectionCount(), pool_version: this.#poolVersion
+        });
+        if (poolBefore === 0) {
+            this.#telemetry.emit('validator.pool_restored', {
+                initial_connection: this.#emptySince === null,
+                duration_ms: this.#emptySince === null ? 0 : Date.now() - this.#emptySince,
+                pool_version: this.#poolVersion
+            });
+            this.#emptySince = null;
         }
+        let connectionError;
+        connection.on('error', error => { connectionError = error?.name ?? 'Error'; });
+        connection.on('close', () => {
+            this.remove(publicKeyHex, {
+                endConnection: false, expectedConnection: connection,
+                reason: connectionError ? 'connection_error' : 'connection_closed', error_type: connectionError
+            });
+        });
     }
 
     #toHexString(publicKey) {

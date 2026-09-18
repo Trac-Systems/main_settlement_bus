@@ -8,6 +8,7 @@ import { networkMessageFactory } from '../../../messages/network/v1/networkMessa
 import { generateUUID } from '../../../utils/helpers.js';
 import { NETWORK_CAPABILITIES, ResultCode } from '../../../utils/constants.js';
 import { Logger } from '../../../utils/logger.js';
+import { getTelemetry } from '../../../utils/telemetry.js';
 
 class ProtocolSession {
     #legacyProtocol;
@@ -22,6 +23,8 @@ class ProtocolSession {
     #config;
     #capabilities;
     #logger;
+    #telemetry;
+    #telemetryContext = {};
 
     constructor(legacyProtocol, v1Protocol, wallet, config) {
         // These are Protomux "message" objects (returned by channel.addMessage).
@@ -34,6 +37,17 @@ class ProtocolSession {
         this.#config = config;
         this.#capabilities = NETWORK_CAPABILITIES;
         this.#logger = new Logger(config);
+        this.#telemetry = getTelemetry(config);
+    }
+
+    // Context identifies a local connection/check; request_id is taken only from
+    // the actual message built by this session.
+    setTelemetryContext(context) {
+        try {
+            for (const key of ['validator', 'validator_address', 'connection_attempt_id', 'connection_id', 'healthcheck_id']) {
+                if (context?.[key] !== undefined) this.#telemetryContext[key] = context[key];
+            }
+        } catch { /* Diagnostic metadata cannot interrupt protocol operations. */ }
     }
 
     get preferredProtocol() {
@@ -87,13 +101,21 @@ class ProtocolSession {
             return; // TODO: Consider not returning silently
         }
 
+        const startedAt = Date.now();
+        const context = { ...this.#telemetryContext };
+        let message;
         try {
-            const message = await this.#buildLivenessRequest();
+            message = await this.#buildLivenessRequest();
             if (!this.#v1Protocol) {
                 throw new Error('ProtocolSession: v1 protocol not available for probing');
             }
             const result = await this.#v1Protocol.send(message);
             if (result !== ResultCode.OK) {
+                this.#telemetry.emit('protocol.probe_failed', {
+                    ...context, request_id: message.id, result_code: result,
+                    reason: 'peer_response', duration_ms: Date.now() - startedAt,
+                    fallback_allowed: true, fallback_protocol: this.#supportedProtocols.LEGACY,
+                }, 4);
                 // TODO: Think about how to handle failure result codes after legacy protocol is retired
                 this.#logger.warn(`ProtocolSession: v1 protocol probe failed with non-OK result code: ${result}`);
                 this.setLegacyAsPreferredProtocol();
@@ -101,6 +123,13 @@ class ProtocolSession {
             }
             this.setV1AsPreferredProtocol();
         } catch (err) {
+            this.#telemetry.emit('protocol.probe_failed', {
+                ...context, request_id: message?.id,
+                reason: 'request_failed', stage: message ? 'request_send' : 'request_build',
+                error_type: err?.name, error_code: err?.code,
+                duration_ms: Date.now() - startedAt,
+                fallback_allowed: true, fallback_protocol: this.#supportedProtocols.LEGACY,
+            }, 4);
             this.#logger.debug(`ProtocolSession: v1 protocol probe failed, falling back to legacy. Details: ${err?.message ?? err}`);
             this.setLegacyAsPreferredProtocol();
         }
@@ -112,13 +141,28 @@ class ProtocolSession {
      * @returns {Promise<ResultCode>} Result code indicating success or failure of the health check.
      */
     async sendHealthCheck() {
+        const startedAt = Date.now();
+        const context = { ...this.#telemetryContext };
+        let message;
         switch (this.#preferredProtocol) {
             case this.#supportedProtocols.V1:
                 try {
-                    const message = await this.#buildLivenessRequest();
-                    return await this.#v1Protocol.send(message);
+                    message = await this.#buildLivenessRequest();
+                    const result = await this.#v1Protocol.send(message);
+                    if (result !== ResultCode.OK) this.#telemetry.emit('protocol.healthcheck_failed', {
+                        ...context, request_id: message.id, result_code: result,
+                        reason: 'peer_response', duration_ms: Date.now() - startedAt,
+                    }, 4);
+                    return result;
                 }
                 catch (err) {
+                    this.#telemetry.emit('protocol.healthcheck_failed', {
+                        ...context, request_id: message?.id,
+                        result_code: ResultCode.UNEXPECTED_ERROR,
+                        reason: 'request_failed', stage: message ? 'request_send' : 'request_build',
+                        error_type: err?.name, error_code: err?.code,
+                        duration_ms: Date.now() - startedAt,
+                    }, 4);
                     this.#logger.error(`ProtocolSession: v1 health check failed: ${err?.message ?? err}`);
                     return ResultCode.UNEXPECTED_ERROR; // TODO: Consider just propagating the error instead
                 }
@@ -126,6 +170,10 @@ class ProtocolSession {
                 this.#logger.warn('ProtocolSession: health check not supported on LEGACY protocol');
                 return ResultCode.OK; // TODO: Consider implementing a new result code (e.g. NOT_SUPPORTED) instead of returning OK
             default:
+                this.#telemetry.emit('protocol.healthcheck_failed', {
+                    ...context, result_code: ResultCode.UNSPECIFIED,
+                    reason: 'preferred_protocol_unset', duration_ms: Date.now() - startedAt,
+                }, 4);
                 this.#logger.warn('ProtocolSession: preferred protocol not set. Call probe() first.');
                 return ResultCode.UNSPECIFIED; // TODO: Define a more specific result code.
         }

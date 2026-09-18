@@ -2,7 +2,7 @@ import ReadyResource from "ready-resource";
 import Corestore from "corestore";
 import tracCryptoApi from "trac-crypto-api";
 import b4a from "b4a";
-import { sleep, isHexString } from "./utils/helpers.js";
+import { sleep, isHexString, generateUUID } from "./utils/helpers.js";
 import { applyStateMessageFactory } from "./messages/state/applyStateMessageFactory.js";
 import { isAddressValid } from "./core/state/utils/address.js";
 import Network from "./core/network/Network.js";
@@ -29,6 +29,8 @@ import {safeDecodeApplyOperation, safeEncodeApplyOperation} from "./utils/protob
 import PartialTransactionValidator from "./core/network/protocols/shared/validators/PartialTransactionValidator.js";
 import PartialTransferValidator from "./core/network/protocols/shared/validators/PartialTransferValidator.js";
 import { BroadcastError, ValidationError } from "./utils/errors.js";
+import { getTelemetry } from './utils/telemetry.js';
+import { MsbDiagnostics } from './utils/msbDiagnostics.js';
 
 export class MainSettlementBus extends ReadyResource {
     #store;
@@ -37,6 +39,8 @@ export class MainSettlementBus extends ReadyResource {
     #state;
     #isClosing = false;
     #config
+    #telemetry;
+    #diagnostics;
 
     /**
      * @param {import("./config/config.js").Config} config
@@ -45,6 +49,15 @@ export class MainSettlementBus extends ReadyResource {
     constructor(config, wallet = undefined) {
         super();
         this.#config = config
+        this.#telemetry = getTelemetry(config);
+        this.#diagnostics = new MsbDiagnostics(config);
+        if (this.#telemetry.enabled) {
+            this.#telemetry.setContext({
+                boot_id: generateUUID(),
+                node_id: config.graylog?.host,
+                network_id: config.networkId,
+            });
+        }
         this.#wallet = wallet;
         this.#store = new Corestore(this.#config.storesFullPath);
         this.check = new Check(this.#config);
@@ -70,10 +83,23 @@ export class MainSettlementBus extends ReadyResource {
     }
 
     async _open() {
+        this.#telemetry.emit('node.starting', { component: 'msb' });
+        try {
+            await this.#open();
+        } catch (error) {
+            this.#diagnostics.stop();
+            this.#telemetry.emit('node.start_failed', { component: 'msb', error_type: error?.name }, 3);
+            await this.#telemetry.close();
+            throw error;
+        }
+    }
+
+    async #open() {
         this.#state = new State(this.#store, this.#wallet, this.#config);
         this.#network = new Network(this.#state, this.#config, this.#wallet?.address ?? null);
 
         await this.#state.ready();
+        this.#diagnostics.start(this.#state, this.#network);
         await this.#network.ready();
         await this.#stateEventsListener();
 
@@ -100,12 +126,27 @@ export class MainSettlementBus extends ReadyResource {
         if (this.#wallet) {
             await this.#printBalance();
         }
+        this.#telemetry.emit('node.ready', { component: 'msb' });
     }
 
     async _close() {
         console.log("Closing everything gracefully... This may take a moment.");
 
         this.#isClosing = true;
+        this.#telemetry.emit('node.stopping', { component: 'msb', reason: 'graceful_shutdown' });
+        this.#diagnostics.stop();
+        try {
+            await this.#close();
+            this.#telemetry.emit('node.stopped', { component: 'msb', reason: 'graceful_shutdown' });
+        } catch (error) {
+            this.#telemetry.emit('node.stop_failed', { component: 'msb', error_type: error?.name }, 3);
+            throw error;
+        } finally {
+            await this.#telemetry.close();
+        }
+    }
+
+    async #close() {
         await this.#network.close();
 
         await sleep(100);
@@ -165,17 +206,39 @@ export class MainSettlementBus extends ReadyResource {
 
         const success = await this.broadcastPartialTransaction(payload);
         if (!success) {
+            this.#telemetry.emit('tx.broadcast_rejected', {
+                component: 'msb', tx_hash: hash, reason: 'send_failed',
+            }, 4);
             throw new BroadcastError("Failed to broadcast transaction after multiple attempts.");
         }
 
-        const isConfirmed = await this.#state.waitForUnsigned(
-            hash,
-            this.#config.messageValidatorResponseTimeout,
-            100
-        );
+        const waitStartedAt = Date.now();
+        let isConfirmed;
+        try {
+            isConfirmed = await this.#state.waitForUnsigned(
+                hash,
+                this.#config.messageValidatorResponseTimeout,
+                100
+            );
+        } catch (error) {
+            this.#telemetry.emit('tx.unsigned_wait_failed', {
+                component: 'msb', tx_hash: hash, error_type: error?.name,
+                duration_ms: Date.now() - waitStartedAt,
+            }, 4);
+            throw error;
+        }
         if (!isConfirmed) {
+            this.#telemetry.emit('tx.unsigned_wait_timeout', {
+                component: 'msb', tx_hash: hash, duration_ms: Date.now() - waitStartedAt,
+                timeout_ms: this.#config.messageValidatorResponseTimeout,
+            }, 4);
             throw new BroadcastError("Failed to broadcast transaction after multiple attempts.");
         }
+
+        this.#telemetry.emit('tx.unsigned_observed', {
+            component: 'msb', tx_hash: hash, observation: 'rpc_wait',
+            wait_duration_ms: Date.now() - waitStartedAt,
+        });
 
         return {
             signedLength: this.#state.getSignedLength(),
@@ -214,6 +277,7 @@ export class MainSettlementBus extends ReadyResource {
         });
 
         this.#state.base.on(EventType.IS_INDEXER, () => {
+            this.#telemetry.emit('node.role_changed', { component: 'msb', role: 'indexer', enabled: true });
             console.log("Current node is an indexer");
         });
 
@@ -221,14 +285,17 @@ export class MainSettlementBus extends ReadyResource {
             // Prevent further actions if closing is in progress
             // The reason is that getNodeEntry is async and may cause issues if we will access state after closing
             if (this.#isClosing) return;
+            this.#telemetry.emit('node.role_changed', { component: 'msb', role: 'indexer', enabled: false });
             console.log("Current node is not an indexer anymore");
         });
 
         this.#state.base.on(EventType.WRITABLE, async () => {
+            this.#telemetry.emit('node.role_changed', { component: 'msb', role: 'writable', enabled: true });
             console.log("Current node is writable");
         });
 
         this.#state.base.on(EventType.UNWRITABLE, async () => {
+            this.#telemetry.emit('node.role_changed', { component: 'msb', role: 'writable', enabled: false });
             console.log("Current node is unwritable");
         });
     }

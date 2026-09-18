@@ -4,6 +4,7 @@ import b4a from "b4a";
 import { bufferToAddress } from "../../../core/state/utils/address.js";
 import tracCryptoApi from "trac-crypto-api";
 import { WRITER_BYTE_LENGTH, CONNECTION_STATUS } from "../../../utils/constants.js";
+import { getTelemetry } from "../../../utils/telemetry.js";
 
 // Internal constants
 const VALIDATOR_CANDIDATES_PER_CYCLE = 10;
@@ -22,6 +23,8 @@ class ValidatorObserverService {
     #writersCache;       // Cached writer list with dynamic TTL
     #isInterrupted;      // Used to stop execution mid-cycle
     #keyDecodeCache;
+    #telemetry;
+    #lastCycleCompletedAt = null;
 
     /**
      * @param {Object} network - The network layer instance (e.g., Hyperswarm wrapper).
@@ -41,6 +44,11 @@ class ValidatorObserverService {
         this.#writersCache = { list: [], lastUpdated: 0 };
         this.#isInterrupted = false;
         this.#keyDecodeCache = new Map();
+        this.#telemetry = getTelemetry(config);
+    }
+
+    get lastCycleCompletedAt() {
+        return this.#lastCycleCompletedAt;
     }
 
     /**
@@ -144,7 +152,10 @@ class ValidatorObserverService {
         // Non-admin nodes: ensure the admin is not kept as a validator connection
         const adminWriter = writers.find((w) => w.address === adminEntry?.address);
         if (adminWriter?.publicKey) {
-            this.#network.validatorConnectionManager.remove(adminWriter.publicKey);
+            this.#network.validatorConnectionManager.remove(adminWriter.publicKey, {
+                reason: 'admin_policy', alive_writers: aliveWritersCount,
+                admin_threshold: this.#config.maxWritersForAdminIndexerConnection
+            });
         }
     }
 
@@ -156,7 +167,7 @@ class ValidatorObserverService {
         const manager = this.#network.validatorConnectionManager;
 
         if (manager.connected(publicKey)) {
-            manager.remove(publicKey);
+            manager.remove(publicKey, { reason: 'writer_removed' });
             this.#logger.debug(`Removed stale validator connection: ${b4a.toString(publicKey, "hex")}`);
         }
     }
@@ -277,6 +288,9 @@ class ValidatorObserverService {
 
         } catch (err) {
             this.#logger.error(`ValidatorObserver worker error: ${err.message}`);
+            this.#telemetry.emit('validator.observer_failed', { stage: 'cycle', error_type: err?.name ?? 'Error' }, 3);
+        } finally {
+            this.#lastCycleCompletedAt = Date.now();
         }
 
         next(interval);
@@ -442,6 +456,7 @@ class ValidatorObserverService {
             }
         } catch (err) {
             this.#logger.error(`Autobase writer scan error: ${err.message}`);
+            this.#telemetry.emit('validator.observer_failed', { stage: 'writer_scan', error_type: err?.name ?? 'Error' }, 3);
         }
 
         return Array.from(activeMap.values());
@@ -462,6 +477,9 @@ class ValidatorObserverService {
             return await this.#network.tryConnect(candidate.publicKeyHex, "validator");
         } catch (err) {
             this.#logger.error(`Validator connection attempt failed: ${err.message}`);
+            this.#telemetry.emit('validator.connect_failed', {
+                validator: candidate.publicKeyHex, stage: 'initiation', error_type: err?.name ?? 'Error'
+            }, 4);
         }
     }
 }

@@ -1,17 +1,20 @@
 import b4a from 'b4a'
 import { isDefined } from '../utils/type.js'
 import _ from 'lodash'
+import { createGraylogConfig } from './graylog.js'
 
 export class Config {
     #options
     #config
     #bootstrap
     #channel
+    #graylog
 
     constructor(options = {}, config = {}) {
         this.#validate(options, config)
         this.#options = options
         this.#config = config
+        this.#graylog = createGraylogConfig(options.graylog ?? config.graylog)
         this.#bootstrap = this.#normalizeBootstrap(
             isDefined(options.bootstrap) ? options.bootstrap : config.bootstrap
         )
@@ -22,6 +25,10 @@ export class Config {
 
     get addressLength() {
         return this.#config.addressLength
+    }
+
+    get graylog() {
+        return this.#graylog
     }
 
     get addressPrefix() {

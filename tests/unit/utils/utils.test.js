@@ -5,6 +5,9 @@ import { default as test } from 'brittle';
 async function runTests() {
     test.pause();
 
+    await import('./telemetry.test.js');
+    await import('./msbDiagnostics.test.js');
+
     await import('./check/check.test.js');
     await import('./deepEqualApplyPayload/deepEqualApplyPayload.test.js');
     await import('./protobuf/operationHelpers.test.js');

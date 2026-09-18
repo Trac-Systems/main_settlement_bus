@@ -13,6 +13,9 @@ import { bufferToBigInt, licenseBufferToBigInt } from "../src/utils/amountSerial
 import { isAddressValid } from "../src/core/state/utils/address.js";
 import { getConfirmedParameter } from "./utils/confirmedParameter.js";
 import { BroadcastError, ValidationError } from "../src/utils/errors.js";
+import { getTelemetry } from '../src/utils/telemetry.js';
+import { generateUUID } from '../src/utils/helpers.js';
+import { operationToPayload } from '../src/utils/applyOperations.js';
 
 export async function handleHealth({ msbInstance, respond }) {
     try {
@@ -64,20 +67,49 @@ export async function handleConfirmedLength({ msbInstance, respond }) {
 export async function handleBroadcastTransaction({ msbInstance, respond, req }) {
     let body = '';
     const MAX_BODY_SIZE = 2_000_000;
-    let limitExceeded = false;
+    const telemetry = getTelemetry(msbInstance?.config);
+    const startedAt = Date.now();
+    const fields = { rpc_request_id: generateUUID(), source: 'rpc' };
+    let finished = false;
+    let broadcastStarted = false;
+
+    const finish = (status, response, reason, extra = {}) => {
+        if (finished) return;
+        finished = true;
+        req.socket?.removeListener('close', onClientAborted);
+        telemetry.emit('rpc.tx_finished', {
+            ...fields,
+            ...extra,
+            http_status: status,
+            reason,
+            duration_ms: Date.now() - startedAt,
+            broadcast_started: broadcastStarted,
+        }, status === 200 ? 6 : 4);
+        if (status !== null) return respond(status, response);
+    };
+    function onClientAborted() {
+        finish(null, null, 'client_aborted', {
+            // Disconnecting the HTTP client does not cancel an already submitted transaction.
+            broadcast_outcome: broadcastStarted ? 'unknown' : 'not_started',
+        });
+    }
+
+    telemetry.emit('rpc.tx_received', fields);
+    req.on('aborted', onClientAborted);
+    req.socket?.once('close', onClientAborted);
 
     req.on('data', chunk => {
-        if (limitExceeded) return;
+        if (finished) return;
         body += chunk.toString();
         if (body.length > MAX_BODY_SIZE) {
-            limitExceeded = true;
-            respond(413, { error: 'Payload too large.' });
+            body = '';
+            finish(413, { error: 'Payload too large.' }, 'body_too_large');
             req.resume();
         }
     });
 
     req.on('end', async () => {
-        if (limitExceeded) return;
+        if (finished) return;
 
         try {
             if (!body) {
@@ -103,35 +135,45 @@ export async function handleBroadcastTransaction({ msbInstance, respond, req }) 
             const decodedPayload = decodeBase64Payload(payload);
             validatePayloadStructure(decodedPayload);
             const sanitizedPayload = sanitizeTransferPayload(decodedPayload);
+            const txHash = sanitizedPayload[operationToPayload(sanitizedPayload.type)]?.tx;
+            if (isValidTxHash(txHash)) fields.tx_hash = txHash;
+            fields.operation_type = sanitizedPayload.type;
+            telemetry.emit('rpc.tx_decoded', fields);
 
+            broadcastStarted = true;
             const result = await msbInstance.broadcastTransaction(sanitizedPayload);
-            respond(200, { result: { ...result, message: 'Transaction broadcasted successfully.' } });
+            finish(200, { result: { ...result, message: 'Transaction broadcasted successfully.' } }, 'broadcast_returned');
 
         } catch (error) {
             let code = 500;
             let errorMsg = 'An error occurred processing the transaction.';
+            let reason = 'internal_error';
 
             if (error instanceof ValidationError || error instanceof SyntaxError) {
                 code = 400;
                 errorMsg = error.message;
+                reason = 'invalid_payload';
             } 
             else if (error instanceof BroadcastError) {
                 code = 429;
                 errorMsg = error.message;
+                reason = 'broadcast_failed';
             }
 
             if (code === 500) {
                 console.error('Error in handleBroadcastTransaction:', error);
             }
 
-            respond(code, { error: errorMsg });
+            finish(code, { error: errorMsg }, reason, {
+                error_type: error instanceof Error ? error.name : 'UnknownError',
+            });
         }
     });
 
     req.on('error', () => {
-        if (!limitExceeded) {
-            respond(500, { error: 'Request stream failed during body transfer.' });
-        }
+        finish(500, { error: 'Request stream failed during body transfer.' }, 'request_error', {
+            broadcast_outcome: broadcastStarted ? 'unknown' : 'not_started',
+        });
     });
 }
 
