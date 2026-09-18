@@ -207,7 +207,7 @@ if (isBareRuntime) {
 
         t.ok(disconnected, 'disconnect should report tracked validator removal');
         t.absent(connectionManagerInstance.exists(publicKey), 'validator should be removed from connection manager');
-        t.alike(connectionManagerInstance.removed, [{ publicKey, options: { endConnection: false } }], 'tracked validator should be detached without ending the socket');
+        t.alike(connectionManagerInstance.removed, [{ publicKey, options: { endConnection: false, reason: 'peer no longer valid validator' } }], 'tracked validator should be detached without ending the socket and retain the initiating reason');
         t.is(swarmInstance.leavePeer.callCount, 1, 'leavePeer should be called to clear explicit peer tracking without closing the socket');
     });
 

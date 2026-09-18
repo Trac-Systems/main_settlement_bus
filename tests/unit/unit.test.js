@@ -5,6 +5,8 @@ import { default as test } from 'brittle';
 async function runTests() {
     test.pause();
     await import('./index.test.js');
+    await import('./index.telemetry.test.js');
+    await import('./rpc/telemetry.test.js');
     await import('./config/configModule.test.js');
     await import('./cli/commandHandler.test.js');
     await import('./utils/utils.test.js');

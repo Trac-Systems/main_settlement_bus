@@ -132,8 +132,8 @@ class State extends ReadyResource {
         return transactionUtils.FEE;
     }
 
-    async get(key) {
-        const result = await this.#base.view.get(key);
+    async get(key, options) {
+        const result = await this.#base.view.get(key, options);
         if (result === null) return null;
         return result.value;
     }
@@ -149,10 +149,10 @@ class State extends ReadyResource {
         return false;
     }
 
-    async getSigned(key) {
+    async getSigned(key, options) {
         const view_session = this.#base.view.checkout(this.#base.view.core.signedLength);
         try {
-            const result = await view_session.get(key);
+            const result = await view_session.get(key, options);
             return result ? result.value : null;
         } finally {
             await view_session.close();

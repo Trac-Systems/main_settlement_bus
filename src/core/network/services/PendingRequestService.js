@@ -26,6 +26,18 @@ export default class PendingRequestService {
         return this.#pendingRequests.has(id);
     }
 
+    diagnostics() {
+        const now = Date.now();
+        let oldestAge = 0;
+        for (const entry of this.#pendingRequests.values()) {
+            oldestAge = Math.max(oldestAge, now - entry.createdAt);
+        }
+        return {
+            pending_requests: this.#pendingRequests.size,
+            pending_requests_oldest_age_ms: oldestAge,
+        };
+    }
+
     isProbePending(peerPubKeyHex) {
         for (const [, entry] of this.#pendingRequests) {
             if (entry.requestedTo === peerPubKeyHex && entry.requestType === NetworkOperationType.LIVENESS_REQUEST) {
@@ -70,6 +82,7 @@ export default class PendingRequestService {
 
         const entry = {
             id: id,
+            createdAt: Date.now(),
             requestType: message.type,
             requestTxData: this.#extractRequestTxData(message),
             requestedTo: peerPubKeyHex,

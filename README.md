@@ -53,6 +53,21 @@ npm install -g bare
 
 Runtime entry points cover CLI-driven runs (`start`, `rpc`) and `.env`-aware runs (`env`, `env-rpc`). Each section below lists the accepted configuration inputs.
 
+### Graylog diagnostics
+
+Optional Graylog events cover validator rotation and connections, transaction attempts and RPC results, local transaction observations, and a progress summary every 30 seconds. Append the following to the node's existing `.env`:
+
+```dotenv
+GRAYLOG_APP=msb-explorer-rpc
+GRAYLOG_TOKEN='your-token'
+GRAYLOG_HOST=msb-explorer-rpc-01
+GRAYLOG_URL='https://graylog.example.org/gelf'
+```
+
+`GRAYLOG_HOST` names the emitting node. A blank `GRAYLOG_URL` disables telemetry. For HTTPS, start with `npm run env-rpc-node`, which runs directly in Node and respects the existing RPC host, port, network and store settings. HTTP collectors also work with the existing Pear entry points.
+
+See [Graylog monitoring](docs/graylog-monitoring.md) for optional settings, the event list, runtime support, observation limits and deployment verification. A copyable template is available in [`.env.example`](.env.example).
+
 ### Startup input validation
 
 Startup input is validated before MSB finishes booting. This applies to direct CLI flags and to the `.env` / inline environment-variable entry points, because those scripts pass the same flags through the Pear v2/v3 runner.
