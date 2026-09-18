@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package state;
+
+enum EscrowStatus {
+    PENDING = 0;
+    CLAIMED = 1;
+    REFUNDED = 2;
+}
+
+// Persisted TNK settlement state; nonce and authorization remain in the lock transaction.
+message EscrowEntry {
+    uint32 version                              = 1;
+    optional EscrowStatus status                = 2;  // Explicit presence required, including PENDING (zero)
+    bytes amount                                = 3;  // 16-byte principal in TNK base units
+    bytes additionalFeeAmount                   = 4;  // 16-byte surcharge; zero disables the additional fee
+    bytes lockerAddress                         = 5;  // Canonical MSB address bytes, not a public key
+    bytes claimRecipientAddress                 = 6;  // Canonical MSB address bytes
+    bytes refundRecipientAddress                = 7;  // Canonical MSB address bytes
+    optional bytes additionalFeeRecipientAddress = 8; // Present exactly when additionalFeeAmount is non-zero
+    bytes lockId                                = 9;  // 32-byte lock transaction hash
+    bytes hashLock                              = 10; // 32-byte SHA-256 hashlock
+    optional bytes preimage                     = 11; // 32-byte secret; present only after claim
+    optional bytes policyHash                   = 12; // Optional 32-byte application commitment
+    bytes refundEpoch                           = 13; // 8-byte unsigned, big-endian epoch
+}

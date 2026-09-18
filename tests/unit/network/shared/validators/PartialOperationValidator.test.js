@@ -17,6 +17,7 @@ import {
     buildBootstrapDeploymentPayload,
     buildTransactionPayload,
     buildTransferPayload,
+    buildHtlcLockPayload,
     expectSharedValidatorError,
     getPayloadTxHex
 } from '../../utils/sharedValidatorTestUtils.js';
@@ -46,7 +47,8 @@ test('PartialOperationValidator.isPayloadSchemaValid accepts supported payload s
         await buildRoleAccessPayload(OperationType.ADD_WRITER, requester),
         await buildBootstrapDeploymentPayload(requester),
         await buildTransactionPayload(requester),
-        await buildTransferPayload(requester, recipient.address, bigIntToBuffer(1n))
+        await buildTransferPayload(requester, recipient.address, bigIntToBuffer(1n)),
+        await buildHtlcLockPayload(requester, recipient.address)
     ];
 
     for (const payload of payloads) {

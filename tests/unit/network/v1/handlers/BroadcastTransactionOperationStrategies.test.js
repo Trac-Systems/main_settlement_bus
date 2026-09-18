@@ -7,7 +7,10 @@ import {
 } from '../../../../../src/core/network/protocols/v1/handlers/broadcastTransaction/BroadcastTransactionOperationStrategies.js';
 import {OperationType, ResultCode} from '../../../../../src/utils/constants.js';
 import {V1ProtocolError} from '../../../../../src/core/network/protocols/v1/V1ProtocolError.js';
+import PartialHtlcValidator from '../../../../../src/core/network/protocols/shared/validators/PartialHtlcValidator.js';
 import applyOperationFixtures from '../../../../fixtures/applyOperation.fixtures.js';
+import {config} from '../../../../helpers/config.js';
+import {createState, expectSharedValidatorError} from '../../utils/sharedValidatorTestUtils.js';
 
 const VALID_ADDR = 'trac123z3gfpr2epjwww7ntm3m6ud2fhmq0tvts27p2f5mx3qkecsutlqfys769';
 const VALID_TO_ADDR = 'trac1mqktwme8fvklrds4hlhfy6lhmsu9qgfn3c3kuhz7c5zwjt8rc3dqj9tx7h';
@@ -58,6 +61,10 @@ function createFakeFactory() {
                     calls.push({args, method: 'buildCompleteTransferOperationMessage'});
                     return {method: 'buildCompleteTransferOperationMessage'};
                 },
+                buildCompleteHtlcLockOperationMessage(...args) {
+                    calls.push({args, method: 'buildCompleteHtlcLockOperationMessage'});
+                    return {method: 'buildCompleteHtlcLockOperationMessage'};
+                },
                 buildCompleteHtlcClaimOperationMessage(...args) {
                     calls.push({args, method: 'buildCompleteHtlcClaimOperationMessage'});
                     return {method: 'buildCompleteHtlcClaimOperationMessage'};
@@ -75,6 +82,7 @@ test('resolveBroadcastTransactionOperationStrategy selects and builds all suppor
         partialBootstrapDeploymentValidator: createFakeValidator('bootstrap-deployment', validatorCalls),
         partialTransactionValidator: createFakeValidator('transaction', validatorCalls),
         partialTransferValidator: createFakeValidator('transfer', validatorCalls),
+        partialHtlcValidator: createFakeValidator('htlc', validatorCalls),
         createApplyStateMessageFactory: () => factory.createApplyStateMessageFactory()
     });
 
@@ -167,6 +175,28 @@ test('resolveBroadcastTransactionOperationStrategy selects and builds all suppor
                     am: b4a.alloc(16, 10)
                 }
             }
+        },
+        {
+            type: OperationType.HTLC_LOCK,
+            payloadKey: 'hlo',
+            validator: 'htlc',
+            builderMethod: 'buildCompleteHtlcLockOperationMessage',
+            decodedTransaction: {
+                address: VALID_ADDR,
+                type: OperationType.HTLC_LOCK,
+                hlo: {
+                    ...basePayload(),
+                    ca: VALID_TO_ADDR,
+                    ra: VALID_ADDR,
+                    am: b4a.alloc(16, 1),
+                    fa: b4a.alloc(16),
+                    hl: b4a.alloc(32, 2),
+                    re: b4a.alloc(8, 3),
+                    ss: [b4a.alloc(32, 5)],
+                    th: b4a.from([1]),
+                    app: []
+                }
+            }
         }
     ];
 
@@ -182,6 +212,9 @@ test('resolveBroadcastTransactionOperationStrategy selects and builds all suppor
         t.is(lastValidatorCall.decodedTransaction, scenario.decodedTransaction, `${scenario.builderMethod} validates the incoming payload`);
         t.is(lastFactoryCall.method, scenario.builderMethod, `${scenario.builderMethod} selects the expected completion builder`);
         t.is(lastFactoryCall.args[0], scenario.decodedTransaction.address, `${scenario.builderMethod} forwards the requester address`);
+        if (scenario.type === OperationType.HTLC_LOCK) {
+            t.is(lastFactoryCall.args[1], scenario.decodedTransaction.hlo, 'HTLC completion receives the full lock body');
+        }
     }
 });
 
@@ -191,6 +224,7 @@ test('resolveBroadcastTransactionOperationStrategy rejects unsupported transacti
         partialBootstrapDeploymentValidator: createFakeValidator('bootstrap-deployment', []),
         partialTransactionValidator: createFakeValidator('transaction', []),
         partialTransferValidator: createFakeValidator('transfer', []),
+        partialHtlcValidator: createFakeValidator('htlc', []),
         createApplyStateMessageFactory: () => createFakeFactory().createApplyStateMessageFactory()
     });
 
@@ -230,4 +264,24 @@ test('HTLC claim strategy validates and forwards the complete signed claim', asy
         decodedOperation.hco.in,
         decodedOperation.hco.is
     ]);
+});
+
+test('unfinished HTLC operations are rejected before broadcast completion', async t => {
+    const factory = createFakeFactory();
+    const strategies = createBroadcastTransactionOperationStrategies({
+        partialHtlcValidator: new PartialHtlcValidator(createState(), undefined, config),
+        createApplyStateMessageFactory: () => factory.createApplyStateMessageFactory()
+    });
+
+    for (const type of [OperationType.HTLC_CLAIM, OperationType.HTLC_REFUND]) {
+        const strategy = resolveBroadcastTransactionOperationStrategy(type, strategies);
+        await expectSharedValidatorError(
+            t,
+            () => strategy.build({...applyOperationFixtures.validHtlcClaimOperation, type}),
+            ResultCode.OPERATION_TYPE_UNKNOWN,
+            'validation is not implemented'
+        );
+    }
+
+    t.is(factory.calls.length, 0, 'no complete transaction is built for an unfinished operation');
 });

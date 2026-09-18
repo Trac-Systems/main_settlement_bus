@@ -2,4 +2,23 @@ syntax = "proto3";
 
 package apply.operations;
 
-message HtlcLockOperation {}
+message HtlcLockOperation {
+    bytes tx                      = 1;  // Transaction hash and lock identifier
+    bytes txv                     = 2;  // Transaction-validity state
+    bytes ca                      = 3;  // Address receiving the principal on claim
+    bytes ra                      = 4;  // Address receiving all escrowed TNK on refund
+    bytes am                      = 5;  // Principal amount paid to the claimant
+    bytes fa                      = 6;  // TNK surcharge reserved in addition to am; zero is allowed
+    optional bytes fr             = 7;  // Surcharge recipient on claim; present only when fa is non-zero
+    bytes hl                      = 8;  // SHA-256 hashlock
+    bytes re                      = 9;  // Refund epoch
+    optional bytes ph             = 10; // Opaque application policy hash; MSB does not evaluate its rules
+    repeated bytes ss             = 11; // Signer public keys; locker is always index zero
+    bytes th                      = 12; // Total required signatures including is; range 1..ss.length
+    repeated bytes cs             = 13; // Additional signatures in relative ss order; may be empty when th is 1
+    bytes in                      = 14; // Nonce of the locker
+    bytes is                      = 15; // Mandatory locker signature
+    bytes va                      = 16; // Validator's address; absent in partial, required in complete transactions
+    bytes vn                      = 17; // Validator's nonce; absent in partial, required in complete transactions
+    bytes vs                      = 18; // Validator's signature; absent in partial, required in complete transactions
+}
