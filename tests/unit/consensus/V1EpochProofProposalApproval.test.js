@@ -5,7 +5,7 @@ import {WalletProvider} from 'trac-wallet';
 
 import ConsensusMessageBuilder from '../../../src/messages/consensus/v1/ConsensusMessageBuilder.js';
 import V1EpochProofProposalApproval from '../../../src/core/consensus/v1/validators/V1EpochProofProposalApproval.js';
-import {V1ConsensusProtocolError} from '../../../src/core/consensus/v1/V1ConsensusProtocolError.js';
+import {V1ConsensusProtocolError, V1ConsensusPublicKeyMismatchError} from '../../../src/core/consensus/v1/V1ConsensusProtocolError.js';
 import {bufferToAddress} from '../../../src/core/state/utils/address.js';
 import {encodeProofProposalApproval} from '../../../src/codecs/consensus/v1/consensusV1OperationCodec.js';
 import {
@@ -112,6 +112,7 @@ async function assertProtocolError(t, action, resultCode, messageIncludes) {
     if (messageIncludes) {
         t.ok(error.message.includes(messageIncludes));
     }
+    return error;
 }
 
 test('V1EpochProofProposalApproval validates approval signature against original proof proposal', async t => {
@@ -168,6 +169,30 @@ test('V1EpochProofProposalApproval rejects non-OK response without approval', as
         ConsensusResultCode.INVALID_PAYLOAD,
         `Proof proposal response result code is not OK: ${ConsensusResultCode.INVALID_PAYLOAD}`
     );
+});
+
+test('V1EpochProofProposalApproval does not mark a signed peer PUBLIC_KEY_MISMATCH rejection as a local identity violation', async t => {
+    const proposerWallet = await createWallet(testKeyPair1);
+    const approverWallet = await createWallet(testKeyPair2);
+    const validator = new V1EpochProofProposalApproval(config, state);
+    const proofProposalPayload = await buildProofProposalPayload(proposerWallet);
+    const approvalPayload = await buildProofProposalRejectionPayload(
+        approverWallet,
+        proofProposalPayload,
+        ConsensusResultCode.PUBLIC_KEY_MISMATCH
+    );
+
+    const error = await assertProtocolError(
+        t,
+        () => validator.validate(
+            approvalPayload,
+            {remotePublicKey: approverWallet.publicKey},
+            proofProposalPayload.proof_proposal
+        ),
+        ConsensusResultCode.PUBLIC_KEY_MISMATCH,
+        'Proof proposal response result code is not OK'
+    );
+    t.absent(error instanceof V1ConsensusPublicKeyMismatchError);
 });
 
 test('V1EpochProofProposalApproval rejects fake non-OK response signature before result code handling', async t => {
@@ -229,7 +254,7 @@ test('V1EpochProofProposalApproval rejects approver address mismatched with remo
         otherWallet.address
     );
 
-    await assertProtocolError(
+    const error = await assertProtocolError(
         t,
         async () => validator.validate(
             approvalPayload,
@@ -239,6 +264,7 @@ test('V1EpochProofProposalApproval rejects approver address mismatched with remo
         ConsensusResultCode.PUBLIC_KEY_MISMATCH,
         'Address does not match remote public key'
     );
+    t.ok(error instanceof V1ConsensusPublicKeyMismatchError);
 });
 
 test('V1EpochProofProposalApproval rejects fake approval signature', async t => {

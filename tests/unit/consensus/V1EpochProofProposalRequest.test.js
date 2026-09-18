@@ -6,7 +6,7 @@ import {solveWesolowski} from '@tracsystems/trac-vdf';
 
 import ConsensusMessageBuilder from '../../../src/messages/consensus/v1/ConsensusMessageBuilder.js';
 import V1EpochProofProposalRequest from '../../../src/core/consensus/v1/validators/V1EpochProofProposalRequest.js';
-import {V1ConsensusProtocolError} from '../../../src/core/consensus/v1/V1ConsensusProtocolError.js';
+import {V1ConsensusProtocolError, V1ConsensusPublicKeyMismatchError} from '../../../src/core/consensus/v1/V1ConsensusProtocolError.js';
 import {addressToBuffer} from '../../../src/core/state/utils/address.js';
 import {
     createGenesisEpochProof
@@ -159,6 +159,7 @@ async function assertProtocolError(t, action, resultCode, messageIncludes) {
     if (messageIncludes) {
         t.ok(error.message.includes(messageIncludes));
     }
+    return error;
 }
 
 test('V1EpochProofProposalRequest validates proof proposal signature', async t => {
@@ -351,14 +352,15 @@ test('V1EpochProofProposalRequest rejects proposer address mismatched with remot
     const wallet = await createWallet(testKeyPair1);
     const otherWallet = await createWallet(testKeyPair2);
     const validator = new V1EpochProofProposalRequest(config, createState());
-    const proposer = addressToBuffer(wallet.address, config.addressPrefix);
+    const payload = await buildProofProposalPayload(wallet);
 
-    await assertProtocolError(
+    const error = await assertProtocolError(
         t,
-        () => validator.assertAddressWithRemotePublicKey(proposer, otherWallet.publicKey),
+        () => validator.validate(payload, {remotePublicKey: otherWallet.publicKey}),
         ConsensusResultCode.PUBLIC_KEY_MISMATCH,
         'Address does not match remote public key'
     );
+    t.ok(error instanceof V1ConsensusPublicKeyMismatchError);
 });
 
 test('V1EpochProofProposalRequest rejects invalid proposer address as protocol error', async t => {

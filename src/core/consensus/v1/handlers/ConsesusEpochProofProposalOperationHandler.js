@@ -1,6 +1,6 @@
 import V1EpochProofProposalRequest from "../validators/V1EpochProofProposalRequest.js";
 import V1EpochProofProposalApproval from "../validators/V1EpochProofProposalApproval.js";
-import { getResultCode } from "../V1ConsensusProtocolError.js"
+import { getResultCode, V1ConsensusPublicKeyMismatchError } from "../V1ConsensusProtocolError.js"
 import { ConsensusResultCode, CustomEventType } from "../../../../utils/constants.js";
 import { consensusMessageFactory } from "../../../../messages/consensus/v1/consensusMessageFactory.js";
 import { bufferToAddress } from "../../../state/utils/address.js"
@@ -25,7 +25,8 @@ class ConsensusEpochProofProposalOperationHandler extends ConnectionOperationHan
      * Handles a leader's consensus v1 epoch proof proposal from the minion side.
      * @param {object} message Decoded consensus v1 message containing `proof_proposal` and `session_id`.
      * @param {object} connection Peer connection context used by the request validator.
-     * @returns {Promise<void>} Resolves after sending a signed consensus v1 proof proposal response.
+     * @param protocolSession Protocol session context used by the request validator.
+     * @returns {Promise<void>} Resolves after sending a signed response, unless a local identity violation closes the connection.
      */
     async handleRequest(message, connection, protocolSession) {
         const eventContext = this.#buildRequestEventContext(message, connection);
@@ -45,7 +46,6 @@ class ConsensusEpochProofProposalOperationHandler extends ConnectionOperationHan
         } catch (e) {
             validationError = e;
             resultCode = getResultCode(e);
-            // TODO: If INVALID_ADDRESS_ASSERTION is introduced, blacklist the specific remote address/pubKey.
             this.#emitEvent(CustomEventType.EPOCH_PROPOSAL_VALIDATION_FAILURE, {
                 ...eventContext,
                 resultCode,
@@ -53,13 +53,16 @@ class ConsensusEpochProofProposalOperationHandler extends ConnectionOperationHan
             });
         }
         finally {
-            await this.#sendEpochProofProposalApprovalResponse(
-                message?.session_id,
-                connection,
-                protocolSession,
-                message,
-                resultCode
-            );
+            // Network bans and disconnects this peer when it receives the failure event.
+            if (!(validationError instanceof V1ConsensusPublicKeyMismatchError)) {
+                await this.#sendEpochProofProposalApprovalResponse(
+                    message?.session_id,
+                    connection,
+                    protocolSession,
+                    message,
+                    resultCode
+                );
+            }
         }
     }
 
@@ -68,6 +71,7 @@ class ConsensusEpochProofProposalOperationHandler extends ConnectionOperationHan
      *
      * @param {object} message Decoded consensus v1 message containing `proof_proposal_response`.
      * @param {object} connection Peer connection context used by the response validator.
+     * @param _protocolSession Protocol session context used by the response validator.
      * @param {object} proofProposal Original proof proposal used by the response validator.
      * @returns {Promise<{resultCode: number, approval?: object}>} Approval handling outcome with a ConsensusResultCode value.
      */

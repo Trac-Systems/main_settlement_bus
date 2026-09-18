@@ -19,6 +19,21 @@ export class V1ConsensusProtocolError extends Error {
 }
 
 /**
+ * Local validation found that a payload address belongs to another peer key.
+ *
+ * This type marks an observed identity violation. A peer rejection carrying
+ * PUBLIC_KEY_MISMATCH remains a plain V1ConsensusProtocolError.
+ */
+export class V1ConsensusPublicKeyMismatchError extends V1ConsensusProtocolError {
+    constructor() {
+        super(
+            ConsensusResultCode.PUBLIC_KEY_MISMATCH,
+            'Address does not match remote public key.'
+        );
+    }
+}
+
+/**
  * Returns the consensus result code attached to a protocol error.
  *
  * @param {unknown} err Error-like value to inspect.

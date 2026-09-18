@@ -6,7 +6,7 @@ import { WalletProvider } from 'trac-wallet';
 import ConsensusEpochProofProposalOperationHandler from '../../../src/core/consensus/v1/handlers/ConsesusEpochProofProposalOperationHandler.js';
 import V1EpochProofProposalRequest from '../../../src/core/consensus/v1/validators/V1EpochProofProposalRequest.js';
 import V1EpochProofProposalApproval from '../../../src/core/consensus/v1/validators/V1EpochProofProposalApproval.js';
-import { V1ConsensusProtocolError } from '../../../src/core/consensus/v1/V1ConsensusProtocolError.js';
+import { V1ConsensusProtocolError, V1ConsensusPublicKeyMismatchError } from '../../../src/core/consensus/v1/V1ConsensusProtocolError.js';
 import consensusV1OperationFixtures from '../../fixtures/consensusV1Operation.fixtures.js';
 import { config } from '../../helpers/config.js';
 import { testKeyPair2 } from '../../fixtures/apply.fixtures.js';
@@ -239,6 +239,37 @@ test('handleRequest maps consensus validation errors to signed rejection respons
     t.is(proofProposalResponse.result, ConsensusResultCode.INVALID_PAYLOAD);
     t.absent(proofProposalResponse.approval);
     t.ok(await verifyProofProposalResponseSignature(proofProposalResponse, wallet.publicKey));
+});
+
+test('handleRequest emits a local public key mismatch without building or sending a response', async t => {
+    const calls = [];
+    const message = proofProposalMessage();
+    const connection = createConnection(calls);
+    const validationError = new V1ConsensusPublicKeyMismatchError();
+    const handler = setupHandler(t, calls, {
+        wallet: {
+            sign() {
+                t.fail('must not sign a response for a banned peer');
+            }
+        },
+        requestValidate: async () => {
+            calls.push({ name: 'validateRequest' });
+            throw validationError;
+        }
+    });
+    handler.displayError = () => t.fail('must not attempt to build or send a response');
+
+    await handler.handleRequest(message, connection, connection.protocolSession.indexers);
+
+    t.alike(callNames(calls), [
+        'onEpochProposalReceived',
+        'validateRequest',
+        'onEpochProposalValidationFailure'
+    ]);
+    t.is(calls[2].context.error, validationError);
+    t.is(calls[2].context.resultCode, ConsensusResultCode.PUBLIC_KEY_MISMATCH);
+    t.is(calls[2].context.connection, connection);
+    t.is(connection.sent.length, 0);
 });
 
 test('handleRequest maps unexpected validation errors to UNEXPECTED_ERROR responses', async t => {

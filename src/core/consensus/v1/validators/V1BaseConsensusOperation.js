@@ -5,7 +5,7 @@ import {
     ConsensusOperationType,
     ConsensusResultCode
 } from "../../../../utils/constants.js";
-import {V1ConsensusProtocolError} from "../V1ConsensusProtocolError.js";
+import {V1ConsensusProtocolError, V1ConsensusPublicKeyMismatchError} from "../V1ConsensusProtocolError.js";
 import tracCryptoApi from "trac-crypto-api";
 import {createMessage} from "../../../../utils/buffer.js";
 import {bufferToAddress} from "../../../state/utils/address.js";
@@ -301,10 +301,7 @@ class V1BaseConsensusOperation {
         }
 
         if (!b4a.equals(publicKeyFromAddress, remotePublicKey)) {
-            throw new V1ConsensusProtocolError(
-                ConsensusResultCode.PUBLIC_KEY_MISMATCH,
-                'Address does not match remote public key.'
-            );
+            throw new V1ConsensusPublicKeyMismatchError();
         }
     }
 
