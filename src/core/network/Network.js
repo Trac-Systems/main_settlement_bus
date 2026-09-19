@@ -263,7 +263,10 @@ class Network extends ReadyResource {
                         new Error('Connection closed before response')
                     );
                     this.#swarm?.leavePeer(connection.remotePublicKey);
-                    this.#validatorConnectionManager.remove(publicKey);
+                    // only act on the connection this event belongs to
+                    if (this.#validatorConnectionManager.isCurrent(publicKey, connection)) {
+                        this.#validatorConnectionManager.remove(publicKey);
+                    }
                     if (connection.protocolSession) {
                         try {
                             connection.protocolSession.close();
