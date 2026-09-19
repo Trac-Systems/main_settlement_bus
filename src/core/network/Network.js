@@ -32,6 +32,9 @@ class Network extends ReadyResource {
     #validatorMessageOrchestrator;
     #config;
     #pendingConnections;
+    // Includes sockets that are still initializing, before they enter the validator pool.
+    #openConnectionsByPeer = new Map();
+    #validatorConnectionIds = new WeakMap();
     #connectTimeoutMs;
     #maxPendingConnections;
     #rateLimiter;
@@ -133,6 +136,7 @@ class Network extends ReadyResource {
                 swarm.removeAllListeners('connection');
             }
             await swarm.destroy();
+            this.#openConnectionsByPeer.clear();
             if (this.#swarm === swarm) {
                 this.#swarm = null;
             }
@@ -154,46 +158,76 @@ class Network extends ReadyResource {
             const pending = this.#pendingConnections.get(publicKey);
             const timeoutId = pending?.timeoutId;
 
-            if (!timeoutId) return;
+            if (!timeoutId) {
+                return;
+            }
 
             clearTimeout(timeoutId);
             this.#pendingConnections.delete(publicKey);
 
-            if (type === 'validator') {
-                try {
-                    connection.protocolSession.setTelemetryContext?.({
-                        validator: publicKey, validator_address: publicKeyToAddress(publicKey, this.#config),
-                        connection_attempt_id: pending.attemptId,
-                    });
-                    if (!connection.protocolSession.isProbed()) await connection.protocolSession.probe();
-                } catch (err) {
-                    this.#telemetry.emit('validator.probe_failed', {
-                        ...this.#attemptContext(publicKey, pending), stage: 'probe', error_type: err?.name ?? 'Error',
-                        fallback_allowed: true
-                    }, 4);
-                    this.#logger.debug(`failed to probe peer with publicKey ${publicKey}: ${err?.message ?? err}`);
-                }
-
-                const added = this.#validatorConnectionManager.addValidator(publicKey, connection, this.#attemptContext(publicKey, pending));
-                if (!added) this.#telemetry.emit('validator.connect_ignored', {
-                    ...this.#attemptContext(publicKey, pending), reason: this.#validatorConnectionManager.connected(publicKey)
-                        ? 'already_connected' : 'pool_limit'
-                });
-
-                let healthCheckSupported = false;
-                try {
-                    healthCheckSupported = connection.protocolSession.isHealthCheckSupported();
-                } catch (err) {
-                    this.#logger.debug(`health check support unknown for peer with publicKey ${publicKey}: ${err?.message ?? err}`);
-                }
-
-                if (healthCheckSupported) {
-                    this.#validatorHealthCheckService.start(publicKey);
-                } else {
-                    this.#validatorHealthCheckService.stop(publicKey);
-                }
+            if (type !== 'validator') {
+                return;
             }
 
+            try {
+                connection.protocolSession.setTelemetryContext?.({
+                    validator: publicKey,
+                    validator_address: publicKeyToAddress(publicKey, this.#config),
+                    connection_attempt_id: pending.attemptId,
+                });
+                if (!connection.protocolSession.isProbed()) {
+                    await connection.protocolSession.probe();
+                }
+            } catch (error) {
+                this.#telemetry.emit('validator.probe_failed', {
+                    ...this.#attemptContext(publicKey, pending),
+                    stage: 'probe',
+                    error_type: error?.name ?? 'Error',
+                    fallback_allowed: true,
+                }, 4);
+                this.#logger.debug(`failed to probe peer with publicKey ${publicKey}: ${error?.message ?? error}`);
+            }
+
+            // The socket may have closed while we waited for the probe response.
+            if (this.#closing) {
+                return;
+            }
+
+            const connectionIsStillOpen = this.#isConnectionTracked(publicKey, connection);
+            if (!connectionIsStillOpen) {
+                return;
+            }
+
+            // Another connection may already occupy this validator's place in the pool.
+            const validatorWasAdded = this.#validatorConnectionManager.addValidator(
+                publicKey,
+                connection,
+                this.#attemptContext(publicKey, pending)
+            );
+            if (!validatorWasAdded) {
+                const alreadyConnected = this.#validatorConnectionManager.connected(publicKey);
+                this.#telemetry.emit('validator.connect_ignored', {
+                    ...this.#attemptContext(publicKey, pending),
+                    reason: alreadyConnected ? 'already_connected' : 'pool_limit',
+                });
+                return;
+            }
+
+            const diagnostics = this.#validatorConnectionManager.getConnectionDiagnostics?.(publicKey);
+            this.#validatorConnectionIds.set(connection, diagnostics?.connection_id);
+
+            let healthCheckSupported = false;
+            try {
+                healthCheckSupported = connection.protocolSession.isHealthCheckSupported();
+            } catch (error) {
+                this.#logger.debug(`health check support unknown for peer with publicKey ${publicKey}: ${error?.message ?? error}`);
+            }
+
+            if (healthCheckSupported) {
+                this.#validatorHealthCheckService.start(publicKey);
+            } else {
+                this.#validatorHealthCheckService.stop(publicKey);
+            }
         });
     }
 
@@ -258,6 +292,12 @@ class Network extends ReadyResource {
                     return;
                 }
 
+                const publicKey = b4a.toString(connection.remotePublicKey, 'hex');
+                const pendingConnectionAttempt = this.#pendingConnections.get(publicKey);
+                // Track sockets before asynchronous setup so an older socket closing
+                // cannot cancel discovery or requests for its replacement.
+                this.#trackPeerConnection(publicKey, connection);
+
                 try {
                     // Per-peer connection initialization:
                     // - attach Protomux (legacy + v1 channels/messages)
@@ -267,7 +307,14 @@ class Network extends ReadyResource {
                     // Pear v3 can deliver a late swarm connection while shutdown is
                     // already closing the Corestore. Do not replicate a connection
                     // after close has begun; store.replicate would otherwise throw.
-                    if (this.#closing || this.#swarm === null) {
+                    const networkIsClosing = this.#closing || this.#swarm === null;
+                    if (networkIsClosing) {
+                        this.#destroyConnection(connection);
+                        return;
+                    }
+
+                    const connectionIsStillOpen = this.#isConnectionTracked(publicKey, connection);
+                    if (!connectionIsStillOpen) {
                         this.#destroyConnection(connection);
                         return;
                     }
@@ -276,15 +323,12 @@ class Network extends ReadyResource {
                     const stream = store.replicate(connection);
                     wakeup.addStream(stream);
                 } catch (error) {
-                    const publicKey = connection.remotePublicKey
-                        ? b4a.toString(connection.remotePublicKey, 'hex')
-                        : 'unknown';
                     this.#telemetry.emit('network.connection_setup_failed', {
-                        ...this.#attemptContext(publicKey, this.#pendingConnections.get(publicKey)),
+                        ...this.#attemptContext(publicKey, pendingConnectionAttempt),
                         stage: 'protocol_setup', error_type: error?.name ?? 'Error'
                     }, 3);
-                    this.#pendingRequestsService.rejectPendingRequestsForPeer(
-                        publicKey,
+                    this.#pendingRequestsService.rejectPendingRequestsForConnection(
+                        connection,
                         error ?? new Error('Connection setup failed')
                     );
                     this.#destroyConnection(connection);
@@ -294,60 +338,10 @@ class Network extends ReadyResource {
                     return;
                 }
 
-                const publicKey = b4a.toString(connection.remotePublicKey, 'hex');
                 if (this.#pendingConnections.has(publicKey)) {
                     const { type } = this.#pendingConnections.get(publicKey);
                     await this.#finalizeConnection(publicKey, type, connection);
                 }
-
-                let connectionError;
-                connection.on('close', () => {
-                    this.#pendingRequestsService.rejectPendingRequestsForPeer(
-                        publicKey,
-                        new Error('Connection closed before response')
-                    );
-                    this.#swarm?.leavePeer(connection.remotePublicKey);
-                    // only act on the connection this event belongs to
-                    if (this.#validatorConnectionManager.isCurrent(publicKey, connection)) {
-                        this.#validatorConnectionManager.remove(publicKey, {
-                            endConnection: false,
-                            expectedConnection: connection,
-                            reason: this.#closing ? 'shutdown' : connectionError ? 'connection_error' : 'connection_closed',
-                            error_type: connectionError,
-                        });
-                    }
-                    if (connection.protocolSession) {
-                        try {
-                            connection.protocolSession.close();
-                        } catch {}
-                    }
-                });
-
-                connection.on('error', (error) => {
-                    connectionError = error?.name ?? 'Error';
-                    this.#telemetry.emit('network.connection_error', {
-                        validator: publicKey, ...this.#validatorConnectionManager.getConnectionDiagnostics?.(publicKey),
-                        error_type: connectionError, error_code: error?.code,
-                        reason: error?.message?.includes('connection reset by peer') ? 'connection_reset'
-                            : error?.message?.includes('Duplicate connection') ? 'duplicate_connection'
-                                : error?.message?.includes('connection timed out') ? 'connection_timeout' : 'socket_error'
-                    }, 4);
-                    this.#pendingRequestsService.rejectPendingRequestsForPeer(
-                        publicKey,
-                        error ?? new Error('Connection error before response')
-                    );
-                    if (
-                        error && error.message && (
-                            error.message.includes('connection reset by peer') ||
-                            error.message.includes('Duplicate connection') ||
-                            error.message.includes('connection timed out'))
-                    ) {
-                        // TODO: decide if we want to handle this error in a specific way. It generates a lot of logs.
-                        return;
-                    }
-                    this.#logger.error(error?.message ?? 'Unknown network connection error');
-                });
-
             });
 
             this.#swarm.join(this.#config.channel, { server: true, client: true });
@@ -474,13 +468,137 @@ class Network extends ReadyResource {
         }
     }
 
+    #isConnectionTracked(publicKey, connection) {
+        const peerConnections = this.#openConnectionsByPeer.get(publicKey);
+        if (!peerConnections) {
+            return false;
+        }
+
+        return peerConnections.has(connection);
+    }
+
+    #trackPeerConnection(publicKey, connection) {
+        let peerConnections = this.#openConnectionsByPeer.get(publicKey);
+        if (!peerConnections) {
+            peerConnections = new Set();
+            this.#openConnectionsByPeer.set(publicKey, peerConnections);
+        }
+        peerConnections.add(connection);
+
+        let lastErrorType;
+        connection.once('close', () => {
+            this.#handleConnectionClosed(publicKey, connection, peerConnections, lastErrorType);
+        });
+
+        connection.on('error', error => {
+            lastErrorType = error?.name ?? 'Error';
+            this.#handleConnectionError(publicKey, connection, error);
+        });
+    }
+
+    #handleConnectionClosed(publicKey, closedConnection, peerConnections, lastErrorType) {
+        const closeError = new Error('Connection closed before response');
+        this.#pendingRequestsService.rejectPendingRequestsForConnection(closedConnection, closeError);
+
+        peerConnections.delete(closedConnection);
+
+        // Keep discovery active while another socket to this peer is open or initializing.
+        const noPeerConnectionsRemain = peerConnections.size === 0;
+        const currentPeerConnections = this.#openConnectionsByPeer.get(publicKey);
+        const connectionSetIsStillCurrent = currentPeerConnections === peerConnections;
+
+        if (noPeerConnectionsRemain && connectionSetIsStillCurrent) {
+            this.#openConnectionsByPeer.delete(publicKey);
+            if (this.#swarm) {
+                this.#swarm.leavePeer(closedConnection.remotePublicKey);
+            }
+        }
+
+        const isCurrentValidatorConnection = this.#validatorConnectionManager.isCurrent(
+            publicKey,
+            closedConnection
+        );
+        if (isCurrentValidatorConnection) {
+            let removalReason = 'connection_closed';
+            if (this.#closing) {
+                removalReason = 'shutdown';
+            } else if (lastErrorType) {
+                removalReason = 'connection_error';
+            }
+
+            this.#validatorConnectionManager.remove(publicKey, {
+                endConnection: false,
+                expectedConnection: closedConnection,
+                reason: removalReason,
+                error_type: lastErrorType,
+            });
+        }
+
+        if (closedConnection.protocolSession) {
+            try {
+                closedConnection.protocolSession.close();
+            } catch {
+                // The transport is already closed; protocol cleanup is best effort.
+            }
+        }
+    }
+
+    #handleConnectionError(publicKey, connection, error) {
+        const errorMessage = error?.message;
+        const peerResetConnection = errorMessage?.includes('connection reset by peer');
+        const duplicateConnection = errorMessage?.includes('Duplicate connection');
+        const connectionTimedOut = errorMessage?.includes('connection timed out');
+
+        let errorReason = 'socket_error';
+        if (peerResetConnection) {
+            errorReason = 'connection_reset';
+        } else if (duplicateConnection) {
+            errorReason = 'duplicate_connection';
+        } else if (connectionTimedOut) {
+            errorReason = 'connection_timeout';
+        }
+
+        const isCurrentValidatorConnection = this.#validatorConnectionManager.isCurrent(publicKey, connection);
+        const savedConnectionId = this.#validatorConnectionIds.get(connection);
+        let connectionDiagnostics = { connection_id: savedConnectionId };
+        if (isCurrentValidatorConnection) {
+            connectionDiagnostics = this.#validatorConnectionManager.getConnectionDiagnostics?.(publicKey);
+        }
+
+        // A late error belongs to the old socket, including its identity in Graylog.
+        // Only the current socket has live age and sent-count diagnostics in the pool.
+        this.#telemetry.emit('network.connection_error', {
+            validator: publicKey,
+            ...connectionDiagnostics,
+            stale_connection: Boolean(savedConnectionId) && !isCurrentValidatorConnection,
+            error_type: error?.name ?? 'Error',
+            error_code: error?.code,
+            reason: errorReason,
+        }, 4);
+
+        const requestError = error ?? new Error('Connection error before response');
+        this.#pendingRequestsService.rejectPendingRequestsForConnection(connection, requestError);
+
+        if (peerResetConnection || duplicateConnection || connectionTimedOut) {
+            return;
+        }
+
+        this.#logger.error(errorMessage ?? 'Unknown network connection error');
+    }
+
     #destroyConnection(connection) {
-        if (!connection) return;
+        if (!connection) {
+            return;
+        }
+
         if (connection.protocolSession) {
             try {
                 connection.protocolSession.close();
-            } catch {}
+            } catch {
+                // A protocol cleanup failure must not prevent closing the transport.
+            }
         }
+
         if (typeof connection.destroy === 'function') {
             connection.destroy();
         } else if (typeof connection.end === 'function') {

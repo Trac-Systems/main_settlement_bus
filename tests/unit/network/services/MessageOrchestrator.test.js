@@ -1,11 +1,12 @@
 import { hook, test } from 'brittle';
 import sinon from 'sinon';
+import EventEmitter from 'bare-events';
 import MessageOrchestrator from '../../../../src/core/network/services/MessageOrchestrator.js';
 import State from '../../../../src/core/state/State.js';
 import { OperationType, ResultCode } from '../../../../src/utils/constants.js';
 import { testKeyPair1, testKeyPair2 } from '../../../fixtures/apply.fixtures.js';
 import { publicKeyToAddress } from '../../../../src/utils/helpers.js';
-import { ConnectionManagerError } from '../../../../src/core/network/services/ConnectionManager.js';
+import ConnectionManager, { ConnectionManagerError } from '../../../../src/core/network/services/ConnectionManager.js';
 import { PendingRequestServiceTimeoutError } from '../../../../src/core/network/services/PendingRequestService.js';
 import { WalletProvider } from 'trac-wallet';
 import { config, overrideConfig } from '../../../helpers/config.js';
@@ -52,6 +53,42 @@ const createConnectionManager = ({
     incrementSentCount: sinon.stub(),
     getSentCount: sinon.stub().returns(sentCount),
 });
+
+function deferred() {
+    let resolve;
+    let reject;
+    const promise = new Promise((resolvePromise, rejectPromise) => {
+        resolve = resolvePromise;
+        reject = rejectPromise;
+    });
+    return { promise, resolve, reject };
+}
+
+function createReplacementHarness(config, preferredProtocol = 'v1') {
+    const makeConnection = () => {
+        const connection = new EventEmitter();
+        connection.end = sinon.stub();
+        connection.protocolSession = {
+            preferredProtocol,
+            supportedProtocols: { LEGACY: 'legacy', V1: 'v1' },
+            send: sinon.stub().resolves(ResultCode.OK),
+        };
+        return connection;
+    };
+    const connectionManager = new ConnectionManager(config);
+    const original = makeConnection();
+    const replacement = makeConnection();
+    connectionManager.addValidator(VALIDATOR_KEY, original);
+    return {
+        connectionManager,
+        original,
+        replacement,
+        replace() {
+            connectionManager.remove(VALIDATOR_KEY, { expectedConnection: original, endConnection: false });
+            connectionManager.addValidator(VALIDATOR_KEY, replacement);
+        },
+    };
+}
 
 hook('setup', () => {
     sinon.stub(console, 'log');
@@ -463,4 +500,174 @@ test('MessageOrchestrator.send V1 avoids selecting validator with requester addr
     t.is(result, true);
     t.is(sendSingleMessage.callCount, 1);
     t.is(sendSingleMessage.firstCall.args[1], otherValidatorKey);
+});
+
+test('MessageOrchestrator stale V1 rejection preserves the replacement for the normal retry', async t => {
+    const testConfig = overrideConfig({ maxRetries: 1 });
+    const harness = createReplacementHarness(testConfig);
+    const started = deferred();
+    const response = deferred();
+    harness.original.protocolSession.send.callsFake(() => {
+        started.resolve();
+        return response.promise;
+    });
+    const wallet = await createWallet(testConfig);
+    const orchestrator = new MessageOrchestrator(harness.connectionManager, {}, testConfig);
+    orchestrator.setWallet(wallet);
+    const pending = orchestrator.send(createTransferMessage(testConfig, wallet));
+    await started.promise;
+    harness.replace();
+    response.reject(new Error('old connection closed'));
+
+    t.is(await pending, true, 'the existing retry succeeds through the replacement');
+    t.is(harness.replacement.protocolSession.send.callCount, 1);
+    t.is(harness.connectionManager.getConnection(VALIDATOR_KEY), harness.replacement);
+    t.is(harness.connectionManager.getSentCount(VALIDATOR_KEY), 1, 'only the replacement request increments its counter');
+    t.is(harness.replacement.end.callCount, 0);
+});
+
+test('MessageOrchestrator stale V1 success cannot increment or rotate a replacement near its threshold', async t => {
+    const harness = createReplacementHarness(config);
+    const started = deferred();
+    const response = deferred();
+    harness.original.protocolSession.send.callsFake(() => {
+        started.resolve();
+        return response.promise;
+    });
+    const wallet = await createWallet(config);
+    const orchestrator = new MessageOrchestrator(harness.connectionManager, {}, config);
+    orchestrator.setWallet(wallet);
+    const pending = orchestrator.send(createTransferMessage(config, wallet));
+    await started.promise;
+    harness.replace();
+    for (let sent = 0; sent < config.messageThreshold - 1; sent++) {
+        harness.connectionManager.incrementSentCount(VALIDATOR_KEY);
+    }
+    response.resolve(ResultCode.OK);
+
+    t.is(await pending, true, 'the original successful response remains successful');
+    t.is(harness.connectionManager.getSentCount(VALIDATOR_KEY), config.messageThreshold - 1);
+    t.is(harness.connectionManager.getConnection(VALIDATOR_KEY), harness.replacement);
+    t.is(harness.replacement.end.callCount, 0);
+    t.is(harness.replacement.protocolSession.send.callCount, 0);
+});
+
+for (const resultCode of [ResultCode.TIMEOUT, 99999]) {
+    test(`MessageOrchestrator stale V1 policy result ${resultCode} cannot remove a replacement`, async t => {
+        const harness = createReplacementHarness(config);
+        const started = deferred();
+        const response = deferred();
+        harness.original.protocolSession.send.callsFake(() => {
+            started.resolve();
+            return response.promise;
+        });
+        const wallet = await createWallet(config);
+        const orchestrator = new MessageOrchestrator(harness.connectionManager, {}, config);
+        orchestrator.setWallet(wallet);
+        const pending = orchestrator.send(createTransferMessage(config, wallet));
+        await started.promise;
+        harness.replace();
+        response.resolve(resultCode);
+
+        t.is(await pending, false, 'policy rejection still returns false without retrying');
+        t.is(harness.connectionManager.getConnection(VALIDATOR_KEY), harness.replacement);
+        t.is(harness.replacement.end.callCount, 0);
+        t.is(harness.replacement.protocolSession.send.callCount, 0);
+    });
+}
+
+test('MessageOrchestrator reselects the protocol when the connection changes during V1 request construction', async t => {
+    const testConfig = overrideConfig({ maxRetries: 1 });
+    const harness = createReplacementHarness(testConfig);
+    harness.replacement.protocolSession.preferredProtocol = 'legacy';
+    const state = { waitForUnsigned: sinon.stub().resolves(true) };
+    const wallet = await createWallet(testConfig);
+    const message = createTransferMessage(testConfig, wallet);
+    const orchestrator = new MessageOrchestrator(harness.connectionManager, state, testConfig);
+    orchestrator.setWallet(wallet);
+
+    const pending = orchestrator.send(message);
+    // V1 construction awaits hashing before dispatching the request.
+    harness.replace();
+
+    t.is(await pending, true);
+    t.is(harness.original.protocolSession.send.callCount, 0);
+    t.is(harness.replacement.protocolSession.send.callCount, 1);
+    t.is(harness.replacement.protocolSession.send.firstCall.args[0], message, 'legacy replacement receives its canonical payload');
+    t.is(harness.connectionManager.getSentCount(VALIDATOR_KEY), 1);
+});
+
+test('MessageOrchestrator late legacy confirmation does not increment or rotate a replacement', async t => {
+    const harness = createReplacementHarness(config, 'legacy');
+    const waiting = deferred();
+    const confirmation = deferred();
+    const state = {
+        waitForUnsigned: sinon.stub().callsFake(() => {
+            waiting.resolve();
+            return confirmation.promise;
+        }),
+    };
+    const wallet = await createWallet(config);
+    const orchestrator = new MessageOrchestrator(harness.connectionManager, state, config);
+    orchestrator.setWallet(wallet);
+    const pending = orchestrator.send(createTransferMessage(config, wallet));
+    await waiting.promise;
+    harness.replace();
+    for (let sent = 0; sent < config.messageThreshold - 1; sent++) {
+        harness.connectionManager.incrementSentCount(VALIDATOR_KEY);
+    }
+    confirmation.resolve(true);
+
+    t.is(await pending, true);
+    t.is(harness.connectionManager.getSentCount(VALIDATOR_KEY), config.messageThreshold - 1);
+    t.is(harness.connectionManager.getConnection(VALIDATOR_KEY), harness.replacement);
+    t.is(harness.replacement.end.callCount, 0);
+});
+
+test('MessageOrchestrator expired legacy confirmation retries using the preserved replacement', async t => {
+    const testConfig = overrideConfig({ maxRetries: 1 });
+    const harness = createReplacementHarness(testConfig, 'legacy');
+    const waiting = deferred();
+    const confirmation = deferred();
+    const state = { waitForUnsigned: sinon.stub().resolves(true) };
+    state.waitForUnsigned.onFirstCall().callsFake(() => {
+        waiting.resolve();
+        return confirmation.promise;
+    });
+    const wallet = await createWallet(testConfig);
+    const orchestrator = new MessageOrchestrator(harness.connectionManager, state, testConfig);
+    orchestrator.setWallet(wallet);
+    const pending = orchestrator.send(createTransferMessage(testConfig, wallet));
+    await waiting.promise;
+    harness.replace();
+    confirmation.resolve(false);
+
+    t.is(await pending, true);
+    t.is(harness.replacement.protocolSession.send.callCount, 1);
+    t.is(harness.connectionManager.getConnection(VALIDATOR_KEY), harness.replacement);
+    t.is(harness.connectionManager.getSentCount(VALIDATOR_KEY), 1);
+    t.is(harness.replacement.end.callCount, 0);
+});
+
+test('MessageOrchestrator exhausted legacy rejection cannot remove a replacement after recursive retry', async t => {
+    const testConfig = overrideConfig({ maxRetries: 0 });
+    const harness = createReplacementHarness(testConfig, 'legacy');
+    const started = deferred();
+    const response = deferred();
+    harness.original.protocolSession.send.callsFake(() => {
+        started.resolve();
+        return response.promise;
+    });
+    const wallet = await createWallet(testConfig);
+    const orchestrator = new MessageOrchestrator(harness.connectionManager, {}, testConfig);
+    orchestrator.setWallet(wallet);
+    const pending = orchestrator.send(createTransferMessage(testConfig, wallet));
+    await started.promise;
+    harness.replace();
+    response.reject(new Error('old legacy request failed'));
+
+    t.is(await pending, false, 'legacy retry exhaustion is unchanged');
+    t.is(harness.connectionManager.getConnection(VALIDATOR_KEY), harness.replacement);
+    t.is(harness.replacement.end.callCount, 0);
+    t.is(harness.replacement.protocolSession.send.callCount, 0, 'maxRetries still prevents another send');
 });

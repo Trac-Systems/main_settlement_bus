@@ -44,6 +44,16 @@ const emitHealthCheck = async (healthCheckService, publicKey, requestId) => {
     await tick();
 };
 
+const deferred = () => {
+    let resolve;
+    let reject;
+    const promise = new Promise((resolvePromise, rejectPromise) => {
+        resolve = resolvePromise;
+        reject = rejectPromise;
+    });
+    return { promise, resolve, reject };
+};
+
 let connections
 
 const makeManager = (maxValidators = 6, conns = null, configOverrides = {}) => {
@@ -260,6 +270,53 @@ test('ConnectionManager', () => {
             t.absent(connectionManager.connected(data.key), 'validator should be removed from the pool')
             t.is(data.connection.end.callCount, 0, 'socket should remain open for in-flight responses')
         })
+
+        test('a stale expected connection cannot remove its replacement or reset its health failures', async t => {
+            const first = createV1Connection(testKeyPair5.publicKey);
+            const connectionManager = makeManager(1, [first]);
+            const healthCheckService = makeHealthCheckService();
+            connectionManager.subscribeToHealthChecks(healthCheckService);
+            connectionManager.remove(first.key, { endConnection: false });
+            const stopCount = healthCheckService.stop.callCount;
+            connectionManager.remove(first.key, { expectedConnection: first.connection });
+            t.is(healthCheckService.stop.callCount, stopCount, 'stale removal of an absent key has no health-check side effects');
+
+            const replacement = createV1Connection(testKeyPair5.publicKey, sinon.stub().resolves(ResultCode.TIMEOUT));
+            connectionManager.addValidator(replacement.key, replacement.connection);
+            await emitHealthCheck(healthCheckService, testKeyPair5.publicKey, 'replacement-1');
+            await emitHealthCheck(healthCheckService, testKeyPair5.publicKey, 'replacement-2');
+
+            connectionManager.remove(first.key, { expectedConnection: first.connection });
+
+            t.ok(connectionManager.isCurrent(replacement.key, replacement.connection), 'stale expected connection cannot remove the replacement');
+            t.is(replacement.connection.end.callCount, 0, 'replacement socket stays open');
+            t.is(healthCheckService.stop.callCount, stopCount, 'replacement checks are not stopped');
+            await emitHealthCheck(healthCheckService, testKeyPair5.publicKey, 'replacement-3');
+            t.absent(connectionManager.connected(replacement.key), 'stale removal did not reset the replacement failure streak');
+        });
+
+        test('synchronous close during health-based removal cannot delete a replacement or stop its checks', async t => {
+            const first = createV1Connection(testKeyPair6.publicKey, sinon.stub().resolves(ResultCode.TIMEOUT));
+            const replacement = createV1Connection(testKeyPair6.publicKey);
+            const connectionManager = makeManager(1, [first], { validatorHealthCheckFailureThreshold: 1 });
+            const healthCheckService = makeHealthCheckService();
+            connectionManager.subscribeToHealthChecks(healthCheckService);
+            let replacementAdded = false;
+            first.connection.end.callsFake(() => {
+                first.connection.emit('close');
+                replacementAdded = connectionManager.addValidator(replacement.key, replacement.connection);
+            });
+
+            await emitHealthCheck(healthCheckService, testKeyPair6.publicKey, 'first-failure');
+
+            t.ok(replacementAdded, 'old pool entry is deleted before socket shutdown invokes callbacks');
+            t.ok(connectionManager.isCurrent(replacement.key, replacement.connection), 'replacement added inside end remains tracked');
+            t.is(first.connection.end.callCount, 1, 'close callback does not recursively end the old socket');
+            t.is(replacement.connection.end.callCount, 0, 'replacement is never ended');
+            t.is(healthCheckService.stop.callCount, 1, 'health handler does not stop replacement checks after removal returns');
+            first.connection.emit('close');
+            t.ok(connectionManager.isCurrent(replacement.key, replacement.connection), 'late duplicate close still leaves replacement intact');
+        });
     })
 
     test('on close', async () => {
@@ -487,6 +544,58 @@ test('ConnectionManager', () => {
             } finally {
                 sinon.restore();
             }
+        });
+
+        for (const outcome of ['non-OK response', 'rejection']) {
+            test(`a stale healthcheck ${outcome} cannot remove a replacement near the failure threshold`, async t => {
+                const pending = deferred();
+                const first = createV1Connection(testKeyPair7.publicKey, sinon.stub().returns(pending.promise));
+                const connectionManager = makeManager(1, [first]);
+                const healthCheckService = makeHealthCheckService();
+                connectionManager.subscribeToHealthChecks(healthCheckService);
+                healthCheckService.emit(EventType.VALIDATOR_HEALTH_CHECK, testKeyPair7.publicKey, 'old-pending');
+
+                connectionManager.remove(first.key, { endConnection: false });
+                const replacement = createV1Connection(testKeyPair7.publicKey, sinon.stub().resolves(ResultCode.TIMEOUT));
+                connectionManager.addValidator(replacement.key, replacement.connection);
+                await emitHealthCheck(healthCheckService, testKeyPair7.publicKey, 'replacement-1');
+                await emitHealthCheck(healthCheckService, testKeyPair7.publicKey, 'replacement-2');
+                const stopCount = healthCheckService.stop.callCount;
+
+                if (outcome === 'rejection') pending.reject(new Error('old socket failed'));
+                else pending.resolve(ResultCode.TIMEOUT);
+                await tick();
+
+                t.ok(connectionManager.isCurrent(replacement.key, replacement.connection), 'old failure does not count against the replacement');
+                t.is(replacement.connection.end.callCount, 0, 'old failure does not end replacement socket');
+                t.is(healthCheckService.stop.callCount, stopCount, 'old failure cannot stop replacement checks');
+                await emitHealthCheck(healthCheckService, testKeyPair7.publicKey, 'replacement-3');
+                t.absent(connectionManager.connected(replacement.key), 'replacement still reaches threshold on its own third failure');
+            });
+        }
+
+        test('a stale successful healthcheck cannot reset the replacement failure streak', async t => {
+            const pending = deferred();
+            const first = createV1Connection(testKeyPair8.publicKey, sinon.stub().returns(pending.promise));
+            const connectionManager = makeManager(1, [first]);
+            const healthCheckService = makeHealthCheckService();
+            connectionManager.subscribeToHealthChecks(healthCheckService);
+            healthCheckService.emit(EventType.VALIDATOR_HEALTH_CHECK, testKeyPair8.publicKey, 'old-pending');
+
+            connectionManager.remove(first.key, { endConnection: false });
+            const replacement = createV1Connection(testKeyPair8.publicKey, sinon.stub().resolves(ResultCode.TIMEOUT));
+            connectionManager.addValidator(replacement.key, replacement.connection);
+            await emitHealthCheck(healthCheckService, testKeyPair8.publicKey, 'replacement-1');
+            await emitHealthCheck(healthCheckService, testKeyPair8.publicKey, 'replacement-2');
+            const stopCount = healthCheckService.stop.callCount;
+
+            pending.resolve(ResultCode.OK);
+            await tick();
+
+            t.ok(connectionManager.isCurrent(replacement.key, replacement.connection));
+            t.is(healthCheckService.stop.callCount, stopCount, 'old success has no health-check side effects');
+            await emitHealthCheck(healthCheckService, testKeyPair8.publicKey, 'replacement-3');
+            t.absent(connectionManager.connected(replacement.key), 'old success cannot erase two failures on replacement');
         });
 
         test('ignores malformed health check events', async t => {

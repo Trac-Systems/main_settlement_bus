@@ -2,7 +2,8 @@ import { test } from 'brittle';
 import sinon from 'sinon';
 import b4a from 'b4a';
 import EventEmitter from 'bare-events';
-import { CONNECTION_STATUS } from '../../../src/utils/constants.js';
+import { CONNECTION_STATUS, NetworkOperationType, ResultCode } from '../../../src/utils/constants.js';
+import PendingRequestService from '../../../src/core/network/services/PendingRequestService.js';
 
 const isBareRuntime = typeof globalThis.Bare !== 'undefined';
 
@@ -97,19 +98,19 @@ async function loadNetwork(options = {}) {
         setWallet() {}
     }
 
-    class PendingRequestServiceMock {
-        constructor() {
+    class PendingRequestServiceMock extends PendingRequestService {
+        constructor(config) {
+            super(config);
             pendingRequestServiceInstance = this;
             this.rejected = [];
         }
 
         isProbePending() { return false; }
 
-        rejectPendingRequestsForPeer(publicKey) {
-            this.rejected.push(normalizePublicKey(publicKey));
+        rejectPendingRequestsForConnection(connection, error) {
+            this.rejected.push(connection);
+            return super.rejectPendingRequestsForConnection(connection, error);
         }
-
-        close() {}
     }
 
     class TransactionCommitServiceMock {
@@ -156,6 +157,9 @@ async function loadNetwork(options = {}) {
 
     const Network = NetworkModule.default;
     const config = {
+        addressPrefix: 'trac',
+        pendingRequestTimeout: 10000,
+        maxPendingRequestsInPendingRequestsService: 10,
         enableWallet: true,
         connectTimeoutMs: 1_000,
         maxPendingConnections: 10,
@@ -189,6 +193,23 @@ function deferred() {
         resolve = done;
     });
     return { promise, resolve };
+}
+
+function makeConnection(publicKey) {
+    const connection = new EventEmitter();
+    connection.remotePublicKey = b4a.from(publicKey, 'hex');
+    connection.protocolSession = { close: sinon.stub() };
+    connection.destroy = sinon.stub().callsFake(() => connection.emit('close'));
+    return connection;
+}
+
+function pendingRequest(service, publicKey, id, connection) {
+    const promise = service.registerPendingRequest(publicKey, {
+        id,
+        type: NetworkOperationType.BROADCAST_TRANSACTION_REQUEST,
+    }, connection);
+    promise.catch(() => {});
+    return promise;
 }
 
 if (isBareRuntime) {
@@ -265,7 +286,7 @@ if (isBareRuntime) {
             } }],
             'removal should be requested once for the tracked validator'
         );
-        t.alike(pendingRequestServiceInstance.rejected, [publicKey], 'pending requests for the peer should be rejected');
+        t.alike(pendingRequestServiceInstance.rejected, [connection], 'only requests for the closed connection should be rejected');
         t.is(swarmInstance.leavePeer.callCount, 1, 'peer discovery should be cancelled');
     });
 
@@ -285,13 +306,20 @@ if (isBareRuntime) {
         await new Promise(resolve => setTimeout(resolve, 0));
 
         connectionManagerInstance.addValidator(publicKey, second);
+        t.teardown(() => pendingRequestServiceInstance.close());
+        const oldRequest = pendingRequest(pendingRequestServiceInstance, publicKey, 'old-close', first);
+        const newRequest = pendingRequest(pendingRequestServiceInstance, publicKey, 'new-close', second);
         first.emit('close');
 
         t.ok(connectionManagerInstance.exists(publicKey), 'tracked validator should stay in the pool');
         t.alike(connectionManagerInstance.removed, [], 'no removal should be requested');
         t.ok(connectionManagerInstance.isCurrent(publicKey, second), 'the tracked connection should stay unchanged');
-        t.alike(pendingRequestServiceInstance.rejected, [publicKey], 'pending requests for the peer should be rejected');
-        t.is(swarmInstance.leavePeer.callCount, 1, 'peer discovery should be cancelled');
+        t.alike(pendingRequestServiceInstance.rejected, [first], 'only requests on the old connection are rejected');
+        await t.exception(oldRequest, /Connection closed before response/);
+        t.ok(pendingRequestServiceInstance.has('new-close'), 'replacement request remains pending');
+        pendingRequestServiceInstance.resolvePendingRequest('new-close', ResultCode.OK);
+        t.is(await newRequest, ResultCode.OK, 'replacement can still complete its request');
+        t.is(swarmInstance.leavePeer.callCount, 0, 'discovery stays active while a replacement socket exists');
 
         second.emit('close');
         t.alike(
@@ -304,6 +332,139 @@ if (isBareRuntime) {
             } }],
             'the tracked connection closing should remove the validator'
         );
+        t.is(swarmInstance.leavePeer.callCount, 1, 'discovery is cancelled only after the last socket closes');
+    });
+
+    test('Network keeps replacement requests pending when an old connection emits an error', async t => {
+        const publicKey = 'f'.repeat(64);
+        const { swarmInstance, connectionManagerInstance, pendingRequestServiceInstance } = await loadNetwork();
+        t.teardown(() => pendingRequestServiceInstance.close());
+        const first = makeConnection(publicKey);
+        const second = makeConnection(publicKey);
+        swarmInstance.emit('connection', first);
+        swarmInstance.emit('connection', second);
+        await new Promise(resolve => setTimeout(resolve, 0));
+        connectionManagerInstance.addValidator(publicKey, second);
+        const oldRequest = pendingRequest(pendingRequestServiceInstance, publicKey, 'old-error', first);
+        const newRequest = pendingRequest(pendingRequestServiceInstance, publicKey, 'new-error', second);
+
+        first.emit('error', new Error('old socket failed'));
+
+        await t.exception(oldRequest, /old socket failed/);
+        t.ok(pendingRequestServiceInstance.has('new-error'), 'replacement request survives the old error');
+        t.ok(connectionManagerInstance.isCurrent(publicKey, second));
+        t.is(swarmInstance.leavePeer.callCount, 0);
+        pendingRequestServiceInstance.resolvePendingRequest('new-error', ResultCode.OK);
+        t.is(await newRequest, ResultCode.OK);
+    });
+
+    test('Network preserves a replacement when an older connection fails asynchronous setup', async t => {
+        const publicKey = '1'.repeat(64);
+        const first = makeConnection(publicKey);
+        const second = makeConnection(publicKey);
+        const setupEntered = deferred();
+        const resumeSetup = deferred();
+        const { swarmInstance, connectionManagerInstance, pendingRequestServiceInstance } = await loadNetwork({
+            async setupProtomuxMessages(connection) {
+                if (connection === first) {
+                    setupEntered.resolve();
+                    await resumeSetup.promise;
+                    throw new Error('old setup failed');
+                }
+            },
+        });
+        t.teardown(() => pendingRequestServiceInstance.close());
+        swarmInstance.emit('connection', first);
+        await setupEntered.promise;
+        swarmInstance.emit('connection', second);
+        await new Promise(resolve => setTimeout(resolve, 0));
+        connectionManagerInstance.addValidator(publicKey, second);
+        const oldRequest = pendingRequest(pendingRequestServiceInstance, publicKey, 'old-setup', first);
+        const newRequest = pendingRequest(pendingRequestServiceInstance, publicKey, 'new-setup', second);
+
+        resumeSetup.resolve();
+        await t.exception(oldRequest, /old setup failed/);
+        await new Promise(resolve => setTimeout(resolve, 0));
+        t.is(first.destroy.callCount, 1);
+        t.ok(connectionManagerInstance.isCurrent(publicKey, second));
+        t.ok(pendingRequestServiceInstance.has('new-setup'));
+        t.is(swarmInstance.leavePeer.callCount, 0, 'old setup failure does not cancel replacement discovery');
+        pendingRequestServiceInstance.resolvePendingRequest('new-setup', ResultCode.OK);
+        t.is(await newRequest, ResultCode.OK);
+    });
+
+    test('Network preserves discovery for a replacement still initializing when an old socket closes', async t => {
+        const publicKey = '2'.repeat(64);
+        const first = makeConnection(publicKey);
+        const second = makeConnection(publicKey);
+        const setupEntered = deferred();
+        const resumeSetup = deferred();
+        const { swarmInstance, store } = await loadNetwork({
+            async setupProtomuxMessages(connection) {
+                if (connection === second) {
+                    setupEntered.resolve();
+                    await resumeSetup.promise;
+                }
+            },
+        });
+        swarmInstance.emit('connection', first);
+        await new Promise(resolve => setTimeout(resolve, 0));
+        swarmInstance.emit('connection', second);
+        await setupEntered.promise;
+
+        first.emit('close');
+        t.is(swarmInstance.leavePeer.callCount, 0);
+        resumeSetup.resolve();
+        await new Promise(resolve => setTimeout(resolve, 0));
+        t.is(store.replicate.callCount, 2, 'replacement can complete initialization');
+        second.emit('close');
+        t.is(swarmInstance.leavePeer.callCount, 1);
+    });
+
+    test('Network does not replicate a socket that closes during initialization', async t => {
+        const publicKey = '3'.repeat(64);
+        const connection = makeConnection(publicKey);
+        const setupEntered = deferred();
+        const resumeSetup = deferred();
+        const { swarmInstance, store } = await loadNetwork({
+            async setupProtomuxMessages() {
+                setupEntered.resolve();
+                await resumeSetup.promise;
+            },
+        });
+        swarmInstance.emit('connection', connection);
+        await setupEntered.promise;
+        connection.emit('close');
+        resumeSetup.resolve();
+        await new Promise(resolve => setTimeout(resolve, 0));
+        t.is(store.replicate.callCount, 0);
+        t.is(swarmInstance.leavePeer.callCount, 1, 'close cleanup runs once even if destroy emits close again');
+    });
+
+    test('Network does not re-add a closed validator after its probe finishes', async t => {
+        const publicKey = '4'.repeat(64);
+        const connection = makeConnection(publicKey);
+        const probeEntered = deferred();
+        const finishProbe = deferred();
+        connection.protocolSession.isProbed = () => false;
+        connection.protocolSession.probe = async () => {
+            probeEntered.resolve();
+            await finishProbe.promise;
+        };
+        connection.protocolSession.isHealthCheckSupported = () => true;
+        const { network, swarmInstance, connectionManagerInstance } = await loadNetwork();
+        network.setupNetworkListeners();
+        t.teardown(() => network.cleanupNetworkListeners());
+        t.teardown(() => network.cleanupPendingConnections());
+        await network.tryConnect(publicKey, 'validator');
+        swarmInstance.emit('connection', connection);
+        await probeEntered.promise;
+
+        connection.emit('close');
+        finishProbe.resolve();
+        await new Promise(resolve => setTimeout(resolve, 0));
+        t.absent(connectionManagerInstance.exists(publicKey), 'late probe result cannot restore the closed socket');
+        t.is(swarmInstance.leavePeer.callCount, 1);
     });
 
     test('Network#close prevents late connection setup from replicating a closed Corestore', async t => {
