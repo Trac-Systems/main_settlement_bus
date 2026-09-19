@@ -1,8 +1,10 @@
 import sinon from "sinon";
 import { test } from "brittle";
 import b4a from "b4a";
+import EventEmitter from "bare-events";
 import tracCryptoApi from "trac-crypto-api";
 import ValidatorObserverService from "../../../../src/core/network/services/ValidatorObserverService.js";
+import ConnectionManager from "../../../../src/core/network/services/ConnectionManager.js";
 import { bufferToAddress } from "../../../../src/core/state/utils/address.js";
 
 if (typeof setTimeout !== "undefined" && typeof setTimeout.restore === "function") {
@@ -965,6 +967,32 @@ test("keeps a validator connected when stopped before scanning its active replac
         t.ok(connected.has(publicKeyHex), "the active wallet remains connected");
     } finally {
         resumeScan();
+        await cleanup(service);
+        clock.restore();
+        sinon.restore();
+    }
+});
+
+test("drops the validator role of a removed writer without ending its connection", async (t) => {
+    const clock = sinon.useFakeTimers({ now: 0 });
+    const writers = [{ key: b4a.alloc(32, 1), value: { isRemoved: true } }];
+    const { network, state, config, publicKeyHex } = createWriterHistoryMocks(writers, true);
+    const connection = new EventEmitter();
+    connection.end = sinon.stub();
+    const manager = new ConnectionManager(config);
+    manager.addValidator(publicKeyHex, connection);
+    network.validatorConnectionManager = manager;
+    const service = new ValidatorObserverService(network, state, "self", config);
+
+    try {
+        t.ok(manager.connected(publicKeyHex), "the validator starts in the pool");
+
+        await service.start();
+        await clock.tickAsync(50);
+
+        t.absent(manager.exists(publicKeyHex), "the validator is no longer in the pool");
+        t.is(connection.end.callCount, 0, "the connection is not ended");
+    } finally {
         await cleanup(service);
         clock.restore();
         sinon.restore();

@@ -90,8 +90,16 @@ if (typeof globalThis.Bare !== 'undefined') {
         socket.protocolSession.setTelemetryContext = context => { protocolContext = context; };
         manager.addValidator(publicKey, socket);
         const checks = healthChecks(manager);
+        for (let attempt = 1; attempt <= 2; attempt++) {
+            await checks.run();
+            t.ok(manager.connected(publicKey), 'isolated failures keep the validator connected');
+            t.is(events.filter(e => e.event === 'validator.removed').length, 0);
+        }
         await checks.run();
-        const failure = events.find(e => e.event === 'validator.healthcheck_failed');
+        const failures = events.filter(e => e.event === 'validator.healthcheck_failed');
+        t.is(failures.length, 3, 'every failed check is logged before the threshold removes the validator');
+        t.alike(failures.map(event => event.fields.consecutive_failures), [1, 2, 3]);
+        const failure = failures.at(-1);
         const removed = events.find(e => e.event === 'validator.removed');
         t.is(failure.fields.reason, 'healthcheck_timeout');
         t.is(failure.fields.result_code, ResultCode.TIMEOUT);

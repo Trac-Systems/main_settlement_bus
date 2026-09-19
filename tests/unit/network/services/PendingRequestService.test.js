@@ -200,6 +200,69 @@ test('PendingRequestService rejects all pending requests for a specific peer', a
     await promiseB1;
 });
 
+test('PendingRequestService connection cleanup preserves replacement, other-peer, and unbound requests', async t => {
+    const service = new PendingRequestService(config);
+    t.teardown(() => service.close());
+    const oldConnection = { remotePublicKey: b4a.from(validPeerA, 'hex') };
+    const replacementConnection = { remotePublicKey: b4a.from(validPeerA, 'hex') };
+    const otherPeerConnection = { remotePublicKey: b4a.from(validPeerB, 'hex') };
+    const oldLiveness = await buildV1Request();
+    const oldBroadcast = await buildV1BroadcastRequest();
+    const replacement = await buildV1Request();
+    const otherPeer = await buildV1Request();
+    const unbound = await buildV1Request();
+    const promises = [
+        service.registerPendingRequest(validPeerA, oldLiveness, oldConnection),
+        service.registerPendingRequest(validPeerA, oldBroadcast, oldConnection),
+        service.registerPendingRequest(validPeerA, replacement, replacementConnection),
+        service.registerPendingRequest(validPeerB, otherPeer, otherPeerConnection),
+        service.registerPendingRequest(validPeerA, unbound),
+    ];
+    const settled = Promise.allSettled(promises);
+
+    t.is(service.getPendingRequest(oldLiveness.id).connection, oldConnection);
+    t.is(service.getPendingRequest(replacement.id).connection, replacementConnection);
+    t.is(service.getPendingRequest(unbound.id).connection, null);
+    const failure = new Error('old socket closed');
+    t.is(service.rejectPendingRequestsForConnection(oldConnection, failure), 2);
+    t.is(service.has(oldLiveness.id), false);
+    t.is(service.has(oldBroadcast.id), false);
+    for (const request of [replacement, otherPeer, unbound]) {
+        t.ok(service.has(request.id), 'requests with other or missing socket identities remain pending');
+        service.resolvePendingRequest(request.id, ResultCode.OK);
+    }
+    const results = await settled;
+    t.is(results[0].reason, failure);
+    t.is(results[1].reason, failure);
+    t.alike(results.slice(2).map(result => [result.status, result.value]), [
+        ['fulfilled', ResultCode.OK],
+        ['fulfilled', ResultCode.OK],
+        ['fulfilled', ResultCode.OK],
+    ]);
+    t.is(service.rejectPendingRequestsForConnection(oldConnection, failure), 0, 'duplicate socket cleanup is harmless');
+});
+
+test('PendingRequestService does not infer a request owner from missing or lookalike connections', async t => {
+    const service = new PendingRequestService(config);
+    t.teardown(() => service.close());
+    const connection = { remotePublicKey: b4a.from(validPeerA, 'hex') };
+    const bound = await buildV1Request();
+    const unbound = await buildV1Request();
+    const promises = [
+        service.registerPendingRequest(validPeerA, bound, connection),
+        service.registerPendingRequest(validPeerA, unbound),
+    ];
+    const settled = Promise.allSettled(promises);
+    for (const missingOrDifferent of [undefined, null, {}, { ...connection }, '', validPeerA]) {
+        t.is(service.rejectPendingRequestsForConnection(missingOrDifferent, new Error('connection closed')), 0);
+        t.ok(service.has(bound.id));
+        t.ok(service.has(unbound.id));
+    }
+    service.resolvePendingRequest(bound.id);
+    service.resolvePendingRequest(unbound.id);
+    t.alike((await settled).map(result => result.status), ['fulfilled', 'fulfilled']);
+});
+
 test('PendingRequestService stores only transaction data for broadcast requests', async t => {
     const service = new PendingRequestService(config);
     const peer = validPeerA;

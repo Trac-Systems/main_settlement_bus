@@ -18,15 +18,18 @@ async function setup(t, options = {}) {
         events.push({ event, fields: { ...fields }, level });
     });
     t.teardown(() => emit.restore());
+    const connection = {
+        protocolSession: {
+            preferredProtocol: options.protocol ?? 'v1',
+            supportedProtocols: { V1: 'v1', LEGACY: 'legacy' },
+        },
+    };
     const manager = {
         poolVersion: 7,
         connectedValidators: sinon.stub().returns(options.empty ? [] : [testKeyPair2.publicKey]),
         pickRandomValidator: validators => validators[0] ?? null,
         getConnectionDiagnostics: () => ({ connection_id: 'connection-1', connection_age_ms: 100 }),
-        getConnection: () => ({ protocolSession: {
-            preferredProtocol: options.protocol ?? 'v1',
-            supportedProtocols: { V1: 'v1', LEGACY: 'legacy' },
-        } }),
+        getConnection: () => connection,
         sendSingleMessage: options.send ?? sinon.stub().resolves(ResultCode.OK),
         incrementSentCount: sinon.stub(),
         getSentCount: () => options.sentCount ?? 0,
@@ -128,6 +131,65 @@ test('telemetry: connection race retries without changing removal policy', async
     t.is(manager.remove.callCount, 0);
     t.is(find('tx.retry')[0].fields.reason, 'connection_unavailable');
     t.is(find('tx.broadcast_finished')[0].fields.attempts, 2);
+});
+
+test('telemetry: replacement during V1 construction records only the actual send in the same broadcast', async t => {
+    const { orchestrator, message, manager, events, find } = await setup(t);
+    const replacement = { protocolSession: { ...manager.getConnection().protocolSession } };
+
+    const pending = orchestrator.send(message);
+    // The selected connection is captured before request construction awaits hashing.
+    manager.getConnection = () => replacement;
+    manager.getConnectionDiagnostics = () => ({ connection_id: 'connection-2', connection_age_ms: 0 });
+
+    t.is(await pending, true);
+    t.is(manager.sendSingleMessage.callCount, 1, 'the obsolete request is never dispatched');
+    t.is(manager.remove.callCount, 0, 'selection changing is handled by the existing connection-error retry');
+    const selections = find('validator.selected');
+    t.alike(selections.map(entry => entry.fields.connection_id), ['connection-1', 'connection-2']);
+    const attempts = find('tx.send_started');
+    t.is(attempts.length, 1);
+    t.is(attempts[0].fields.attempt, 1);
+    t.is(attempts[0].fields.connection_id, 'connection-2');
+    t.is(attempts[0].fields.request_id, manager.sendSingleMessage.firstCall.args[0].id);
+    t.not(attempts[0].fields.request_id, selections[0].fields.request_id);
+    const retry = find('tx.retry');
+    t.is(retry.length, 1);
+    t.is(retry[0].fields.reason, 'connection_unavailable');
+    t.is(retry[0].fields.connection_id, 'connection-1');
+    t.is(find('tx.response').length, 1);
+    t.is(find('tx.broadcast_started').length, 1);
+    t.is(find('tx.broadcast_finished').length, 1);
+    t.is(find('tx.broadcast_finished')[0].fields.attempts, 1);
+    t.is(new Set(events.map(entry => entry.fields.broadcast_id)).size, 1);
+});
+
+test('telemetry: a late successful response keeps its original connection context without rotating the replacement', async t => {
+    let respond;
+    let signalDispatch;
+    const response = new Promise(resolve => { respond = resolve; });
+    const dispatched = new Promise(resolve => { signalDispatch = resolve; });
+    const send = sinon.stub().callsFake(() => {
+        signalDispatch();
+        return response;
+    });
+    const { config, orchestrator, message, manager, find } = await setup(t, { send });
+    const replacement = { protocolSession: { ...manager.getConnection().protocolSession } };
+    const pending = orchestrator.send(message);
+    await dispatched;
+    manager.getConnection = () => replacement;
+    manager.getConnectionDiagnostics = () => ({ connection_id: 'connection-2', connection_age_ms: 0 });
+    manager.getSentCount = () => config.messageThreshold;
+    respond(ResultCode.OK);
+
+    t.is(await pending, true);
+    t.is(manager.incrementSentCount.callCount, 0, 'old success cannot increment the replacement counter');
+    t.is(manager.remove.callCount, 0, 'old success cannot trigger a replacement threshold rotation');
+    const completedResponse = find('tx.response')[0].fields;
+    t.is(completedResponse.connection_id, 'connection-1');
+    t.is(completedResponse.request_id, send.firstCall.args[0].id);
+    t.is(find('tx.broadcast_finished')[0].fields.attempts, 1);
+    t.is(find('tx.broadcast_finished')[0].fields.success, true);
 });
 
 test('telemetry: retry exhaustion reports the actual send count and one final failure', async t => {
