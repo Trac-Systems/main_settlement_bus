@@ -307,11 +307,15 @@ class Network extends ReadyResource {
                         new Error('Connection closed before response')
                     );
                     this.#swarm?.leavePeer(connection.remotePublicKey);
-                    this.#validatorConnectionManager.remove(publicKey, {
-                        endConnection: false, expectedConnection: connection,
-                        reason: this.#closing ? 'shutdown' : connectionError ? 'connection_error' : 'connection_closed',
-                        error_type: connectionError
-                    });
+                    // only act on the connection this event belongs to
+                    if (this.#validatorConnectionManager.isCurrent(publicKey, connection)) {
+                        this.#validatorConnectionManager.remove(publicKey, {
+                            endConnection: false,
+                            expectedConnection: connection,
+                            reason: this.#closing ? 'shutdown' : connectionError ? 'connection_error' : 'connection_closed',
+                            error_type: connectionError,
+                        });
+                    }
                     if (connection.protocolSession) {
                         try {
                             connection.protocolSession.close();

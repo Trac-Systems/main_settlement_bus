@@ -56,6 +56,7 @@ const configData = {
         txCommitTimeout: 2200,
         txPoolSize: 1000, // size of transaction pool
         validatorHealthCheckInterval: 5 * 60 * 1000, // How often to check validator health (ms)
+        validatorHealthCheckFailureThreshold: 3, // Consecutive failed health checks before a validator is removed
         storesDirectory: 'stores/',
         storeName: 'testnet',
     },
@@ -105,6 +106,7 @@ const configData = {
         txCommitTimeout: 2200,
         txPoolSize: 1000, // size of transaction pool
         validatorHealthCheckInterval: 5 * 60 * 1000, // How often to check validator health (ms)
+        validatorHealthCheckFailureThreshold: 3, // Consecutive failed health checks before a validator is removed
         storesDirectory: 'stores/',
         storeName: 'mainnet',
     },
@@ -154,6 +156,7 @@ const configData = {
         txCommitTimeout: 2200,
         txPoolSize: 1000, // size of transaction pool
         validatorHealthCheckInterval: 1_000, // How often to check validator health (ms)
+        validatorHealthCheckFailureThreshold: 3, // Consecutive failed health checks before a validator is removed
         storesDirectory: 'stores/',
         storeName: 'development',
     }

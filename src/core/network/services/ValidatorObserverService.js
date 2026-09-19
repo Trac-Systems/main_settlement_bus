@@ -167,7 +167,11 @@ class ValidatorObserverService {
         const manager = this.#network.validatorConnectionManager;
 
         if (manager.connected(publicKey)) {
-            manager.remove(publicKey, { reason: 'writer_removed' });
+            // Remove the validator role while leaving the transport to the swarm.
+            manager.remove(publicKey, {
+                endConnection: false,
+                reason: 'writer_removed',
+            });
             this.#logger.debug(`Removed stale validator connection: ${b4a.toString(publicKey, "hex")}`);
         }
     }
