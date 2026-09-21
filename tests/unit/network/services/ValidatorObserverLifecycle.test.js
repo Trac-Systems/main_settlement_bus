@@ -468,15 +468,15 @@ test("does NOT drop connections when it is the admin and threshold reached", asy
     }
 });
 
-test("removes admin when threshold exceeded", async (t) => {
+test("detaches admin without closing replication when threshold exceeded", async (t) => {
     const clock = sinon.useFakeTimers({ now: 0 });
 
-    let removed = 0;
+    const removed = [];
 
     const { network, config } = createBaseMocks({
         network: {
             validatorConnectionManager: {
-                remove: () => removed++,
+                remove: (_key, options) => removed.push(options),
             },
         },
         config: { maxWritersForAdminIndexerConnection: 0 },
@@ -512,14 +512,15 @@ test("removes admin when threshold exceeded", async (t) => {
     try {
         await service.start();
 
-        for (let i = 0; i < 20 && removed === 0; i++) {
+        for (let i = 0; i < 20 && removed.length === 0; i++) {
             clock.tick(10);
             await Promise.resolve();
         }
 
         await service.stopValidatorObserver(false);
 
-        t.ok(removed >= 1);
+        t.ok(removed.length >= 1);
+        t.ok(removed.every(options => options?.endConnection === false), "admin replication remains open");
     } finally {
         clock.restore();
         sinon.restore();

@@ -26,7 +26,7 @@ async function loadNetwork(options = {}) {
             this._allConnections = new Map();
             this.joinPeer = sinon.stub().callsFake((target) => {
                 const publicKeyHex = b4a.toString(target, 'hex');
-                this.peers.set(publicKeyHex, { publicKey: target });
+                this.peers.set(publicKeyHex, { publicKey: target, explicit: true });
             });
             this.leavePeer = sinon.stub();
             this.join = sinon.stub();
@@ -196,6 +196,32 @@ if (isBareRuntime) {
         t.pass('skipped in Bare because esmock depends on node:module');
     });
 } else {
+    test('Network#tryConnect rejoins a retained peer without explicit retries', async t => {
+        const { network, swarmInstance } = await loadNetwork();
+        t.teardown(() => network.cleanupPendingConnections());
+        const publicKey = 'd'.repeat(64);
+        const target = b4a.from(publicKey, 'hex');
+        swarmInstance.peers.set(publicKey, { publicKey: target, explicit: false, waiting: false });
+
+        t.is(await network.tryConnect(publicKey, 'validator'), CONNECTION_STATUS.PENDING);
+        t.is(swarmInstance.joinPeer.callCount, 1, 'retained peer is explicitly joined again');
+        t.alike(swarmInstance.joinPeer.firstCall?.args, [target]);
+        t.is(await network.tryConnect(publicKey, 'validator'), CONNECTION_STATUS.IGNORED);
+        t.is(swarmInstance.joinPeer.callCount, 1, 'pending attempts remain deduplicated');
+    });
+
+    test('Network#tryConnect preserves backoff for an already explicit peer', async t => {
+        const { network, swarmInstance } = await loadNetwork();
+        t.teardown(() => network.cleanupPendingConnections());
+        const publicKey = 'd'.repeat(64);
+        swarmInstance.peers.set(publicKey, {
+            publicKey: b4a.from(publicKey, 'hex'), explicit: true, waiting: true,
+        });
+
+        t.is(await network.tryConnect(publicKey, 'validator'), CONNECTION_STATUS.PENDING);
+        t.is(swarmInstance.joinPeer.callCount, 0, 'existing retry timer is left to Hyperswarm');
+    });
+
     test('Network#disconnectValidatorPeer clears pending validator attempts', async t => {
         const publicKey = 'a'.repeat(64);
         const { network, swarmInstance } = await loadNetwork();

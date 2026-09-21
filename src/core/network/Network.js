@@ -353,7 +353,8 @@ class Network extends ReadyResource {
         this.#pendingConnections.set(publicKey, { type, timeoutId });
 
         const target = b4a.from(publicKey, 'hex');
-        if (!this.#swarm.peers.has(publicKey)) {
+        // A retained peer may have lost explicit retries after leavePeer().
+        if (!this.#swarm.peers.get(publicKey)?.explicit) {
             this.#swarm.joinPeer(target);
         }
 
