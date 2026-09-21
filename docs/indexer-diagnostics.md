@@ -12,6 +12,7 @@ The normal `msb.mjs` entrypoint enables diagnostics with:
 enable_indexer_diagnostics: true,
 diagnostics_interval_ms: 10000,
 diagnostics_verbose_events: false,
+diagnostics_log_file: 'logs/msb-diag-admin.jsonl', // Derived from store name in msb.mjs.
 ```
 
 The RPC entrypoint explicitly disables them. Library users opt in through the
@@ -30,7 +31,7 @@ per-socket detail is included at most every 60 seconds during healthy operation,
 and additionally when a stall is first detected. `details_included`, per-list
 truncation flags and `size_limited` describe what was retained in a snapshot.
 
-Each diagnostic is a single JSON line on stdout with an `msb.diag.*` event name,
+Each diagnostic is a single JSON line in the configured file with an `msb.diag.*` event name,
 UTC `timestamp`, `epoch_ms`, `boot_id`, local `writer_key`, and
 `network_public_key`. Initial events can have null identities before the network
 is initialized. `network.attached` provides the local writer/network-key mapping;
@@ -46,15 +47,48 @@ wallet files, private keys, transaction payloads, or signature bytes are read
 for telemetry. Error logs select only type, code, truncated message and stack;
 long hex strings in error text are redacted.
 
-For PM2, preserve the existing stdout/stderr logs for **each indexer**, including
-the time before a stall and before any restart. A read-only filter is:
+The normal entrypoint now writes details to `logs/msb-diag-<store>.jsonl`, relative
+to the process working directory. For `admin`, this is
+`logs/msb-diag-admin.jsonl`. There is one active file and five archives, each up
+to 16 MiB (96 MiB total for files created by this logger). `.1` is the newest
+archive, `.5` the oldest. Rotation overwrites the oldest archive; retention is
+volume-based, not a guaranteed number of days. Existing files are appended on
+restart. Use a distinct filename for each process; concurrent writers or external
+rotation of these files are not supported. New files use mode `0600`.
+
+PM2 shows a short status every 30 seconds, plus bounded immediate alerts for
+ACK/apply/Autobase failures and stall/recovery transitions. Peer connection
+attempts, network errors, stacks and snapshots go to the diagnostic file only.
+For example:
+
+```text
+[MSB] ... state=finalizing signed=433457 unsigned=433457 gap=0 signed_delta=+3/30s ack=idle ...
+```
+
+`signed_delta` is a change in view length, **not a transaction count**. `caught_up`
+means no observed unsigned gap; it does not claim that new work arrived or that
+every other node is healthy. `log_dropped` and `log_failed` expose file sink
+problems. Console alerts are limited to six per minute; `alerts_suppressed` is
+cumulative, and their file records still follow the usual diagnostic budgets.
+
+Read the detailed file independently from `pm2 logs`:
+
+```sh
+tail -F logs/msb-diag-admin.jsonl
+rg 'msb\.diag\.(ack|ack_timer|apply)\.failed|msb\.diag\.progress\.' logs/msb-diag-admin.jsonl*
+```
+
+Preserve the diagnostic files and PM2 stdout/stderr for **each indexer**,
+including the time before a stall and before any restart. Earlier diagnostic
+versions wrote JSON to PM2 stdout; those records remain in the old log:
 
 ```sh
 rg 'msb\.diag\.' /path/to/indexer-out.log
 ```
 
-The normal PM2 timestamp prefix may precede the JSON. There is no new HTTP
-endpoint and no need to enable RPC on the indexers.
+Omitting `diagnostics_log_file` preserves the original JSON-to-stdout behavior
+for library callers. A custom `diagnostics_write` callback takes precedence over
+file output. There is no new HTTP endpoint and no need to enable RPC on indexers.
 
 ## Events
 
@@ -89,9 +123,11 @@ in `_executing`, when instrumented: `pending`, `fulfilled`, or `rejected`.
 Null means it was not observed; it is not evidence of a healthy timer.
 
 `previous_sample_duration_ms` measures the prior sample's construction and log
-write call, using the local clock. `log_bytes_before_sample` is the cumulative
-number of diagnostic bytes submitted to the log sink before this snapshot. It
-does not confirm that a downstream log collector has persisted those bytes.
+enqueue call, using the local clock; it excludes asynchronous file I/O.
+`log_bytes_before_sample` is the cumulative number of bytes accepted by the sink
+before this snapshot. `log_sink` reports queued bytes, completed append bytes,
+dropped records and failure state. Completed append calls do not guarantee
+durability across power loss; the logger does not call fsync.
 
 ## Read a blackout
 
@@ -165,16 +201,24 @@ a completely blocked process cannot emit snapshots while blocked.
 - Snapshot construction is synchronous but covers multiple components whose
   I/O can change between samples. A local stall does not establish a global
   stall. Quorum 2/3 still requires available histories and working ACKs.
-- Output goes through stdout; use the deployment's existing log collection and
-  rotation. A blocked stdout can still delay the process; byte limits reduce
-  volume but cannot guarantee nonblocking output. Protect log retention before a restart. The module cannot recover
-  prior socket/timer state from the database after a restart.
+- File output uses asynchronous append/rotation with a 1 MiB byte queue,
+  including in-flight data. Writes batch for up to 5 seconds, with at most 64 KiB
+  per batch. Producers never await disk writes. If the queue fills, new records
+  are dropped and counted. On an I/O error, file logging is disabled for that
+  instance with one console warning; later summaries report `log_failed=true`.
+  It does not retry indefinitely or flood stdout with a JSON fallback.
+  Normal diagnostic shutdown starts a queue drain; forced termination can
+  lose buffered records. Short console messages still use stdout and a blocked
+  stdout can delay those calls. Protect retention before old archives rotate.
+  No logger can recover prior socket/timer state after a restart.
 
 ## Validation
 
 ```sh
 ./node_modules/.bin/brittle-node -t 30000 tests/unit/network/IndexerDiagnostics.test.js
 ./node_modules/.bin/brittle-bare -t 30000 tests/unit/network/IndexerDiagnostics.test.js
+./node_modules/.bin/brittle-node -t 30000 tests/unit/network/DiagnosticOutput.test.js
+./node_modules/.bin/brittle-bare -t 30000 tests/unit/network/DiagnosticOutput.test.js
 ./node_modules/.bin/brittle-node -t 30000 tests/unit/state/StateDiagnostics.test.js
 ```
 
@@ -184,6 +228,12 @@ hook cleanup, live writer/checkpoint sampling, and three isolated Autobases with
 in-memory replication. A clean disconnection of one indexer leaves the other two
 able to finalize in that test. This does not reproduce or explain the production
 blackout, and the injected error does not establish its natural trigger.
+Output tests cover file rotation/reopening, UTF-8 byte limits, a slow disk,
+disk failure, bounded console alerts, and separation of detail from console status.
+An isolated Autobase also finalizes an appended value while its diagnostic
+append call is deliberately held pending and the 1 MiB logging queue overflows.
+That test proves there is no dependency on completion of diagnostic writes;
+it does not measure CPU overhead or shared-disk contention under production load.
 
 A synthetic sizing run of 600 samples at simulated 10-second intervals produced
 about 63 MiB/day of snapshots for 3 writers, 8 peers per core and 64 sockets,

@@ -19,6 +19,7 @@ const opts = {
     enable_indexer_diagnostics: true,
     diagnostics_interval_ms: 10000,
     diagnostics_verbose_events: false,
+    diagnostics_log_file: `logs/msb-diag-${String(args[0] ?? 'node').replace(/[^a-zA-Z0-9_-]/g, '_')}.jsonl`,
 };
 
 const rpc_opts = {

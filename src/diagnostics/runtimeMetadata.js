@@ -58,7 +58,7 @@ export function runtimeMetadata() {
         const sourceHashes = {};
         for (const filename of ['msb.mjs', 'src/index.js', 'src/core/state/State.js',
             'src/core/network/Network.js', 'src/diagnostics/IndexerDiagnostics.js',
-            'src/diagnostics/runtimeMetadata.js']) {
+            'src/diagnostics/runtimeMetadata.js', 'src/diagnostics/DiagnosticOutput.js']) {
             const source = read(path.join(root, filename));
             sourceHashes[filename] = source === null ? null : hash(Buffer.from(source)).toString('hex');
         }

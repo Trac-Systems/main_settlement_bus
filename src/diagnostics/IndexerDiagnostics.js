@@ -1,6 +1,7 @@
 import b4a from 'b4a';
 import { randomBytes } from 'hypercore-crypto';
 import { runtimeMetadata } from './runtimeMetadata.js';
+import DiagnosticOutput from './DiagnosticOutput.js';
 
 const MAX_WRITERS = 32;
 const MAX_PEERS = 16;
@@ -43,8 +44,11 @@ export default class IndexerDiagnostics {
         this.options = options;
         this.bootId = hex(randomBytes(16));
         this.interval = Math.max(1000, Math.min(60000, Number(options.diagnostics_interval_ms) || 10000));
-        this.write = options.diagnostics_write ?? (line => console.log(line));
         this.now = options.diagnostics_now ?? Date.now;
+        this.output = !options.diagnostics_write && options.diagnostics_log_file
+            ? new DiagnosticOutput(options.diagnostics_log_file, options) : null;
+        this.write = options.diagnostics_write ?? (this.output
+            ? (line, payload) => this.output.write(line, payload) : line => console.log(line));
         this.scopes = new Map();
         this.operations = new Map();
         this.timerPromises = new WeakMap();
@@ -144,8 +148,7 @@ export default class IndexerDiagnostics {
                 }
                 this[counter] += bytes;
             }
-            this.write(line);
-            this.totalBytes += bytes;
+            if (this.write(line, payload) !== false) this.totalBytes += bytes;
         });
     }
 
@@ -305,6 +308,8 @@ export default class IndexerDiagnostics {
         this.emit('started', {
             ...runtimeMetadata(), interval_ms: this.interval,
             details_interval_ms: DETAILS_INTERVAL, verbose_events: this.verbose,
+            output: this.output ? 'rotating_file' : 'custom_or_stdout',
+            log_file: this.output?.status().file ?? null,
             adapter: 'autobase-7.20.1/hypercore-11.18.3/hyperswarm-4.14.2',
             limits: { writers: MAX_WRITERS, peers_per_core: MAX_PEERS, peers_per_sample: MAX_CONNECTIONS,
                 line_bytes: MAX_LINE_BYTES, event_bytes_per_interval: MAX_EVENT_BYTES, error_bytes_per_interval: MAX_ERROR_BYTES },
@@ -535,6 +540,7 @@ export default class IndexerDiagnostics {
                 details_included: details, last_details_at_ms: this.lastDetails,
                 previous_sample_duration_ms: this.lastSampleDuration,
                 log_bytes_before_sample: this.totalBytes,
+                log_sink: this.output?.status() ?? null,
                 sample_delay_ms: this.lastSample === null ? null : Math.max(0, now - this.lastSample - this.interval),
                 view, system: coreInfo(b.system?.core), local: coreInfo(b.local),
                 last_signed_progress_at_ms: this.lastSignedChange, last_unsigned_progress_at_ms: this.lastUnsignedChange,
@@ -578,7 +584,7 @@ export default class IndexerDiagnostics {
     }
 
     stop() {
-        if (this.stopped) return;
+        if (this.stopped) return this.output?.close();
         this.sample();
         this.emit('stopped', {}, true);
         this.stopped = true;
@@ -588,5 +594,6 @@ export default class IndexerDiagnostics {
         for (const record of this.coreListeners.values()) attempt(record.detach);
         this.coreListeners.clear();
         this.connections.clear();
+        return this.output?.close();
     }
 }

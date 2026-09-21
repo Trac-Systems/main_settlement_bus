@@ -31,3 +31,6 @@ migration/*
 
 # Environment files
 .env
+
+# Rotating indexer diagnostic logs
+logs/msb-diag-*.jsonl*
