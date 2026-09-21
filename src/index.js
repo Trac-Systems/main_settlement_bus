@@ -184,6 +184,7 @@ export class MainSettlementBus extends ReadyResource {
         console.log("Closing everything gracefully... This may take a moment.");
 
         this.#isClosing = true;
+        this.#state?.diagnostics?.stop();
         await this.#network.close();
 
         await sleep(100);

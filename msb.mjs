@@ -16,10 +16,14 @@ const opts = {
     disable_rate_limit: false,
     enable_tx_apply_logs: false,
     enable_error_apply_logs: false,
+    enable_indexer_diagnostics: true,
+    diagnostics_interval_ms: 10000,
+    diagnostics_verbose_events: false,
 };
 
 const rpc_opts = {
     ...opts,
+    enable_indexer_diagnostics: false,
     enable_tx_apply_logs: false,
     enable_error_apply_logs: false,
     enable_wallet: false,

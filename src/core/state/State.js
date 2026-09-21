@@ -43,6 +43,7 @@ import { safeWriteUInt32BE } from '../../utils/buffer.js';
 import deploymentEntryUtils from './utils/deploymentEntry.js';
 import { deepCopyBuffer } from '../../utils/buffer.js';
 import { Status } from './utils/transaction.js';
+import IndexerDiagnostics from '../../diagnostics/IndexerDiagnostics.js';
 
 const OVERSIZED_BATCH_PENALTY_MULTIPLIER = BATCH_SIZE;
 
@@ -57,6 +58,7 @@ class State extends ReadyResource {
     #enable_tx_apply_logs;
     #enable_error_apply_logs;
     #writingKey;
+    #diagnostics = null;
 
     constructor(store, bootstrap, wallet, options = {}) {
         super();
@@ -76,10 +78,17 @@ class State extends ReadyResource {
             open: this.#setupHyperbee.bind(this),
             apply: this.applyHandler,
         })
+        if (options.enable_indexer_diagnostics === true) {
+            this.#diagnostics = new IndexerDiagnostics(this.#base, options);
+        }
     }
 
     get base() {
         return this.#base;
+    }
+
+    get diagnostics() {
+        return this.#diagnostics;
     }
 
     get writingKey() {
@@ -91,16 +100,20 @@ class State extends ReadyResource {
     }
 
     get applyHandler() {
-        return this.#apply.bind(this);
+        return (...args) => this.#diagnostics
+            ? this.#diagnostics.trace('apply', this.#apply, this, args)
+            : this.#apply(...args);
     }
 
     async _open() {
         console.log("State initialization...")
         await this.#base.ready();
         this.#writingKey = this.#base.local.key;
+        this.#diagnostics?.start();
     }
 
     async _close() {
+        this.#diagnostics?.stop();
         console.log("State: closing gracefully...");
         if (this.#bee !== null) {
             await this.#bee.close();

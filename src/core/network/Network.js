@@ -31,9 +31,11 @@ class Network extends ReadyResource {
     #validatorConnectionManager;
     #options;
     #identityProvider = null;
+    #diagnostics;
 
     constructor(state, channel, address = null, options = {}) {
         super();
+        this.#diagnostics = state.diagnostics;
         this.#options = options;
         this.#enable_wallet = options.enable_wallet !== false;
         this.#channel = channel;
@@ -103,16 +105,27 @@ class Network extends ReadyResource {
                 maxClientConnections: MAX_CLIENT_CONNECTIONS
             });
 
+            this.#diagnostics?.attachNetwork(this.#swarm);
             console.log(`Channel: ${b4a.toString(this.#channel)}`);
             this.#networkMessages.initializeMessageRouter(state, wrappedWallet);
 
-            this.#swarm.on('connection', async (connection) => {
-                const { message_channel, message } = await this.#networkMessages.setupProtomuxMessages(connection);
-                connection.messenger = message;
+            this.#swarm.on('connection', async (connection, peerInfo) => {
+                this.#diagnostics?.trackConnection(connection, peerInfo);
+                let message_channel;
+                try {
+                    this.#diagnostics?.connectionStage(connection, 'protocol_setup');
+                    const setup = await this.#networkMessages.setupProtomuxMessages(connection);
+                    message_channel = setup.message_channel;
+                    connection.messenger = setup.message;
 
-                // ATTENTION: Must be called AFTER the protomux init above
-                const stream = store.replicate(connection);
-                wakeup.addStream(stream);
+                    // ATTENTION: Must be called AFTER the protomux init above
+                    const stream = store.replicate(connection);
+                    wakeup.addStream(stream);
+                    this.#diagnostics?.connectionStage(connection, 'replicating');
+                } catch (error) {
+                    this.#diagnostics?.connectionStage(connection, 'setup_failed', error);
+                    throw error;
+                }
 
                 connection.on('close', () => {
                     if (this.admin_stream === connection) {
@@ -162,6 +175,7 @@ class Network extends ReadyResource {
 
     async tryConnect(publicKey, type = null) {
         if (null === this.#swarm) throw new Error('Network swarm is not initialized');
+        this.#diagnostics?.connectRequested(publicKey, type);
 
         if (false === this.#swarm.peers.has(publicKey)) {
             this.#swarm.joinPeer(b4a.from(publicKey, 'hex'));
