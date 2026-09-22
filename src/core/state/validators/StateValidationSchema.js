@@ -10,7 +10,6 @@ import {
     BOOTSTRAP_BYTE_LENGTH,
     CHANNEL_BYTE_LENGTH,
     AMOUNT_BYTE_LENGTH,
-    PROTOCOL_VERSION_BYTE_LENGTH,
     NETWORK_ID_BYTE_LENGTH,
     EPOCH_BYTE_LENGTH,
     VDF_DIFFICULTY_SIZE,
@@ -18,6 +17,7 @@ import {
     VDF_PROOF_BYTE_LENGTHS,
     CONSENSUS_CONFIG_SCHEMA_VERSION_BYTE_LENGTH,
     CONSENSUS_CONFIG_DATA_MAX_SIZE,
+    SET_EPOCH_DATA_MAX_SIZE,
 } from '../../../utils/constants.js';
 import {
     decodeProofProposalApproval,
@@ -36,6 +36,7 @@ class StateValidationSchema {
     #validateTransferOperationSchema;
     #validateBalanceInitializationSchema;
     #validateSetEpochOperationSchema;
+    #validateEpochProofV1Schema;
     #validateConsensusControlOperationSchema;
     #proofDataFields;
     #config;
@@ -47,7 +48,6 @@ class StateValidationSchema {
         this.#config = config
 
         this.#proofDataFields = Object.freeze([
-            {name: 'protocol_version', length: PROTOCOL_VERSION_BYTE_LENGTH},
             {name: 'network_id', length: NETWORK_ID_BYTE_LENGTH},
             {name: 'epoch', length: EPOCH_BYTE_LENGTH},
             {name: 'previous_epoch_record_hash', length: HASH_BYTE_LENGTH},
@@ -325,6 +325,7 @@ class StateValidationSchema {
         this.#validateTransferOperationSchema = this.#compileTransferOperationSchema();
         this.#validateBalanceInitializationSchema = this.#compileBalanceInitializationSchema();
         this.#validateSetEpochOperationSchema = this.#compileSetEpochOperationSchema();
+        this.#validateEpochProofV1Schema = this.#compileEpochProofV1Schema();
         this.#validateConsensusControlOperationSchema = this.#compileConsensusControlOperationSchema();
 
     }
@@ -681,12 +682,16 @@ class StateValidationSchema {
                 strict: true,
                 type: 'object',
                 props: {
-                    pd: {type: 'proof_data', required: true}, // proof data
-                    app: {
-                        type: 'array',
-                        required: true,
-                        items: {type: 'proof_proposal_approval'}
-                    }, // approvals
+                    sv: {
+                        type: 'buffer',
+                        length: CONSENSUS_CONFIG_SCHEMA_VERSION_BYTE_LENGTH,
+                        required: true
+                    },
+                    data: {
+                        type: 'buffer_max_length',
+                        maxLength: SET_EPOCH_DATA_MAX_SIZE,
+                        required: true
+                    }
                 },
             }
         };
@@ -695,6 +700,23 @@ class StateValidationSchema {
 
     validateSetEpochOperation(op) {
         return this.#validateSetEpochOperationSchema(op) === true;
+    }
+
+    #compileEpochProofV1Schema() {
+        const schema = {
+            $$strict: true,
+            pd: {type: 'proof_data', required: true},
+            app: {
+                type: 'array',
+                required: true,
+                items: {type: 'proof_proposal_approval'}
+            }
+        };
+        return this.#validator.compile(schema);
+    }
+
+    validateEpochProofV1(epochProof) {
+        return this.#validateEpochProofV1Schema(epochProof) === true;
     }
 
     #compileConsensusControlOperationSchema() {

@@ -41,10 +41,11 @@ function createSubject(overrides = {}) {
 }
 
 function stubConsole(t) {
-    sinon.stub(console, "info");
-    sinon.stub(console, "log");
-    sinon.stub(console, "error");
-    t.teardown(() => sinon.restore());
+    const sandbox = sinon.createSandbox();
+    t.teardown(() => sandbox.restore());
+    sandbox.stub(console, "info");
+    sandbox.stub(console, "log");
+    sandbox.stub(console, "error");
 }
 
 test("CommandHandler queues transfer preview without submitting immediately", async (t) => {

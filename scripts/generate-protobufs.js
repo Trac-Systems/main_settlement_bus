@@ -4,7 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { execFileSync } from 'child_process';
 
-function generatePbjsModule(pbjsPath, protoRootPath, entryPath, outputPath, rootName) {
+function generatePbjsModule(pbjsPath, protoRootPath, entryPaths, outputPath, rootName) {
     execFileSync(pbjsPath, [
         '-t', 'static-module',
         '-w', 'commonjs',
@@ -12,7 +12,7 @@ function generatePbjsModule(pbjsPath, protoRootPath, entryPath, outputPath, root
         '--root', rootName,
         '-p', protoRootPath,
         '-o', outputPath,
-        entryPath
+        ...entryPaths
     ]);
     console.log(`${outputPath} has been generated.`);
 }
@@ -45,6 +45,7 @@ function main() {
     const networkEntryPath = path.join(inputDir, 'network/v1/network_message.proto');
     const generatedNetworkOutputPath = path.join(networkOutputDir, 'networkV1.generated.cjs');
     const consensusEntryPath = path.join(inputDir, 'consensus/v1/consensus_message_header.proto');
+    const epochProofV1EntryPath = path.join(inputDir, 'common/consensus/epoch_proof_v1.proto');
     const generatedConsensusOutputPath = path.join(consensusOutputDir, 'consensusV1.generated.cjs');
 
     fs.mkdirSync(applyOutputDir, { recursive: true });
@@ -54,7 +55,7 @@ function main() {
     generatePbjsModule(
         pbjsPath,
         inputDir,
-        applyOperationsEntryPath,
+        [applyOperationsEntryPath],
         generatedApplyOperationsOutputPath,
         'applyOperations'
     );
@@ -63,7 +64,7 @@ function main() {
     generatePbjsModule(
         pbjsPath,
         inputDir,
-        networkEntryPath,
+        [networkEntryPath],
         generatedNetworkOutputPath,
         'networkV1'
     );
@@ -72,7 +73,7 @@ function main() {
     generatePbjsModule(
         pbjsPath,
         inputDir,
-        consensusEntryPath,
+        [consensusEntryPath, epochProofV1EntryPath],
         generatedConsensusOutputPath,
         'consensusV1'
     );

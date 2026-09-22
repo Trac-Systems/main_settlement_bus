@@ -6,7 +6,6 @@ import {
     SIGNATURE_BYTE_LENGTH,
     ConsensusResultCode,
     VDF_PROOF_BYTE_LENGTHS,
-    PROTOCOL_VERSION_BYTE_LENGTH,
     NETWORK_ID_BYTE_LENGTH,
     EPOCH_BYTE_LENGTH,
     VDF_DIFFICULTY_SIZE,
@@ -99,7 +98,6 @@ class ConsensusValidationSchema {
                 strict: true,
                 type: 'object',
                 props: {
-                    protocol_version: { type: 'buffer', length: PROTOCOL_VERSION_BYTE_LENGTH, required: true },
                     network_id: { type: 'buffer', length: NETWORK_ID_BYTE_LENGTH, required: true },
                     epoch: { type: 'buffer', length: EPOCH_BYTE_LENGTH, required: true },
                     previous_epoch_record_hash: { type: 'buffer', length: HASH_BYTE_LENGTH, required: true },

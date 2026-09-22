@@ -5,7 +5,7 @@ import consensusV1Generated from '../../src/codecs/consensus/v1/consensusV1.gene
 import { v7 as uuidv7 } from 'uuid';
 import { config } from '../helpers/config.js';
 import { asAddress } from '../helpers/address.js';
-import { uint8ToBuffer, uint16ToBuffer, uint64ToBuffer } from '../../src/utils/buffer.js';
+import { uint16ToBuffer, uint64ToBuffer } from '../../src/utils/buffer.js';
 import {
     ConsensusResultCode,
     HASH_BYTE_LENGTH,
@@ -19,7 +19,6 @@ const { MessageType } = consensusV1Generated.consensus.v1;
 const bytes = (value, length) => b4a.alloc(length, value);
 
 const proofProposal = Object.freeze({
-    protocol_version: uint8ToBuffer(1),
     network_id: uint16ToBuffer(67),
     epoch: uint64ToBuffer(67),
     previous_epoch_record_hash: bytes(1, HASH_BYTE_LENGTH),
