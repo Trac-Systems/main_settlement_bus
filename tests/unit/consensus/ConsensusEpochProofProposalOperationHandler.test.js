@@ -102,7 +102,10 @@ function setupHandler(t, calls, options = {}) {
     }
 
     V1EpochProofProposalRequest.prototype.validate = options.requestValidate ?? (async () => true);
-    V1EpochProofProposalApproval.prototype.validate = options.approvalValidate ?? (async () => true);
+    V1EpochProofProposalApproval.prototype.validate = options.approvalValidate ?? (async payload => ({
+        resultCode: ConsensusResultCode.OK,
+        approval: payload.proof_proposal_response.approval
+    }));
 
     return new ConsensusEpochProofProposalOperationHandler(
         state,
@@ -239,6 +242,40 @@ test('handleRequest maps consensus validation errors to signed rejection respons
     t.is(proofProposalResponse.result, ConsensusResultCode.INVALID_PAYLOAD);
     t.absent(proofProposalResponse.approval);
     t.ok(await verifyProofProposalResponseSignature(proofProposalResponse, wallet.publicKey));
+});
+
+test('handleRequest emits a local public key mismatch without building or sending a response', async t => {
+    const calls = [];
+    const message = proofProposalMessage();
+    const connection = createConnection(calls);
+    const validationError = new V1ConsensusProtocolError(
+        ConsensusResultCode.PUBLIC_KEY_MISMATCH,
+        'Address does not match remote public key.'
+    );
+    const handler = setupHandler(t, calls, {
+        wallet: {
+            sign() {
+                t.fail('must not sign a response for a banned peer');
+            }
+        },
+        requestValidate: async () => {
+            calls.push({ name: 'validateRequest' });
+            throw validationError;
+        }
+    });
+    handler.displayError = () => t.fail('must not attempt to build or send a response');
+
+    await handler.handleRequest(message, connection, connection.protocolSession.indexers);
+
+    t.alike(callNames(calls), [
+        'onEpochProposalReceived',
+        'validateRequest',
+        'onEpochProposalValidationFailure'
+    ]);
+    t.is(calls[2].context.error, validationError);
+    t.is(calls[2].context.resultCode, ConsensusResultCode.PUBLIC_KEY_MISMATCH);
+    t.is(calls[2].context.connection, connection);
+    t.is(connection.sent.length, 0);
 });
 
 test('handleRequest maps unexpected validation errors to UNEXPECTED_ERROR responses', async t => {
@@ -392,7 +429,10 @@ test('handleApproval validates OK responses, emits success, and returns approval
             validatorPayload = payload;
             validatorConnection = conn;
             validatorProofProposal = proposal;
-            return true;
+            return {
+                resultCode: ConsensusResultCode.OK,
+                approval: payload.proof_proposal_response.approval
+            };
         }
     });
 
@@ -421,6 +461,35 @@ test('handleApproval validates OK responses, emits success, and returns approval
     const successContext = calls[2].context;
     t.is(successContext.resultCode, ConsensusResultCode.OK);
     t.is(successContext.approval, message.proof_proposal_response.approval);
+});
+
+test('handleApproval reports a validated peer rejection without a local error', async t => {
+    const calls = [];
+    const message = proofProposalApprovalMessage({
+        result: ConsensusResultCode.PUBLIC_KEY_MISMATCH,
+        approval: undefined
+    });
+    const proofProposal = consensusV1OperationFixtures.proofProposal;
+    const connection = createConnection(calls);
+    const handler = setupHandler(t, calls, {
+        approvalValidate: async () => {
+            calls.push({ name: 'validateApproval' });
+            return { resultCode: ConsensusResultCode.PUBLIC_KEY_MISMATCH };
+        }
+    });
+
+    const result = await handler.handleApproval(message, connection, connection.protocolSession.indexers, proofProposal);
+
+    t.alike(result, { resultCode: ConsensusResultCode.PUBLIC_KEY_MISMATCH });
+    t.alike(callNames(calls), [
+        'onApprovalResponseReceived',
+        'validateApproval',
+        'onApprovalResponseFailure'
+    ]);
+    t.is(calls[2].context.resultCode, ConsensusResultCode.PUBLIC_KEY_MISMATCH);
+    t.absent(calls[2].context.error);
+    t.absent(calls[2].context.approval);
+    t.absent(connection.ended);
 });
 
 test('handleApproval maps consensus validation failure and does not read approval payload', async t => {

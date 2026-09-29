@@ -25,7 +25,8 @@ class ConsensusEpochProofProposalOperationHandler extends ConnectionOperationHan
      * Handles a leader's consensus v1 epoch proof proposal from the minion side.
      * @param {object} message Decoded consensus v1 message containing `proof_proposal` and `session_id`.
      * @param {object} connection Peer connection context used by the request validator.
-     * @returns {Promise<void>} Resolves after sending a signed consensus v1 proof proposal response.
+     * @param protocolSession Protocol session context used by the request validator.
+     * @returns {Promise<void>} Resolves after sending a signed response, unless a local identity violation closes the connection.
      */
     async handleRequest(message, connection, protocolSession) {
         const eventContext = this.#buildRequestEventContext(message, connection);
@@ -45,7 +46,6 @@ class ConsensusEpochProofProposalOperationHandler extends ConnectionOperationHan
         } catch (e) {
             validationError = e;
             resultCode = getResultCode(e);
-            // TODO: If INVALID_ADDRESS_ASSERTION is introduced, blacklist the specific remote address/pubKey.
             this.#emitEvent(CustomEventType.EPOCH_PROPOSAL_VALIDATION_FAILURE, {
                 ...eventContext,
                 resultCode,
@@ -53,21 +53,28 @@ class ConsensusEpochProofProposalOperationHandler extends ConnectionOperationHan
             });
         }
         finally {
-            await this.#sendEpochProofProposalApprovalResponse(
-                message?.session_id,
-                connection,
-                protocolSession,
-                message,
-                resultCode
-            );
+            // Network bans and disconnects this peer when it receives the failure event.
+            if (resultCode !== ConsensusResultCode.PUBLIC_KEY_MISMATCH) {
+                await this.#sendEpochProofProposalApprovalResponse(
+                    message?.session_id,
+                    connection,
+                    protocolSession,
+                    message,
+                    resultCode
+                );
+            }
         }
     }
 
     /**
      * Handles a minion's consensus v1 epoch proof proposal approval from the requester side.
      *
+     * Failure events include `error` only for locally detected validation failures;
+     * authenticated peer rejections carry their result code without an error.
+     *
      * @param {object} message Decoded consensus v1 message containing `proof_proposal_response`.
      * @param {object} connection Peer connection context used by the response validator.
+     * @param _protocolSession Protocol session context used by the response validator.
      * @param {object} proofProposal Original proof proposal used by the response validator.
      * @returns {Promise<{resultCode: number, approval?: object}>} Approval handling outcome with a ConsensusResultCode value.
      */
@@ -81,27 +88,28 @@ class ConsensusEpochProofProposalOperationHandler extends ConnectionOperationHan
         const eventContext = this.#buildApprovalEventContext(message, connection, proofProposal);
         this.#emitEvent(CustomEventType.EPOCH_PROPOSAL_APPROVAL_RECEIVED, eventContext); // NOTE: Maybe not needed. Investigate. For now, this will be only a placeholder
 
-        let resultCode = ConsensusResultCode.OK;
-        let approval;
+        let result;
         try {
-            await this.#proofProposalApprovalValidator.validate(message, connection, proofProposal);
-            approval = message.proof_proposal_response.approval;
-        } catch (e) {
-            resultCode = getResultCode(e);
+            result = await this.#proofProposalApprovalValidator.validate(message, connection, proofProposal);
+        } catch (error) {
+            const resultCode = getResultCode(error);
             this.#emitEvent(CustomEventType.EPOCH_PROPOSAL_APPROVAL_FAILURE, {
                 ...eventContext,
                 resultCode,
-                error: e
+                error: error
             });
             return { resultCode };
         }
 
-        this.#emitEvent(CustomEventType.EPOCH_PROPOSAL_APPROVAL_SUCCESS, {
+        const event = result.resultCode === ConsensusResultCode.OK
+            ? CustomEventType.EPOCH_PROPOSAL_APPROVAL_SUCCESS
+            : CustomEventType.EPOCH_PROPOSAL_APPROVAL_FAILURE;
+
+        this.#emitEvent(event, {
             ...eventContext,
-            resultCode,
-            approval
+            ...result
         });
-        return { resultCode, approval };
+        return result;
     }
 
     #buildRequestEventContext(message, connection) {

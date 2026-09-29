@@ -112,6 +112,7 @@ async function assertProtocolError(t, action, resultCode, messageIncludes) {
     if (messageIncludes) {
         t.ok(error.message.includes(messageIncludes));
     }
+    return error;
 }
 
 test('V1EpochProofProposalApproval validates approval signature against original proof proposal', async t => {
@@ -121,13 +122,16 @@ test('V1EpochProofProposalApproval validates approval signature against original
     const proofProposalPayload = await buildProofProposalPayload(proposerWallet);
     const approvalPayload = await buildProofProposalApprovalPayload(approverWallet, proofProposalPayload);
 
-    await validator.validate(
+    const result = await validator.validate(
         approvalPayload,
         {remotePublicKey: approverWallet.publicKey},
         proofProposalPayload.proof_proposal
     );
 
-    t.pass();
+    t.alike(result, {
+        resultCode: ConsensusResultCode.OK,
+        approval: approvalPayload.proof_proposal_response.approval
+    });
 });
 
 test('V1EpochProofProposalApproval rejects approver that is not an indexer', async t => {
@@ -151,23 +155,40 @@ test('V1EpochProofProposalApproval rejects approver that is not an indexer', asy
     );
 });
 
-test('V1EpochProofProposalApproval rejects non-OK response without approval', async t => {
+test('V1EpochProofProposalApproval returns a signed rejection without approval', async t => {
     const proposerWallet = await createWallet(testKeyPair1);
     const approverWallet = await createWallet(testKeyPair2);
     const validator = new V1EpochProofProposalApproval(config, state);
     const proofProposalPayload = await buildProofProposalPayload(proposerWallet);
     const approvalPayload = await buildProofProposalRejectionPayload(approverWallet, proofProposalPayload);
 
-    await assertProtocolError(
-        t,
-        async () => validator.validate(
-            approvalPayload,
-            {remotePublicKey: approverWallet.publicKey},
-            proofProposalPayload.proof_proposal
-        ),
-        ConsensusResultCode.INVALID_PAYLOAD,
-        `Proof proposal response result code is not OK: ${ConsensusResultCode.INVALID_PAYLOAD}`
+    const result = await validator.validate(
+        approvalPayload,
+        {remotePublicKey: approverWallet.publicKey},
+        proofProposalPayload.proof_proposal
     );
+
+    t.alike(result, { resultCode: ConsensusResultCode.INVALID_PAYLOAD });
+});
+
+test('V1EpochProofProposalApproval returns a signed PUBLIC_KEY_MISMATCH rejection without throwing', async t => {
+    const proposerWallet = await createWallet(testKeyPair1);
+    const approverWallet = await createWallet(testKeyPair2);
+    const validator = new V1EpochProofProposalApproval(config, state);
+    const proofProposalPayload = await buildProofProposalPayload(proposerWallet);
+    const approvalPayload = await buildProofProposalRejectionPayload(
+        approverWallet,
+        proofProposalPayload,
+        ConsensusResultCode.PUBLIC_KEY_MISMATCH
+    );
+
+    const result = await validator.validate(
+        approvalPayload,
+        {remotePublicKey: approverWallet.publicKey},
+        proofProposalPayload.proof_proposal
+    );
+
+    t.alike(result, { resultCode: ConsensusResultCode.PUBLIC_KEY_MISMATCH });
 });
 
 test('V1EpochProofProposalApproval rejects fake non-OK response signature before result code handling', async t => {
@@ -175,7 +196,11 @@ test('V1EpochProofProposalApproval rejects fake non-OK response signature before
     const approverWallet = await createWallet(testKeyPair2);
     const validator = new V1EpochProofProposalApproval(config, state);
     const proofProposalPayload = await buildProofProposalPayload(proposerWallet);
-    const approvalPayload = await buildProofProposalRejectionPayload(approverWallet, proofProposalPayload);
+    const approvalPayload = await buildProofProposalRejectionPayload(
+        approverWallet,
+        proofProposalPayload,
+        ConsensusResultCode.PUBLIC_KEY_MISMATCH
+    );
     const fakeApprovalPayload = {
         ...approvalPayload,
         proof_proposal_response: {

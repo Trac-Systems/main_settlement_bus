@@ -20,17 +20,17 @@ class V1EpochProofProposalApproval extends V1BaseConsensusOperation {
     }
 
     /**
-     * Validates a complete incoming proof proposal approval.
+     * Validates an incoming proof proposal response and returns its outcome.
      *
-     * Checks the response schema and signature, requires an OK result, verifies
-     * that the approver belongs to the remote public key, verifies the approval
-     * signature against the original proposal, and checks indexer membership.
+     * Checks every response's schema and signature. A signed rejection is returned
+     * as a result. An OK response also requires the approver to match the remote
+     * public key, a valid approval signature, and indexer membership.
      *
      * @param {object} payload Decoded proof proposal approval payload.
      * @param {object} connection Peer connection containing `remotePublicKey`.
      * @param {object} proofProposal Original proof proposal being approved.
-     * @returns {Promise<boolean>} Resolves to `true` when every check succeeds.
-     * @throws {V1ConsensusProtocolError} When any approval validation check fails.
+     * @returns {Promise<{resultCode: number, approval?: object}>} Authenticated peer outcome.
+     * @throws {V1ConsensusProtocolError} When local response validation fails.
      */
     async validate(payload, connection, proofProposal) {
         return await this.validateAsProtocolError(async () => {
@@ -38,7 +38,10 @@ class V1EpochProofProposalApproval extends V1BaseConsensusOperation {
 
             await this.#validateResponseSignature(payload, connection.remotePublicKey);
             const resultCode = payload.proof_proposal_response.result;
-            this.#validateIfResultCodeIsOk(resultCode);
+            if (resultCode !== ConsensusResultCode.OK) {
+                return { resultCode };
+            }
+
             const approval = payload.proof_proposal_response.approval;
             this.assertAddressWithRemotePublicKey(
                 approval.approver,
@@ -46,7 +49,7 @@ class V1EpochProofProposalApproval extends V1BaseConsensusOperation {
             );
             await this.validateSignature(payload, connection.remotePublicKey, proofProposal, ConsensusResultCode.APPROVAL_SIGNATURE_INVALID);
             await this.validateAddressIsIndexer(connection.remotePublicKey);
-            return true;
+            return { resultCode, approval };
         });
     }
 
@@ -100,19 +103,6 @@ class V1EpochProofProposalApproval extends V1BaseConsensusOperation {
                 ConsensusResultCode.RESPONSE_SIGNATURE_INVALID,
                 'response signature verification failed.'
             );
-        }
-    }
-
-    /**
-     * Validates that the proof proposal response accepts the proposal.
-     *
-     * @param {number} resultCode Consensus result code from the response.
-     * @returns {void}
-     * @throws {V1ConsensusProtocolError} When the response result is not `ConsensusResultCode.OK`.
-     */
-    #validateIfResultCodeIsOk(resultCode) {
-        if (resultCode !== ConsensusResultCode.OK) {
-            throw new V1ConsensusProtocolError(resultCode, `Proof proposal response result code is not OK: ${resultCode}`);
         }
     }
 

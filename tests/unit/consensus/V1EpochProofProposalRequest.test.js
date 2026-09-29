@@ -159,6 +159,7 @@ async function assertProtocolError(t, action, resultCode, messageIncludes) {
     if (messageIncludes) {
         t.ok(error.message.includes(messageIncludes));
     }
+    return error;
 }
 
 test('V1EpochProofProposalRequest validates proof proposal signature', async t => {
@@ -351,11 +352,11 @@ test('V1EpochProofProposalRequest rejects proposer address mismatched with remot
     const wallet = await createWallet(testKeyPair1);
     const otherWallet = await createWallet(testKeyPair2);
     const validator = new V1EpochProofProposalRequest(config, createState());
-    const proposer = addressToBuffer(wallet.address, config.addressPrefix);
+    const payload = await buildProofProposalPayload(wallet);
 
     await assertProtocolError(
         t,
-        () => validator.assertAddressWithRemotePublicKey(proposer, otherWallet.publicKey),
+        () => validator.validate(payload, {remotePublicKey: otherWallet.publicKey}),
         ConsensusResultCode.PUBLIC_KEY_MISMATCH,
         'Address does not match remote public key'
     );
