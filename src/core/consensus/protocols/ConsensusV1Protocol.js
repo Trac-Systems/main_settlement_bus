@@ -8,11 +8,13 @@ class ConsensusV1Protocol {
     #router;
     #pendingRequestService;
     #publicKeyHex;
+    #logger;
 
-    constructor(router, connection, pendingRequestService, onClose) {
+    constructor(router, connection, pendingRequestService, onClose, logger) {
         this.#router = router;
         this.#pendingRequestService = pendingRequestService;
         this.#publicKeyHex =connection.remotePublicKey.toString('hex');
+        this.#logger = logger;
         this.#init(connection, onClose);
     }
 
@@ -38,8 +40,7 @@ class ConsensusV1Protocol {
             encoding: c.raw,
             onmessage: (incomingMessage) => {
                 this.#router.route(incomingMessage, connection, this).catch((err) => {
-                    console.error(`ConsensusV1Protocol: unhandled router error: ${err.message}`);
-                    try { connection.end(); } catch {}
+                    this.#logger.error(`ConsensusV1Protocol: unhandled router error for Consensus V1 message, peer: ${this.#publicKeyHex}: ${err.message}`);
                 });
             }
         });

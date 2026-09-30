@@ -2,6 +2,7 @@ import test from 'brittle';
 import b4a from 'b4a';
 import Protomux from 'protomux';
 import c from 'compact-encoding';
+import { Logger } from '../../../src/utils/logger.js';
 
 if (typeof globalThis.Bare !== 'undefined') {
     test('ConsensusV1Protocol shared transport coverage is Node-only', t => {
@@ -35,6 +36,11 @@ if (typeof globalThis.Bare !== 'undefined') {
         local.remotePublicKey = b4a.alloc(32, 1);
         t.teardown(() => { local.destroy(); remote.destroy(); });
 
+        const localMux = Protomux.from(local);
+        const remoteMux = Protomux.from(remote);
+        localMux.cork();
+        remoteMux.cork();
+
         const originalConsoleError = console.error;
         let reportError;
         const routerFailed = new Promise(resolve => { reportError = resolve; });
@@ -48,23 +54,31 @@ if (typeof globalThis.Bare !== 'undefined') {
                 if (b4a.toString(message) === 'invalid') throw new Error('router failed');
                 receiveNextMessage(message);
             }
-        }, local, { rejectPendingRequestsForSession() {} }, function onClose() {});
+        }, local, { rejectPendingRequestsForSession() {} }, function onClose() {}, new Logger({}));
 
-        const remoteConsensus = Protomux.from(remote).createChannel({ protocol: 'consensus/v1' });
+        const remoteConsensus = remoteMux.createChannel({ protocol: 'consensus/v1' });
         const sendConsensus = remoteConsensus.addMessage({ encoding: c.raw });
         remoteConsensus.open();
 
         let receiveOtherMessage;
         const otherMessage = new Promise(resolve => { receiveOtherMessage = resolve; });
-        const remoteOther = Protomux.from(remote).createChannel({ protocol: 'shared-transport-test' });
+        const remoteOther = remoteMux.createChannel({ protocol: 'shared-transport-test' });
         remoteOther.addMessage({ encoding: c.raw, onmessage: receiveOtherMessage });
         remoteOther.open();
-        const localOther = Protomux.from(local).createChannel({ protocol: 'shared-transport-test' });
+        const localOther = localMux.createChannel({ protocol: 'shared-transport-test' });
         const sendOther = localOther.addMessage({ encoding: c.raw });
         localOther.open();
+        localMux.uncork();
+        remoteMux.uncork();
+        t.ok(await remoteConsensus.fullyOpened(), 'consensus channel opened');
+        t.ok(await remoteOther.fullyOpened(), 'other channel opened');
 
         sendConsensus.send(b4a.from('invalid'));
-        t.ok((await routerFailed).includes('router failed'));
+        const errorMessage = await routerFailed;
+        t.ok(errorMessage.includes('router failed'));
+        t.ok(errorMessage.includes('e: ConsensusV1Protocol:'), 'uses Logger');
+        t.ok(errorMessage.includes('Consensus V1 message'));
+        t.ok(errorMessage.includes(local.remotePublicKey.toString('hex')), 'identifies the peer');
         t.absent(local.writableEnded, 'router failure does not end the transport');
         t.absent(local.destroyed, 'router failure does not destroy the transport');
         if (local.writableEnded || local.destroyed) return;
