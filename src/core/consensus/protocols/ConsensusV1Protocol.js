@@ -1,6 +1,7 @@
 import Protomux from 'protomux';
 import c from 'compact-encoding';
 import { encodeConsensusMessage } from '../../../codecs/consensus/v1/consensusV1OperationCodec.js';
+import { handleConsensusLocalError } from '../ConsensusPeerPolicy.js';
 
 class ConsensusV1Protocol {
     #channel;
@@ -40,7 +41,7 @@ class ConsensusV1Protocol {
             encoding: c.raw,
             onmessage: (incomingMessage) => {
                 this.#router.route(incomingMessage, connection, this).catch((err) => {
-                    this.#logger.error(`ConsensusV1Protocol: unhandled router error for Consensus V1 message, peer: ${this.#publicKeyHex}: ${err.message}`);
+                    handleConsensusLocalError(this.#logger, `ConsensusV1Protocol: unhandled router error for Consensus V1 message, peer: ${this.#publicKeyHex}: ${err.message}`);
                 });
             }
         });
