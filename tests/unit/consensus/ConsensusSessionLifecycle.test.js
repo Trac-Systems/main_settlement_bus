@@ -2,9 +2,11 @@ import test from 'brittle';
 import b4a from 'b4a';
 import Protomux from 'protomux';
 import c from 'compact-encoding';
+import EventEmitter from 'bare-events';
 import ConsensusMessages from '../../../src/core/consensus/protocols/ConsensusMessages.js';
 import IndexerConnectionManager from '../../../src/core/consensus/services/IndexerConnectionManager.js';
 import IndexerPendingRequestService from '../../../src/core/consensus/services/IndexerPendingRequestService.js';
+import { encodeConsensusMessage } from '../../../src/codecs/consensus/v1/consensusV1OperationCodec.js';
 import fixtures from '../../fixtures/consensusV1Operation.fixtures.js';
 import { config } from '../../helpers/config.js';
 
@@ -14,7 +16,7 @@ const proposal = id => ({ ...fixtures.proofProposalHeader, session_id: id });
 function setup(t) {
     const pending = new IndexerPendingRequestService(config);
     let manager;
-    const messages = new ConsensusMessages({}, {}, config, pending, connection => {
+    const messages = new ConsensusMessages(new EventEmitter(), {}, config, pending, connection => {
         manager.remove(connection.remotePublicKey, connection);
     });
     manager = new IndexerConnectionManager(10, config, { debug() {} }, messages);
@@ -68,7 +70,7 @@ async function openSession(t, context) {
 if (typeof globalThis.Bare !== 'undefined') {
     test('Consensus session lifecycle uses Node duplex streams', t => t.pass('covered in Node'));
 } else {
-    for (const closer of ['session', 'manager', 'remote', 'transport', 'router']) {
+    for (const closer of ['session', 'manager', 'remote', 'transport', 'router', 'handler']) {
         test(`Consensus session cleanup after closure by ${closer}`, async t => {
             const context = setup(t);
             const { local, remote, session, remoteConsensus, remoteSender, otherSender, received } = await openSession(t, context);
@@ -81,6 +83,7 @@ if (typeof globalThis.Bare !== 'undefined') {
             if (closer === 'remote') remoteConsensus.close();
             if (closer === 'transport') local.destroy();
             if (closer === 'router') remoteSender.send(b4a.from([0xff]));
+            if (closer === 'handler') remoteSender.send(encodeConsensusMessage(proposal('')));
 
             t.ok((await result).message.includes('Consensus session closed'));
             t.absent(context.pending.has('pending'), 'request removed immediately');

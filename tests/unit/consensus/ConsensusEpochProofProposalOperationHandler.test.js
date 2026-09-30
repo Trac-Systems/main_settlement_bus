@@ -68,6 +68,11 @@ function createConnection(calls, overrides = {}) {
         flushed: false,
         protocolSession: {
             indexers: {
+                closed: false,
+                close() {
+                    this.closed = true;
+                    calls.push({ name: 'close' });
+                },
                 sendAndForget(response) {
                     calls.push({ name: 'send', response });
                     if (overrides.sendError) throw overrides.sendError;
@@ -348,7 +353,7 @@ test('handleRequest sends signed rejection for malformed proof proposal with val
     t.ok(await verifyProofProposalResponseSignature(proofProposalResponse, wallet.publicKey));
 });
 
-test('handleRequest ends connection without response when session id is invalid', async t => {
+test('handleRequest closes only consensus without response when session id is invalid', async t => {
     const wallet = await createWallet();
     const calls = [];
     const message = proofProposalMessage({ session_id: '' });
@@ -371,14 +376,15 @@ test('handleRequest ends connection without response when session id is invalid'
         'onEpochProposalReceived',
         'validateRequest',
         'onEpochProposalValidationFailure',
-        'end'
+        'close'
     ]);
     t.is(connection.sent.length, 0);
     t.absent(connection.flushed);
-    t.ok(connection.ended);
+    t.absent(connection.ended);
+    t.ok(connection.protocolSession.indexers.closed);
 });
 
-test('handleRequest ends the connection when response sending fails', async t => {
+test('handleRequest logs a response send failure without closing the session or transport', async t => {
     const wallet = await createWallet();
     const calls = [];
     const message = proofProposalMessage();
@@ -402,15 +408,81 @@ test('handleRequest ends the connection when response sending fails', async t =>
         'onEpochProposalReceived',
         'validateRequest',
         'onEpochProposalValidationSuccess',
-        'send',
-        'end'
+        'send'
     ]);
     t.is(connection.sent.length, 0);
     t.absent(connection.flushed);
-    t.ok(connection.ended);
+    t.absent(connection.ended);
+    t.absent(connection.protocolSession.indexers.closed);
     t.is(displayErrors.length, 1);
     t.is(displayErrors[0].error, sendError);
     t.is(displayErrors[0].remotePublicKey, connection.remotePublicKey);
+});
+
+test('handleRequest logs a response signing failure through Logger without closing anything', async t => {
+    const wallet = await createWallet();
+    const calls = [];
+    const connection = createConnection(calls);
+    const errors = [];
+    const originalConsoleError = console.error;
+    console.error = message => errors.push(message);
+    t.teardown(() => { console.error = originalConsoleError; });
+    const handler = setupHandler(t, calls, {
+        wallet: {
+            address: wallet.address,
+            sign() { throw new Error('signer unavailable'); }
+        }
+    });
+
+    await handler.handleRequest(proofProposalMessage(), connection, connection.protocolSession.indexers);
+
+    t.is(connection.sent.length, 0);
+    t.absent(connection.ended);
+    t.absent(connection.protocolSession.indexers.closed);
+    t.is(errors.length, 1);
+    t.ok(errors[0].includes('e: '), 'uses the shared logger format');
+    t.ok(errors[0].includes('Consensus V1 message'));
+    t.ok(errors[0].includes('signer unavailable'));
+});
+
+test('handleRequest skips response building when consensus closes during validation', async t => {
+    const calls = [];
+    const connection = createConnection(calls);
+    const session = connection.protocolSession.indexers;
+    const handler = setupHandler(t, calls, {
+        wallet: { sign() { t.fail('closed session must not sign a response'); } },
+        requestValidate: async () => { session.close(); }
+    });
+    handler.displayError = () => t.fail('closed session must not attempt to build a response');
+
+    await handler.handleRequest(proofProposalMessage(), connection, session);
+
+    t.is(connection.sent.length, 0);
+    t.absent(connection.ended);
+});
+
+test('handleRequest skips sending when consensus closes while the response is being built', async t => {
+    const wallet = await createWallet();
+    const calls = [];
+    const connection = createConnection(calls);
+    const session = connection.protocolSession.indexers;
+    const handler = setupHandler(t, calls, {
+        wallet: {
+            address: wallet.address,
+            sign(data) {
+                if (!session.closed) session.close();
+                return wallet.sign(data);
+            }
+        }
+    });
+    handler.displayError = () => t.fail('response should build successfully');
+
+    await handler.handleRequest(proofProposalMessage(), connection, session);
+
+    t.ok(session.closed);
+    t.is(connection.sent.length, 0);
+    t.absent(calls.some(call => call.name === 'send'), 'does not attempt to send on the closed session');
+    t.absent(connection.ended);
 });
 
 test('handleApproval validates OK responses, emits success, and returns approval', async t => {

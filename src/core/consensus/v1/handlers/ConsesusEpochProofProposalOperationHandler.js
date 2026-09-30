@@ -6,6 +6,8 @@ import { consensusMessageFactory } from "../../../../messages/consensus/v1/conse
 import { bufferToAddress } from "../../../state/utils/address.js"
 import ConnectionOperationHandler from "../../../network/protocols/shared/ConnectionOperationHandler.js";
 import { shouldBanConsensusPeer } from "../../ConsensusPeerPolicy.js";
+import { Logger } from "../../../../utils/logger.js";
+import { publicKeyToAddress } from "../../../../utils/helpers.js";
 
 
 class ConsensusEpochProofProposalOperationHandler extends ConnectionOperationHandler {
@@ -13,11 +15,13 @@ class ConsensusEpochProofProposalOperationHandler extends ConnectionOperationHan
     #proofProposalApprovalValidator;
     #wallet;
     #state;
+    #logger;
 
     constructor(state, wallet, config) {
         super(config)
         this.#state = state;
         this.#wallet = wallet;
+        this.#logger = new Logger(config);
         this.#proofProposalRequestValidator = new V1EpochProofProposalRequest(config, state);
         this.#proofProposalApprovalValidator = new V1EpochProofProposalApproval(config, state);
     }
@@ -27,7 +31,7 @@ class ConsensusEpochProofProposalOperationHandler extends ConnectionOperationHan
      * @param {object} message Decoded consensus v1 message containing `proof_proposal` and `session_id`.
      * @param {object} connection Peer connection context used by the request validator.
      * @param protocolSession Protocol session context used by the request validator.
-     * @returns {Promise<void>} Resolves after sending a signed response, unless a local identity violation closes the connection.
+     * @returns {Promise<void>} Resolves after responding, unless the consensus session is closed or the peer is banned.
      */
     async handleRequest(message, connection, protocolSession) {
         const eventContext = this.#buildRequestEventContext(message, connection);
@@ -185,8 +189,9 @@ class ConsensusEpochProofProposalOperationHandler extends ConnectionOperationHan
         resultCode
     ) {
         try {
+            if (protocolSession.closed) return;
             if (!this.#isValidResponseSessionId(messageId)) {
-                connection.end();
+                protocolSession.close();
                 return;
             }
 
@@ -201,12 +206,7 @@ class ConsensusEpochProofProposalOperationHandler extends ConnectionOperationHan
                     resultCode
                 );
 
-            await this.sendResponseAndMaybeClose(
-                protocolSession,
-                connection,
-                response,
-                false
-            );
+            if (!protocolSession.closed) protocolSession.sendAndForget(response);
 
         } catch (error) {
             this.displayError(
@@ -214,8 +214,12 @@ class ConsensusEpochProofProposalOperationHandler extends ConnectionOperationHan
                 connection.remotePublicKey,
                 error
             );
-            connection.end();
         }
+    }
+
+    displayError(step, senderPublicKey, error) {
+        const sender = publicKeyToAddress(senderPublicKey, this.config);
+        this.#logger.error(`${this.constructor.name}: Consensus V1 message ${step}, sender: ${sender}: ${error?.message ?? 'Unexpected error'}`);
     }
 
 }
