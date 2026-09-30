@@ -5,6 +5,7 @@ import { ConsensusResultCode, CustomEventType } from "../../../../utils/constant
 import { consensusMessageFactory } from "../../../../messages/consensus/v1/consensusMessageFactory.js";
 import { bufferToAddress } from "../../../state/utils/address.js"
 import ConnectionOperationHandler from "../../../network/protocols/shared/ConnectionOperationHandler.js";
+import { shouldBanConsensusPeer } from "../../ConsensusPeerPolicy.js";
 
 
 class ConsensusEpochProofProposalOperationHandler extends ConnectionOperationHandler {
@@ -54,7 +55,7 @@ class ConsensusEpochProofProposalOperationHandler extends ConnectionOperationHan
         }
         finally {
             // Network bans and disconnects this peer when it receives the failure event.
-            if (resultCode !== ConsensusResultCode.PUBLIC_KEY_MISMATCH) {
+            if (!shouldBanConsensusPeer(validationError)) {
                 await this.#sendEpochProofProposalApprovalResponse(
                     message?.session_id,
                     connection,

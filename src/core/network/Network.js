@@ -16,11 +16,11 @@ import EpochCoordinatorService from '../consensus/services/EpochCoordinatorServi
 import IndexerConnectionManager from '../consensus/services/IndexerConnectionManager.js';
 import { Logger } from '../../utils/logger.js';
 import { WalletProvider } from 'trac-wallet';
-import { ConsensusResultCode, CustomEventType } from '../../utils/constants.js';
+import { CustomEventType } from '../../utils/constants.js';
 import tracCryptoApi from 'trac-crypto-api'
 import ConsensusMessages from '../consensus/protocols/ConsensusMessages.js';
 import IndexerPendingRequestService from '../consensus/services/IndexerPendingRequestService.js';
-import { V1ConsensusProtocolError } from '../consensus/v1/V1ConsensusProtocolError.js';
+import { shouldBanConsensusPeer } from '../consensus/ConsensusPeerPolicy.js';
 
 const wakeup = new w();
 
@@ -283,8 +283,7 @@ class Network extends ReadyResource {
 
     /** Bans only identity mismatches detected locally, never result codes reported by a peer. */
     #handleConsensusValidationFailure({ connection, error } = {}) {
-        if (!(error instanceof V1ConsensusProtocolError)) return;
-        if (error.resultCode !== ConsensusResultCode.PUBLIC_KEY_MISMATCH) return;
+        if (!shouldBanConsensusPeer(error)) return;
         if (this.closing !== null || this.closed) return;
 
         const publicKey = this.#normalizePublicKey(connection?.remotePublicKey);
