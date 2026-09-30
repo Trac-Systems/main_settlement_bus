@@ -46,7 +46,7 @@ async function openSession(t, context) {
     localMux.cork();
     remoteMux.cork();
     const remoteConsensus = remoteMux.createChannel({ protocol: 'consensus/v1' });
-    remoteConsensus.addMessage({ encoding: c.raw });
+    const remoteSender = remoteConsensus.addMessage({ encoding: c.raw });
     context.manager.add(peerKey, local);
     remoteConsensus.open();
 
@@ -62,16 +62,16 @@ async function openSession(t, context) {
     remoteMux.uncork();
     t.ok(await remoteConsensus.fullyOpened(), 'consensus channel opened');
     t.ok(await remoteOther.fullyOpened(), 'other channel opened');
-    return { local, remote, session: local.protocolSessions.indexer, remoteConsensus, otherSender, received };
+    return { local, remote, session: local.protocolSessions.indexer, remoteConsensus, remoteSender, otherSender, received };
 }
 
 if (typeof globalThis.Bare !== 'undefined') {
     test('Consensus session lifecycle uses Node duplex streams', t => t.pass('covered in Node'));
 } else {
-    for (const closer of ['session', 'manager', 'remote', 'transport']) {
+    for (const closer of ['session', 'manager', 'remote', 'transport', 'router']) {
         test(`Consensus session cleanup after closure by ${closer}`, async t => {
             const context = setup(t);
-            const { local, remote, session, remoteConsensus, otherSender, received } = await openSession(t, context);
+            const { local, remote, session, remoteConsensus, remoteSender, otherSender, received } = await openSession(t, context);
             const result = session.send(proposal('pending')).catch(error => error);
             const validatorSession = { active: true };
             local.protocolSessions.validator = validatorSession;
@@ -80,6 +80,7 @@ if (typeof globalThis.Bare !== 'undefined') {
             if (closer === 'manager') context.manager.remove(peerKey, local);
             if (closer === 'remote') remoteConsensus.close();
             if (closer === 'transport') local.destroy();
+            if (closer === 'router') remoteSender.send(b4a.from([0xff]));
 
             t.ok((await result).message.includes('Consensus session closed'));
             t.absent(context.pending.has('pending'), 'request removed immediately');

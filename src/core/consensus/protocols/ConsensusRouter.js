@@ -2,10 +2,12 @@ import { decodeConsensusMessage } from '../../../codecs/consensus/v1/consensusV1
 import b4a from 'b4a'
 import { ConsensusOperationType, CONSENSUS_MESSAGE_MAX_BYTE_SIZE } from '../../../utils/constants.js'
 import { publicKeyToAddress } from '../../../utils/helpers.js'
+import { Logger } from '../../../utils/logger.js'
 import ConsensusEpochProofProposalOperationHandler from '../v1/handlers/ConsesusEpochProofProposalOperationHandler.js'
 
 class ConsensusRouterV1 {
     #config
+    #logger
     #epochProofProposalHandler
     #pendingRequestService
     constructor(
@@ -15,6 +17,7 @@ class ConsensusRouterV1 {
         pendingRequestService
     ) {
         this.#config = config
+        this.#logger = new Logger(config);
         this.#epochProofProposalHandler = new ConsensusEpochProofProposalOperationHandler(
             state,
             wallet,
@@ -23,9 +26,11 @@ class ConsensusRouterV1 {
         this.#pendingRequestService = pendingRequestService;
     }
 
-    async route(incomingMessage, connection) {
+    async route(incomingMessage, connection, protocolSession) {
+        if (protocolSession.closed) return;
+
         if (!this.#preValidate(incomingMessage)) {
-            this.#disconnect(connection, 'Pre-validation failed for incoming V1 message')
+            this.#closeConsensusChannel(connection, protocolSession, 'Pre-validation failed for incoming Consensus V1 message')
             return;
         }
         let decodedMessage;
@@ -33,50 +38,55 @@ class ConsensusRouterV1 {
         try {
             decodedMessage = decodeConsensusMessage(incomingMessage)
         } catch (error) {
-            this.#disconnect(connection, `Failed to decode incoming Consensus message: ${error.message}`)
+            this.#closeConsensusChannel(connection, protocolSession, `Failed to decode incoming Consensus V1 message: ${error.message}`)
             return;
         }
 
-        // TODO: Decide if we really need to check decodedMessage.type here, since this is done
         // again in the next switch statement
         if (!decodedMessage || !Number.isInteger(decodedMessage.type) || decodedMessage.type <= 0) {
-            this.#disconnect(connection, `Invalid V1 message type: ${decodedMessage?.type}`)
+            this.#closeConsensusChannel(connection, protocolSession, `Invalid Consensus V1 message type: ${decodedMessage?.type}`)
             return;
         }
 
+        let pendingApproval;
         try {
             switch (decodedMessage.type) {
                 case ConsensusOperationType.PROOF_PROPOSAL:
-                    await this.#epochProofProposalHandler.handleRequest(decodedMessage, connection, connection.protocolSessions.indexer);
+                    await this.#epochProofProposalHandler.handleRequest(decodedMessage, connection, protocolSession);
                     break;
                 case ConsensusOperationType.PROOF_PROPOSAL_APPROVAL: {
                     const pendingEntry = this.#pendingRequestService.getPendingRequest(decodedMessage.session_id)
-                    if (!pendingEntry) {
-                        this.#disconnect(connection, 'Approval received without matching pending request')
-                        break;
-                    }
+                    // Responses can arrive after a timeout or cancellation.
+                    if (!pendingEntry) break;
 
                     const expectedPeer = pendingEntry.requestedTo ? b4a.from(pendingEntry.requestedTo, 'hex') : null;
                     if (expectedPeer && !b4a.equals(expectedPeer, connection.remotePublicKey)) {
-                        this.#disconnect(connection, 'Approval received from unexpected peer')
+                        this.#closeConsensusChannel(connection, protocolSession, 'Consensus V1 message: approval received from unexpected peer')
                         break;
                     }
+                    if (pendingEntry.session && pendingEntry.session !== protocolSession) break;
 
+                    pendingApproval = pendingEntry;
                     const response = await this.#epochProofProposalHandler.handleApproval(
                         decodedMessage,
                         connection,
-                        connection.protocolSessions.indexer,
+                        protocolSession,
                         pendingEntry.proofProposal
                     );
-                    // TODO: Decide if we want to resolve pending requests here or delegate it elsewhere.
-                    this.#pendingRequestService.resolvePendingRequest(decodedMessage.session_id, response);
+                    // Validation may finish after this request was cancelled or replaced.
+                    if (this.#pendingRequestService.getPendingRequest(decodedMessage.session_id) === pendingEntry) {
+                        this.#pendingRequestService.resolvePendingRequest(decodedMessage.session_id, response);
+                    }
                     break;
                 }
                 default:
-                    this.#disconnect(connection, `Unsupported V1 message type: ${decodedMessage.type}`)
+                    this.#closeConsensusChannel(connection, protocolSession, `Unsupported Consensus V1 message type: ${decodedMessage.type}`)
             }
         } catch (error) {
-            this.#disconnect(connection, `Unhandled error while routing V1 message: ${error.message}`)
+            if (pendingApproval && this.#pendingRequestService.getPendingRequest(decodedMessage.session_id) === pendingApproval) {
+                this.#pendingRequestService.rejectPendingRequest(decodedMessage.session_id, error);
+            }
+            this.#logError(connection, `Unhandled error while routing Consensus V1 message: ${error.message}`)
         }
     }
 
@@ -84,10 +94,14 @@ class ConsensusRouterV1 {
         return !(!incomingMessage || !b4a.isBuffer(incomingMessage) || incomingMessage.length === 0 || incomingMessage.length > CONSENSUS_MESSAGE_MAX_BYTE_SIZE);
     }
 
-    #disconnect(connection, reason) {
+    #closeConsensusChannel(connection, protocolSession, reason) {
+        this.#logError(connection, reason);
+        protocolSession.close();
+    }
+
+    #logError(connection, reason) {
         const sender = publicKeyToAddress(connection.remotePublicKey, this.#config)
-        console.error(`NetworkMessageRouterV1: ${reason}, sender: ${sender}`)
-        connection.end();
+        this.#logger.error(`ConsensusRouterV1: ${reason}, sender: ${sender}`)
     }
 }
 

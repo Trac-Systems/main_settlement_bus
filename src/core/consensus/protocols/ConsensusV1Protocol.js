@@ -37,7 +37,7 @@ class ConsensusV1Protocol {
         this.#session = this.#channel.addMessage({
             encoding: c.raw,
             onmessage: (incomingMessage) => {
-                this.#router.route(incomingMessage, connection).catch((err) => {
+                this.#router.route(incomingMessage, connection, this).catch((err) => {
                     console.error(`ConsensusV1Protocol: unhandled router error: ${err.message}`);
                     try { connection.end(); } catch {}
                 });
