@@ -9,25 +9,30 @@ class ConsensusV1Protocol {
     #pendingRequestService;
     #publicKeyHex;
 
-    constructor(router, connection, pendingRequestService) {
+    constructor(router, connection, pendingRequestService, onClose) {
         this.#router = router;
         this.#pendingRequestService = pendingRequestService;
         this.#publicKeyHex =connection.remotePublicKey.toString('hex');
-        this.#init(connection);
+        this.#init(connection, onClose);
     }
 
-    #init(connection) {
+    get closed() {
+        return !this.#channel || this.#channel.closed;
+    }
+
+    #init(connection, onClose) {
         const mux = Protomux.from(connection);
 
         this.#channel = mux.createChannel({
             protocol: 'consensus/v1',
             onopen() {},
-            onclose() {}
+            onclose: () => {
+                this.#pendingRequestService.rejectPendingRequestsForSession(this, new Error('Consensus session closed before response'));
+                onClose(this);
+            }
         });
 
         if (!this.#channel) return; // connection already destroyed before protocol setup completed
-
-        this.#channel.open();
 
         this.#session = this.#channel.addMessage({
             encoding: c.raw,
@@ -38,11 +43,13 @@ class ConsensusV1Protocol {
                 });
             }
         });
+        this.#channel.open();
     }
 
     async send(message) {
+        if (this.closed) throw new Error('Consensus session is closed');
         const encodedMessage = encodeConsensusMessage(message);
-        const msgReplyPromise = this.#pendingRequestService.registerPendingRequest(this.#publicKeyHex, message);
+        const msgReplyPromise = this.#pendingRequestService.registerPendingRequest(this.#publicKeyHex, message, this);
         try {
             this.#session.send(encodedMessage);
         } catch (error) {
@@ -52,6 +59,7 @@ class ConsensusV1Protocol {
     }
 
     sendAndForget(message) {
+        if (this.closed) return;
         this.#session?.send(encodeConsensusMessage(message));
     }
 

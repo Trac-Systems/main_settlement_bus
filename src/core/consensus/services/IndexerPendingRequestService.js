@@ -35,7 +35,7 @@ export default class IndexerPendingRequestService extends BasePendingRequestServ
     /*
     @returns {Promise}
     */
-    registerPendingRequest(peerPubKeyHex, message) {
+    registerPendingRequest(peerPubKeyHex, message, session = null) {
         this.#validateRegisterInput(peerPubKeyHex, message);
         const id = message.session_id;
         const peerAddress = publicKeyToAddress(peerPubKeyHex, this.#config);
@@ -51,6 +51,7 @@ export default class IndexerPendingRequestService extends BasePendingRequestServ
             id: id,
             requestType: message.type,
             requestedTo: peerPubKeyHex,
+            session,
             proofProposal: message.proof_proposal,
             timeoutId: null,
             resolve: null,
@@ -91,5 +92,11 @@ export default class IndexerPendingRequestService extends BasePendingRequestServ
             ConsensusResultCode.UNEXPECTED_ERROR,
             `Pending request ${id} cancelled (shutdown).`
         );
-    }    
+    }
+
+    rejectPendingRequestsForSession(session, error) {
+        for (const [id, entry] of this._pendingRequests) {
+            if (entry.session === session) this.rejectPendingRequest(id, error);
+        }
+    }
 }

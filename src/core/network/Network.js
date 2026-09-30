@@ -129,7 +129,10 @@ class Network extends ReadyResource {
 
         this.#validatorMessageOrchestrator = new MessageOrchestrator(this.#validatorConnectionManager, this.#state, this.#config, this.#wallet);
 
-        this.#consensusMessages = new ConsensusMessages(this.#state, this.#wallet, this.#config, this.#indexerPendingRequestService);
+        this.#consensusMessages = new ConsensusMessages(
+            this.#state, this.#wallet, this.#config, this.#indexerPendingRequestService,
+            this.#handleConsensusSessionClosed.bind(this)
+        );
 
         const indexerCount = await this.#state.indexerCount();
         this.#indexerConnectionManager = new IndexerConnectionManager(
@@ -176,6 +179,10 @@ class Network extends ReadyResource {
         await this.#indexerConnectionManager.close();
         await this.#validatorConnectionManager.close()
         await this.#swarm.destroy();
+    }
+
+    #handleConsensusSessionClosed(connection) {
+        this.#indexerConnectionManager.remove(connection.remotePublicKey, connection);
     }
 
     #prepareConnection(connection) {

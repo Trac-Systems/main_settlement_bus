@@ -7,9 +7,11 @@ const PROTOCOL = 'consensus/v1';
 class ConsensusMessages {
     #consensusRouter;
     #pendingRequestService;
+    #onSessionClosed;
 
-    constructor(state, wallet, config, pendingRequestService) {
+    constructor(state, wallet, config, pendingRequestService, onSessionClosed) {
         this.#pendingRequestService = pendingRequestService;
+        this.#onSessionClosed = onSessionClosed;
         this.#consensusRouter = new ConsensusRouterV1(state, wallet, config, pendingRequestService);
     }
 
@@ -17,19 +19,24 @@ class ConsensusMessages {
         return new ConsensusV1Protocol(
             this.#consensusRouter,
             connection,
-            this.#pendingRequestService
+            this.#pendingRequestService,
+            session => {
+                if (connection.protocolSessions?.indexer !== session) return;
+                delete connection.protocolSessions.indexer;
+                this.#onSessionClosed(connection);
+            }
         );
     }
 
     /**
      * Opens the consensus/v1 channel on this connection unless one is already open.
-     * `mux.opened()` reflects Protomux's own channel bookkeeping, so it stays correct
-     * even though `connection.protocolSession` is shared with the validator protocol.
+     * The close callback removes the session reference so a new channel can open.
      */
     attachChannel(connection) {
         connection.protocolSessions ??= {};
         if (connection.protocolSessions.indexer) return;
-        connection.protocolSessions.indexer = this.createProtocolSession(connection);
+        const session = this.createProtocolSession(connection);
+        if (!session.closed) connection.protocolSessions.indexer = session;
     }
 
     /**

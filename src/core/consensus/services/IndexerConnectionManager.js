@@ -20,6 +20,7 @@ class IndexerConnectionManager extends PeerConnectionManager {
 
     add(publicKey, connection) {
         this.#messages.attachChannel(connection);
+        if (!connection.protocolSessions.indexer || connection.protocolSessions.indexer.closed) return;
         this._add(publicKey, connection)
     }
 
@@ -52,8 +53,8 @@ class IndexerConnectionManager extends PeerConnectionManager {
         if (connection && entry.connection !== connection) return;
 
         const targetConnection = connection ?? entry.connection;
-        targetConnection.protocolSessions.indexer.close();
         this._connections.delete(key);
+        targetConnection.protocolSessions.indexer?.close();
     }
 
     async send(publicKey, message) {

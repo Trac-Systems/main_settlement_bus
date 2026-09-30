@@ -48,7 +48,7 @@ if (typeof globalThis.Bare !== 'undefined') {
                 if (b4a.toString(message) === 'invalid') throw new Error('router failed');
                 receiveNextMessage(message);
             }
-        }, local, { rejectPendingRequestsForSession() {} });
+        }, local, { rejectPendingRequestsForSession() {} }, function onClose() {});
 
         const remoteConsensus = Protomux.from(remote).createChannel({ protocol: 'consensus/v1' });
         const sendConsensus = remoteConsensus.addMessage({ encoding: c.raw });
