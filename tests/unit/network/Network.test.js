@@ -6,6 +6,7 @@ import tracCryptoApi from 'trac-crypto-api';
 import { WalletProvider } from 'trac-wallet';
 import { CONNECTION_STATUS, CustomEventType, ConsensusResultCode } from '../../../src/utils/constants.js';
 import { V1ConsensusProtocolError } from '../../../src/core/consensus/v1/V1ConsensusProtocolError.js';
+import ConsensusConnectionPolicy from '../../../src/core/consensus/ConsensusConnectionPolicy.js';
 import ConsensusEpochProofProposalOperationHandler from '../../../src/core/consensus/v1/handlers/ConsesusEpochProofProposalOperationHandler.js';
 import { encodeProofProposalApproval } from '../../../src/codecs/consensus/v1/consensusV1OperationCodec.js';
 import { createMessage, uint16ToBuffer, uint32ToBuffer } from '../../../src/utils/buffer.js';
@@ -245,7 +246,7 @@ async function loadNetwork({ isIndexer = false, currentEpoch = null, indexerCoun
         }
     }
 
-    const NetworkModule = await esmock('../../../src/core/network/Network.js', {
+    const NetworkModule = await esmock.strict('../../../src/core/network/Network.js', {
         hyperswarm: HyperswarmMock,
         '../../../src/core/network/services/TransactionPoolService.js': { default: TransactionPoolServiceMock },
         '../../../src/core/network/services/ValidatorObserverService.js': { default: ValidatorObserverServiceMock },
@@ -288,6 +289,7 @@ async function loadNetwork({ isIndexer = false, currentEpoch = null, indexerCoun
 
     const store = new CorestoreMock();
     const state = new EventEmitter();
+    const connectionPolicy = new ConsensusConnectionPolicy(state, new LoggerMock());
     state.isAdmin = async () => false;
     state.isIndexer = () => isIndexer;
     state.indexerCount = async () => indexerCount;
@@ -305,6 +307,7 @@ async function loadNetwork({ isIndexer = false, currentEpoch = null, indexerCoun
         epochCoordinatorServiceInstance,
         validatorPendingRequestServiceInstance,
         indexerPendingRequestServiceInstance,
+        connectionPolicy,
         state
     };
 }
@@ -556,7 +559,7 @@ if (isBareRuntime) {
             const {
                 network, state, swarmInstance, indexerPendingRequestServiceInstance,
                 validatorPendingRequestServiceInstance, validatorConnectionManagerInstance,
-                indexerConnectionManagerInstance,
+                indexerConnectionManagerInstance, connectionPolicy,
             } = context;
             t.teardown(() => network.close());
             const wallet = await new WalletProvider(consensusConfig).fromSecretKey(testKeyPair2.secretKey);
@@ -578,7 +581,7 @@ if (isBareRuntime) {
             const otherRequest = { ...request, session_id: 'other-peer-request' };
             indexerPendingRequestServiceInstance.registerPendingRequest(claimedKey.toString('hex'), otherRequest)
                 .catch(() => {});
-            const handler = new ConsensusEpochProofProposalOperationHandler(state, {}, consensusConfig);
+            const handler = new ConsensusEpochProofProposalOperationHandler(state, {}, consensusConfig, connectionPolicy);
             const session = { sendAndForget: sinon.stub() };
 
             if (kind === 'proposal') {
@@ -624,13 +627,13 @@ if (isBareRuntime) {
     }
 
     test('Network does not ban a peer for a signed PUBLIC_KEY_MISMATCH rejection', async t => {
-        const { network, state, swarmInstance } = await loadNetwork();
+        const { network, state, swarmInstance, connectionPolicy } = await loadNetwork();
         t.teardown(() => network.close());
         const wallet = await new WalletProvider(consensusConfig).fromSecretKey(testKeyPair2.secretKey);
         const connection = createMockConnection(wallet.publicKey.toString('hex'));
         const peerInfo = createPeerInfo(connection.remotePublicKey);
         swarmInstance.peers.set(wallet.publicKey.toString('hex'), peerInfo);
-        const handler = new ConsensusEpochProofProposalOperationHandler(state, {}, consensusConfig);
+        const handler = new ConsensusEpochProofProposalOperationHandler(state, {}, consensusConfig, connectionPolicy);
         const response = await signedConsensusResponse(wallet, ConsensusResultCode.PUBLIC_KEY_MISMATCH);
         let failureContext;
         state.once(CustomEventType.EPOCH_PROPOSAL_APPROVAL_FAILURE, context => { failureContext = context; });
@@ -649,7 +652,7 @@ if (isBareRuntime) {
         t.teardown(() => network.close());
         const publicKey = 'ac'.repeat(32);
         const connection = createMockConnection(publicKey);
-        state.emit(CustomEventType.EPOCH_PROPOSAL_APPROVAL_FAILURE, {
+        state.emit(CustomEventType.CONSENSUS_PEER_BAN_REQUESTED, {
             connection,
             error: new V1ConsensusProtocolError(ConsensusResultCode.PUBLIC_KEY_MISMATCH, 'Address does not match remote public key.'),
         });
@@ -680,7 +683,7 @@ if (isBareRuntime) {
         swarmInstance.connections.add(replacementConnection);
         swarmInstance.connections.add(otherConnection);
 
-        state.emit(CustomEventType.EPOCH_PROPOSAL_APPROVAL_FAILURE, {
+        state.emit(CustomEventType.CONSENSUS_PEER_BAN_REQUESTED, {
             connection: oldConnection,
             error: new V1ConsensusProtocolError(ConsensusResultCode.PUBLIC_KEY_MISMATCH, 'Address does not match remote public key.'),
         });
@@ -705,7 +708,7 @@ if (isBareRuntime) {
             validatorConnectionManagerInstance.validators.add(normalizePublicKey(key));
         };
         const connecting = network.tryConnect(publicKey, 'validator');
-        state.emit(CustomEventType.EPOCH_PROPOSAL_VALIDATION_FAILURE, {
+        state.emit(CustomEventType.CONSENSUS_PEER_BAN_REQUESTED, {
             connection,
             error: new V1ConsensusProtocolError(ConsensusResultCode.PUBLIC_KEY_MISMATCH, 'Address does not match remote public key.'),
         });
@@ -716,8 +719,8 @@ if (isBareRuntime) {
         t.ok(connection.destroy.calledOnce);
     });
 
-    test('Network ignores other consensus failures and removes ban listeners on close', async t => {
-        const { network, state, swarmInstance } = await loadNetwork();
+    test('Network consumes only ban requests and removes its listener on close', async t => {
+        const { network, state, swarmInstance, connectionPolicy } = await loadNetwork();
         t.teardown(() => network.close());
         const publicKey = 'ab'.repeat(32);
         const connection = createMockConnection(publicKey);
@@ -726,24 +729,24 @@ if (isBareRuntime) {
         const events = [CustomEventType.EPOCH_PROPOSAL_VALIDATION_FAILURE, CustomEventType.EPOCH_PROPOSAL_APPROVAL_FAILURE];
 
         for (const event of events) {
-            t.is(state.listenerCount(event), 1);
-            for (const code of [ConsensusResultCode.INDEXER_ROLE_INVALID, ConsensusResultCode.ADDRESS_INVALID,
-                ConsensusResultCode.EPOCH_INVALID, ConsensusResultCode.UNEXPECTED_ERROR]) {
-                state.emit(event, { connection, resultCode: code, error: new V1ConsensusProtocolError(code, 'ordinary failure') });
-            }
-            state.emit(event, { connection, resultCode: ConsensusResultCode.PUBLIC_KEY_MISMATCH });
-            const unexpectedError = Object.assign(new Error('unexpected failure'), { resultCode: ConsensusResultCode.PUBLIC_KEY_MISMATCH });
-            state.emit(event, { connection, error: unexpectedError });
+            t.is(state.listenerCount(event), 0, 'Network no longer interprets validation events');
+            state.emit(event, { connection, error: new V1ConsensusProtocolError(ConsensusResultCode.PUBLIC_KEY_MISMATCH, 'validation failure') });
         }
+        for (const code of [ConsensusResultCode.INDEXER_ROLE_INVALID, ConsensusResultCode.ADDRESS_INVALID,
+            ConsensusResultCode.EPOCH_INVALID, ConsensusResultCode.UNEXPECTED_ERROR]) {
+            t.absent(connectionPolicy.requestPeerBan(connection, new V1ConsensusProtocolError(code, 'ordinary failure')));
+        }
+        const unexpectedError = Object.assign(new Error('unexpected failure'), { resultCode: ConsensusResultCode.PUBLIC_KEY_MISMATCH });
+        t.absent(connectionPolicy.requestPeerBan(connection, unexpectedError));
+        t.absent(connectionPolicy.requestPeerBan(connection, undefined));
         t.absent(peerInfo.ban.called);
         t.absent(connection.destroy.called);
 
+        t.is(state.listenerCount(CustomEventType.CONSENSUS_PEER_BAN_REQUESTED), 1);
         await network.close();
-        for (const event of events) {
-            t.is(state.listenerCount(event), 0, 'network removes its failure listener');
-            state.emit(event, { connection, error: new V1ConsensusProtocolError(ConsensusResultCode.PUBLIC_KEY_MISMATCH, 'Address does not match remote public key.') });
-        }
-        t.absent(peerInfo.ban.called, 'late failure events cannot act on a closed network');
+        t.is(state.listenerCount(CustomEventType.CONSENSUS_PEER_BAN_REQUESTED), 0, 'network removes its ban listener');
+        connectionPolicy.requestPeerBan(connection, new V1ConsensusProtocolError(ConsensusResultCode.PUBLIC_KEY_MISMATCH, 'Address does not match remote public key.'));
+        t.absent(peerInfo.ban.called, 'late ban requests cannot act on a closed network');
         t.absent(connection.destroy.called);
     });
 

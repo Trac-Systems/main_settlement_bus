@@ -1,7 +1,10 @@
 import test from 'brittle';
 import b4a from 'b4a';
+import EventEmitter from 'bare-events';
 
 import ConsensusRouterV1 from '../../../src/core/consensus/protocols/ConsensusRouter.js';
+import ConsensusConnectionPolicy from '../../../src/core/consensus/ConsensusConnectionPolicy.js';
+import { Logger } from '../../../src/utils/logger.js';
 import ConsensusEpochProofProposalOperationHandler from '../../../src/core/consensus/v1/handlers/ConsesusEpochProofProposalOperationHandler.js';
 import { encodeConsensusMessage } from '../../../src/codecs/consensus/v1/consensusV1OperationCodec.js';
 import consensusV1Generated from '../../../src/codecs/consensus/v1/consensusV1.generated.cjs';
@@ -118,8 +121,10 @@ function setupRouter(
         }
     };
 
+    const state = new EventEmitter();
+    const connectionPolicy = new ConsensusConnectionPolicy(state, new Logger(config));
     return {
-        router: new ConsensusRouterV1({}, {}, config, pendingRequestService),
+        router: new ConsensusRouterV1(state, {}, config, pendingRequestService, connectionPolicy),
         setPendingEntry(entry) { pendingEntry = entry; },
         calls,
         errors

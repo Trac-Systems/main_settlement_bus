@@ -5,8 +5,6 @@ import { ConsensusResultCode, CustomEventType } from "../../../../utils/constant
 import { consensusMessageFactory } from "../../../../messages/consensus/v1/consensusMessageFactory.js";
 import { bufferToAddress } from "../../../state/utils/address.js"
 import ConnectionOperationHandler from "../../../network/protocols/shared/ConnectionOperationHandler.js";
-import { shouldBanConsensusPeer, handleInvalidConsensusMessage, handleConsensusLocalError } from "../../ConsensusPeerPolicy.js";
-import { Logger } from "../../../../utils/logger.js";
 import { publicKeyToAddress } from "../../../../utils/helpers.js";
 
 
@@ -15,13 +13,13 @@ class ConsensusEpochProofProposalOperationHandler extends ConnectionOperationHan
     #proofProposalApprovalValidator;
     #wallet;
     #state;
-    #logger;
+    #connectionPolicy;
 
-    constructor(state, wallet, config) {
+    constructor(state, wallet, config, connectionPolicy) {
         super(config)
         this.#state = state;
         this.#wallet = wallet;
-        this.#logger = new Logger(config);
+        this.#connectionPolicy = connectionPolicy;
         this.#proofProposalRequestValidator = new V1EpochProofProposalRequest(config, state);
         this.#proofProposalApprovalValidator = new V1EpochProofProposalApproval(config, state);
     }
@@ -58,8 +56,7 @@ class ConsensusEpochProofProposalOperationHandler extends ConnectionOperationHan
             });
         }
         finally {
-            // Network bans and disconnects this peer when it receives the failure event.
-            if (!shouldBanConsensusPeer(validationError)) {
+            if (!this.#connectionPolicy.requestPeerBan(connection, validationError)) {
                 await this.#sendEpochProofProposalApprovalResponse(
                     message?.session_id,
                     connection,
@@ -103,6 +100,7 @@ class ConsensusEpochProofProposalOperationHandler extends ConnectionOperationHan
                 resultCode,
                 error: error
             });
+            this.#connectionPolicy.requestPeerBan(connection, error);
             return { resultCode };
         }
 
@@ -192,7 +190,7 @@ class ConsensusEpochProofProposalOperationHandler extends ConnectionOperationHan
             if (protocolSession.closed) return;
             if (!this.#isValidResponseSessionId(messageId)) {
                 const sender = publicKeyToAddress(connection.remotePublicKey, this.config);
-                handleInvalidConsensusMessage(protocolSession, this.#logger, `${this.constructor.name}: invalid Consensus V1 message session_id, sender: ${sender}`);
+                this.#connectionPolicy.handleInvalidMessage(protocolSession, `${this.constructor.name}: invalid Consensus V1 message session_id, sender: ${sender}`);
                 return;
             }
 
@@ -220,7 +218,7 @@ class ConsensusEpochProofProposalOperationHandler extends ConnectionOperationHan
 
     displayError(step, senderPublicKey, error) {
         const sender = publicKeyToAddress(senderPublicKey, this.config);
-        handleConsensusLocalError(this.#logger, `${this.constructor.name}: Consensus V1 message ${step}, sender: ${sender}: ${error?.message ?? 'Unexpected error'}`);
+        this.#connectionPolicy.handleLocalError(`${this.constructor.name}: Consensus V1 message ${step}, sender: ${sender}: ${error?.message ?? 'Unexpected error'}`);
     }
 
 }

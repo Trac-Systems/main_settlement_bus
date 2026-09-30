@@ -4,6 +4,8 @@ import EventEmitter from 'bare-events';
 import tracCryptoApi from 'trac-crypto-api';
 import { WalletProvider } from 'trac-wallet';
 import ConsensusEpochProofProposalOperationHandler from '../../../src/core/consensus/v1/handlers/ConsesusEpochProofProposalOperationHandler.js';
+import ConsensusConnectionPolicy from '../../../src/core/consensus/ConsensusConnectionPolicy.js';
+import { Logger } from '../../../src/utils/logger.js';
 import V1EpochProofProposalRequest from '../../../src/core/consensus/v1/validators/V1EpochProofProposalRequest.js';
 import V1EpochProofProposalApproval from '../../../src/core/consensus/v1/validators/V1EpochProofProposalApproval.js';
 import { V1ConsensusProtocolError } from '../../../src/core/consensus/v1/V1ConsensusProtocolError.js';
@@ -27,7 +29,8 @@ const consensusEventNames = [
     [CustomEventType.EPOCH_PROPOSAL_VALIDATION_FAILURE, 'onEpochProposalValidationFailure'],
     [CustomEventType.EPOCH_PROPOSAL_APPROVAL_RECEIVED, 'onApprovalResponseReceived'],
     [CustomEventType.EPOCH_PROPOSAL_APPROVAL_SUCCESS, 'onApprovalResponseSuccess'],
-    [CustomEventType.EPOCH_PROPOSAL_APPROVAL_FAILURE, 'onApprovalResponseFailure']
+    [CustomEventType.EPOCH_PROPOSAL_APPROVAL_FAILURE, 'onApprovalResponseFailure'],
+    [CustomEventType.CONSENSUS_PEER_BAN_REQUESTED, 'onConsensusPeerBanRequested']
 ];
 
 function restorePatches() {
@@ -112,10 +115,13 @@ function setupHandler(t, calls, options = {}) {
         approval: payload.proof_proposal_response.approval
     }));
 
+    const handlerConfig = options.config ?? config;
+    const connectionPolicy = new ConsensusConnectionPolicy(state, new Logger(handlerConfig));
     return new ConsensusEpochProofProposalOperationHandler(
         state,
         options.wallet ?? {},
-        options.config ?? config
+        handlerConfig,
+        connectionPolicy
     );
 }
 
@@ -249,7 +255,7 @@ test('handleRequest maps consensus validation errors to signed rejection respons
     t.ok(await verifyProofProposalResponseSignature(proofProposalResponse, wallet.publicKey));
 });
 
-test('handleRequest emits a local public key mismatch without building or sending a response', async t => {
+test('handleRequest requests a ban for a local public key mismatch without sending a response', async t => {
     const calls = [];
     const message = proofProposalMessage();
     const connection = createConnection(calls);
@@ -275,11 +281,14 @@ test('handleRequest emits a local public key mismatch without building or sendin
     t.alike(callNames(calls), [
         'onEpochProposalReceived',
         'validateRequest',
-        'onEpochProposalValidationFailure'
+        'onEpochProposalValidationFailure',
+        'onConsensusPeerBanRequested'
     ]);
     t.is(calls[2].context.error, validationError);
     t.is(calls[2].context.resultCode, ConsensusResultCode.PUBLIC_KEY_MISMATCH);
     t.is(calls[2].context.connection, connection);
+    t.is(calls[3].context.connection, connection);
+    t.is(calls[3].context.error, validationError);
     t.is(connection.sent.length, 0);
 });
 
@@ -535,7 +544,34 @@ test('handleApproval validates OK responses, emits success, and returns approval
     t.is(successContext.approval, message.proof_proposal_response.approval);
 });
 
-test('handleApproval reports a validated peer rejection without a local error', async t => {
+test('handleApproval requests a ban for a local public key mismatch', async t => {
+    const calls = [];
+    const connection = createConnection(calls);
+    const validationError = new V1ConsensusProtocolError(
+        ConsensusResultCode.PUBLIC_KEY_MISMATCH,
+        'Address does not match remote public key.'
+    );
+    const handler = setupHandler(t, calls, {
+        approvalValidate: async () => { throw validationError; }
+    });
+
+    const result = await handler.handleApproval(
+        proofProposalApprovalMessage(), connection, connection.protocolSession.indexers,
+        consensusV1OperationFixtures.proofProposal
+    );
+
+    t.alike(callNames(calls), [
+        'onApprovalResponseReceived',
+        'onApprovalResponseFailure',
+        'onConsensusPeerBanRequested'
+    ]);
+    t.is(result.resultCode, ConsensusResultCode.PUBLIC_KEY_MISMATCH);
+    t.is(calls[1].context.error, validationError);
+    t.is(calls[2].context.error, validationError);
+    t.is(calls[2].context.connection, connection);
+});
+
+test('handleApproval reports a validated peer rejection without requesting a ban', async t => {
     const calls = [];
     const message = proofProposalApprovalMessage({
         result: ConsensusResultCode.PUBLIC_KEY_MISMATCH,

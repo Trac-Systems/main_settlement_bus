@@ -2,27 +2,27 @@ import { decodeConsensusMessage } from '../../../codecs/consensus/v1/consensusV1
 import b4a from 'b4a'
 import { ConsensusOperationType, CONSENSUS_MESSAGE_MAX_BYTE_SIZE } from '../../../utils/constants.js'
 import { publicKeyToAddress } from '../../../utils/helpers.js'
-import { Logger } from '../../../utils/logger.js'
 import ConsensusEpochProofProposalOperationHandler from '../v1/handlers/ConsesusEpochProofProposalOperationHandler.js'
-import { handleInvalidConsensusMessage, handleConsensusLocalError, shouldIgnoreConsensusApproval } from '../ConsensusPeerPolicy.js';
 
 class ConsensusRouterV1 {
     #config
-    #logger
+    #connectionPolicy
     #epochProofProposalHandler
     #pendingRequestService
     constructor(
         state,
         wallet,
         config,
-        pendingRequestService
+        pendingRequestService,
+        connectionPolicy
     ) {
         this.#config = config
-        this.#logger = new Logger(config);
+        this.#connectionPolicy = connectionPolicy;
         this.#epochProofProposalHandler = new ConsensusEpochProofProposalOperationHandler(
             state,
             wallet,
             config,
+            connectionPolicy
         );
         this.#pendingRequestService = pendingRequestService;
     }
@@ -62,7 +62,7 @@ class ConsensusRouterV1 {
                         this.#handleInvalidMessage(connection, protocolSession, 'Consensus V1 message: approval received from unexpected peer')
                         break;
                     }
-                    if (shouldIgnoreConsensusApproval(pendingEntry, protocolSession)) break;
+                    if (this.#connectionPolicy.shouldIgnoreApproval(pendingEntry, protocolSession)) break;
 
                     pendingApproval = pendingEntry;
                     const response = await this.#epochProofProposalHandler.handleApproval(
@@ -94,12 +94,12 @@ class ConsensusRouterV1 {
 
     #handleInvalidMessage(connection, protocolSession, reason) {
         const sender = publicKeyToAddress(connection.remotePublicKey, this.#config);
-        handleInvalidConsensusMessage(protocolSession, this.#logger, `ConsensusRouterV1: ${reason}, sender: ${sender}`);
+        this.#connectionPolicy.handleInvalidMessage(protocolSession, `ConsensusRouterV1: ${reason}, sender: ${sender}`);
     }
 
     #logError(connection, reason) {
         const sender = publicKeyToAddress(connection.remotePublicKey, this.#config)
-        handleConsensusLocalError(this.#logger, `ConsensusRouterV1: ${reason}, sender: ${sender}`);
+        this.#connectionPolicy.handleLocalError(`ConsensusRouterV1: ${reason}, sender: ${sender}`);
     }
 }
 

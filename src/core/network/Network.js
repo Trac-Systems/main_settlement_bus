@@ -20,7 +20,6 @@ import { CustomEventType } from '../../utils/constants.js';
 import tracCryptoApi from 'trac-crypto-api'
 import ConsensusMessages from '../consensus/protocols/ConsensusMessages.js';
 import IndexerPendingRequestService from '../consensus/services/IndexerPendingRequestService.js';
-import { shouldBanConsensusPeer } from '../consensus/ConsensusPeerPolicy.js';
 
 const wakeup = new w();
 
@@ -44,7 +43,7 @@ class Network extends ReadyResource {
     #networkMessages;
     #consensusMessages;
     #indexerConnectionManager;
-    #consensusValidationFailureListener;
+    #consensusPeerBanRequestedListener;
 
     /**
      * @param {State} state
@@ -66,7 +65,7 @@ class Network extends ReadyResource {
         this.#validatorPendingRequestService = new ValidatorPendingRequestService(this.#config);
         this.#indexerPendingRequestService = new IndexerPendingRequestService(this.#config);
         this.#logger = new Logger(this.#config);
-        this.#consensusValidationFailureListener = this.#handleConsensusValidationFailure.bind(this);
+        this.#consensusPeerBanRequestedListener = this.#handleConsensusPeerBanRequested.bind(this);
     }
 
     get swarm() {
@@ -87,10 +86,6 @@ class Network extends ReadyResource {
 
     get validatorMessageOrchestrator() {
         return this.#validatorMessageOrchestrator;
-    }
-
-    get consensusMessages() {
-        return this.#consensusMessages;
     }
 
     get indexerConnectionManager() {
@@ -165,8 +160,7 @@ class Network extends ReadyResource {
 
     async _close() {
         this.#logger.info('Network: closing gracefully...');
-        this.#state.off(CustomEventType.EPOCH_PROPOSAL_VALIDATION_FAILURE, this.#consensusValidationFailureListener);
-        this.#state.off(CustomEventType.EPOCH_PROPOSAL_APPROVAL_FAILURE, this.#consensusValidationFailureListener);
+        this.#state.off(CustomEventType.CONSENSUS_PEER_BAN_REQUESTED, this.#consensusPeerBanRequestedListener);
         await this.#epochCoordinatorService.close();
         await this.transactionPoolService.stop();
         await sleep(100);
@@ -192,8 +186,7 @@ class Network extends ReadyResource {
     }
 
     #listeners() {
-        this.#state.on(CustomEventType.EPOCH_PROPOSAL_VALIDATION_FAILURE, this.#consensusValidationFailureListener);
-        this.#state.on(CustomEventType.EPOCH_PROPOSAL_APPROVAL_FAILURE, this.#consensusValidationFailureListener);
+        this.#state.on(CustomEventType.CONSENSUS_PEER_BAN_REQUESTED, this.#consensusPeerBanRequestedListener);
         this.#state.on(CustomEventType.IS_INDEXER, async (publicKey) => {
             const publicKeyHex = this.#normalizePublicKey(publicKey);
             this.#validatorConnectionManager.remove(publicKeyHex);
@@ -288,9 +281,8 @@ class Network extends ReadyResource {
         return this.#pendingConnections.size;
     }
 
-    /** Bans only identity mismatches detected locally, never result codes reported by a peer. */
-    #handleConsensusValidationFailure({ connection, error } = {}) {
-        if (!shouldBanConsensusPeer(error)) return;
+    /** Executes a ban requested by the consensus connection policy. */
+    #handleConsensusPeerBanRequested({ connection, error } = {}) {
         if (this.closing !== null || this.closed) return;
 
         const publicKey = this.#normalizePublicKey(connection?.remotePublicKey);

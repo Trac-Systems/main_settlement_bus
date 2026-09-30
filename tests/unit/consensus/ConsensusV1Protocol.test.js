@@ -2,6 +2,8 @@ import test from 'brittle';
 import b4a from 'b4a';
 import Protomux from 'protomux';
 import c from 'compact-encoding';
+import EventEmitter from 'bare-events';
+import ConsensusConnectionPolicy from '../../../src/core/consensus/ConsensusConnectionPolicy.js';
 import { Logger } from '../../../src/utils/logger.js';
 
 if (typeof globalThis.Bare !== 'undefined') {
@@ -49,12 +51,13 @@ if (typeof globalThis.Bare !== 'undefined') {
 
         let receiveNextMessage;
         const nextMessage = new Promise(resolve => { receiveNextMessage = resolve; });
+        const connectionPolicy = new ConsensusConnectionPolicy(new EventEmitter(), new Logger({}));
         new ConsensusV1Protocol({
             async route(message) {
                 if (b4a.toString(message) === 'invalid') throw new Error('router failed');
                 receiveNextMessage(message);
             }
-        }, local, { rejectPendingRequestsForSession() {} }, function onClose() {}, new Logger({}));
+        }, local, { rejectPendingRequestsForSession() {} }, function onClose() {}, connectionPolicy);
 
         const remoteConsensus = remoteMux.createChannel({ protocol: 'consensus/v1' });
         const sendConsensus = remoteConsensus.addMessage({ encoding: c.raw });
