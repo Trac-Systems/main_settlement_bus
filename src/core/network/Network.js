@@ -225,6 +225,12 @@ class Network extends ReadyResource {
         });
 
         this.#swarm.prependListener('connection', async (connection) => {
+            // A handshake accepted before a ban can finish after the ban was applied.
+            if (this.#isPeerBanned(connection.remotePublicKey)) {
+                connection.destroy();
+                return;
+            }
+
             /*
              Here is the issue:
              
@@ -239,6 +245,9 @@ class Network extends ReadyResource {
             this.#consensusMessages.prepareConnection(connection);
         })
         this.#swarm.on('connection', async (connection) => {
+            // Returning from the prepended listener does not stop this listener.
+            if (this.#isPeerBanned(connection.remotePublicKey)) return;
+
             const publicKey = b4a.toString(connection.remotePublicKey, 'hex');
             // This function will ignore connections that havent been triggered by the observer. In this case, the promotion will happen during tryConnect when the connection entity will be qualified.
             await this.#promotePendingConnection(publicKey, connection);

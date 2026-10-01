@@ -63,6 +63,7 @@ async function loadNetwork({ isIndexer = false, currentEpoch = null, indexerCoun
     let epochCoordinatorServiceInstance = null;
     let validatorPendingRequestServiceInstance = null;
     let indexerPendingRequestServiceInstance = null;
+    let consensusMessagesInstance = null;
 
     class HyperswarmMock extends EventEmitter {
         constructor() {
@@ -226,6 +227,7 @@ async function loadNetwork({ isIndexer = false, currentEpoch = null, indexerCoun
 
     class ConsensusMessagesMock {
         constructor(_state, _wallet, _config, pendingRequests) {
+            consensusMessagesInstance = this;
             indexerPendingRequestServiceInstance = pendingRequests;
         }
         async setupProtomuxMessages() {}
@@ -307,6 +309,7 @@ async function loadNetwork({ isIndexer = false, currentEpoch = null, indexerCoun
         epochCoordinatorServiceInstance,
         validatorPendingRequestServiceInstance,
         indexerPendingRequestServiceInstance,
+        consensusMessagesInstance,
         connectionPolicy,
         state
     };
@@ -692,6 +695,49 @@ if (isBareRuntime) {
         t.ok(oldConnection.destroy.calledOnce);
         t.ok(replacementConnection.destroy.calledOnce, 'ban closes the current transport for the same key');
         t.absent(otherConnection.destroy.called, 'other peers are unaffected');
+    });
+
+    test('Network rejects a connection delivered after its peer was banned without affecting other peers', async t => {
+        const {
+            network, store, swarmInstance, connectionPolicy,
+            validatorConnectionManagerInstance, indexerConnectionManagerInstance, consensusMessagesInstance,
+        } = await loadNetwork();
+        t.teardown(() => network.close());
+        const publicKey = 'ba'.repeat(32);
+        const existingConnection = createMockConnection(publicKey);
+        const delayedConnection = createMockConnection(publicKey);
+        const prepareConsensus = sinon.spy(consensusMessagesInstance, 'prepareConnection');
+        const addValidator = sinon.spy(validatorConnectionManagerInstance, 'add');
+
+        await network.tryConnect(publicKey, 'indexer');
+        connectionPolicy.requestPeerBan(existingConnection, new V1ConsensusProtocolError(
+            ConsensusResultCode.PUBLIC_KEY_MISMATCH,
+            'Address does not match remote public key.'
+        ));
+        t.ok(swarmInstance.peers.get(publicKey).banned);
+        t.absent(network.isConnectionPending(publicKey));
+
+        // A handshake accepted before the ban finishes after the ban has been applied.
+        swarmInstance.emit('connection', delayedConnection);
+        await Promise.resolve();
+
+        t.ok(delayedConnection.destroy.calledOnce, 'late transport is destroyed');
+        t.absent(store.replicate.called, 'replication is never started for the banned peer');
+        t.absent(prepareConsensus.called, 'consensus channels are not prepared');
+        t.absent(indexerConnectionManagerInstance.add.called, 'peer is not promoted to indexer manager');
+        t.absent(addValidator.called, 'peer is not promoted to validator manager');
+        t.absent(delayedConnection.on.called, 'the second connection listener also skips the banned peer');
+
+        const otherPublicKey = 'bb'.repeat(32);
+        const otherConnection = createMockConnection(otherPublicKey);
+        await network.tryConnect(otherPublicKey, 'indexer');
+        swarmInstance.emit('connection', otherConnection);
+        await Promise.resolve();
+
+        t.absent(otherConnection.destroy.called, 'another peer keeps its transport');
+        t.ok(store.replicate.calledOnceWithExactly(otherConnection), 'another peer starts replication');
+        t.ok(prepareConsensus.calledOnceWithExactly(otherConnection));
+        t.ok(indexerConnectionManagerInstance.add.calledOnceWithExactly(otherConnection.remotePublicKey, otherConnection));
     });
 
     test('Network does not retain a validator promoted after its pending probe was banned', async t => {
