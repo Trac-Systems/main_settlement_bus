@@ -18,9 +18,10 @@ class IndexerConnectionManager extends PeerConnectionManager {
         this.#wallet = wallet;
     }
 
-    add(publicKey, connection) {
-        this.#messages.attachChannel(connection);
-        if (!connection.protocolSessions.indexer || connection.protocolSessions.indexer.closed) return;
+    async add(publicKey, connection) {
+        await this.#messages.attachChannel(connection);
+        if (connection.destroyed) return;
+        if (!connection.protocolSessions?.indexer || connection.protocolSessions.indexer.closed) return;
         this._add(publicKey, connection)
     }
 

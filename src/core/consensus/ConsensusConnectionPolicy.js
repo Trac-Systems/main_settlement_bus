@@ -1,13 +1,27 @@
 import { ConsensusResultCode, CustomEventType } from '../../utils/constants.js';
+import { publicKeyToAddress } from '../../utils/helpers.js';
 import { V1ConsensusProtocolError } from './v1/V1ConsensusProtocolError.js';
 
 class ConsensusConnectionPolicy {
     #state;
     #logger;
+    #config;
 
-    constructor(state, logger) {
+    constructor(state, logger, config) {
         this.#state = state;
         this.#logger = logger;
+        this.#config = config;
+    }
+
+    async shouldAcceptConsensusChannel(connection) {
+        try {
+            const address = publicKeyToAddress(connection.remotePublicKey, this.#config);
+            // Waiting for replication inside Protomux pairing can block the shared stream.
+            return await this.#state.isIndexerAddress(address, { wait: false, update: false });
+        } catch (error) {
+            this.handleLocalError(`ConsensusConnectionPolicy: failed to check indexer membership: ${error.message}`);
+            return false;
+        }
     }
 
     // Remote rejections are returned as results, not local validation errors.

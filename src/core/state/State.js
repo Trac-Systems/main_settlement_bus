@@ -329,10 +329,22 @@ class State extends ReadyResource {
         return false;
     }
 
-    async getSigned(key) {
+    /**
+     * Reads a value from the view checked out at the current signed length.
+     * Consensus channel admission uses { wait: false, update: false } to avoid
+     * waiting for replication while deciding whether to open the channel.
+     *
+     * @param {string|Buffer} key Entry key.
+     * @param {object} [options={}] Read options forwarded to Hyperbee.
+     * @param {boolean} [options.wait=true] Wait for missing blocks to be replicated.
+     *   When false, a missing block causes an error rather than waiting.
+     * @param {boolean} [options.update=true] Allow Hyperbee to update an empty view before reading.
+     * @returns {Promise<Buffer|null>} Stored value, or null if the key does not exist.
+     */
+    async getSigned(key, options = {}) {
         const view_session = this.#base.view.checkout(this.#base.view.core.signedLength);
         try {
-            const result = await view_session.get(key);
+            const result = await view_session.get(key, options);
             return result ? result.value : null;
         } finally {
             await view_session.close();
@@ -400,14 +412,15 @@ class State extends ReadyResource {
     /**
      * Checks whether a bech32m address belongs to a registered indexer.
      * @param {string} targetAddress Address to check.
+     * @param {object} [options] Hyperbee read options, e.g. `wait: false` for channel admission.
      * @returns {Promise<boolean>} True when the address belongs to an indexer in signed state.
      */
-    async isIndexerAddress(targetAddress) {
+    async isIndexerAddress(targetAddress, options) {
         const targetAddressBuffer = addressUtils.addressToBuffer(targetAddress, this.#config.addressPrefix);
         if (targetAddressBuffer.length === 0) return false;
         const entries = await this.getIndexersEntry();
         for (const entry of entries) {
-            const address = await this.getSigned(EntryType.WRITER_ADDRESS + b4a.toString(entry.key, 'hex'));
+            const address = await this.getSigned(EntryType.WRITER_ADDRESS + b4a.toString(entry.key, 'hex'), options);
             if (address && b4a.equals(targetAddressBuffer, address)) return true;
         }
         return false;

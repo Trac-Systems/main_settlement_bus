@@ -388,12 +388,17 @@ class Network extends ReadyResource {
         if (!peerInfo) return;
 
         const connection = this.#swarm._allConnections.get(peerInfo.publicKey);
-        if (!connection) return CONNECTION_STATUS.PENDING;
+        // _allConnections also contains transports whose handshake is still in progress.
+        if (!connection || !this.#swarm.connections.has(connection)) return CONNECTION_STATUS.PENDING;
 
         const isConnectionReady = (type === 'validator' && !this.#validatorPendingRequestService.isProbePending(connection.remotePublicKey.toString('hex'))) || type === 'indexer'
         if (isConnectionReady) {
             await this.#promotePendingConnection(publicKey, connection);
-            return this.#isPeerBanned(publicKey) ? CONNECTION_STATUS.IGNORED : CONNECTION_STATUS.CONNECTED;
+            if (this.#isPeerBanned(publicKey)) return CONNECTION_STATUS.IGNORED;
+            if (type === 'indexer' && !this.#indexerConnectionManager.connected(publicKey)) {
+                return CONNECTION_STATUS.IGNORED;
+            }
+            return CONNECTION_STATUS.CONNECTED;
         } 
         
         return CONNECTION_STATUS.PENDING;

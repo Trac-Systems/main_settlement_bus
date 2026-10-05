@@ -1,4 +1,5 @@
 import Protomux from 'protomux';
+import _ from 'lodash';
 import ConsensusRouterV1 from "./ConsensusRouter.js";
 import ConsensusV1Protocol from "./ConsensusV1Protocol.js";
 import ConsensusConnectionPolicy from '../ConsensusConnectionPolicy.js';
@@ -16,7 +17,7 @@ class ConsensusMessages {
         this.#pendingRequestService = pendingRequestService;
         this.#onSessionClosed = onSessionClosed;
         const logger = new Logger(config);
-        this.#connectionPolicy = new ConsensusConnectionPolicy(state, logger);
+        this.#connectionPolicy = new ConsensusConnectionPolicy(state, logger, config);
         this.#consensusRouter = new ConsensusRouterV1(
             state, wallet, config, pendingRequestService, this.#connectionPolicy
         );
@@ -37,21 +38,30 @@ class ConsensusMessages {
     }
 
     /**
-     * Opens the consensus/v1 channel on this connection unless one is already open.
+     * Opens the consensus/v1 channel only for a peer recognized as an indexer.
      * The close callback removes the session reference so a new channel can open.
      */
-    attachChannel(connection) {
-        connection.protocolSessions ??= {};
+    async attachChannel(connection) {
+        if (connection.destroyed) return;
+        if (_.isNil(connection.protocolSessions)) {
+            connection.protocolSessions = {};
+        }
         if (connection.protocolSessions.indexer) return;
-        const session = this.createProtocolSession(connection);
-        if (!session.closed) connection.protocolSessions.indexer = session;
+        try {
+            if (!await this.#connectionPolicy.shouldAcceptConsensusChannel(connection)) return;
+            // The connection may close or another attempt may create the session while awaiting state.
+            if (connection.destroyed || connection.protocolSessions.indexer) return;
+            const session = this.createProtocolSession(connection);
+            if (!session.closed) connection.protocolSessions.indexer = session;
+        } catch (error) {
+            // A rejected Protomux pairing callback would destroy the shared transport.
+            this.#connectionPolicy.handleLocalError(`ConsensusMessages: failed to open Consensus V1 channel: ${error.message}`);
+        }
     }
 
     /**
-     * Reacts if the remote opens a consensus/v1 channel before we've qualified this peer
-     * as an indexer ourselves - otherwise whichever side gets there first wins the Protomux
-     * pairing race and the other side's channel gets silently rejected.
-     * See: node_modules/hypercore/lib/replicator.js (attachTo) for the same pattern.
+     * Applies the same admission check to remote opens. Returning without creating
+     * a session rejects only this channel attempt. Replication and later retries remain possible.
      */
     prepareConnection(connection) {
         const mux = Protomux.from(connection);
