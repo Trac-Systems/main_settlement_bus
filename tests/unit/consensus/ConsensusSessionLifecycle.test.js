@@ -16,7 +16,9 @@ const proposal = id => ({ ...fixtures.proofProposalHeader, session_id: id });
 function setup(t) {
     const pending = new IndexerPendingRequestService(config);
     let manager;
-    const messages = new ConsensusMessages(new EventEmitter(), {}, config, pending, connection => {
+    const state = new EventEmitter();
+    state.isIndexerAddress = async () => true;
+    const messages = new ConsensusMessages(state, {}, config, pending, connection => {
         manager.remove(connection.remotePublicKey, connection);
     });
     manager = new IndexerConnectionManager(10, config, { debug() {} }, messages);
@@ -49,7 +51,7 @@ async function openSession(t, context) {
     remoteMux.cork();
     const remoteConsensus = remoteMux.createChannel({ protocol: 'consensus/v1' });
     const remoteSender = remoteConsensus.addMessage({ encoding: c.raw });
-    context.manager.add(peerKey, local);
+    await context.manager.add(peerKey, local);
     remoteConsensus.open();
 
     let receive;
@@ -106,7 +108,7 @@ if (typeof globalThis.Bare !== 'undefined') {
                     channel.addMessage({ encoding: c.raw });
                     channel.open();
                 });
-                context.manager.add(peerKey, local);
+                await context.manager.add(peerKey, local);
                 t.ok(local.protocolSessions.indexer, 'a new consensus session can be attached');
                 t.absent(local.protocolSessions.indexer === session, 'the closed session is not reused');
             }

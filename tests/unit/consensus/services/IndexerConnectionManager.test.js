@@ -28,10 +28,10 @@ const makeConnection = (publicKeyHex) => {
     return emitter;
 };
 
-const makeManager = (...keys) => {
+const makeManager = async (...keys) => {
     const manager = new IndexerConnectionManager(100, mockConfig, mockLogger, mockMessages);
     for (const key of keys) {
-        manager.add(key, makeConnection(key));
+        await manager.add(key, makeConnection(key));
     }
     return manager;
 };
@@ -39,39 +39,78 @@ const makeManager = (...keys) => {
 test('IndexerConnectionManager', () => {
 
     test('add', () => {
+        for (const sessions of [undefined, {}, { indexer: { closed: true } }]) {
+            test('does not register a peer without an admitted live session', async t => {
+                const messages = { attachChannel: sinon.stub().resolves() };
+                const manager = new IndexerConnectionManager(10, mockConfig, mockLogger, messages);
+                const connection = makeConnection(testKeyPair1.publicKey);
+                connection.protocolSessions = sessions;
+                await manager.add(testKeyPair1.publicKey, connection);
+                t.absent(manager.connected(testKeyPair1.publicKey));
+                t.ok(messages.attachChannel.calledOnceWithExactly(connection));
+            });
+        }
+
+        test('waits for admission before registering a peer', async t => {
+            const connection = makeConnection(testKeyPair1.publicKey);
+            const session = connection.protocolSessions.indexer;
+            delete connection.protocolSessions.indexer;
+            let finish;
+            const admission = new Promise(resolve => { finish = resolve; });
+            const messages = { async attachChannel() { await admission; connection.protocolSessions.indexer = session; } };
+            const manager = new IndexerConnectionManager(10, mockConfig, mockLogger, messages);
+            const adding = manager.add(testKeyPair1.publicKey, connection);
+            t.absent(manager.connected(testKeyPair1.publicKey));
+            finish();
+            await adding;
+            t.is(manager.getConnection(testKeyPair1.publicKey), connection);
+        });
+
+        test('does not register a transport destroyed while admission was pending', async t => {
+            const connection = makeConnection(testKeyPair1.publicKey);
+            let finish;
+            const messages = { attachChannel: () => new Promise(resolve => { finish = resolve; }) };
+            const manager = new IndexerConnectionManager(10, mockConfig, mockLogger, messages);
+            const adding = manager.add(testKeyPair1.publicKey, connection);
+            connection.destroyed = true;
+            finish();
+            await adding;
+            t.absent(manager.connected(testKeyPair1.publicKey));
+        });
+
         test('adds a new indexer', async t => {
             const manager = new IndexerConnectionManager(10, mockConfig, mockLogger, mockMessages);
             const conn = makeConnection(testKeyPair1.publicKey);
-            manager.add(testKeyPair1.publicKey, conn);
+            await manager.add(testKeyPair1.publicKey, conn);
             t.ok(manager.connected(testKeyPair1.publicKey));
         });
 
         test('does not replace an already connected indexer', async t => {
-            const manager = makeManager(testKeyPair1.publicKey);
+            const manager = await makeManager(testKeyPair1.publicKey);
             const existingConnection = manager.getConnection(testKeyPair1.publicKey);
             const conn = makeConnection(testKeyPair1.publicKey);
-            manager.add(testKeyPair1.publicKey, conn);
+            await manager.add(testKeyPair1.publicKey, conn);
             t.is(manager.getConnection(testKeyPair1.publicKey), existingConnection);
         });
 
         test('does not add a new indexer when maxIndexers limit is reached', async t => {
             const manager = new IndexerConnectionManager(1, mockConfig, mockLogger, mockMessages);
-            manager.add(testKeyPair1.publicKey, makeConnection(testKeyPair1.publicKey));
-            manager.add(testKeyPair2.publicKey, makeConnection(testKeyPair2.publicKey));
+            await manager.add(testKeyPair1.publicKey, makeConnection(testKeyPair1.publicKey));
+            await manager.add(testKeyPair2.publicKey, makeConnection(testKeyPair2.publicKey));
             t.absent(manager.connected(testKeyPair2.publicKey));
         });
     });
 
     test('remove', () => {
         test('removes an existing indexer', async t => {
-            const manager = makeManager(testKeyPair1.publicKey);
+            const manager = await makeManager(testKeyPair1.publicKey);
             t.ok(manager.connected(testKeyPair1.publicKey));
             manager.remove(testKeyPair1.publicKey);
             t.absent(manager.connected(testKeyPair1.publicKey));
         });
 
         test('is a no-op for unknown key', async t => {
-            const manager = makeManager(testKeyPair1.publicKey);
+            const manager = await makeManager(testKeyPair1.publicKey);
             manager.remove(testKeyPair2.publicKey);
             t.ok(manager.connected(testKeyPair1.publicKey));
         });
@@ -79,12 +118,12 @@ test('IndexerConnectionManager', () => {
 
     test('connected', () => {
         test('returns true for added indexer', async t => {
-            const manager = makeManager(testKeyPair1.publicKey);
+            const manager = await makeManager(testKeyPair1.publicKey);
             t.ok(manager.connected(testKeyPair1.publicKey));
         });
 
         test('returns false for unknown key', async t => {
-            const manager = makeManager(testKeyPair1.publicKey);
+            const manager = await makeManager(testKeyPair1.publicKey);
             t.absent(manager.connected(testKeyPair2.publicKey));
         });
     });
@@ -93,19 +132,19 @@ test('IndexerConnectionManager', () => {
         test('returns the connection for a known indexer', async t => {
             const conn = makeConnection(testKeyPair1.publicKey);
             const manager = new IndexerConnectionManager(undefined, mockConfig, mockLogger, mockMessages);
-            manager.add(testKeyPair1.publicKey, conn);
+            await manager.add(testKeyPair1.publicKey, conn);
             t.is(manager.getConnection(testKeyPair1.publicKey), conn);
         });
 
         test('returns undefined for unknown key', async t => {
-            const manager = makeManager(testKeyPair1.publicKey);
+            const manager = await makeManager(testKeyPair1.publicKey);
             t.absent(manager.getConnection(testKeyPair2.publicKey));
         });
     });
 
     test('connectedPeers', () => {
         test('returns all connected public key hexes', async t => {
-            const manager = makeManager(testKeyPair1.publicKey, testKeyPair2.publicKey, testKeyPair3.publicKey);
+            const manager = await makeManager(testKeyPair1.publicKey, testKeyPair2.publicKey, testKeyPair3.publicKey);
             const indexers = manager.connectedPeers();
             t.is(indexers.length, 3);
             t.ok(indexers.includes(testKeyPair1.publicKey));
@@ -123,7 +162,7 @@ test('IndexerConnectionManager', () => {
         test('calls protocolSession.send with the message', async t => {
             const conn = makeConnection(testKeyPair1.publicKey);
             const manager = new IndexerConnectionManager(undefined, mockConfig, mockLogger, mockMessages);
-            manager.add(testKeyPair1.publicKey, conn);
+            await manager.add(testKeyPair1.publicKey, conn);
 
             await manager.send(testKeyPair1.publicKey, { type: 'ping' });
 
@@ -140,7 +179,7 @@ test('IndexerConnectionManager', () => {
 
     test('clear', () => {
         test('removes all indexers from the pool', async t => {
-            const manager = makeManager(testKeyPair1.publicKey, testKeyPair2.publicKey, testKeyPair3.publicKey);
+            const manager = await makeManager(testKeyPair1.publicKey, testKeyPair2.publicKey, testKeyPair3.publicKey);
             t.is(manager.connectedPeers().length, 3);
             manager.clear();
             t.is(manager.connectedPeers().length, 0);
@@ -155,7 +194,7 @@ test('IndexerConnectionManager', () => {
 
     test('clear', () => {
         test('removes all indexers from the pool', async t => {
-            const manager = makeManager(testKeyPair1.publicKey, testKeyPair2.publicKey, testKeyPair3.publicKey);
+            const manager = await makeManager(testKeyPair1.publicKey, testKeyPair2.publicKey, testKeyPair3.publicKey);
             t.is(manager.connectedPeers().length, 3);
             manager.clear();
             t.is(manager.connectedPeers().length, 0);
@@ -172,7 +211,7 @@ test('IndexerConnectionManager', () => {
         test('calls protocolSession.sendAndForget with the message', async t => {
             const conn = makeConnection(testKeyPair1.publicKey);
             const manager = new IndexerConnectionManager(undefined, mockConfig, mockLogger, mockMessages);
-            manager.add(testKeyPair1.publicKey, conn);
+            await manager.add(testKeyPair1.publicKey, conn);
 
             manager.sendAndForget(testKeyPair1.publicKey, { type: 'ping' });
 
@@ -190,23 +229,23 @@ test('IndexerConnectionManager', () => {
 
     test('exists', () => {
         test('returns true for an added indexer', async t => {
-            const manager = makeManager(testKeyPair1.publicKey);
+            const manager = await makeManager(testKeyPair1.publicKey);
             t.ok(manager.exists(testKeyPair1.publicKey));
         });
 
         test('returns false for an unknown key', async t => {
-            const manager = makeManager(testKeyPair1.publicKey);
+            const manager = await makeManager(testKeyPair1.publicKey);
             t.absent(manager.exists(testKeyPair2.publicKey));
         });
 
         test('returns false after removal', async t => {
-            const manager = makeManager(testKeyPair1.publicKey);
+            const manager = await makeManager(testKeyPair1.publicKey);
             manager.remove(testKeyPair1.publicKey);
             t.absent(manager.exists(testKeyPair1.publicKey));
         });
 
         test('accepts buffer input', async t => {
-            const manager = makeManager(testKeyPair1.publicKey);
+            const manager = await makeManager(testKeyPair1.publicKey);
             const bufferKey = b4a.from(testKeyPair1.publicKey, 'hex');
             t.ok(manager.exists(bufferKey));
         });
@@ -215,22 +254,22 @@ test('IndexerConnectionManager', () => {
     test('setMax', () => {
         test('increasing max allows more connections', async t => {
             const manager = new IndexerConnectionManager(1, mockConfig, mockLogger, mockMessages);
-            manager.add(testKeyPair1.publicKey, makeConnection(testKeyPair1.publicKey));
-            manager.add(testKeyPair2.publicKey, makeConnection(testKeyPair2.publicKey));
+            await manager.add(testKeyPair1.publicKey, makeConnection(testKeyPair1.publicKey));
+            await manager.add(testKeyPair2.publicKey, makeConnection(testKeyPair2.publicKey));
             t.absent(manager.connected(testKeyPair2.publicKey), 'blocked at limit=1');
 
             manager.setMax(2);
-            manager.add(testKeyPair2.publicKey, makeConnection(testKeyPair2.publicKey));
+            await manager.add(testKeyPair2.publicKey, makeConnection(testKeyPair2.publicKey));
             t.ok(manager.connected(testKeyPair2.publicKey), 'allowed after setMax(2)');
         });
 
         test('decreasing max blocks future additions but keeps existing', async t => {
             const manager = new IndexerConnectionManager(3, mockConfig, mockLogger, mockMessages);
-            manager.add(testKeyPair1.publicKey, makeConnection(testKeyPair1.publicKey));
-            manager.add(testKeyPair2.publicKey, makeConnection(testKeyPair2.publicKey));
+            await manager.add(testKeyPair1.publicKey, makeConnection(testKeyPair1.publicKey));
+            await manager.add(testKeyPair2.publicKey, makeConnection(testKeyPair2.publicKey));
 
             manager.setMax(2);
-            manager.add(testKeyPair3.publicKey, makeConnection(testKeyPair3.publicKey));
+            await manager.add(testKeyPair3.publicKey, makeConnection(testKeyPair3.publicKey));
             t.absent(manager.connected(testKeyPair3.publicKey), 'blocked after setMax(2)');
             t.ok(manager.connected(testKeyPair1.publicKey), 'existing connections are kept');
             t.ok(manager.connected(testKeyPair2.publicKey), 'existing connections are kept');

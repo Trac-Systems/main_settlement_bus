@@ -291,7 +291,7 @@ async function loadNetwork({ isIndexer = false, currentEpoch = null, indexerCoun
 
     const store = new CorestoreMock();
     const state = new EventEmitter();
-    const connectionPolicy = new ConsensusConnectionPolicy(state, new LoggerMock());
+    const connectionPolicy = new ConsensusConnectionPolicy(state, new LoggerMock(), config);
     state.isAdmin = async () => false;
     state.isIndexer = () => isIndexer;
     state.indexerCount = async () => indexerCount;
@@ -465,6 +465,7 @@ if (isBareRuntime) {
         const connection = createMockConnection(publicKey);
         swarmInstance.peers.set(publicKey, { publicKey: publicKeyBuffer });
         swarmInstance._allConnections.set(publicKeyBuffer, connection);
+        swarmInstance.connections.add(connection);
 
         const status = await network.tryConnect(publicKey, 'validator');
         t.is(status, CONNECTION_STATUS.CONNECTED, 'returns CONNECTED for ready validator peer');
@@ -481,6 +482,7 @@ if (isBareRuntime) {
         const connection = createMockConnection(publicKey);
         swarmInstance.peers.set(publicKey, { publicKey: publicKeyBuffer });
         swarmInstance._allConnections.set(publicKeyBuffer, connection);
+        swarmInstance.connections.add(connection);
 
         // Indexer connections are promoted into the single indexer manager Network
         // owns for its lifetime (network.indexerConnectionManager), not a per-call one.
@@ -503,6 +505,105 @@ if (isBareRuntime) {
 
         t.absent(network.isConnectionPending(publicKey), 'pending is cleared after timeout elapses');
         t.teardown(async () => await network.close());
+    });
+
+    test('Network keeps a handshake pending until Hyperswarm delivers the connection', async t => {
+        const { network, swarmInstance, indexerConnectionManagerInstance, consensusMessagesInstance } = await loadNetwork();
+        t.teardown(() => network.close());
+        const publicKey = 'ce'.repeat(32);
+        const connection = createMockConnection(publicKey);
+        swarmInstance.peers.set(publicKey, createPeerInfo(connection.remotePublicKey));
+        swarmInstance._allConnections.set(connection.remotePublicKey, connection);
+        const prepare = sinon.spy(consensusMessagesInstance, 'prepareConnection');
+
+        t.is(await network.tryConnect(publicKey, 'indexer'), CONNECTION_STATUS.PENDING);
+        t.ok(network.isConnectionPending(publicKey));
+        t.absent(indexerConnectionManagerInstance.add.called, 'no consensus session before the connection event');
+        t.absent(prepare.called);
+
+        swarmInstance.connections.add(connection);
+        swarmInstance.emit('connection', connection);
+        await Promise.resolve();
+        t.ok(prepare.calledOnceWithExactly(connection));
+        t.ok(indexerConnectionManagerInstance.add.calledOnceWithExactly(connection.remotePublicKey, connection));
+        t.absent(network.isConnectionPending(publicKey));
+    });
+
+    test('Network reports an admission refusal without closing transport and allows a later attempt', async t => {
+        const { network, swarmInstance, indexerConnectionManagerInstance } = await loadNetwork();
+        t.teardown(() => network.close());
+        const publicKey = 'cf'.repeat(32);
+        const connection = createMockConnection(publicKey);
+        const peerInfo = createPeerInfo(connection.remotePublicKey);
+        swarmInstance.peers.set(publicKey, peerInfo);
+        swarmInstance._allConnections.set(connection.remotePublicKey, connection);
+        swarmInstance.connections.add(connection);
+        indexerConnectionManagerInstance.add.onFirstCall().callsFake(async () => {});
+
+        t.is(await network.tryConnect(publicKey, 'indexer'), CONNECTION_STATUS.IGNORED);
+        t.absent(network.isConnectionPending(publicKey), 'refusal does not prevent a later attempt');
+        t.absent(indexerConnectionManagerInstance.connected(publicKey));
+        t.absent(connection.destroy.called);
+        t.absent(peerInfo.ban.called);
+        t.is(await network.tryConnect(publicKey, 'indexer'), CONNECTION_STATUS.CONNECTED);
+        t.ok(indexerConnectionManagerInstance.connected(publicKey));
+    });
+
+    test('Network does not report consensus ready while admission is still running', async t => {
+        const { network, swarmInstance, indexerConnectionManagerInstance } = await loadNetwork();
+        t.teardown(() => network.close());
+        const publicKey = 'cd'.repeat(32);
+        const connection = createMockConnection(publicKey);
+        swarmInstance.peers.set(publicKey, createPeerInfo(connection.remotePublicKey));
+        swarmInstance._allConnections.set(connection.remotePublicKey, connection);
+        swarmInstance.connections.add(connection);
+        let finish;
+        const admission = new Promise(resolve => { finish = resolve; });
+        indexerConnectionManagerInstance.add.callsFake(async () => {
+            await admission;
+            indexerConnectionManagerInstance.indexers.add(publicKey);
+        });
+        let settled = false;
+        const connecting = network.tryConnect(publicKey, 'indexer').then(status => { settled = true; return status; });
+        await Promise.resolve();
+        t.absent(settled);
+        finish();
+        t.is(await connecting, CONNECTION_STATUS.CONNECTED);
+    });
+
+    test('Network keeps a known peer pending when its transport is not available yet', async t => {
+        const { network, swarmInstance, indexerConnectionManagerInstance } = await loadNetwork();
+        t.teardown(() => network.close());
+        const publicKey = 'cc'.repeat(32);
+        swarmInstance.peers.set(publicKey, createPeerInfo(b4a.from(publicKey, 'hex')));
+        t.is(await network.tryConnect(publicKey, 'indexer'), CONNECTION_STATUS.PENDING);
+        t.ok(network.isConnectionPending(publicKey));
+        t.absent(indexerConnectionManagerInstance.add.called);
+    });
+
+    test('Network does not duplicate a pending connection attempt', async t => {
+        const { network, swarmInstance } = await loadNetwork();
+        t.teardown(() => network.close());
+        const publicKey = 'cb'.repeat(32);
+        t.is(await network.tryConnect(publicKey, 'indexer'), CONNECTION_STATUS.PENDING);
+        t.is(await network.tryConnect(publicKey, 'indexer'), CONNECTION_STATUS.IGNORED);
+        t.ok(swarmInstance.joinPeer.calledOnce);
+        t.is(network.pendingConnectionsCount(), 1);
+    });
+
+    test('Network leaves an active validator transport pending while its probe is running', async t => {
+        const { network, swarmInstance, validatorPendingRequestServiceInstance, validatorConnectionManagerInstance } = await loadNetwork();
+        t.teardown(() => network.close());
+        const publicKey = 'ca'.repeat(32);
+        const connection = createMockConnection(publicKey);
+        swarmInstance.peers.set(publicKey, createPeerInfo(connection.remotePublicKey));
+        swarmInstance._allConnections.set(connection.remotePublicKey, connection);
+        swarmInstance.connections.add(connection);
+        validatorPendingRequestServiceInstance.isProbePending = () => true;
+        t.is(await network.tryConnect(publicKey, 'validator'), CONNECTION_STATUS.PENDING);
+        t.ok(network.isConnectionPending(publicKey));
+        t.absent(validatorConnectionManagerInstance.connected(publicKey));
+        t.absent(connection.destroy.called);
     });
 
     test('Network swarm connection event promotes pending connection', async t => {
@@ -747,6 +848,7 @@ if (isBareRuntime) {
         const connection = createMockConnection(publicKey);
         swarmInstance.peers.set(publicKey, createPeerInfo(connection.remotePublicKey));
         swarmInstance._allConnections.set(connection.remotePublicKey, connection);
+        swarmInstance.connections.add(connection);
         let finishProbe;
         const probe = new Promise(resolve => { finishProbe = resolve; });
         validatorConnectionManagerInstance.add = async key => {
