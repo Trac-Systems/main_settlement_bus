@@ -4,7 +4,7 @@ import b4a from 'b4a';
 import EventEmitter from 'bare-events';
 import tracCryptoApi from 'trac-crypto-api';
 import { WalletProvider } from 'trac-wallet';
-import { CONNECTION_STATUS, CustomEventType, ConsensusResultCode } from '../../../src/utils/constants.js';
+import { CONNECTION_STATUS, CustomEventType, ConsensusResultCode, ConsensusVersion } from '../../../src/utils/constants.js';
 import { V1ConsensusProtocolError } from '../../../src/core/consensus/v1/V1ConsensusProtocolError.js';
 import ConsensusConnectionPolicy from '../../../src/core/consensus/ConsensusConnectionPolicy.js';
 import ConsensusEpochProofProposalOperationHandler from '../../../src/core/consensus/v1/handlers/ConsesusEpochProofProposalOperationHandler.js';
@@ -697,6 +697,13 @@ if (isBareRuntime) {
                     },
                 }, connection, session);
             } else {
+                state.requireSignedConsensusConfig = async () => ({
+                    schemaVersion: ConsensusVersion.VDF_V1,
+                    configData: {
+                        difficulty: request.proof_proposal.difficulty.readUInt32BE(0),
+                        discriminantBitSize: request.proof_proposal.discriminant_bit_size.readUInt16BE(0),
+                    },
+                });
                 const response = await signedConsensusResponse(wallet, ConsensusResultCode.OK, {
                     approver: claimedAddress,
                     approval_sig: b4a.alloc(64, 1),

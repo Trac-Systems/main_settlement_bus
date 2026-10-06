@@ -1,4 +1,5 @@
-import { decodeEpochProof } from '../../../../src/codecs/apply/applyOperationCodec.js';
+import { decodeEpochRecord, decodeEpochProofV1 } from '../../../../src/codecs/apply/applyOperationCodec.js';
+import { ConsensusVersion } from '../../../../src/utils/constants.js';
 import {
     decodeProofProposal,
     decodeProofProposalApproval,
@@ -15,7 +16,9 @@ export async function assertSignedEpoch(t, network) {
     t.ok(hashes.every(hash => hash.equals(hashes[0])), 'all nodes agree on the signed epoch hash');
     const proofs = await Promise.all(nodes.map((node, index) => node.state.getEpochProof(hashes[index])));
     t.ok(proofs.every(proof => proof.equals(proofs[0])), 'all nodes store the same signed epoch proof');
-    const proof = decodeEpochProof(proofs[0]);
+    const record = decodeEpochRecord(proofs[0]);
+    t.is(record.sv.readUInt8(0), ConsensusVersion.VDF_V1, 'the signed epoch uses the VDF V1 format');
+    const proof = decodeEpochProofV1(record.data);
     const proposal = decodeProofProposal(proof.pd);
     t.is(proposal.epoch.readBigUInt64BE(), 1n);
     t.is(proposal.difficulty.readUInt32BE(), VDF_DIFFICULTY);

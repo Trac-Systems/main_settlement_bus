@@ -1,6 +1,6 @@
 import test from 'brittle';
 import sinon from 'sinon';
-import { safeDecodeApplyOperation } from '../../../../src/codecs/apply/applyOperationCodec.js';
+import { decodeEpochProofV1, safeDecodeApplyOperation } from '../../../../src/codecs/apply/applyOperationCodec.js';
 import { createConsensusNetwork, waitFor } from '../helpers/consensusNetwork.js';
 import { assertSignedEpoch } from '../helpers/epochAssertions.js';
 
@@ -38,7 +38,8 @@ test('consensus refreshes quorum when membership grows from two to five before a
 
     const round = network.startRound();
     await firstPayloadReady.promise;
-    t.is(safeDecodeApplyOperation(firstPayload).seo.app.length, 0, 'the original two-indexer payload needs no external approval');
+    const firstProof = decodeEpochProofV1(safeDecodeApplyOperation(firstPayload).seo.data);
+    t.is(firstProof.app.length, 0, 'the original two-indexer payload needs no external approval');
     for (const node of nodes.slice(2)) await network.addIndexer(node);
     resumePayload.resolve();
 
@@ -61,7 +62,8 @@ test('consensus refreshes quorum when membership grows from two to five before a
     await waitFor('round completion after membership growth', () => round.completed);
 
     t.is(append.callCount, 1, 'only the payload meeting the new quorum is appended');
-    t.is(safeDecodeApplyOperation(append.firstCall.args[0]).seo.app.length, 2, 'the appended payload already satisfies the new quorum');
+    const appendedProof = decodeEpochProofV1(safeDecodeApplyOperation(append.firstCall.args[0]).seo.data);
+    t.is(appendedProof.app.length, 2, 'the appended payload already satisfies the new quorum');
     t.is(build.callCount, 2, 'the old payload is rebuilt with new approvals');
     t.is(calculateVDF.callCount, 1, 'membership refresh reuses the existing VDF proof');
 });
