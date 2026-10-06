@@ -132,9 +132,8 @@ export class EpochCoordinatorOperations {
         return this.#state.append(payload);
     }
 
-    /** Returns all indexers except this node; an admin/indexer still counts as an approver. */
-    async approvers() {
-        const indexers = await this.#state.getIndexersEntry();
+    /** Filters the attempt's indexer snapshot; an admin/indexer still counts as an approver. */
+    approvers(indexers) {
         const writingKey = this.#state.writingKey;
         return indexers.filter(({ key }) => !b4a.equals(key, writingKey));
     }

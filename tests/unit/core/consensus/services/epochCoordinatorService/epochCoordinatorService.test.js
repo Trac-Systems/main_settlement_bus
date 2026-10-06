@@ -2,7 +2,7 @@ import test from 'brittle';
 import sinon from 'sinon';
 import { CustomEventType } from '../../../../../../src/utils/constants.js';
 import { SCHEDULABLE_SERVICE_EVENTS } from '../../../../../../src/utils/scheduler/SchedulableService.js';
-import { CONFIG, drainMicrotasks, makeOperations, makeState } from '../epochCoordinatorTestHelpers.js';
+import { CONFIG, drainMicrotasks, makeIndexers, makeOperations, makeState } from '../epochCoordinatorTestHelpers.js';
 
 const isBareRuntime = typeof globalThis.Bare !== 'undefined';
 
@@ -316,7 +316,7 @@ if (isBareRuntime) {
             context = await setup({
                 useRealRound: true,
                 operations: makeOperations(),
-                stateOverrides: { indexerCount: sinon.stub().resolves(3) },
+                stateOverrides: { getIndexersEntry: sinon.stub().resolves(makeIndexers(3)) },
                 managerOverrides: { connect: sinon.stub().returns(connection.promise) },
             });
             await context.service.start();

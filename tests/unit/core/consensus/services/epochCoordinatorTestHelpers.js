@@ -19,6 +19,10 @@ export const makeConfirmation = () => ({
     approver: b4a.alloc(21, 0x01),
 });
 
+export const makeIndexers = count => Array.from({ length: count }, (_, index) => ({
+    key: b4a.alloc(32, index + 1),
+}));
+
 export const flush = () => new Promise((resolve) => setTimeout(resolve, 20));
 
 export const drainMicrotasks = async () => {
@@ -64,6 +68,8 @@ export function makeEmitter() {
 export function makeState(overrides = {}) {
     const state = Object.assign(makeEmitter(), {
         indexerCount: sinon.stub().resolves(1),
+        getIndexersEntry: sinon.stub().resolves(makeIndexers(1)),
+        writingKey: b4a.alloc(32, 1),
         getCurrentEpoch: sinon.stub().resolves(5n),
         getEpoch: sinon.stub().resolves(b4a.alloc(32, 0xaa)),
         refresh: sinon.stub().resolves(),
@@ -114,7 +120,7 @@ export function makeOperations(overrides = {}) {
         createProofProposal: sinon.stub().resolves({
             proof_proposal: { epoch: b4a.alloc(8) },
         }),
-        approvers: sinon.stub().resolves([{ key: b4a.alloc(32, 0x02) }]),
+        approvers: sinon.stub().callsFake(indexers => indexers.filter(({ key }) => !b4a.equals(key, b4a.alloc(32, 1)))),
         collectSignature: sinon.stub().resolves(makeConfirmation()),
         buildSetEpochPayload: sinon.stub().resolves(b4a.alloc(64, 0xdd)),
         appendSetEpoch: sinon.stub().resolves(),

@@ -302,14 +302,10 @@ test('approvers excludes only self, including when an admin entry also appears a
     const otherKey = b4a.alloc(32, 3);
     const state = makeState({
         writingKey,
-        getIndexersEntry: sinon.stub().resolves([
-            { key: writingKey },
-            { key: adminKey },
-            { key: otherKey },
-        ]),
     });
+    const indexers = [{ key: writingKey }, { key: adminKey }, { key: otherKey }];
 
-    const result = await makeOps({ state }).approvers();
+    const result = makeOps({ state }).approvers(indexers);
 
     t.is(result.length, 2);
     t.ok(result.some(({ key }) => b4a.equals(key, adminKey)));
@@ -321,10 +317,10 @@ test('approvers returns everyone but self', async t => {
     const otherKey = b4a.alloc(32, 3);
     const state = makeState({
         writingKey,
-        getIndexersEntry: sinon.stub().resolves([{ key: writingKey }, { key: otherKey }]),
     });
+    const indexers = [{ key: writingKey }, { key: otherKey }];
 
-    const result = await makeOps({ state }).approvers();
+    const result = makeOps({ state }).approvers(indexers);
 
     t.is(result.length, 1);
     t.ok(b4a.equals(result[0].key, otherKey));

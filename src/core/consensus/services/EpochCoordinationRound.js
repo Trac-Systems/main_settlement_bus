@@ -1,3 +1,4 @@
+import b4a from 'b4a';
 import { EPOCH_EVENTS, EPOCH_STATES, EpochStateMachine } from './EpochStateMachine.js';
 import { ConsensusProtocolVersion } from '../../../utils/constants.js';
 import {
@@ -9,6 +10,7 @@ import {
 } from '../../../utils/buffer.js';
 import { addressToBuffer } from '../../state/utils/address.js';
 import { EpochRoundListeners } from './EpochRoundListeners.js';
+import { calculateQuorum } from '../quorum.js';
 
 const INACTIVE_ROUND_ERROR = new Error('Epoch coordination round is no longer active');
 
@@ -44,6 +46,7 @@ export class EpochCoordinationRound {
         this.#intervalMs = intervalMs;
         this.#machine = new EpochStateMachine(this.#buildHandlers());
         this.#machine.on(EPOCH_EVENTS.APPROVAL_COLLECTION_FAILED, ({ context }) => {
+            this.#closeApprovalCollection();
             this.#logApprovalBackoff(context);
         });
         this.#listeners = new EpochRoundListeners({
@@ -154,6 +157,12 @@ export class EpochCoordinationRound {
         }
     }
 
+    /** Only the current, open collection can accept responses while the round is active. */
+    #isApprovalCollectionActive(proposals) {
+        return this.#isActive() && !proposals.closed && proposals === this.#machine.context.proposals;
+    }
+
+
     /**
      * Waits for the remote proposal timeout.
      * cancel() finishes this wait without waiting for the timer.
@@ -204,12 +213,6 @@ export class EpochCoordinationRound {
         backoffWait.complete();
     }
 
-    /** @returns {Promise<number>} signature quorum required for the current indexer set */
-    async #getQuorum() {
-        const indexerCount = await this.#state.indexerCount();
-        return indexerCount <= 2 ? 1 : Math.floor(indexerCount / 2) + 1;
-    }
-
     /** Loads the signed epoch and config used by this round. */
     async #handleLoadEpochContext(_context, machine) {
         const currentEpoch = await this.#state.requireCurrentEpoch();
@@ -220,10 +223,8 @@ export class EpochCoordinationRound {
                 discriminantBitSize: vdfDiscriminantSize,
             },
         } = await this.#state.requireSignedConsensusConfig();
-        const quorum = await this.#getQuorum();
-
         this.#assertActive();
-        machine.appendContext({ currentEpoch, currentEpochHash, vdfDifficulty, vdfDiscriminantSize, quorum });
+        machine.appendContext({ currentEpoch, currentEpochHash, vdfDifficulty, vdfDiscriminantSize });
         await machine.send(EPOCH_EVENTS.START);
     }
 
@@ -275,8 +276,21 @@ export class EpochCoordinationRound {
             }
         }
 
+        // Each attempt uses one authoritative membership snapshot, regardless of peer connectivity.
+        const indexers = await this.#state.getIndexersEntry();
+        this.#assertActive();
+        const indexerKeys = new Set(indexers.map(({ key }) => b4a.toString(key, 'hex')));
+        if (!indexerKeys.has(b4a.toString(this.#state.writingKey, 'hex'))) {
+            await context.next(this.#intervalMs);
+            return;
+        }
+
+        const quorum = calculateQuorum(indexers.length);
+        const approvers = this.#operations.approvers(indexers);
+        machine.appendContext({ indexerKeys, quorum, approvers, proposals: null });
+
         await machine.send(
-            context.quorum <= 1
+            quorum <= 1
                 ? EPOCH_EVENTS.EXTERNAL_APPROVALS_NOT_REQUIRED
                 : EPOCH_EVENTS.EXTERNAL_APPROVALS_REQUIRED,
         );
@@ -284,15 +298,9 @@ export class EpochCoordinationRound {
 
     /** Connects to eligible indexers and starts one approval request per approver. */
     async #handleSendProposalToIndexers(context, machine) {
-        const approvers = await this.#operations.approvers();
-        this.#assertActive();
+        const { approvers } = context;
         await this.#manager.connect();
         this.#assertActive();
-
-        if (approvers.length + 1 < context.quorum) {
-            await machine.send(EPOCH_EVENTS.APPROVAL_COLLECTION_FAILED);
-            return;
-        }
 
         const proposals = {
             approvers,
@@ -326,7 +334,7 @@ export class EpochCoordinationRound {
 
     /** Records a valid approval and advances the state machine after reaching quorum. */
     async #handleApproval(confirmation, proposals, machine) {
-        if (!this.#isActive() || proposals.closed) return;
+        if (!this.#isApprovalCollectionActive(proposals)) return;
 
         proposals.approvals.push(confirmation);
         if (proposals.approvals.length + 1 >= machine.context.quorum) {
@@ -337,7 +345,7 @@ export class EpochCoordinationRound {
 
     /** Records a rejected approval and stops collection when quorum is no longer possible. */
     async #handleApprovalFailure(error, member, proposals, machine) {
-        if (!this.#isActive() || proposals.closed) return;
+        if (!this.#isApprovalCollectionActive(proposals)) return;
 
         proposals.rejections.push({ member, error });
         if (proposals.rejections.length > proposals.approvers.length - machine.context.quorum + 1) {
@@ -357,15 +365,20 @@ export class EpochCoordinationRound {
         await machine.send(EPOCH_EVENTS.SET_EPOCH_BUILT);
     }
 
-    /** Checks signed state before append, so an old epoch is not submitted. */
+    /** Checks the epoch and membership before appending a payload built by this attempt. */
     async #handleRefreshSignedStateBeforeAppend(context, machine) {
         const latestEpochBeforeAppend = await this.#state.getCurrentEpoch();
         this.#assertActive();
-        await machine.send(
-            latestEpochBeforeAppend === context.currentEpoch
-                ? EPOCH_EVENTS.TARGET_EPOCH_ABSENT
-                : EPOCH_EVENTS.TARGET_EPOCH_ALREADY_SIGNED,
-        );
+        if (latestEpochBeforeAppend !== context.currentEpoch) {
+            await machine.send(EPOCH_EVENTS.TARGET_EPOCH_ALREADY_SIGNED);
+            return;
+        }
+
+        const indexers = await this.#state.getIndexersEntry();
+        this.#assertActive();
+        const membershipChanged = indexers.length !== context.indexerKeys.size ||
+            indexers.some(({ key }) => !context.indexerKeys.has(b4a.toString(key, 'hex')));
+        await machine.send(membershipChanged ? EPOCH_EVENTS.INDEXERS_CHANGED : EPOCH_EVENTS.TARGET_EPOCH_ABSENT);
     }
 
     /** Appends SET_EPOCH locally. The event or timeout decides the final result. */
