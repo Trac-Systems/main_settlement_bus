@@ -12,7 +12,7 @@ class V1EpochProofProposalApproval extends V1BaseConsensusOperation {
      * @param {Config} config Application configuration. Approval validation uses
      * `addressLength` for schemas and `addressPrefix` for approver addresses.
      * @param {State} state Ledger state. It must expose
-     * `isIndexerAddress(address)` for approver membership validation.
+     * `isIndexerAddress(address)` and `requireSignedConsensusConfig()`.
      * @throws {Error} When consensus schemas cannot be initialized from the configuration.
      */
     constructor(config, state) {
@@ -24,7 +24,8 @@ class V1EpochProofProposalApproval extends V1BaseConsensusOperation {
      *
      * Checks every response's schema and signature. A signed rejection is returned
      * as a result. An OK response also requires the approver to match the remote
-     * public key, a valid approval signature, and indexer membership.
+     * public key, a valid approval signature, indexer membership, and matching
+     * active consensus config before and after the asynchronous approval checks.
      *
      * @param {object} payload Decoded proof proposal approval payload.
      * @param {object} connection Peer connection containing `remotePublicKey`.
@@ -42,6 +43,7 @@ class V1EpochProofProposalApproval extends V1BaseConsensusOperation {
                 return { resultCode };
             }
 
+            await this.validateProofProposalConfig(proofProposal);
             const approval = payload.proof_proposal_response.approval;
             this.assertAddressWithRemotePublicKey(
                 approval.approver,
@@ -49,6 +51,9 @@ class V1EpochProofProposalApproval extends V1BaseConsensusOperation {
             );
             await this.validateSignature(payload, connection.remotePublicKey, proofProposal, ConsensusResultCode.APPROVAL_SIGNATURE_INVALID);
             await this.validateAddressIsIndexer(connection.remotePublicKey);
+
+            // Reject late approvals if the signed config changed while validating them.
+            await this.validateProofProposalConfig(proofProposal);
             return { resultCode, approval };
         });
     }

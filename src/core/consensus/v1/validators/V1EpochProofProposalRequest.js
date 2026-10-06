@@ -1,6 +1,6 @@
 import V1BaseConsensusOperation from "./V1BaseConsensusOperation.js";
 import { V1ConsensusProtocolError } from "../V1ConsensusProtocolError.js";
-import { ConsensusProtocolVersion, ConsensusResultCode } from "../../../../utils/constants.js";
+import { ConsensusResultCode } from "../../../../utils/constants.js";
 import { uint16ToBuffer } from "../../../../utils/buffer.js";
 import b4a from "b4a";
 import { verifyWesolowski } from '@tracsystems/trac-vdf';
@@ -23,7 +23,7 @@ class V1EpochProofProposalRequest extends V1BaseConsensusOperation {
     /**
      * Validates a complete incoming epoch proof proposal request.
      *
-     * Checks the payload schema, protocol version, network id, proposer identity,
+     * Checks the payload schema, active consensus version, network id, proposer identity,
      * proposal signature, proposer indexer membership, next epoch number,
      * previous epoch record hash, consensus configuration, and VDF proof.
      *
@@ -35,70 +35,24 @@ class V1EpochProofProposalRequest extends V1BaseConsensusOperation {
     async validate(payload, connection) {
         return await this.validateAsProtocolError(async () => {
             this.isPayloadSchemaValid(payload);
-            this.validateProofProposalProtocolVersion(payload.proof_proposal);
             this.validateProofProposalNetworkId(payload.proof_proposal);
             this.assertAddressWithRemotePublicKey(
                 payload.proof_proposal.proposer,
                 connection.remotePublicKey
             );
+            await this.validateProofProposalConfig(payload.proof_proposal);
             await this.validateSignature(payload, connection.remotePublicKey, undefined, ConsensusResultCode.PROPOSAL_SIGNATURE_INVALID);
             await this.validateAddressIsIndexer(connection.remotePublicKey);
             this.validateLocalNodeIsIndexer();
             const currentEpoch = await this._state.requireCurrentEpoch();
             this.validateIncomingEpoch(payload.proof_proposal, currentEpoch);
             await this.validatePreviousEpochRecordHash(payload.proof_proposal, currentEpoch);
-            await this.validateProofProposalConfig(payload.proof_proposal);
             await this.validateProofProposalVdfProof(payload.proof_proposal);
+
+            // The signed config may have changed during VDF verification.
+            await this.validateProofProposalConfig(payload.proof_proposal);
             return true;
         });
-    }
-
-    /**
-     * Validates that the proof proposal uses the supported consensus protocol version.
-     *
-     * @param {object} proofProposal Decoded proof proposal.
-     * @returns {void}
-     * @throws {V1ConsensusProtocolError} When the version is missing or is not consensus v1.
-     */
-    validateProofProposalProtocolVersion(proofProposal) {
-        if (!proofProposal?.protocol_version) {
-            throw new V1ConsensusProtocolError(
-                ConsensusResultCode.INVALID_PAYLOAD,
-                'Proof proposal protocol version is missing.'
-            );
-        }
-
-        if (proofProposal.protocol_version[0] !== ConsensusProtocolVersion.V1) {
-            throw new V1ConsensusProtocolError(
-                ConsensusResultCode.BAD_PROTOCOL_VERSION,
-                'Unsupported proof proposal protocol version.'
-            );
-        }
-    }
-
-    /**
-     * Validates that the proof proposal VDF parameters match signed consensus state.
-     *
-     * @param {object} proofProposal Decoded proof proposal.
-     * @returns {Promise<void>}
-     * @throws {V1ConsensusProtocolError} When the proposal parameters do not match consensus state.
-     */
-    async validateProofProposalConfig(proofProposal) {
-        const consensusConfig = await this._state.requireSignedConsensusConfig();
-
-        const difficulty = proofProposal.difficulty.readUInt32BE(0);
-        const discriminantBitSize =
-            proofProposal.discriminant_bit_size.readUInt16BE(0);
-
-        if (
-            difficulty !== consensusConfig.configData.difficulty ||
-            discriminantBitSize !== consensusConfig.configData.discriminantBitSize
-        ) {
-            throw new V1ConsensusProtocolError(
-                ConsensusResultCode.CONSENSUS_CONFIG_MISMATCH,
-                'Proof proposal does not match the current consensus configuration.'
-            );
-        }
     }
 
     /**

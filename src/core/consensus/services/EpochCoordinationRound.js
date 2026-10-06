@@ -1,12 +1,10 @@
 import b4a from 'b4a';
 import { EPOCH_EVENTS, EPOCH_STATES, EpochStateMachine } from './EpochStateMachine.js';
-import { ConsensusProtocolVersion } from '../../../utils/constants.js';
 import {
     createMessage,
     uint16ToBuffer,
     uint32ToBuffer,
     uint64ToBuffer,
-    uint8ToBuffer,
 } from '../../../utils/buffer.js';
 import { addressToBuffer } from '../../state/utils/address.js';
 import { EpochRoundListeners } from './EpochRoundListeners.js';
@@ -233,7 +231,6 @@ export class EpochCoordinationRound {
         const { currentEpochHash, vdfDifficulty, vdfDiscriminantSize, currentEpoch } = context;
 
         const challenge = createMessage(
-            uint8ToBuffer(ConsensusProtocolVersion.V1),
             uint16ToBuffer(this.#config.networkId),
             uint64ToBuffer(currentEpoch + 1n),
             currentEpochHash,

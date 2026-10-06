@@ -106,7 +106,6 @@ export class EpochCoordinatorOperations {
     /** Creates a SET_EPOCH payload from the proof and collected signatures. */
     async buildSetEpochPayload(proofProposal, signatures) {
         const proofData = encodeProofProposal({
-            protocol_version: proofProposal.protocol_version,
             network_id: proofProposal.network_id,
             epoch: proofProposal.epoch,
             previous_epoch_record_hash: proofProposal.previous_epoch_record_hash,

@@ -5,7 +5,6 @@ import IndexerPendingRequestService, { IndexerPendingRequestServiceTimeoutError 
 import ConsensusMessageBuilder from '../../../../src/messages/consensus/v1/ConsensusMessageBuilder.js';
 import {
     ConsensusOperationType,
-    ConsensusProtocolVersion,
     ConsensusResultCode,
     VDF_DIFFICULTY_SIZE,
     VDF_PROOF_BYTE_LENGTHS
@@ -38,7 +37,6 @@ async function buildProofProposal({ sessionId = uuidv7() } = {}) {
         .setType(ConsensusOperationType.PROOF_PROPOSAL)
         .setSessionId(sessionId)
         .setTimestamp()
-        .setProtocolVersion(ConsensusProtocolVersion.V1)
         .setNetworkId(config.networkId)
         .setEpoch(1n)
         .setPreviousEpochRecordHash(b4a.alloc(32))

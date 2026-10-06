@@ -1,7 +1,11 @@
 import b4a from 'b4a';
 import tracCryptoApi from 'trac-crypto-api';
 import { CustomEventType, EntryType } from '../../../../../src/utils/constants.js';
-import { safeEncodeEpochProof } from '../../../../../src/codecs/apply/applyOperationCodec.js';
+import {
+    safeDecodeEpochProofV1,
+    safeEncodeEpochProofV1,
+    encodeEpochRecord
+} from '../../../../../src/codecs/apply/applyOperationCodec.js';
 import {
     appendAndUpdate,
     decodeSetEpochPayload
@@ -56,20 +60,23 @@ export async function applyRejectedEpoch(t, context, payload, label) {
 
 export async function expectedEpochWrites(payload, epoch = 1n) {
     const operation = decodeSetEpochPayload(payload);
-    const encodedProof = safeEncodeEpochProof({
-        pd: operation.seo.pd,
-        app: operation.seo.app
-    });
-    const proofHash = await tracCryptoApi.hash.blake3Safe(encodedProof);
+    const epochProof = safeDecodeEpochProofV1(operation.seo.data);
+    if (epochProof === null) {
+        throw new Error('SET_EPOCH test fixture contains invalid epoch data.');
+    }
+    const encodedProof = safeEncodeEpochProofV1(epochProof);
+    const encodedRecord = encodeEpochRecord({ sv: operation.seo.sv, data: encodedProof });
+    const recordHash = await tracCryptoApi.hash.blake3Safe(encodedRecord);
     const currentEpoch = b4a.alloc(8);
     currentEpoch.writeBigUInt64BE(epoch);
 
     return {
         currentEpoch,
         forwardKey: EntryType.EPOCH + epoch.toString(),
-        proofHash,
-        reverseKey: EntryType.EPOCH_HASH + proofHash.toString('hex'),
-        encodedProof
+        recordHash,
+        reverseKey: EntryType.EPOCH_HASH + recordHash.toString('hex'),
+        encodedProof,
+        encodedRecord
     };
 }
 
@@ -90,14 +97,23 @@ export function changedViewKeys(before, after) {
 
 export async function appendWithEpochProofEncodingFailure(context, payload) {
     const { encodedProof } = await expectedEpochWrites(payload);
+    return appendWithEncodingFailure(context, payload, encodedProof);
+}
+
+export async function appendWithEpochRecordEncodingFailure(context, payload) {
+    const { encodedRecord } = await expectedEpochWrites(payload);
+    return appendWithEncodingFailure(context, payload, encodedRecord);
+}
+
+async function appendWithEncodingFailure(context, payload, target) {
     const originalFrom = b4a.from;
     let injected = false;
 
     b4a.from = (value, ...args) => {
         const encoded = originalFrom(value, ...args);
-        if (!injected && b4a.equals(encoded, encodedProof)) {
+        if (!injected && b4a.equals(encoded, target)) {
             injected = true;
-            throw new Error('injected SET_EPOCH proof encoding failure');
+            throw new Error('injected SET_EPOCH encoding failure');
         }
         return encoded;
     };
@@ -110,13 +126,13 @@ export async function appendWithEpochProofEncodingFailure(context, payload) {
     }
 }
 
-export async function appendWithEpochProofHashFailure(context, payload) {
-    const { encodedProof } = await expectedEpochWrites(payload);
+export async function appendWithEpochRecordHashFailure(context, payload) {
+    const { encodedRecord } = await expectedEpochWrites(payload);
     const originalBlake3Safe = tracCryptoApi.hash.blake3Safe;
     let injected = false;
 
     tracCryptoApi.hash.blake3Safe = async value => {
-        if (!injected && b4a.equals(value, encodedProof)) {
+        if (!injected && b4a.equals(value, encodedRecord)) {
             injected = true;
             return b4a.alloc(0);
         }

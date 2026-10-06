@@ -12,13 +12,11 @@ import {
 } from '../../../../src/codecs/consensus/v1/consensusV1OperationCodec.js';
 import {
     createMessage,
-    uint8ToBuffer,
     uint16ToBuffer,
     uint64ToBuffer, uint32ToBuffer
 } from '../../../../src/utils/buffer.js';
 import {
     ConsensusOperationType,
-    ConsensusProtocolVersion,
     ConsensusResultCode,
     NetworkResultCode
 } from '../../../../src/utils/constants.js';
@@ -46,7 +44,6 @@ test('ConsensusMessageBuilder builds proof proposal and verifies signature', asy
         .setType(ConsensusOperationType.PROOF_PROPOSAL)
         .setSessionId(header.session_id)
         .setTimestamp()
-        .setProtocolVersion(proofProposalFixture.protocol_version[0])
         .setNetworkId(proofProposalFixture.network_id.readUInt16BE(0))
         .setEpoch(Number(proofProposalFixture.epoch.readBigUInt64BE(0)))
         .setPreviousEpochRecordHash(proofProposalFixture.previous_epoch_record_hash)
@@ -61,7 +58,6 @@ test('ConsensusMessageBuilder builds proof proposal and verifies signature', asy
     t.is(payload.session_id, header.session_id);
     t.ok(Number.isSafeInteger(payload.timestamp) && payload.timestamp > 0);
     const proofProposal = payload.proof_proposal;
-    t.alike(proofProposal.protocol_version, proofProposalFixture.protocol_version);
     t.alike(proofProposal.network_id, proofProposalFixture.network_id);
     t.alike(proofProposal.epoch, proofProposalFixture.epoch);
     t.alike(proofProposal.previous_epoch_record_hash, proofProposalFixture.previous_epoch_record_hash);
@@ -72,7 +68,6 @@ test('ConsensusMessageBuilder builds proof proposal and verifies signature', asy
     t.ok(b4a.isBuffer(proofProposal.signature));
 
     const msg = createMessage(
-        proofProposal.protocol_version,
         proofProposal.network_id,
         proofProposal.epoch,
         proofProposal.previous_epoch_record_hash,
@@ -100,7 +95,6 @@ test('ConsensusMessageBuilder iterates proof proposal response ConsensusResultCo
             .setType(ConsensusOperationType.PROOF_PROPOSAL_APPROVAL)
             .setSessionId(header.session_id)
             .setTimestamp()
-            .setProtocolVersion(proofProposalFixture.protocol_version[0])
             .setNetworkId(proofProposalFixture.network_id.readUInt16BE(0))
             .setEpoch(Number(proofProposalFixture.epoch.readBigUInt64BE(0)))
             .setPreviousEpochRecordHash(proofProposalFixture.previous_epoch_record_hash)
@@ -123,7 +117,6 @@ test('ConsensusMessageBuilder iterates proof proposal response ConsensusResultCo
             t.ok(b4a.isBuffer(payload.proof_proposal_response.approval.approval_sig));
 
             const approvalMessage = createMessage(
-                proofProposalFixture.protocol_version,
                 proofProposalFixture.network_id,
                 proofProposalFixture.epoch,
                 proofProposalFixture.previous_epoch_record_hash,
@@ -194,8 +187,6 @@ test('ConsensusMessageBuilder encodes scalar number fields at byte-width boundar
     const header = consensusV1OperationFixtures.proofProposalHeader;
     const proofProposalFixture = consensusV1OperationFixtures.proofProposal;
     const proposer = bufferToAddress(proofProposalFixture.proposer, config.addressPrefix);
-    const protocolVersion = ConsensusProtocolVersion.V1;
-    const protocolVersionBuffer = uint8ToBuffer(protocolVersion);
     const cases = [
         {
             networkId: 1,
@@ -219,7 +210,6 @@ test('ConsensusMessageBuilder encodes scalar number fields at byte-width boundar
             .setType(ConsensusOperationType.PROOF_PROPOSAL)
             .setSessionId(header.session_id)
             .setTimestamp()
-            .setProtocolVersion(protocolVersion)
             .setNetworkId(testCase.networkId)
             .setEpoch(testCase.epoch)
             .setPreviousEpochRecordHash(proofProposalFixture.previous_epoch_record_hash)
@@ -232,8 +222,6 @@ test('ConsensusMessageBuilder encodes scalar number fields at byte-width boundar
         const payload = builder.getResult();
         const proofProposal = payload.proof_proposal;
 
-        t.alike(proofProposal.protocol_version, protocolVersionBuffer);
-        t.is(proofProposal.protocol_version.length, 1);
         t.alike(proofProposal.network_id, networkIdBuffer);
         t.is(proofProposal.network_id.length, 2);
         t.is(proofProposal.network_id.readUInt16BE(0), testCase.networkId);
@@ -242,7 +230,6 @@ test('ConsensusMessageBuilder encodes scalar number fields at byte-width boundar
         t.is(proofProposal.epoch.readBigUInt64BE(0), BigInt(testCase.epoch));
 
         const msg = createMessage(
-            proofProposal.protocol_version,
             proofProposal.network_id,
             proofProposal.epoch,
             proofProposal.previous_epoch_record_hash,
@@ -253,40 +240,6 @@ test('ConsensusMessageBuilder encodes scalar number fields at byte-width boundar
         );
         const hash = await tracCryptoApi.hash.blake3(msg);
         t.ok(wallet.verify(proofProposal.signature, hash, wallet.publicKey));
-    }
-});
-
-test('ConsensusMessageBuilder rejects invalid protocol version numbers', async t => {
-    const wallet = await createWallet();
-    const builder = new ConsensusMessageBuilder(wallet, config);
-    const invalidUint8Values = [
-        -1,
-        0x100,
-        1.5,
-        Number.NaN,
-        Number.POSITIVE_INFINITY,
-        '1',
-        1n,
-        b4a.alloc(1, 1),
-    ];
-    const unsupportedProtocolVersions = [
-        0,
-        2,
-        0xFF
-    ];
-
-    for (const value of invalidUint8Values) {
-        t.exception(
-            () => builder.setProtocolVersion(value),
-            errorMessageIncludes('Value must be an unsigned 8-bit integer.')
-        );
-    }
-
-    for (const value of unsupportedProtocolVersions) {
-        t.exception(
-            () => builder.setProtocolVersion(value),
-            errorMessageIncludes(`Unsupported consensus protocol version: ${value}`)
-        );
     }
 });
 
@@ -428,23 +381,6 @@ test('ConsensusMessageBuilder rejects missing fields before build result is avai
     const networkId = proofProposalFixture.network_id.readUInt16BE(0);
     const epoch = Number(proofProposalFixture.epoch.readBigUInt64BE(0));
 
-    const missingProtocolVersion = new ConsensusMessageBuilder(wallet, config);
-    await t.exception(
-        () => missingProtocolVersion
-            .setType(ConsensusOperationType.PROOF_PROPOSAL)
-            .setSessionId(header.session_id)
-            .setTimestamp()
-            .setNetworkId(networkId)
-            .setEpoch(epoch)
-            .setPreviousEpochRecordHash(proofProposalFixture.previous_epoch_record_hash)
-            .setProposer(proposer)
-            .setDifficulty(proofProposalFixture.difficulty)
-            .setDiscriminantBitSize(proofProposalFixture.discriminant_bit_size)
-            .setProof(proofProposalFixture.proof)
-            .buildPayload(),
-        errorMessageIncludes('Protocol version must be a buffer.')
-    );
-
     const missingHeader = new ConsensusMessageBuilder(wallet, config);
     await t.exception(
         () => missingHeader
@@ -459,7 +395,6 @@ test('ConsensusMessageBuilder rejects missing fields before build result is avai
             .setType(ConsensusOperationType.PROOF_PROPOSAL_APPROVAL)
             .setSessionId(header.session_id)
             .setTimestamp()
-            .setProtocolVersion(proofProposalFixture.protocol_version[0])
             .setNetworkId(networkId)
             .setEpoch(epoch)
             .setPreviousEpochRecordHash(proofProposalFixture.previous_epoch_record_hash)
@@ -480,8 +415,6 @@ test('ConsensusMessageBuilder signs non-zero network id and uint64 epochs withou
     const header = consensusV1OperationFixtures.proofProposalHeader;
     const proofProposalFixture = consensusV1OperationFixtures.proofProposal;
     const proposer = bufferToAddress(proofProposalFixture.proposer, config.addressPrefix);
-    const protocolVersion = ConsensusProtocolVersion.V1;
-    const protocolVersionBuffer = uint8ToBuffer(protocolVersion);
     const networkId = 1;
     const networkIdBuffer = uint16ToBuffer(networkId);
     const epoch = 0x100000000;
@@ -491,7 +424,6 @@ test('ConsensusMessageBuilder signs non-zero network id and uint64 epochs withou
         .setType(ConsensusOperationType.PROOF_PROPOSAL)
         .setSessionId(header.session_id)
         .setTimestamp()
-        .setProtocolVersion(protocolVersion)
         .setNetworkId(networkId)
         .setEpoch(epoch)
         .setPreviousEpochRecordHash(proofProposalFixture.previous_epoch_record_hash)
@@ -502,12 +434,10 @@ test('ConsensusMessageBuilder signs non-zero network id and uint64 epochs withou
         .buildPayload();
 
     const proofProposal = builder.getResult().proof_proposal;
-    t.alike(proofProposal.protocol_version, protocolVersionBuffer);
     t.alike(proofProposal.network_id, networkIdBuffer);
     t.alike(proofProposal.epoch, epochBuffer);
 
     const signedMessage = createMessage(
-        proofProposal.protocol_version,
         proofProposal.network_id,
         proofProposal.epoch,
         proofProposal.previous_epoch_record_hash,
@@ -521,7 +451,6 @@ test('ConsensusMessageBuilder signs non-zero network id and uint64 epochs withou
     t.ok(wallet.verify(proofProposal.signature, signedHash, wallet.publicKey));
 
     const legacyMessage = createMessage(
-        protocolVersion,
         networkId,
         epoch,
         proofProposalFixture.previous_epoch_record_hash,
