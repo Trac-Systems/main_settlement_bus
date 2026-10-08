@@ -5,9 +5,9 @@ import { WalletProvider } from 'trac-wallet';
 import { createConfig, ENV } from '../../../../src/config/env.js';
 import State from '../../../../src/core/state/State.js';
 import { $TNK } from '../../../../src/core/state/utils/balance.js';
-import ConsensusMessages from '../../../../src/core/consensus/protocols/ConsensusMessages.js';
-import IndexerConnectionManager from '../../../../src/core/consensus/services/IndexerConnectionManager.js';
-import IndexerPendingRequestService from '../../../../src/core/consensus/services/IndexerPendingRequestService.js';
+import IndexerMessages from '../../../../src/core/network/protocols/consensus/IndexerMessages.js';
+import IndexerConnectionManager from '../../../../src/core/network/services/IndexerConnectionManager.js';
+import IndexerPendingRequestService from '../../../../src/core/network/protocols/consensus/v1/IndexerPendingRequestService.js';
 import { EpochCoordinationRound } from '../../../../src/core/consensus/services/EpochCoordinationRound.js';
 import { VDFServiceManager } from '../../../../src/core/consensus/services/VDFServiceManager.js';
 import { applyStateMessageFactory } from '../../../../src/messages/state/applyStateMessageFactory.js';
@@ -258,7 +258,7 @@ export async function createConsensusNetwork(t, { indexerCount = 5, prepareConne
         function removeClosedSession(connection) {
             node.manager.remove(connection.remotePublicKey, connection);
         }
-        node.messages = new ConsensusMessages(node.state, node.wallet, node.config, node.pending, removeClosedSession);
+        node.messages = new IndexerMessages(node.state, node.wallet, node.config, node.pending, removeClosedSession);
         const network = {
             isConnectionPending: () => false,
             async tryConnect(publicKey) {

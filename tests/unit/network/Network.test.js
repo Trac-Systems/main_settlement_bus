@@ -5,9 +5,9 @@ import EventEmitter from 'bare-events';
 import tracCryptoApi from 'trac-crypto-api';
 import { WalletProvider } from 'trac-wallet';
 import { CONNECTION_STATUS, CustomEventType, ConsensusResultCode, ConsensusVersion } from '../../../src/utils/constants.js';
-import { V1ConsensusProtocolError } from '../../../src/core/consensus/v1/V1ConsensusProtocolError.js';
-import ConsensusConnectionPolicy from '../../../src/core/consensus/ConsensusConnectionPolicy.js';
-import ConsensusEpochProofProposalOperationHandler from '../../../src/core/consensus/v1/handlers/ConsesusEpochProofProposalOperationHandler.js';
+import { V1ConsensusProtocolError } from '../../../src/core/network/protocols/consensus/v1/V1ConsensusProtocolError.js';
+import ConsensusV1ConnectionPolicy from '../../../src/core/network/protocols/consensus/v1/ConsensusV1ConnectionPolicy.js';
+import V1EpochProofProposalOperationHandler from '../../../src/core/network/protocols/consensus/v1/handlers/V1EpochProofProposalOperationHandler.js';
 import { encodeProofProposalApproval } from '../../../src/codecs/consensus/v1/consensusV1OperationCodec.js';
 import { createMessage, uint16ToBuffer, uint32ToBuffer } from '../../../src/utils/buffer.js';
 import { bufferToAddress } from '../../../src/core/state/utils/address.js';
@@ -140,7 +140,7 @@ async function loadNetwork({ isIndexer = false, currentEpoch = null, indexerCoun
         async stop() {}
     }
 
-    class MessageOrchestratorMock {
+    class ValidatorMessageOrchestratorMock {
         setWallet() {}
     }
 
@@ -205,7 +205,7 @@ async function loadNetwork({ isIndexer = false, currentEpoch = null, indexerCoun
         error() {}
     }
 
-    class NetworkMessagesMock {
+    class ValidatorMessagesMock {
         createProtocolSession(connection) {
             return connection.protocolSessions?.validator ?? {
                 isProbed: () => true,
@@ -225,7 +225,7 @@ async function loadNetwork({ isIndexer = false, currentEpoch = null, indexerCoun
         }
     }
 
-    class ConsensusMessagesMock {
+    class IndexerMessagesMock {
         constructor(_state, _wallet, _config, pendingRequests) {
             consensusMessagesInstance = this;
             indexerPendingRequestServiceInstance = pendingRequests;
@@ -253,15 +253,15 @@ async function loadNetwork({ isIndexer = false, currentEpoch = null, indexerCoun
         '../../../src/core/network/services/TransactionPoolService.js': { default: TransactionPoolServiceMock },
         '../../../src/core/network/services/ValidatorObserverService.js': { default: ValidatorObserverServiceMock },
         '../../../src/core/network/services/ValidatorConnectionManager.js': { default: ValidatorConnectionManagerMock },
-        '../../../src/core/network/services/MessageOrchestrator.js': { default: MessageOrchestratorMock },
+        '../../../src/core/network/services/ValidatorMessageOrchestrator.js': { default: ValidatorMessageOrchestratorMock },
         '../../../src/core/network/services/TransactionRateLimiterService.js': { default: TransactionRateLimiterServiceMock },
-        '../../../src/core/network/services/ValidatorPendingRequestService.js': { default: PendingRequestServiceMock },
+        '../../../src/core/network/protocols/validators/v1/ValidatorPendingRequestService.js': { default: PendingRequestServiceMock },
         '../../../src/core/network/services/TransactionCommitService.js': { default: TransactionCommitServiceMock },
         '../../../src/core/network/services/ValidatorHealthCheckService.js': { default: ValidatorHealthCheckServiceMock },
         '../../../src/core/consensus/services/EpochCoordinatorService.js': { default: EpochCoordinatorServiceMock },
-        '../../../src/core/consensus/services/IndexerConnectionManager.js': { default: IndexerConnectionManagerMock },
-        '../../../src/core/network/protocols/NetworkMessages.js': { default: NetworkMessagesMock },
-        '../../../src/core/consensus/protocols/ConsensusMessages.js': { default: ConsensusMessagesMock },
+        '../../../src/core/network/services/IndexerConnectionManager.js': { default: IndexerConnectionManagerMock },
+        '../../../src/core/network/protocols/validators/ValidatorMessages.js': { default: ValidatorMessagesMock },
+        '../../../src/core/network/protocols/consensus/IndexerMessages.js': { default: IndexerMessagesMock },
         'protomux-wakeup': { default: WakeupMock },
         '../../../src/utils/logger.js': { Logger: LoggerMock },
     });
@@ -291,7 +291,7 @@ async function loadNetwork({ isIndexer = false, currentEpoch = null, indexerCoun
 
     const store = new CorestoreMock();
     const state = new EventEmitter();
-    const connectionPolicy = new ConsensusConnectionPolicy(state, new LoggerMock(), config);
+    const connectionPolicy = new ConsensusV1ConnectionPolicy(state, new LoggerMock(), config);
     state.isAdmin = async () => false;
     state.isIndexer = () => isIndexer;
     state.indexerCount = async () => indexerCount;
@@ -685,7 +685,7 @@ if (isBareRuntime) {
             const otherRequest = { ...request, session_id: 'other-peer-request' };
             indexerPendingRequestServiceInstance.registerPendingRequest(claimedKey.toString('hex'), otherRequest)
                 .catch(() => {});
-            const handler = new ConsensusEpochProofProposalOperationHandler(state, {}, consensusConfig, connectionPolicy);
+            const handler = new V1EpochProofProposalOperationHandler(state, {}, consensusConfig, connectionPolicy);
             const session = { sendAndForget: sinon.stub() };
 
             if (kind === 'proposal') {
@@ -744,7 +744,7 @@ if (isBareRuntime) {
         const connection = createMockConnection(wallet.publicKey.toString('hex'));
         const peerInfo = createPeerInfo(connection.remotePublicKey);
         swarmInstance.peers.set(wallet.publicKey.toString('hex'), peerInfo);
-        const handler = new ConsensusEpochProofProposalOperationHandler(state, {}, consensusConfig, connectionPolicy);
+        const handler = new V1EpochProofProposalOperationHandler(state, {}, consensusConfig, connectionPolicy);
         const response = await signedConsensusResponse(wallet, ConsensusResultCode.PUBLIC_KEY_MISMATCH);
         let failureContext;
         state.once(CustomEventType.EPOCH_PROPOSAL_APPROVAL_FAILURE, context => { failureContext = context; });

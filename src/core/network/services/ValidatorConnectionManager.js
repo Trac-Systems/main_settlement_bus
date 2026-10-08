@@ -1,6 +1,6 @@
 import {EventType, ResultCode} from '../../../utils/constants.js';
 import {publicKeyToAddress} from "../../../utils/helpers.js";
-import { PeerConnectionManager, PeerConnectionManagerError } from '../../shared/PeerConnectionManager.js'
+import { PeerConnectionManager, PeerConnectionManagerError } from '../shared/PeerConnectionManager.js'
 import ValidatorHealthCheckService from './ValidatorHealthCheckService.js'
 /**
  * @typedef {import('hyperswarm').Connection} Connection

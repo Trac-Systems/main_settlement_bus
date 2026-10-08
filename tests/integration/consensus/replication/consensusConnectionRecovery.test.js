@@ -4,8 +4,8 @@ import Protomux from 'protomux';
 import c from 'compact-encoding';
 import b4a from 'b4a';
 import { ConsensusResultCode } from '../../../../src/utils/constants.js';
-import V1EpochProofProposalRequest from '../../../../src/core/consensus/v1/validators/V1EpochProofProposalRequest.js';
-import ProposalHandler from '../../../../src/core/consensus/v1/handlers/ConsesusEpochProofProposalOperationHandler.js';
+import V1EpochProofProposalRequest from '../../../../src/core/network/protocols/consensus/v1/validators/V1EpochProofProposalRequest.js';
+import ProposalHandler from '../../../../src/core/network/protocols/consensus/v1/handlers/V1EpochProofProposalOperationHandler.js';
 import { createConsensusNetwork, waitFor } from '../helpers/consensusNetwork.js';
 import { replicationProbe, assertEpochWithPeer } from '../helpers/connectionAssertions.js';
 
