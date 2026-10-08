@@ -14,7 +14,7 @@ const APPLY_TO_OBJECT_OPTIONS = Object.freeze({
 });
 
 const normalizeDecodedApplyOperation = operation => {
-    const payload = operation.tro || operation.rao || operation.bdo || operation.txo;
+    const payload = operation.tro || operation.rao || operation.bdo || operation.txo || operation.hlo;
     if (!payload) return operation;
 
     payload.va ??= null;
