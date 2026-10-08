@@ -268,6 +268,35 @@ test('validateDecodedCompletePayloadSchema throws VALIDATOR_RESPONSE_SCHEMA_INVA
     }
 });
 
+test('validateDecodedCompletePayloadSchema requires all HTLC lock validator metadata', t => {
+    const validator = createValidator();
+    const fields = ['va', 'vn', 'vs'];
+
+    for (let mask = 0; mask < 8; mask++) {
+        const operation = {
+            ...protobufFixtures.validHtlcLockOperation,
+            hlo: {...protobufFixtures.validHtlcLockOperation.hlo}
+        };
+        for (let index = 0; index < fields.length; index++) {
+            if (!(mask & (1 << index))) delete operation.hlo[fields[index]];
+        }
+
+        if (mask === 7) {
+            validator.validateDecodedCompletePayloadSchema(operation);
+            t.pass('a complete lock is accepted');
+            continue;
+        }
+
+        try {
+            validator.validateDecodedCompletePayloadSchema(operation);
+            t.fail(`expected metadata combination ${mask} to be rejected`);
+        } catch (error) {
+            t.ok(error instanceof V1ProtocolError);
+            t.is(error.resultCode, ResultCode.VALIDATOR_RESPONSE_SCHEMA_INVALID);
+        }
+    }
+});
+
 test('verifyProofOfPublication delegates verification to state instance', async t => {
     const proof = b4a.from('deadbeef', 'hex');
     const validator = createValidator({

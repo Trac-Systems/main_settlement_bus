@@ -1,6 +1,5 @@
 import test from 'brittle';
 import b4a from 'b4a';
-
 import applyOperationsGenerated from '../../../src/codecs/apply/applyOperations.generated.cjs';
 import consensusV1Generated from '../../../src/codecs/consensus/v1/consensusV1.generated.cjs';
 import {
@@ -47,9 +46,10 @@ const applyPayloads = new Map([
     ['disableInitialization', fixtures.validDisableInitialization],
     ['setEpoch', getValidSetEpochOperation()],
     ['htlcClaim', fixtures.validHtlcClaimOperation],
+    ['htlcLock', fixtures.validHtlcLockOperation],
 ]);
 
-const APPLY_PAYLOAD_KEYS = Object.freeze(['txo', 'tro', 'aco', 'cao', 'rao', 'bdo', 'bio', 'seo', 'hco']);
+const APPLY_PAYLOAD_KEYS = Object.freeze(['txo', 'tro', 'aco', 'cao', 'rao', 'bdo', 'bio', 'seo', 'hco', 'hlo']);
 
 const formatInvalidPayload = payload => {
     if (typeof payload === 'bigint') return `${payload}n`;

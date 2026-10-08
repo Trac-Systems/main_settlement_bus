@@ -60,6 +60,7 @@ export function bufferToAddress(dataBuffer, hrp) {
         const address = dataBuffer.toString('ascii');
         if (!b4a.equals(dataBuffer, b4a.from(address, 'ascii'))) return null;
         if (!isAddressValid(address, hrp)) return null;
+        if (!b4a.equals(addressToBuffer(address, hrp), dataBuffer)) return null;
         return address;
     } catch (error) {
         console.error('Error converting buffer to address:', error);

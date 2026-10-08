@@ -14,6 +14,7 @@ async function runCheckTests() {
     await import('./setGenesisEpochOperation.test.js')
     await import('./setConsensusConfigOperation.test.js')
     await import('./htlcClaimOperation.test.js')
+    await import('./htlcLockOperation.test.js')
 
     test.resume();
 }

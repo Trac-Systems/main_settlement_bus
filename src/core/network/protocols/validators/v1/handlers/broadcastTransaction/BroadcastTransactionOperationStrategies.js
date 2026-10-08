@@ -121,7 +121,8 @@ export function createBroadcastTransactionOperationStrategies({
                 'hlo',
                 partialHtlcValidator,
                 decodedOperation => createApplyStateMessageFactory().buildCompleteHtlcLockOperationMessage(
-                    decodedOperation.address
+                    decodedOperation.address,
+                    decodedOperation.hlo
                 )
             )
         ],
