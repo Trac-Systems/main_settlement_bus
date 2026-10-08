@@ -13,7 +13,8 @@ import { VDFServiceManager } from '../../../../src/core/consensus/services/VDFSe
 import { applyStateMessageFactory } from '../../../../src/messages/state/applyStateMessageFactory.js';
 import { encodeApplyOperation, encodeConsensusConfig } from '../../../../src/codecs/apply/applyOperationCodec.js';
 import { encodeVdfConfig } from '../../../../src/codecs/consensus/v1/vdfConfigCodec.js';
-import { uint8ToBuffer, uint16ToBuffer, uint32ToBuffer } from '../../../../src/utils/buffer.js';
+import { createMessage, uint8ToBuffer, uint16ToBuffer, uint32ToBuffer, uint64ToBuffer } from '../../../../src/utils/buffer.js';
+import { addressToBuffer } from '../../../../src/core/state/utils/address.js';
 import { Logger } from '../../../../src/utils/logger.js';
 import { sleep as delay } from '../../../../src/utils/helpers.js';
 
@@ -83,15 +84,23 @@ export async function createConsensusNetwork(t, { indexerCount = 5, prepareConne
     const directory = await t.tmp();
 
     async function waitForReplication(description, predicate) {
+        let acknowledger = 0;
         try {
             await waitFor(description, async () => {
                 if (errors.length) throw errors[0];
-                for (const node of nodes) {
-                    await node.state.refresh();
-                    // Drive real Autobase acknowledgements to make signed progress explicit.
-                    if (node.state.base.writable && node.state.isIndexer()) await node.state.append(null);
-                }
-                return predicate();
+                await Promise.all(nodes.map(node => node.state.refresh()));
+                if (await predicate()) return true;
+
+                // Let every node process the same heads before adding another ACK.
+                const heads = nodes.map(node => node.state.base.heads()
+                    .map(({ key, length }) => `${key.toString('hex')}:${length}`).sort().join(','));
+                if (!heads.every(value => value === heads[0])) return false;
+
+                const node = nodes[acknowledger];
+                acknowledger = (acknowledger + 1) % nodes.length;
+                // Include writers awaiting promotion; their first ACK completes Autobase membership.
+                if (node.state.base.writable) await node.state.append(null);
+                return false;
             });
         } catch (error) {
             const progress = nodes.map(node => ({
@@ -107,9 +116,15 @@ export async function createConsensusNetwork(t, { indexerCount = 5, prepareConne
     async function connect(a, b) {
         const left = a.store.replicate(true, { keyPair: a.wallet });
         const right = b.store.replicate(false, { keyPair: b.wallet });
-        left.on('error', recordError);
-        right.on('error', recordError);
-        links.push({ a, b, left, right });
+        const link = { a, b, left, right, disconnected: false };
+        function onError(error) {
+            // Abruptly destroying this test link can report a premature stream close.
+            if (link.disconnected && error.message === 'Readable stream closed before ending') return;
+            recordError(error);
+        }
+        left.on('error', onError);
+        right.on('error', onError);
+        links.push(link);
         left.pipe(right).pipe(left);
         await Promise.all([left.noiseStream.opened, right.noiseStream.opened]);
         if (!left.noiseStream.remotePublicKey.equals(b.wallet.publicKey) ||
@@ -119,10 +134,30 @@ export async function createConsensusNetwork(t, { indexerCount = 5, prepareConne
     }
 
     function connectionFrom(node, other) {
-        const link = links.find(link =>
+        const link = links.find(link => !link.disconnected && (
             (link.a === node && link.b === other) || (link.b === node && link.a === other)
-        );
+        ));
         return link.a === node ? link.left.noiseStream : link.right.noiseStream;
+    }
+
+    async function disconnect(a, b) {
+        const link = links.find(link => !link.disconnected && (
+            (link.a === a && link.b === b) || (link.b === a && link.a === b)
+        ));
+        if (!link) throw new Error('No active link to disconnect');
+        const closed = [link.left.noiseStream, link.right.noiseStream].map(stream =>
+            new Promise(resolve => stream.once('close', resolve))
+        );
+        link.disconnected = true;
+        link.left.destroy();
+        link.right.destroy();
+        await Promise.all(closed);
+    }
+
+    async function reconnect(a, b) {
+        await connect(a, b);
+        a.messages.prepareConnection(connectionFrom(a, b));
+        b.messages.prepareConnection(connectionFrom(b, a));
     }
 
     // Each scenario uses five nodes; some start as writers awaiting promotion.
@@ -247,6 +282,19 @@ export async function createConsensusNetwork(t, { indexerCount = 5, prepareConne
     // Other nodes can become proposers explicitly when a scenario needs another round.
     await openOperations(proposer);
 
+    async function createProofProposal(node = proposer) {
+        const epoch = await node.state.requireCurrentEpoch();
+        const hash = await node.state.requireEpoch(epoch);
+        const { configData: { difficulty, discriminantBitSize } } = await node.state.requireSignedConsensusConfig();
+        const challenge = createMessage(
+            uint16ToBuffer(node.config.networkId), uint64ToBuffer(epoch + 1n), hash,
+            addressToBuffer(node.wallet.address, node.config.addressPrefix),
+            uint32ToBuffer(difficulty), uint16ToBuffer(discriminantBitSize)
+        );
+        const proof = await node.operations.calculateVDF(challenge, difficulty, discriminantBitSize);
+        return node.operations.createProofProposal(epoch, hash, proof);
+    }
+
     function startRound(node = proposer, config = node.config) {
         const round = new EpochCoordinationRound({
             state: node.state,
@@ -264,5 +312,5 @@ export async function createConsensusNetwork(t, { indexerCount = 5, prepareConne
         return execution;
     }
 
-    return { nodes, proposer, addIndexer, appendAdmin, connectionFrom, startRound, openOperations, waitForReplication, deferred };
+    return { nodes, proposer, addIndexer, appendAdmin, connectionFrom, disconnect, reconnect, createProofProposal, startRound, openOperations, waitForReplication, deferred };
 }
