@@ -1,5 +1,6 @@
 import test from 'brittle';
 import sinon from 'sinon';
+import b4a from 'b4a';
 import { CustomEventType } from '../../../../../../src/utils/constants.js';
 import { uint64ToBuffer } from '../../../../../../src/utils/buffer.js';
 import { EPOCH_EVENTS, EPOCH_STATES } from '../../../../../../src/core/consensus/services/EpochStateMachine.js';
@@ -17,6 +18,7 @@ function makeMachine() {
         state: EPOCH_STATES.LOAD_EPOCH_CONTEXT,
         context: {
             currentEpoch: 5n,
+            currentEpochHash: b4a.alloc(32, 0xaa),
             next: sinon.stub().callsFake(() => trace.push('next')),
         },
         on(event, handler) {
@@ -76,8 +78,12 @@ function makeMachine() {
     return machine;
 }
 
+function proposalEvent(epoch = 6n, previousHash = b4a.alloc(32, 0xaa)) {
+    return { proofProposal: { epoch: uint64ToBuffer(epoch), previous_epoch_record_hash: previousHash } };
+}
+
 function setup(overrides = {}) {
-    const state = makeEmitter();
+    const state = overrides.state ?? makeEmitter();
     const machine = makeMachine();
     const wallet = { address: 'trac1wallet' };
     const config = { ...CONFIG, ...(overrides.config ?? {}) };
@@ -131,14 +137,65 @@ test('machine close cancels a pending signature timeout', async t => {
 test('remote proposal events update context only while the round is open', async t => {
     const { state, machine } = setup();
 
-    await state.emit(CustomEventType.EPOCH_PROPOSAL_VALIDATION_SUCCESS);
+    await state.emit(CustomEventType.EPOCH_PROPOSAL_VALIDATION_SUCCESS, proposalEvent());
     t.is(machine.context.remoteProposalReceived, true);
     t.ok(machine.appendContext.calledOnce);
 
     await machine.close();
-    await state.emit(CustomEventType.EPOCH_PROPOSAL_VALIDATION_SUCCESS);
+    await state.emit(CustomEventType.EPOCH_PROPOSAL_VALIDATION_SUCCESS, proposalEvent());
     t.ok(machine.appendContext.calledOnce);
 });
+
+for (const [name, event] of [
+    ['previous epoch', proposalEvent(5n)],
+    ['future epoch', proposalEvent(7n)],
+    ['different parent', proposalEvent(6n, b4a.alloc(32, 0xbb))],
+    ['missing payload', undefined],
+    ['missing proposal', {}],
+    ['invalid epoch buffer', { proofProposal: { epoch: b4a.alloc(7) } }],
+    ['missing parent hash', { proofProposal: { epoch: uint64ToBuffer(6n) } }],
+]) {
+    test(`validation success with ${name} does not affect the active round`, async t => {
+        const { state, machine } = setup();
+        t.teardown(() => machine.close());
+
+        await state.emit(CustomEventType.EPOCH_PROPOSAL_VALIDATION_SUCCESS, event);
+
+        t.absent(machine.context.remoteProposalReceived);
+        t.absent(machine.appendContext.called);
+        t.alike(machine.sentEvents, []);
+    });
+}
+
+test('validation success is ignored before the round has loaded its epoch context', async t => {
+    const { state, machine } = setup();
+    t.teardown(() => machine.close());
+    delete machine.context.currentEpoch;
+    delete machine.context.currentEpochHash;
+
+    await state.emit(CustomEventType.EPOCH_PROPOSAL_VALIDATION_SUCCESS, proposalEvent());
+
+    t.absent(machine.appendContext.called);
+});
+
+for (const sameEpoch of [false, true]) {
+    test(`late validation ${sameEpoch ? 'still applies to a retry of the same epoch' : 'cannot affect a round for the next epoch'}`, async t => {
+        const old = setup();
+        await old.machine.close();
+        const current = setup({ state: old.state });
+        t.teardown(() => current.machine.close());
+        if (!sameEpoch) {
+            current.machine.context.currentEpoch = 6n;
+            current.machine.context.currentEpochHash = b4a.alloc(32, 0xbb);
+        }
+
+        await old.state.emit(CustomEventType.EPOCH_PROPOSAL_VALIDATION_SUCCESS, proposalEvent());
+
+        t.absent(old.machine.appendContext.called, 'the closed round has no listener');
+        t.is(current.machine.context.remoteProposalReceived === true, sameEpoch);
+        t.is(old.state.listenerCount(CustomEventType.EPOCH_PROPOSAL_VALIDATION_SUCCESS), 1);
+    });
+}
 
 test('global EPOCH_CREATED closes a non-append state before scheduling the captured interval', async t => {
     const { state, machine } = setup({

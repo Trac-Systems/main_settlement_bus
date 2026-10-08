@@ -666,7 +666,9 @@ test('cancel interrupts the remote-proposal delay', async t => {
     const running = round.run();
     await drainMicrotasks();
 
-    await context.state.emit(CustomEventType.EPOCH_PROPOSAL_VALIDATION_SUCCESS);
+    await context.state.emit(CustomEventType.EPOCH_PROPOSAL_VALIDATION_SUCCESS, {
+        proofProposal: { epoch: uint64ToBuffer(6n), previous_epoch_record_hash: b4a.alloc(32, 0xaa) },
+    });
     proposal.resolve({ proof_proposal: { epoch: b4a.alloc(8) } });
     await drainMicrotasks();
     await round.cancel();

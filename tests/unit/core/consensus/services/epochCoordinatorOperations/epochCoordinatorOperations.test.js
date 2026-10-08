@@ -3,6 +3,7 @@ import sinon from 'sinon';
 import b4a from 'b4a';
 import { EpochCoordinatorOperations } from '../../../../../../src/core/consensus/services/EpochCoordinatorOperations.js';
 import { ConsensusResultCode } from '../../../../../../src/utils/constants.js';
+import { addressToBuffer } from '../../../../../../src/core/state/utils/address.js';
 
 const isBareRuntime = typeof globalThis.Bare !== 'undefined';
 // esmock depends on node:module - tests that mock module imports (via opsWithMocks) are Node-only.
@@ -51,6 +52,38 @@ const makeOps = (overrides = {}) =>
         overrides.wallet ?? { address: WALLET_ADDRESS },
         overrides.config ?? { ...CONFIG },
     );
+
+for (const preparation of ['proposal signing', 'writer lookup']) {
+    test(`collectSignature ignores old preparation after ${preparation} finishes in a new attempt`, async t => {
+        const address = addressToBuffer('trac1quszuupdwwk2h2mlfc5pdcgv8a78pdr30gcakyy7dw7xzasltwyspt524z', 'trac');
+        const state = makeState({ getRegisteredWriterKey: sinon.stub().resolves(address) });
+        const ops = makeOps({ state });
+        const createProposal = sinon.stub(ops, 'createProofProposal').resolves({ session_id: 'new' });
+        const entered = Promise.withResolvers();
+        const release = Promise.withResolvers();
+        const pendingStep = preparation === 'proposal signing' ? createProposal : state.getRegisteredWriterKey;
+        pendingStep.onFirstCall().callsFake(async () => {
+            entered.resolve();
+            await release.promise;
+            return preparation === 'proposal signing' ? { session_id: 'old' } : address;
+        });
+        const manager = makeConnectionManager();
+        const oldCollection = { closed: false };
+        const oldResult = ops.collectSignature({ key: b4a.alloc(32) }, {}, manager, oldCollection).catch(error => error);
+        await entered.promise;
+        oldCollection.closed = true;
+
+        const currentCollection = { closed: false };
+        const currentResult = await ops.collectSignature({ key: b4a.alloc(32) }, {}, manager, currentCollection);
+        release.resolve();
+
+        t.is((await oldResult).message, 'Epoch approval request was cancelled');
+        t.ok(manager.send.calledOnce, 'only the current attempt reaches the transport');
+        t.is(manager.send.firstCall.args[1].session_id, 'new');
+        t.alike(currentResult.approver, address);
+        t.absent(currentCollection.closed, 'old preparation cannot close the new collection');
+    });
+}
 
 const opsWithMocks = async (mocks = {}) => {
     const { default: esmock } = await import('esmock');

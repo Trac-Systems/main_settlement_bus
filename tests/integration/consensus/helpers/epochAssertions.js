@@ -7,12 +7,12 @@ import {
 import { bufferToAddress } from '../../../../src/core/state/utils/address.js';
 import { VDF_DIFFICULTY, VDF_DISCRIMINANT_BITS } from './consensusNetwork.js';
 
-export async function assertSignedEpoch(t, network) {
-    const { nodes, proposer } = network;
-    await network.waitForReplication('epoch 1 signed on all five nodes', async () =>
-        (await Promise.all(nodes.map(node => node.state.getCurrentEpoch()))).every(epoch => epoch === 1n)
+export async function assertSignedEpoch(t, network, { epoch = 1n, proposer = network.proposer } = {}) {
+    const { nodes } = network;
+    await network.waitForReplication(`epoch ${epoch} signed on all five nodes`, async () =>
+        (await Promise.all(nodes.map(node => node.state.getCurrentEpoch()))).every(current => current === epoch)
     );
-    const hashes = await Promise.all(nodes.map(node => node.state.getEpoch(1n)));
+    const hashes = await Promise.all(nodes.map(node => node.state.getEpoch(epoch)));
     t.ok(hashes.every(hash => hash.equals(hashes[0])), 'all nodes agree on the signed epoch hash');
     const proofs = await Promise.all(nodes.map((node, index) => node.state.getEpochProof(hashes[index])));
     t.ok(proofs.every(proof => proof.equals(proofs[0])), 'all nodes store the same signed epoch proof');
@@ -20,7 +20,7 @@ export async function assertSignedEpoch(t, network) {
     t.is(record.sv.readUInt8(0), ConsensusVersion.VDF_V1, 'the signed epoch uses the VDF V1 format');
     const proof = decodeEpochProofV1(record.data);
     const proposal = decodeProofProposal(proof.pd);
-    t.is(proposal.epoch.readBigUInt64BE(), 1n);
+    t.is(proposal.epoch.readBigUInt64BE(), epoch);
     t.is(proposal.difficulty.readUInt32BE(), VDF_DIFFICULTY);
     t.is(proposal.discriminant_bit_size.readUInt16BE(), VDF_DISCRIMINANT_BITS);
     t.is(proof.app.length, 2, 'five indexers require two external approvals plus the proposer');

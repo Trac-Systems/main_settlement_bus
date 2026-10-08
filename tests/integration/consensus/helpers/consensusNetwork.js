@@ -31,7 +31,7 @@ export async function waitFor(description, predicate) {
 }
 
 /** Real State/Autobase nodes over local Noise streams; only peer discovery is replaced. */
-export async function createConsensusNetwork(t, { indexerCount = 5 } = {}) {
+export async function createConsensusNetwork(t, { indexerCount = 5, prepareConnections = true } = {}) {
     const nodes = [];
     const links = [];
     const rounds = [];
@@ -237,22 +237,25 @@ export async function createConsensusNetwork(t, { indexerCount = 5 } = {}) {
         );
         await node.manager.ready();
         for (const other of nodes) {
-            if (other !== node) node.messages.prepareConnection(connectionFrom(node, other));
+            if (prepareConnections && other !== node) node.messages.prepareConnection(connectionFrom(node, other));
         }
     }
-    // One proposer computes the VDF; every other node runs the real protocol validators.
-    proposer.vdfManager = new VDFServiceManager(proposer.state, proposer.wallet, proposer.config);
-    proposer.operations = await proposer.vdfManager.open();
+    async function openOperations(node) {
+        node.vdfManager = new VDFServiceManager(node.state, node.wallet, node.config);
+        node.operations = await node.vdfManager.open();
+    }
+    // Other nodes can become proposers explicitly when a scenario needs another round.
+    await openOperations(proposer);
 
-    function startRound() {
+    function startRound(node = proposer, config = node.config) {
         const round = new EpochCoordinationRound({
-            state: proposer.state,
-            wallet: proposer.wallet,
-            config: proposer.config,
-            manager: proposer.manager,
-            logger: new Logger(proposer.config),
-            operations: proposer.operations,
-            intervalMs: proposer.config.epochInterval,
+            state: node.state,
+            wallet: node.wallet,
+            config,
+            manager: node.manager,
+            logger: new Logger(config),
+            operations: node.operations,
+            intervalMs: config.epochInterval,
         });
         const execution = { round, completed: false };
         rounds.push(execution);
@@ -261,5 +264,5 @@ export async function createConsensusNetwork(t, { indexerCount = 5 } = {}) {
         return execution;
     }
 
-    return { nodes, proposer, addIndexer, appendAdmin, connectionFrom, startRound, waitForReplication, deferred };
+    return { nodes, proposer, addIndexer, appendAdmin, connectionFrom, startRound, openOperations, waitForReplication, deferred };
 }
