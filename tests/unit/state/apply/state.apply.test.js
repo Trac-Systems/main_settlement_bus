@@ -21,6 +21,7 @@ async function runStateTests() {
     await import('./setGenesisEpoch/state.apply.setGenesisEpoch.test.js');
     await import('./setConsensusConfig/state.apply.setConsensusConfig.test.js');
     await import('./setEpoch/state.apply.setEpoch.test.js');
+    await import('./htlcLock/state.apply.htlcLock.test.js');
     test.resume();
 }
 
