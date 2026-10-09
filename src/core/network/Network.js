@@ -4,22 +4,22 @@ import w from 'protomux-wakeup';
 import b4a from 'b4a';
 import TransactionPoolService from './services/TransactionPoolService.js';
 import ValidatorObserverService from './services/ValidatorObserverService.js';
-import NetworkMessages from './protocols/NetworkMessages.js';
+import ValidatorMessages from './protocols/validators/ValidatorMessages.js';
 import { sleep } from '../../utils/helpers.js';
 import { TRAC_NAMESPACE, CONNECTION_STATUS } from '../../utils/constants.js';
 import ValidatorConnectionManager from './services/ValidatorConnectionManager.js';
-import MessageOrchestrator from './services/MessageOrchestrator.js';
+import ValidatorMessageOrchestrator from './services/ValidatorMessageOrchestrator.js';
 import TransactionRateLimiterService from './services/TransactionRateLimiterService.js';
-import ValidatorPendingRequestService from './services/ValidatorPendingRequestService.js';
+import ValidatorPendingRequestService from './protocols/validators/v1/ValidatorPendingRequestService.js';
 import TransactionCommitService from "./services/TransactionCommitService.js";
 import EpochCoordinatorService from '../consensus/services/EpochCoordinatorService.js';
-import IndexerConnectionManager from '../consensus/services/IndexerConnectionManager.js';
+import IndexerConnectionManager from './services/IndexerConnectionManager.js';
 import { Logger } from '../../utils/logger.js';
 import { WalletProvider } from 'trac-wallet';
 import { CustomEventType } from '../../utils/constants.js';
 import tracCryptoApi from 'trac-crypto-api'
-import ConsensusMessages from '../consensus/protocols/ConsensusMessages.js';
-import IndexerPendingRequestService from '../consensus/services/IndexerPendingRequestService.js';
+import IndexerMessages from './protocols/consensus/IndexerMessages.js';
+import IndexerPendingRequestService from './protocols/consensus/v1/IndexerPendingRequestService.js';
 
 const wakeup = new w();
 
@@ -40,8 +40,8 @@ class Network extends ReadyResource {
     #state;
     #store;
     #indexerPendingRequestService;
-    #networkMessages;
-    #consensusMessages;
+    #validatorMessages;
+    #indexerMessages;
     #indexerConnectionManager;
     #consensusPeerBanRequestedListener;
 
@@ -109,7 +109,7 @@ class Network extends ReadyResource {
         });
 
         this.#rateLimiter = new TransactionRateLimiterService(this.#swarm, this.#config);
-        this.#networkMessages = new NetworkMessages(
+        this.#validatorMessages = new ValidatorMessages(
             this.#state,
             this.#wallet,
             this.#rateLimiter,
@@ -119,12 +119,12 @@ class Network extends ReadyResource {
             this.#config
         );
 
-        this.#validatorConnectionManager = new ValidatorConnectionManager(this.#config.maxValidators, this.#config, this.#logger, this.#networkMessages);
+        this.#validatorConnectionManager = new ValidatorConnectionManager(this.#config.maxValidators, this.#config, this.#logger, this.#validatorMessages);
         await this.#validatorConnectionManager.ready();
 
-        this.#validatorMessageOrchestrator = new MessageOrchestrator(this.#validatorConnectionManager, this.#state, this.#config, this.#wallet);
+        this.#validatorMessageOrchestrator = new ValidatorMessageOrchestrator(this.#validatorConnectionManager, this.#state, this.#config, this.#wallet);
 
-        this.#consensusMessages = new ConsensusMessages(
+        this.#indexerMessages = new IndexerMessages(
             this.#state, this.#wallet, this.#config, this.#indexerPendingRequestService,
             this.#handleConsensusSessionClosed.bind(this)
         );
@@ -134,7 +134,7 @@ class Network extends ReadyResource {
             indexerCount,
             this.#config,
             this.#logger,
-            this.#consensusMessages,
+            this.#indexerMessages,
             this.#state,
             this,
             this.#wallet,
@@ -236,13 +236,13 @@ class Network extends ReadyResource {
              
              The current session is supposed to be attached as soon as possible (mostly to respond to probe since there is no connection ready signal on this level)
              Since the connection was started from the other side, this havent gone through "qualification" which happens on tryConnect.
-             Becuase of that, we need to assume the current connection is that of a validator (who responds to probe) and later override it if necessary.
+             Because of that, we need to assume the current connection is that of a validator (who responds to probe) and later override it if necessary.
              This is leaky for two reasons: first we need to keep a reference to messages and disclose the connection structure in this class.
              second is that the protocol itself doesnt fit the connection life-cycle (this is a bigger problem that also touched on DHT factory structure being "swallowed by swarm")
              */
             this.#prepareConnection(connection);
-            this.#networkMessages.prepareConnection(connection);
-            this.#consensusMessages.prepareConnection(connection);
+            this.#validatorMessages.prepareConnection(connection);
+            this.#indexerMessages.prepareConnection(connection);
         })
         this.#swarm.on('connection', async (connection) => {
             // Returning from the prepended listener does not stop this listener.

@@ -1,6 +1,6 @@
 import test from 'brittle';
 import sinon from 'sinon';
-import V1EpochProofProposalRequest from '../../../../src/core/consensus/v1/validators/V1EpochProofProposalRequest.js';
+import V1EpochProofProposalRequest from '../../../../src/core/network/protocols/consensus/v1/validators/V1EpochProofProposalRequest.js';
 import { EpochStateMachine } from '../../../../src/core/consensus/services/EpochStateMachine.js';
 import { CustomEventType } from '../../../../src/utils/constants.js';
 import { createConsensusNetwork, waitFor } from '../helpers/consensusNetwork.js';
