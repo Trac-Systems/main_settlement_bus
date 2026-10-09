@@ -4,22 +4,22 @@ import w from 'protomux-wakeup';
 import b4a from 'b4a';
 import TransactionPoolService from './services/TransactionPoolService.js';
 import ValidatorObserverService from './services/ValidatorObserverService.js';
-import NetworkMessages from './protocols/NetworkMessages.js';
+import ValidatorMessages from './protocols/validators/ValidatorMessages.js';
 import { sleep } from '../../utils/helpers.js';
 import { TRAC_NAMESPACE, CONNECTION_STATUS } from '../../utils/constants.js';
 import ValidatorConnectionManager from './services/ValidatorConnectionManager.js';
-import MessageOrchestrator from './services/MessageOrchestrator.js';
+import ValidatorMessageOrchestrator from './services/ValidatorMessageOrchestrator.js';
 import TransactionRateLimiterService from './services/TransactionRateLimiterService.js';
-import ValidatorPendingRequestService from './services/ValidatorPendingRequestService.js';
+import ValidatorPendingRequestService from './protocols/validators/v1/ValidatorPendingRequestService.js';
 import TransactionCommitService from "./services/TransactionCommitService.js";
 import EpochCoordinatorService from '../consensus/services/EpochCoordinatorService.js';
-import IndexerConnectionManager from '../consensus/services/IndexerConnectionManager.js';
+import IndexerConnectionManager from './services/IndexerConnectionManager.js';
 import { Logger } from '../../utils/logger.js';
 import { WalletProvider } from 'trac-wallet';
 import { CustomEventType } from '../../utils/constants.js';
 import tracCryptoApi from 'trac-crypto-api'
-import ConsensusMessages from '../consensus/protocols/ConsensusMessages.js';
-import IndexerPendingRequestService from '../consensus/services/IndexerPendingRequestService.js';
+import IndexerMessages from './protocols/consensus/IndexerMessages.js';
+import IndexerPendingRequestService from './protocols/consensus/v1/IndexerPendingRequestService.js';
 
 const wakeup = new w();
 
@@ -40,9 +40,10 @@ class Network extends ReadyResource {
     #state;
     #store;
     #indexerPendingRequestService;
-    #networkMessages;
-    #consensusMessages;
+    #validatorMessages;
+    #indexerMessages;
     #indexerConnectionManager;
+    #consensusPeerBanRequestedListener;
 
     /**
      * @param {State} state
@@ -64,6 +65,7 @@ class Network extends ReadyResource {
         this.#validatorPendingRequestService = new ValidatorPendingRequestService(this.#config);
         this.#indexerPendingRequestService = new IndexerPendingRequestService(this.#config);
         this.#logger = new Logger(this.#config);
+        this.#consensusPeerBanRequestedListener = this.#handleConsensusPeerBanRequested.bind(this);
     }
 
     get swarm() {
@@ -84,10 +86,6 @@ class Network extends ReadyResource {
 
     get validatorMessageOrchestrator() {
         return this.#validatorMessageOrchestrator;
-    }
-
-    get consensusMessages() {
-        return this.#consensusMessages;
     }
 
     get indexerConnectionManager() {
@@ -111,7 +109,7 @@ class Network extends ReadyResource {
         });
 
         this.#rateLimiter = new TransactionRateLimiterService(this.#swarm, this.#config);
-        this.#networkMessages = new NetworkMessages(
+        this.#validatorMessages = new ValidatorMessages(
             this.#state,
             this.#wallet,
             this.#rateLimiter,
@@ -121,19 +119,22 @@ class Network extends ReadyResource {
             this.#config
         );
 
-        this.#validatorConnectionManager = new ValidatorConnectionManager(this.#config.maxValidators, this.#config, this.#logger, this.#networkMessages);
+        this.#validatorConnectionManager = new ValidatorConnectionManager(this.#config.maxValidators, this.#config, this.#logger, this.#validatorMessages);
         await this.#validatorConnectionManager.ready();
 
-        this.#validatorMessageOrchestrator = new MessageOrchestrator(this.#validatorConnectionManager, this.#state, this.#config, this.#wallet);
+        this.#validatorMessageOrchestrator = new ValidatorMessageOrchestrator(this.#validatorConnectionManager, this.#state, this.#config, this.#wallet);
 
-        this.#consensusMessages = new ConsensusMessages(this.#state, this.#wallet, this.#config, this.#indexerPendingRequestService);
+        this.#indexerMessages = new IndexerMessages(
+            this.#state, this.#wallet, this.#config, this.#indexerPendingRequestService,
+            this.#handleConsensusSessionClosed.bind(this)
+        );
 
         const indexerCount = await this.#state.indexerCount();
         this.#indexerConnectionManager = new IndexerConnectionManager(
             indexerCount,
             this.#config,
             this.#logger,
-            this.#consensusMessages,
+            this.#indexerMessages,
             this.#state,
             this,
             this.#wallet,
@@ -159,6 +160,7 @@ class Network extends ReadyResource {
 
     async _close() {
         this.#logger.info('Network: closing gracefully...');
+        this.#state.off(CustomEventType.CONSENSUS_PEER_BAN_REQUESTED, this.#consensusPeerBanRequestedListener);
         await this.#epochCoordinatorService.close();
         await this.transactionPoolService.stop();
         await sleep(100);
@@ -173,6 +175,10 @@ class Network extends ReadyResource {
         await this.#swarm.destroy();
     }
 
+    #handleConsensusSessionClosed(connection) {
+        this.#indexerConnectionManager.remove(connection.remotePublicKey, connection);
+    }
+
     #prepareConnection(connection) {
         connection.protocolSessions = {};
         const stream = this.#store.replicate(connection);
@@ -180,6 +186,7 @@ class Network extends ReadyResource {
     }
 
     #listeners() {
+        this.#state.on(CustomEventType.CONSENSUS_PEER_BAN_REQUESTED, this.#consensusPeerBanRequestedListener);
         this.#state.on(CustomEventType.IS_INDEXER, async (publicKey) => {
             const publicKeyHex = this.#normalizePublicKey(publicKey);
             this.#validatorConnectionManager.remove(publicKeyHex);
@@ -218,20 +225,29 @@ class Network extends ReadyResource {
         });
 
         this.#swarm.prependListener('connection', async (connection) => {
+            // A handshake accepted before a ban can finish after the ban was applied.
+            if (this.#isPeerBanned(connection.remotePublicKey)) {
+                connection.destroy();
+                return;
+            }
+
             /*
              Here is the issue:
              
              The current session is supposed to be attached as soon as possible (mostly to respond to probe since there is no connection ready signal on this level)
              Since the connection was started from the other side, this havent gone through "qualification" which happens on tryConnect.
-             Becuase of that, we need to assume the current connection is that of a validator (who responds to probe) and later override it if necessary.
+             Because of that, we need to assume the current connection is that of a validator (who responds to probe) and later override it if necessary.
              This is leaky for two reasons: first we need to keep a reference to messages and disclose the connection structure in this class.
              second is that the protocol itself doesnt fit the connection life-cycle (this is a bigger problem that also touched on DHT factory structure being "swallowed by swarm")
              */
             this.#prepareConnection(connection);
-            this.#networkMessages.prepareConnection(connection);
-            this.#consensusMessages.prepareConnection(connection);
+            this.#validatorMessages.prepareConnection(connection);
+            this.#indexerMessages.prepareConnection(connection);
         })
         this.#swarm.on('connection', async (connection) => {
+            // Returning from the prepended listener does not stop this listener.
+            if (this.#isPeerBanned(connection.remotePublicKey)) return;
+
             const publicKey = b4a.toString(connection.remotePublicKey, 'hex');
             // This function will ignore connections that havent been triggered by the observer. In this case, the promotion will happen during tryConnect when the connection entity will be qualified.
             await this.#promotePendingConnection(publicKey, connection);
@@ -274,6 +290,42 @@ class Network extends ReadyResource {
         return this.#pendingConnections.size;
     }
 
+    /** Executes a ban requested by the consensus connection policy. */
+    #handleConsensusPeerBanRequested({ connection, error } = {}) {
+        if (this.closing !== null || this.closed) return;
+
+        const publicKey = this.#normalizePublicKey(connection?.remotePublicKey);
+        if (!publicKey) return;
+
+        // Hyperswarm retains the ban for this swarm's lifetime, but does not close the socket.
+        const peerInfo = this.#swarm.peers.get(publicKey);
+        peerInfo?.ban(true);
+        const connections = new Set([connection]);
+        for (const activeConnection of this.#swarm.connections) {
+            if (this.#normalizePublicKey(activeConnection.remotePublicKey) === publicKey) {
+                connections.add(activeConnection);
+            }
+        }
+        const pending = this.#pendingConnections.get(publicKey);
+        if (pending) {
+            clearTimeout(pending.timeoutId);
+            this.#pendingConnections.delete(publicKey);
+        }
+        try {
+            this.#rejectAllPendingRequests(publicKey, error);
+            this.#validatorConnectionManager.remove(publicKey);
+            this.#indexerConnectionManager.remove(publicKey);
+        } finally {
+            for (const activeConnection of connections) activeConnection.destroy();
+        }
+        this.#logger.info(`Network: ${peerInfo?.banned ? 'banned' : 'disconnected'} consensus peer ${publicKey}: ${error.message}`);
+    }
+
+    #isPeerBanned(publicKey) {
+        const key = this.#normalizePublicKey(publicKey);
+        return this.#swarm.peers.get(key)?.banned === true;
+    }
+
     disconnectValidatorPeer(publicKey, reason = 'validator peer invalidated') {
         const publicKeyHex = this.#normalizePublicKey(publicKey);
         if (!publicKeyHex) return false;
@@ -310,6 +362,7 @@ class Network extends ReadyResource {
 
     async tryConnect(publicKey, type) {
         if (!this.#swarm) throw new Error('Network swarm is not initialized');
+        if (this.#isPeerBanned(publicKey)) return CONNECTION_STATUS.IGNORED;
         if (this.#pendingConnections.has(publicKey) || this.#pendingConnections.size >= this.#config.maxPendingConnections) {
             this.#logger.debug(`Network.tryConnect: Connection to peer: ${publicKey} as type: ${type} is already pending or max pending connections reached.`);
             return CONNECTION_STATUS.IGNORED;
@@ -335,11 +388,16 @@ class Network extends ReadyResource {
         if (!peerInfo) return;
 
         const connection = this.#swarm._allConnections.get(peerInfo.publicKey);
-        if (!connection) return CONNECTION_STATUS.PENDING;
+        // _allConnections also contains transports whose handshake is still in progress.
+        if (!connection || !this.#swarm.connections.has(connection)) return CONNECTION_STATUS.PENDING;
 
         const isConnectionReady = (type === 'validator' && !this.#validatorPendingRequestService.isProbePending(connection.remotePublicKey.toString('hex'))) || type === 'indexer'
         if (isConnectionReady) {
             await this.#promotePendingConnection(publicKey, connection);
+            if (this.#isPeerBanned(publicKey)) return CONNECTION_STATUS.IGNORED;
+            if (type === 'indexer' && !this.#indexerConnectionManager.connected(publicKey)) {
+                return CONNECTION_STATUS.IGNORED;
+            }
             return CONNECTION_STATUS.CONNECTED;
         } 
         
@@ -356,6 +414,10 @@ class Network extends ReadyResource {
                 await this.#indexerConnectionManager.add(connection.remotePublicKey, connection);
             } else if (pending.type === 'validator') {
                 await this.#validatorConnectionManager.add(publicKey, connection);
+                // A pending probe may settle after its peer has been banned.
+                if (this.#isPeerBanned(publicKey)) {
+                    this.#validatorConnectionManager.remove(publicKey, connection);
+                }
             }
         }
     }

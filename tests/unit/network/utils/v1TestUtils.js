@@ -3,9 +3,9 @@ import sinon from 'sinon';
 import { config } from '../../../helpers/config.js';
 import { NetworkOperationType, V1_PROTOCOL_PAYLOAD_MAX_SIZE } from '../../../../src/utils/constants.js';
 import { encodeV1networkOperation } from '../../../../src/codecs/network/v1/networkV1OperationCodec.js';
-import NetworkMessageRouterV1 from '../../../../src/core/network/protocols/v1/NetworkMessageRouter.js';
-import V1LivenessOperationHandler from '../../../../src/core/network/protocols/v1/handlers/V1LivenessOperationHandler.js';
-import V1BroadcastTransactionOperationHandler from '../../../../src/core/network/protocols/v1/handlers/V1BroadcastTransactionOperationHandler.js';
+import ValidatorV1MessageRouter from '../../../../src/core/network/protocols/validators/v1/ValidatorV1MessageRouter.js';
+import V1LivenessOperationHandler from '../../../../src/core/network/protocols/validators/v1/handlers/V1LivenessOperationHandler.js';
+import V1BroadcastTransactionOperationHandler from '../../../../src/core/network/protocols/validators/v1/handlers/V1BroadcastTransactionOperationHandler.js';
 
 const resolveStub = (stubSource) => {
     if (typeof stubSource === 'function') {
@@ -45,7 +45,7 @@ export const makeRouter = (t, { walletAddress = 'test-wallet' } = {}) => {
     sandbox.stub(console, 'error');
 
     const handlerStubs = makeHandlers(sandbox);
-    const router = new NetworkMessageRouterV1(
+    const router = new ValidatorV1MessageRouter(
         {},
         { address: walletAddress },
         {},
