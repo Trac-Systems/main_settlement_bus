@@ -4,7 +4,7 @@ import { default as EventEmitter } from "bare-events"
 import { testKeyPair1, testKeyPair2, testKeyPair3, testKeyPair4, testKeyPair5, testKeyPair6, testKeyPair7, testKeyPair8 } from "../../../fixtures/apply.fixtures.js";
 import ValidatorConnectionManager from "../../../../src/core/network/services/ValidatorConnectionManager.js";
 import ValidatorHealthCheckService from "../../../../src/core/network/services/ValidatorHealthCheckService.js";
-import { PeerConnectionManagerError } from "../../../../src/core/shared/PeerConnectionManager.js";
+import { PeerConnectionManagerError } from "../../../../src/core/network/shared/PeerConnectionManager.js";
 import { tick } from "../../../helpers/setupApplyTests.js";
 import b4a from 'b4a'
 import { createConfig, ENV } from "../../../../src/config/env.js";

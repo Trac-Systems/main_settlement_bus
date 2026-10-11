@@ -3,7 +3,7 @@ import { test } from 'brittle';
 import b4a from 'b4a';
 
 import TransactionRateLimiterService from '../../../../src/core/network/services/TransactionRateLimiterService.js';
-import { V1ProtocolError } from '../../../../src/core/network/protocols/v1/V1ProtocolError.js';
+import { V1ProtocolError } from '../../../../src/core/network/protocols/validators/v1/V1ProtocolError.js';
 import { ResultCode } from '../../../../src/utils/constants.js';
 import { config } from '../../../helpers/config.js';
 import { testKeyPair1, testKeyPair2 } from '../../../fixtures/apply.fixtures.js';

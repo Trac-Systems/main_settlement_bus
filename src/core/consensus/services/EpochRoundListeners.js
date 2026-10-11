@@ -51,11 +51,19 @@ export class EpochRoundListeners {
         }
     }
 
-    /** Saves information about a valid remote proposal. */
+    /** Only a proposal for this round's epoch and parent can delay local coordination. */
     #listenForRemoteProposal() {
         this.#cleanups.push(
-            listenTo(this.#state, CustomEventType.EPOCH_PROPOSAL_VALIDATION_SUCCESS, () => {
+            listenTo(this.#state, CustomEventType.EPOCH_PROPOSAL_VALIDATION_SUCCESS, (event) => {
                 if (!this.#isRoundActive()) return;
+                const { currentEpoch, currentEpochHash } = this.#machine.context;
+                const { epoch, previous_epoch_record_hash: previousHash } = event?.proofProposal ?? {};
+                // Validation can finish after the round that received the proposal has ended.
+                if (typeof currentEpoch !== 'bigint') return;
+                if (!b4a.isBuffer(epoch) || epoch.length !== EPOCH_BYTE_LENGTH) return;
+                if (epoch.readBigUInt64BE(0) !== currentEpoch + 1n) return;
+                if (!b4a.isBuffer(currentEpochHash) || !b4a.isBuffer(previousHash)) return;
+                if (!b4a.equals(previousHash, currentEpochHash)) return;
                 this.#machine.appendContext({ remoteProposalReceived: true });
             }),
         );

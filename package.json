@@ -23,7 +23,10 @@
     "test:unit:bare": "brittle-bare -t 60000 tests/unit/unit.test.js",
     "test:unit:pear": "BRITTLE='-t 60000' brittle-pear tests/unit/unit.test.js",
     "test:unit:all": "(npm run test:unit:node && npm run test:unit:bare) || exit 1",
-    "test:unit:node:cov": "brittle-node -c -t 60000 tests/unit/unit.test.js"
+    "test:unit:node:cov": "brittle-node -c -t 60000 tests/unit/unit.test.js",
+    "test:integration:consensus:node": "brittle-node -t 180000 tests/integration/consensus/consensus.test.js",
+    "test:integration:consensus:bare": "brittle-bare -t 180000 tests/integration/consensus/consensus.test.js",
+    "test:integration:consensus": "npm run test:integration:consensus:node && npm run test:integration:consensus:bare"
   },
   "dependencies": {
     "@tracsystems/trac-vdf": "^0.0.2",

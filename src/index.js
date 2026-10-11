@@ -33,8 +33,8 @@ import {
     safeEncodeApplyOperation
 } from "./codecs/apply/applyOperationCodec.js";
 import { encodeVdfConfig } from "./codecs/consensus/v1/vdfConfigCodec.js";
-import PartialTransactionValidator from "./core/network/protocols/shared/validators/PartialTransactionValidator.js";
-import PartialTransferValidator from "./core/network/protocols/shared/validators/PartialTransferValidator.js";
+import PartialTransactionValidator from "./core/network/protocols/validators/shared/validators/PartialTransactionValidator.js";
+import PartialTransferValidator from "./core/network/protocols/validators/shared/validators/PartialTransferValidator.js";
 import { BroadcastError, ValidationError } from "./utils/errors.js";
 import { uint8ToBuffer, uint16ToBuffer, uint32ToBuffer } from "./utils/buffer.js";
 

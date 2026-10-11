@@ -9,6 +9,7 @@ async function runTests() {
     await import('./cli/commandHandler.test.js');
     await import('./utils/utils.test.js');
     await import('./messages/messages.test.js');
+    await import('./network/protocols/consensus/consensusModule.test.js');
     await import('./consensus/consensusModule.test.js');
     await import('./network/networkModule.test.js')
     await import('./state/stateModule.test.js');

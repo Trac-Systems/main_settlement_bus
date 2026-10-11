@@ -8,7 +8,7 @@ import {
     resultToValidatorAction,
     shouldEndConnection,
     SENDER_ACTION
-} from '../../src/core/network/protocols/connectionPolicies.js';
+} from '../../src/core/network/protocols/validators/v1/connectionPolicies.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

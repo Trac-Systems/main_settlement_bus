@@ -1,5 +1,5 @@
 import b4a from 'b4a';
-import {V1ProtocolError} from "../protocols/v1/V1ProtocolError.js";
+import {V1ProtocolError} from "../protocols/validators/v1/V1ProtocolError.js";
 import {ResultCode} from "../../../utils/constants.js";
 import {publicKeyToAddress} from "../../../utils/helpers.js";
 

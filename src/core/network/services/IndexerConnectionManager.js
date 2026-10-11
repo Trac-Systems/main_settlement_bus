@@ -1,0 +1,85 @@
+import tracCryptoApi from 'trac-crypto-api'
+import { PeerConnectionManager } from '../shared/PeerConnectionManager.js'
+import b4a from "b4a"
+import { bufferToAddress } from '../../state/utils/address.js'
+
+class IndexerConnectionManager extends PeerConnectionManager {
+    #messages
+    #state
+    #network
+    #wallet
+
+
+    constructor(maxIndexers, config, logger, messages, state, network, wallet) {
+        super(maxIndexers, config, logger);
+        this.#messages = messages;
+        this.#state = state;
+        this.#network = network;
+        this.#wallet = wallet;
+    }
+
+    async add(publicKey, connection) {
+        await this.#messages.attachChannel(connection);
+        if (connection.destroyed) return;
+        if (!connection.protocolSessions?.indexer || connection.protocolSessions.indexer.closed) return;
+        this._add(publicKey, connection)
+    }
+
+    async connect() {
+        const entries = await this.#state.getIndexersEntry();
+
+        for (const entry of entries) {
+            const writerKeyHex = b4a.toString(entry.key, 'hex');
+            const addressBuffer = await this.#state.getRegisteredWriterKey(writerKeyHex);
+            if (!addressBuffer) continue;
+
+            const addr = bufferToAddress(addressBuffer, this._config.addressPrefix);
+            if (!addr || addr === this.#wallet.address) continue;
+
+            const publicKey = tracCryptoApi.address.decode(addr);
+            const publicKeyHex = b4a.toString(publicKey, 'hex');
+
+            const isConnected = this.connected(publicKey);
+            const isPending = this.#network.isConnectionPending(publicKeyHex);
+            if (isConnected || isPending) continue;
+
+            await this.#network.tryConnect(publicKeyHex, "indexer");
+        }
+    }
+
+    remove(publicKey, connection = null) {
+        const key = this._toHexString(publicKey);
+        const entry = this._connections.get(key);
+        if (!entry) return;
+        if (connection && entry.connection !== connection) return;
+
+        const targetConnection = connection ?? entry.connection;
+        this._connections.delete(key);
+        targetConnection.protocolSessions.indexer?.close();
+    }
+
+    async send(publicKey, message) {
+        const connection = this.getConnection(publicKey);
+        if (!connection) {
+            throw new Error(`PeerConnectionManager: no session for ${this._toHexString(publicKey)}`);
+        }
+        if (!connection.connected) {
+            this.remove(publicKey, connection);
+            throw new Error(`PeerConnectionManager: stale connection for ${this._toHexString(publicKey)}`);
+        }
+        return connection.protocolSessions.indexer.send(message);
+    }
+
+    sendAndForget(publicKey, message) {
+        const connection = this.getConnection(publicKey);
+        if (!connection) return;
+        connection.protocolSessions.indexer.sendAndForget(message);
+    }
+
+    prettyPrint() {
+        console.log(`Connection count: ${this._connections.size}`);
+        console.log(`Indexer map keys:\n${Array.from(this._connections.keys()).join('\n')}`);
+    }
+}
+
+export default IndexerConnectionManager;
