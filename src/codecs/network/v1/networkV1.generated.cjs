@@ -1,11 +1,9 @@
 /*eslint-disable block-scoped-var, id-length, no-control-regex, no-magic-numbers, no-prototype-builtins, no-redeclare, no-shadow, no-var, sort-vars*/
 "use strict";
-if (typeof globalThis !== 'undefined' && typeof globalThis.self === 'undefined') {
-  globalThis.self = globalThis;
-}
 
+/** @typedef {ReturnType<typeof import("b4a").alloc>} B4aBuffer */
 
-var $protobuf = require("protobufjs/minimal");
+var $protobuf = require("../../protobufRuntime.cjs");
 
 // Common aliases
 var $Reader = $protobuf.Reader, $Writer = $protobuf.Writer, $util = $protobuf.util;
@@ -163,8 +161,7 @@ $root.network = (function() {
              * @returns {$protobuf.Writer} Writer
              */
             MessageHeader.encode = function encode(message, writer) {
-                if (!writer)
-                    writer = $Writer.create();
+                writer = $Writer.create(writer);
                 if (message.type != null && Object.hasOwnProperty.call(message, "type"))
                     writer.uint32(/* id 1, wireType 0 =*/8).int32(message.type);
                 if (message.id != null && Object.hasOwnProperty.call(message, "id"))
@@ -203,15 +200,14 @@ $root.network = (function() {
              * @function decode
              * @memberof network.v1.MessageHeader
              * @static
-             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
              * @param {number} [length] Message length if known beforehand
              * @returns {network.v1.MessageHeader} MessageHeader
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
             MessageHeader.decode = function decode(reader, length, error) {
-                if (!(reader instanceof $Reader))
-                    reader = $Reader.create(reader);
+                reader = $Reader.create(reader);
                 var end = length === undefined ? reader.len : reader.pos + length, message = new $root.network.v1.MessageHeader();
                 while (reader.pos < end) {
                     var tag = reader.uint32();
@@ -265,14 +261,13 @@ $root.network = (function() {
              * @function decodeDelimited
              * @memberof network.v1.MessageHeader
              * @static
-             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
              * @returns {network.v1.MessageHeader} MessageHeader
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
             MessageHeader.decodeDelimited = function decodeDelimited(reader) {
-                if (!(reader instanceof $Reader))
-                    reader = new $Reader(reader);
+                reader = $Reader.create(reader);
                 return this.decode(reader, reader.uint32());
             };
 
@@ -363,7 +358,7 @@ $root.network = (function() {
              */
             MessageHeader.fromObject = function fromObject(object) {
                 if (object instanceof $root.network.v1.MessageHeader)
-                    return object;
+                    object = Object.assign({}, object);
                 var message = new $root.network.v1.MessageHeader();
                 switch (object.type) {
                 default:
@@ -550,8 +545,8 @@ $root.network = (function() {
              * Properties of a LivenessRequest.
              * @memberof network.v1
              * @interface ILivenessRequest
-             * @property {Uint8Array|null} [nonce] LivenessRequest nonce
-             * @property {Uint8Array|null} [signature] LivenessRequest signature
+             * @property {B4aBuffer|null} [nonce] LivenessRequest nonce
+             * @property {B4aBuffer|null} [signature] LivenessRequest signature
              */
 
             /**
@@ -571,7 +566,7 @@ $root.network = (function() {
 
             /**
              * LivenessRequest nonce.
-             * @member {Uint8Array} nonce
+             * @member {B4aBuffer} nonce
              * @memberof network.v1.LivenessRequest
              * @instance
              */
@@ -579,7 +574,7 @@ $root.network = (function() {
 
             /**
              * LivenessRequest signature.
-             * @member {Uint8Array} signature
+             * @member {B4aBuffer} signature
              * @memberof network.v1.LivenessRequest
              * @instance
              */
@@ -607,8 +602,7 @@ $root.network = (function() {
              * @returns {$protobuf.Writer} Writer
              */
             LivenessRequest.encode = function encode(message, writer) {
-                if (!writer)
-                    writer = $Writer.create();
+                writer = $Writer.create(writer);
                 if (message.nonce != null && Object.hasOwnProperty.call(message, "nonce"))
                     writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.nonce);
                 if (message.signature != null && Object.hasOwnProperty.call(message, "signature"))
@@ -634,15 +628,14 @@ $root.network = (function() {
              * @function decode
              * @memberof network.v1.LivenessRequest
              * @static
-             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
              * @param {number} [length] Message length if known beforehand
              * @returns {network.v1.LivenessRequest} LivenessRequest
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
             LivenessRequest.decode = function decode(reader, length, error) {
-                if (!(reader instanceof $Reader))
-                    reader = $Reader.create(reader);
+                reader = $Reader.create(reader);
                 var end = length === undefined ? reader.len : reader.pos + length, message = new $root.network.v1.LivenessRequest();
                 while (reader.pos < end) {
                     var tag = reader.uint32();
@@ -650,11 +643,11 @@ $root.network = (function() {
                         break;
                     switch (tag >>> 3) {
                     case 1: {
-                            message.nonce = reader.bytes();
+                            message.nonce = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 2: {
-                            message.signature = reader.bytes();
+                            message.signature = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     default:
@@ -670,14 +663,13 @@ $root.network = (function() {
              * @function decodeDelimited
              * @memberof network.v1.LivenessRequest
              * @static
-             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
              * @returns {network.v1.LivenessRequest} LivenessRequest
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
             LivenessRequest.decodeDelimited = function decodeDelimited(reader) {
-                if (!(reader instanceof $Reader))
-                    reader = new $Reader(reader);
+                reader = $Reader.create(reader);
                 return this.decode(reader, reader.uint32());
             };
 
@@ -693,10 +685,10 @@ $root.network = (function() {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
                 if (message.nonce != null && message.hasOwnProperty("nonce"))
-                    if (!(message.nonce && typeof message.nonce.length === "number" || $util.isString(message.nonce)))
+                    if (!$util.isBytes(message.nonce))
                         return "nonce: buffer expected";
                 if (message.signature != null && message.hasOwnProperty("signature"))
-                    if (!(message.signature && typeof message.signature.length === "number" || $util.isString(message.signature)))
+                    if (!$util.isBytes(message.signature))
                         return "signature: buffer expected";
                 return null;
             };
@@ -711,18 +703,12 @@ $root.network = (function() {
              */
             LivenessRequest.fromObject = function fromObject(object) {
                 if (object instanceof $root.network.v1.LivenessRequest)
-                    return object;
+                    object = Object.assign({}, object);
                 var message = new $root.network.v1.LivenessRequest();
                 if (object.nonce != null)
-                    if (typeof object.nonce === "string")
-                        $util.base64.decode(object.nonce, message.nonce = $util.newBuffer($util.base64.length(object.nonce)), 0);
-                    else if (object.nonce.length >= 0)
-                        message.nonce = object.nonce;
+                    message.nonce = $util.bytesFrom(object.nonce);
                 if (object.signature != null)
-                    if (typeof object.signature === "string")
-                        $util.base64.decode(object.signature, message.signature = $util.newBuffer($util.base64.length(object.signature)), 0);
-                    else if (object.signature.length >= 0)
-                        message.signature = object.signature;
+                    message.signature = $util.bytesFrom(object.signature);
                 return message;
             };
 
@@ -756,9 +742,9 @@ $root.network = (function() {
                     }
                 }
                 if (message.nonce != null && message.hasOwnProperty("nonce"))
-                    object.nonce = options.bytes === String ? $util.base64.encode(message.nonce, 0, message.nonce.length) : options.bytes === Array ? Array.prototype.slice.call(message.nonce) : message.nonce;
+                    object.nonce = $util.bytesTo(message.nonce, options);
                 if (message.signature != null && message.hasOwnProperty("signature"))
-                    object.signature = options.bytes === String ? $util.base64.encode(message.signature, 0, message.signature.length) : options.bytes === Array ? Array.prototype.slice.call(message.signature) : message.signature;
+                    object.signature = $util.bytesTo(message.signature, options);
                 return object;
             };
 
@@ -797,8 +783,8 @@ $root.network = (function() {
              * Properties of a LivenessResponse.
              * @memberof network.v1
              * @interface ILivenessResponse
-             * @property {Uint8Array|null} [nonce] LivenessResponse nonce
-             * @property {Uint8Array|null} [signature] LivenessResponse signature
+             * @property {B4aBuffer|null} [nonce] LivenessResponse nonce
+             * @property {B4aBuffer|null} [signature] LivenessResponse signature
              * @property {common.v1.ResultCode|null} [result] LivenessResponse result
              */
 
@@ -819,7 +805,7 @@ $root.network = (function() {
 
             /**
              * LivenessResponse nonce.
-             * @member {Uint8Array} nonce
+             * @member {B4aBuffer} nonce
              * @memberof network.v1.LivenessResponse
              * @instance
              */
@@ -827,7 +813,7 @@ $root.network = (function() {
 
             /**
              * LivenessResponse signature.
-             * @member {Uint8Array} signature
+             * @member {B4aBuffer} signature
              * @memberof network.v1.LivenessResponse
              * @instance
              */
@@ -863,8 +849,7 @@ $root.network = (function() {
              * @returns {$protobuf.Writer} Writer
              */
             LivenessResponse.encode = function encode(message, writer) {
-                if (!writer)
-                    writer = $Writer.create();
+                writer = $Writer.create(writer);
                 if (message.nonce != null && Object.hasOwnProperty.call(message, "nonce"))
                     writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.nonce);
                 if (message.signature != null && Object.hasOwnProperty.call(message, "signature"))
@@ -892,15 +877,14 @@ $root.network = (function() {
              * @function decode
              * @memberof network.v1.LivenessResponse
              * @static
-             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
              * @param {number} [length] Message length if known beforehand
              * @returns {network.v1.LivenessResponse} LivenessResponse
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
             LivenessResponse.decode = function decode(reader, length, error) {
-                if (!(reader instanceof $Reader))
-                    reader = $Reader.create(reader);
+                reader = $Reader.create(reader);
                 var end = length === undefined ? reader.len : reader.pos + length, message = new $root.network.v1.LivenessResponse();
                 while (reader.pos < end) {
                     var tag = reader.uint32();
@@ -908,11 +892,11 @@ $root.network = (function() {
                         break;
                     switch (tag >>> 3) {
                     case 1: {
-                            message.nonce = reader.bytes();
+                            message.nonce = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 2: {
-                            message.signature = reader.bytes();
+                            message.signature = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 3: {
@@ -932,14 +916,13 @@ $root.network = (function() {
              * @function decodeDelimited
              * @memberof network.v1.LivenessResponse
              * @static
-             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
              * @returns {network.v1.LivenessResponse} LivenessResponse
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
             LivenessResponse.decodeDelimited = function decodeDelimited(reader) {
-                if (!(reader instanceof $Reader))
-                    reader = new $Reader(reader);
+                reader = $Reader.create(reader);
                 return this.decode(reader, reader.uint32());
             };
 
@@ -955,10 +938,10 @@ $root.network = (function() {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
                 if (message.nonce != null && message.hasOwnProperty("nonce"))
-                    if (!(message.nonce && typeof message.nonce.length === "number" || $util.isString(message.nonce)))
+                    if (!$util.isBytes(message.nonce))
                         return "nonce: buffer expected";
                 if (message.signature != null && message.hasOwnProperty("signature"))
-                    if (!(message.signature && typeof message.signature.length === "number" || $util.isString(message.signature)))
+                    if (!$util.isBytes(message.signature))
                         return "signature: buffer expected";
                 if (message.result != null && message.hasOwnProperty("result"))
                     switch (message.result) {
@@ -1056,18 +1039,12 @@ $root.network = (function() {
              */
             LivenessResponse.fromObject = function fromObject(object) {
                 if (object instanceof $root.network.v1.LivenessResponse)
-                    return object;
+                    object = Object.assign({}, object);
                 var message = new $root.network.v1.LivenessResponse();
                 if (object.nonce != null)
-                    if (typeof object.nonce === "string")
-                        $util.base64.decode(object.nonce, message.nonce = $util.newBuffer($util.base64.length(object.nonce)), 0);
-                    else if (object.nonce.length >= 0)
-                        message.nonce = object.nonce;
+                    message.nonce = $util.bytesFrom(object.nonce);
                 if (object.signature != null)
-                    if (typeof object.signature === "string")
-                        $util.base64.decode(object.signature, message.signature = $util.newBuffer($util.base64.length(object.signature)), 0);
-                    else if (object.signature.length >= 0)
-                        message.signature = object.signature;
+                    message.signature = $util.bytesFrom(object.signature);
                 switch (object.result) {
                 default:
                     if (typeof object.result === "number") {
@@ -1418,9 +1395,9 @@ $root.network = (function() {
                     object.result = options.enums === String ? "RESULT_CODE_UNSPECIFIED" : 0;
                 }
                 if (message.nonce != null && message.hasOwnProperty("nonce"))
-                    object.nonce = options.bytes === String ? $util.base64.encode(message.nonce, 0, message.nonce.length) : options.bytes === Array ? Array.prototype.slice.call(message.nonce) : message.nonce;
+                    object.nonce = $util.bytesTo(message.nonce, options);
                 if (message.signature != null && message.hasOwnProperty("signature"))
-                    object.signature = options.bytes === String ? $util.base64.encode(message.signature, 0, message.signature.length) : options.bytes === Array ? Array.prototype.slice.call(message.signature) : message.signature;
+                    object.signature = $util.bytesTo(message.signature, options);
                 if (message.result != null && message.hasOwnProperty("result"))
                     object.result = options.enums === String ? $root.common.v1.ResultCode[message.result] === undefined ? message.result : $root.common.v1.ResultCode[message.result] : message.result;
                 return object;
@@ -1461,9 +1438,9 @@ $root.network = (function() {
              * Properties of a BroadcastTransactionRequest.
              * @memberof network.v1
              * @interface IBroadcastTransactionRequest
-             * @property {Uint8Array|null} [data] BroadcastTransactionRequest data
-             * @property {Uint8Array|null} [nonce] BroadcastTransactionRequest nonce
-             * @property {Uint8Array|null} [signature] BroadcastTransactionRequest signature
+             * @property {B4aBuffer|null} [data] BroadcastTransactionRequest data
+             * @property {B4aBuffer|null} [nonce] BroadcastTransactionRequest nonce
+             * @property {B4aBuffer|null} [signature] BroadcastTransactionRequest signature
              */
 
             /**
@@ -1483,7 +1460,7 @@ $root.network = (function() {
 
             /**
              * BroadcastTransactionRequest data.
-             * @member {Uint8Array} data
+             * @member {B4aBuffer} data
              * @memberof network.v1.BroadcastTransactionRequest
              * @instance
              */
@@ -1491,7 +1468,7 @@ $root.network = (function() {
 
             /**
              * BroadcastTransactionRequest nonce.
-             * @member {Uint8Array} nonce
+             * @member {B4aBuffer} nonce
              * @memberof network.v1.BroadcastTransactionRequest
              * @instance
              */
@@ -1499,7 +1476,7 @@ $root.network = (function() {
 
             /**
              * BroadcastTransactionRequest signature.
-             * @member {Uint8Array} signature
+             * @member {B4aBuffer} signature
              * @memberof network.v1.BroadcastTransactionRequest
              * @instance
              */
@@ -1527,8 +1504,7 @@ $root.network = (function() {
              * @returns {$protobuf.Writer} Writer
              */
             BroadcastTransactionRequest.encode = function encode(message, writer) {
-                if (!writer)
-                    writer = $Writer.create();
+                writer = $Writer.create(writer);
                 if (message.data != null && Object.hasOwnProperty.call(message, "data"))
                     writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.data);
                 if (message.nonce != null && Object.hasOwnProperty.call(message, "nonce"))
@@ -1556,15 +1532,14 @@ $root.network = (function() {
              * @function decode
              * @memberof network.v1.BroadcastTransactionRequest
              * @static
-             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
              * @param {number} [length] Message length if known beforehand
              * @returns {network.v1.BroadcastTransactionRequest} BroadcastTransactionRequest
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
             BroadcastTransactionRequest.decode = function decode(reader, length, error) {
-                if (!(reader instanceof $Reader))
-                    reader = $Reader.create(reader);
+                reader = $Reader.create(reader);
                 var end = length === undefined ? reader.len : reader.pos + length, message = new $root.network.v1.BroadcastTransactionRequest();
                 while (reader.pos < end) {
                     var tag = reader.uint32();
@@ -1572,15 +1547,15 @@ $root.network = (function() {
                         break;
                     switch (tag >>> 3) {
                     case 1: {
-                            message.data = reader.bytes();
+                            message.data = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 2: {
-                            message.nonce = reader.bytes();
+                            message.nonce = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 3: {
-                            message.signature = reader.bytes();
+                            message.signature = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     default:
@@ -1596,14 +1571,13 @@ $root.network = (function() {
              * @function decodeDelimited
              * @memberof network.v1.BroadcastTransactionRequest
              * @static
-             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
              * @returns {network.v1.BroadcastTransactionRequest} BroadcastTransactionRequest
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
             BroadcastTransactionRequest.decodeDelimited = function decodeDelimited(reader) {
-                if (!(reader instanceof $Reader))
-                    reader = new $Reader(reader);
+                reader = $Reader.create(reader);
                 return this.decode(reader, reader.uint32());
             };
 
@@ -1619,13 +1593,13 @@ $root.network = (function() {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
                 if (message.data != null && message.hasOwnProperty("data"))
-                    if (!(message.data && typeof message.data.length === "number" || $util.isString(message.data)))
+                    if (!$util.isBytes(message.data))
                         return "data: buffer expected";
                 if (message.nonce != null && message.hasOwnProperty("nonce"))
-                    if (!(message.nonce && typeof message.nonce.length === "number" || $util.isString(message.nonce)))
+                    if (!$util.isBytes(message.nonce))
                         return "nonce: buffer expected";
                 if (message.signature != null && message.hasOwnProperty("signature"))
-                    if (!(message.signature && typeof message.signature.length === "number" || $util.isString(message.signature)))
+                    if (!$util.isBytes(message.signature))
                         return "signature: buffer expected";
                 return null;
             };
@@ -1640,23 +1614,14 @@ $root.network = (function() {
              */
             BroadcastTransactionRequest.fromObject = function fromObject(object) {
                 if (object instanceof $root.network.v1.BroadcastTransactionRequest)
-                    return object;
+                    object = Object.assign({}, object);
                 var message = new $root.network.v1.BroadcastTransactionRequest();
                 if (object.data != null)
-                    if (typeof object.data === "string")
-                        $util.base64.decode(object.data, message.data = $util.newBuffer($util.base64.length(object.data)), 0);
-                    else if (object.data.length >= 0)
-                        message.data = object.data;
+                    message.data = $util.bytesFrom(object.data);
                 if (object.nonce != null)
-                    if (typeof object.nonce === "string")
-                        $util.base64.decode(object.nonce, message.nonce = $util.newBuffer($util.base64.length(object.nonce)), 0);
-                    else if (object.nonce.length >= 0)
-                        message.nonce = object.nonce;
+                    message.nonce = $util.bytesFrom(object.nonce);
                 if (object.signature != null)
-                    if (typeof object.signature === "string")
-                        $util.base64.decode(object.signature, message.signature = $util.newBuffer($util.base64.length(object.signature)), 0);
-                    else if (object.signature.length >= 0)
-                        message.signature = object.signature;
+                    message.signature = $util.bytesFrom(object.signature);
                 return message;
             };
 
@@ -1697,11 +1662,11 @@ $root.network = (function() {
                     }
                 }
                 if (message.data != null && message.hasOwnProperty("data"))
-                    object.data = options.bytes === String ? $util.base64.encode(message.data, 0, message.data.length) : options.bytes === Array ? Array.prototype.slice.call(message.data) : message.data;
+                    object.data = $util.bytesTo(message.data, options);
                 if (message.nonce != null && message.hasOwnProperty("nonce"))
-                    object.nonce = options.bytes === String ? $util.base64.encode(message.nonce, 0, message.nonce.length) : options.bytes === Array ? Array.prototype.slice.call(message.nonce) : message.nonce;
+                    object.nonce = $util.bytesTo(message.nonce, options);
                 if (message.signature != null && message.hasOwnProperty("signature"))
-                    object.signature = options.bytes === String ? $util.base64.encode(message.signature, 0, message.signature.length) : options.bytes === Array ? Array.prototype.slice.call(message.signature) : message.signature;
+                    object.signature = $util.bytesTo(message.signature, options);
                 return object;
             };
 
@@ -1740,9 +1705,9 @@ $root.network = (function() {
              * Properties of a BroadcastTransactionResponse.
              * @memberof network.v1
              * @interface IBroadcastTransactionResponse
-             * @property {Uint8Array|null} [nonce] BroadcastTransactionResponse nonce
-             * @property {Uint8Array|null} [signature] BroadcastTransactionResponse signature
-             * @property {Uint8Array|null} [proof] BroadcastTransactionResponse proof
+             * @property {B4aBuffer|null} [nonce] BroadcastTransactionResponse nonce
+             * @property {B4aBuffer|null} [signature] BroadcastTransactionResponse signature
+             * @property {B4aBuffer|null} [proof] BroadcastTransactionResponse proof
              * @property {number|Long|null} [timestamp] BroadcastTransactionResponse timestamp
              * @property {common.v1.ResultCode|null} [result] BroadcastTransactionResponse result
              */
@@ -1764,7 +1729,7 @@ $root.network = (function() {
 
             /**
              * BroadcastTransactionResponse nonce.
-             * @member {Uint8Array} nonce
+             * @member {B4aBuffer} nonce
              * @memberof network.v1.BroadcastTransactionResponse
              * @instance
              */
@@ -1772,7 +1737,7 @@ $root.network = (function() {
 
             /**
              * BroadcastTransactionResponse signature.
-             * @member {Uint8Array} signature
+             * @member {B4aBuffer} signature
              * @memberof network.v1.BroadcastTransactionResponse
              * @instance
              */
@@ -1780,7 +1745,7 @@ $root.network = (function() {
 
             /**
              * BroadcastTransactionResponse proof.
-             * @member {Uint8Array} proof
+             * @member {B4aBuffer} proof
              * @memberof network.v1.BroadcastTransactionResponse
              * @instance
              */
@@ -1824,8 +1789,7 @@ $root.network = (function() {
              * @returns {$protobuf.Writer} Writer
              */
             BroadcastTransactionResponse.encode = function encode(message, writer) {
-                if (!writer)
-                    writer = $Writer.create();
+                writer = $Writer.create(writer);
                 if (message.nonce != null && Object.hasOwnProperty.call(message, "nonce"))
                     writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.nonce);
                 if (message.signature != null && Object.hasOwnProperty.call(message, "signature"))
@@ -1857,15 +1821,14 @@ $root.network = (function() {
              * @function decode
              * @memberof network.v1.BroadcastTransactionResponse
              * @static
-             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
              * @param {number} [length] Message length if known beforehand
              * @returns {network.v1.BroadcastTransactionResponse} BroadcastTransactionResponse
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
             BroadcastTransactionResponse.decode = function decode(reader, length, error) {
-                if (!(reader instanceof $Reader))
-                    reader = $Reader.create(reader);
+                reader = $Reader.create(reader);
                 var end = length === undefined ? reader.len : reader.pos + length, message = new $root.network.v1.BroadcastTransactionResponse();
                 while (reader.pos < end) {
                     var tag = reader.uint32();
@@ -1873,15 +1836,15 @@ $root.network = (function() {
                         break;
                     switch (tag >>> 3) {
                     case 1: {
-                            message.nonce = reader.bytes();
+                            message.nonce = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 2: {
-                            message.signature = reader.bytes();
+                            message.signature = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 3: {
-                            message.proof = reader.bytes();
+                            message.proof = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 4: {
@@ -1905,14 +1868,13 @@ $root.network = (function() {
              * @function decodeDelimited
              * @memberof network.v1.BroadcastTransactionResponse
              * @static
-             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
              * @returns {network.v1.BroadcastTransactionResponse} BroadcastTransactionResponse
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
             BroadcastTransactionResponse.decodeDelimited = function decodeDelimited(reader) {
-                if (!(reader instanceof $Reader))
-                    reader = new $Reader(reader);
+                reader = $Reader.create(reader);
                 return this.decode(reader, reader.uint32());
             };
 
@@ -1928,13 +1890,13 @@ $root.network = (function() {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
                 if (message.nonce != null && message.hasOwnProperty("nonce"))
-                    if (!(message.nonce && typeof message.nonce.length === "number" || $util.isString(message.nonce)))
+                    if (!$util.isBytes(message.nonce))
                         return "nonce: buffer expected";
                 if (message.signature != null && message.hasOwnProperty("signature"))
-                    if (!(message.signature && typeof message.signature.length === "number" || $util.isString(message.signature)))
+                    if (!$util.isBytes(message.signature))
                         return "signature: buffer expected";
                 if (message.proof != null && message.hasOwnProperty("proof"))
-                    if (!(message.proof && typeof message.proof.length === "number" || $util.isString(message.proof)))
+                    if (!$util.isBytes(message.proof))
                         return "proof: buffer expected";
                 if (message.timestamp != null && message.hasOwnProperty("timestamp"))
                     if (!$util.isInteger(message.timestamp) && !(message.timestamp && $util.isInteger(message.timestamp.low) && $util.isInteger(message.timestamp.high)))
@@ -2035,23 +1997,14 @@ $root.network = (function() {
              */
             BroadcastTransactionResponse.fromObject = function fromObject(object) {
                 if (object instanceof $root.network.v1.BroadcastTransactionResponse)
-                    return object;
+                    object = Object.assign({}, object);
                 var message = new $root.network.v1.BroadcastTransactionResponse();
                 if (object.nonce != null)
-                    if (typeof object.nonce === "string")
-                        $util.base64.decode(object.nonce, message.nonce = $util.newBuffer($util.base64.length(object.nonce)), 0);
-                    else if (object.nonce.length >= 0)
-                        message.nonce = object.nonce;
+                    message.nonce = $util.bytesFrom(object.nonce);
                 if (object.signature != null)
-                    if (typeof object.signature === "string")
-                        $util.base64.decode(object.signature, message.signature = $util.newBuffer($util.base64.length(object.signature)), 0);
-                    else if (object.signature.length >= 0)
-                        message.signature = object.signature;
+                    message.signature = $util.bytesFrom(object.signature);
                 if (object.proof != null)
-                    if (typeof object.proof === "string")
-                        $util.base64.decode(object.proof, message.proof = $util.newBuffer($util.base64.length(object.proof)), 0);
-                    else if (object.proof.length >= 0)
-                        message.proof = object.proof;
+                    message.proof = $util.bytesFrom(object.proof);
                 if (object.timestamp != null)
                     if ($util.Long)
                         (message.timestamp = $util.Long.fromValue(object.timestamp)).unsigned = true;
@@ -2423,11 +2376,11 @@ $root.network = (function() {
                     object.result = options.enums === String ? "RESULT_CODE_UNSPECIFIED" : 0;
                 }
                 if (message.nonce != null && message.hasOwnProperty("nonce"))
-                    object.nonce = options.bytes === String ? $util.base64.encode(message.nonce, 0, message.nonce.length) : options.bytes === Array ? Array.prototype.slice.call(message.nonce) : message.nonce;
+                    object.nonce = $util.bytesTo(message.nonce, options);
                 if (message.signature != null && message.hasOwnProperty("signature"))
-                    object.signature = options.bytes === String ? $util.base64.encode(message.signature, 0, message.signature.length) : options.bytes === Array ? Array.prototype.slice.call(message.signature) : message.signature;
+                    object.signature = $util.bytesTo(message.signature, options);
                 if (message.proof != null && message.hasOwnProperty("proof"))
-                    object.proof = options.bytes === String ? $util.base64.encode(message.proof, 0, message.proof.length) : options.bytes === Array ? Array.prototype.slice.call(message.proof) : message.proof;
+                    object.proof = $util.bytesTo(message.proof, options);
                 if (message.timestamp != null && message.hasOwnProperty("timestamp"))
                     if (typeof message.timestamp === "number")
                         object.timestamp = options.longs === String ? String(message.timestamp) : message.timestamp;

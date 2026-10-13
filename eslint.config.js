@@ -102,4 +102,13 @@ export default [
             },
         },
     },
+    {
+        files: ["src/codecs/**/*.js"],
+        rules: {
+            "no-restricted-globals": ["error",
+                { name: "Buffer", message: "Use b4a for codec binary handling." },
+                { name: "Uint8Array", message: "Use b4a for codec binary handling." },
+            ],
+        },
+    },
 ];

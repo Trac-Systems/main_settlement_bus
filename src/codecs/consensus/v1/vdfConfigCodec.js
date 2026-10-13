@@ -49,8 +49,8 @@ export const decodeVdfConfig = (encoded) => {
     }
 
     return {
-        difficulty: encoded.subarray(0, VDF_DIFFICULTY_SIZE),
-        discriminantBitSize: encoded.subarray(VDF_DIFFICULTY_SIZE)
+        difficulty: b4a.toBuffer(encoded.subarray(0, VDF_DIFFICULTY_SIZE)),
+        discriminantBitSize: b4a.toBuffer(encoded.subarray(VDF_DIFFICULTY_SIZE))
     };
 }
 
