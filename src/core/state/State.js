@@ -215,6 +215,11 @@ class State extends ReadyResource {
         return _.isNil(currentEpoch) ? null : currentEpoch.readBigUInt64BE(0);
     }
 
+    async getCurrentEpochUnsigned() {
+        const currentEpoch = await this.get(EntryType.EPOCH_CURRENT);
+        return isBufferValid(currentEpoch, EPOCH_BYTE_LENGTH) ? currentEpoch.readBigUInt64BE(0) : null;
+    }
+
     /**
      * Reads the required current epoch id from signed state.
      *
@@ -834,17 +839,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         }
 
-        let isLockerSignatureValid = false;
-        try {
-            isLockerSignatureValid = tracCryptoApi.signature.verify(
-                op.hlo.is,
-                regeneratedTxHash,
-                lockerPublicKey
-            );
-        } catch {
-            isLockerSignatureValid = false;
-        }
-        if (!isLockerSignatureValid) {
+        if (!tracCryptoApi.signature.verify(op.hlo.is, regeneratedTxHash, lockerPublicKey)) {
             this.#safeLogApply(OperationType.HTLC_LOCK, "Failed to verify locker signature.", node.from.key);
             return Status.FAILURE;
         }
@@ -890,17 +885,7 @@ class State extends ReadyResource {
         }
 
         const validatorMessageHash = await tracCryptoApi.hash.blake3Safe(validatorMessage);
-        let isValidatorSignatureValid = false;
-        try {
-            isValidatorSignatureValid = tracCryptoApi.signature.verify(
-                op.hlo.vs,
-                validatorMessageHash,
-                validatorPublicKey
-            );
-        } catch {
-            isValidatorSignatureValid = false;
-        }
-        if (!isValidatorSignatureValid) {
+        if (!tracCryptoApi.signature.verify(op.hlo.vs, validatorMessageHash, validatorPublicKey)) {
             this.#safeLogApply(OperationType.HTLC_LOCK, "Failed to verify validator signature.", node.from.key);
             return Status.FAILURE;
         }

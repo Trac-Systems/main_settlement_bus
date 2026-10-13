@@ -28,6 +28,27 @@ import {
     encodeProofProposalApproval,
     encodeProofProposal
 } from '../../../codecs/consensus/v1/consensusV1OperationCodec.js';
+
+function boundedHtlcBufferArray(min, max, length) {
+    return {
+        type: 'custom',
+        required: true,
+        check(value, errors, _schema, field) {
+            if (!Array.isArray(value) || value.length < min || value.length > max) {
+                errors.push({type: 'array', field, message: `Expected ${min} to ${max} entries`});
+                return value;
+            }
+            for (let index = 0; index < value.length; index++) {
+                const item = value[index];
+                if (!b4a.isBuffer(item) || item.length !== length || item.every(byte => byte === 0)) {
+                    errors.push({type: 'buffer', field: `${field}[${index}]`, message: `Expected a non-zero ${length}-byte buffer`});
+                }
+            }
+            return value;
+        }
+    };
+}
+
 class StateValidationSchema {
     #validator;
     #validateCoreAdminOperationSchema;
@@ -754,21 +775,9 @@ class StateValidationSchema {
                     hl: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
                     re: {type: 'buffer', length: EPOCH_BYTE_LENGTH, required: true},
                     ph: {type: 'buffer', length: HASH_BYTE_LENGTH, optional: true},
-                    ss: {
-                        type: 'array',
-                        min: 1,
-                        max: HTLC_MAX_SIGNERS,
-                        required: true,
-                        items: {type: 'buffer', length: PUBLIC_KEY_LENGTH}
-                    },
+                    ss: boundedHtlcBufferArray(1, HTLC_MAX_SIGNERS, PUBLIC_KEY_LENGTH),
                     th: {type: 'buffer', length: HTLC_THRESHOLD_BYTE_LENGTH, required: true},
-                    cs: {
-                        type: 'array',
-                        min: 0,
-                        max: HTLC_MAX_SIGNERS - 1,
-                        required: true,
-                        items: {type: 'buffer', length: SIGNATURE_BYTE_LENGTH}
-                    },
+                    cs: boundedHtlcBufferArray(0, HTLC_MAX_SIGNERS - 1, SIGNATURE_BYTE_LENGTH),
                     in: {type: 'buffer', length: NONCE_BYTE_LENGTH, required: true},
                     is: {type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true},
                     va: {type: 'buffer', length: this.#config.addressLength, optional: true},
@@ -798,7 +807,7 @@ class StateValidationSchema {
                         }
                     }
 
-                    if (Array.isArray(ss)) {
+                    if (Array.isArray(ss) && ss.length <= HTLC_MAX_SIGNERS) {
                         const uniqueSignerKeys = new Set();
                         for (let index = 0; index < ss.length; index++) {
                             const signer = ss[index];
@@ -880,14 +889,6 @@ class StateValidationSchema {
     }
 
     validateHtlcLockOperation(op) {
-        const {ss, cs} = op?.hlo ?? {};
-        // Bound arrays before the compiled validator visits their entries.
-        if (
-            !Array.isArray(ss) || ss.length < 1 || ss.length > HTLC_MAX_SIGNERS ||
-            !Array.isArray(cs) || cs.length > HTLC_MAX_SIGNERS - 1
-        ) {
-            return false;
-        }
         return this.#validateHtlcLockOperationSchema(op) === true;
     }
 

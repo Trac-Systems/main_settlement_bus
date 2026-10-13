@@ -57,9 +57,12 @@ function hasValidSettlementFields({
         isBufferValid(additionalFeeAmount, BALANCE_BYTE_LENGTH) &&
         isRequiredBuffer(hashLock, HASH_BYTE_LENGTH) &&
         isRequiredBuffer(refundEpoch, EPOCH_BYTE_LENGTH);
-    const feeFieldsAreValid = feeIsZero
-        ? additionalFeeRecipientAddress === undefined
-        : isSettlementAddress(additionalFeeRecipientAddress, hrp);
+    let feeFieldsAreValid;
+    if (feeIsZero) {
+        feeFieldsAreValid = additionalFeeRecipientAddress === undefined;
+    } else {
+        feeFieldsAreValid = isSettlementAddress(additionalFeeRecipientAddress, hrp);
+    }
     const policyHashIsValid = policyHash === undefined || isRequiredBuffer(policyHash, HASH_BYTE_LENGTH);
 
     return requiredFieldsAreValid && feeFieldsAreValid && policyHashIsValid &&
