@@ -62,8 +62,10 @@ function hasValidSettlementFields({
         : isSettlementAddress(additionalFeeRecipientAddress, hrp);
     const policyHashIsValid = policyHash === undefined || isRequiredBuffer(policyHash, HASH_BYTE_LENGTH);
 
-    return requiredFieldsAreValid && feeFieldsAreValid && policyHashIsValid &&
-        Boolean(toBalance(amount).add(toBalance(additionalFeeAmount)));
+    if (!requiredFieldsAreValid || !feeFieldsAreValid || !policyHashIsValid) return false;
+
+    const totalLockedAmount = toBalance(amount).add(toBalance(additionalFeeAmount));
+    return totalLockedAmount !== null;
 }
 
 /**

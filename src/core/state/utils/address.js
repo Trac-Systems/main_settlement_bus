@@ -13,7 +13,7 @@ import _ from 'lodash'
  */
 export function isAddressValid(address, hrp) {
     if (b4a.isBuffer(address)) {
-        return bufferToAddress(address, hrp) !== null;
+        address = address.toString('ascii');
     }
 
     const res = _.attempt(() => 
@@ -52,11 +52,8 @@ export function addressToBuffer(bech32mAddress, hrp) {
 // TODO: Do we really need to try-catch here? Maybe we should only validate the input buffer.
 export function bufferToAddress(dataBuffer, hrp) {
     try {
-        // ASCII decoding masks high bits; reject lossy encodings before conversion.
-        if (!b4a.isBuffer(dataBuffer) || dataBuffer.some(byte => byte > 0x7f)) return null;
-        const address = b4a.toString(dataBuffer, 'ascii');
+        const address = dataBuffer.toString('ascii');
         if (!isAddressValid(address, hrp)) return null;
-        if (!b4a.equals(addressToBuffer(address, hrp), dataBuffer)) return null;
         return address;
     } catch (error) {
         console.error('Error converting buffer to address:', error);
