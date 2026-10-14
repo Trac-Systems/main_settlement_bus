@@ -11,6 +11,7 @@ import {
     NONCE_BYTE_LENGTH,
     OperationType,
     PUBLIC_KEY_LENGTH,
+    UINT32_MAX,
 } from './constants.js';
 
 const EMPTY_HASH = b4a.alloc(HASH_BYTE_LENGTH);
@@ -26,7 +27,7 @@ function requireBuffer(value, length, field, allowZero = false) {
  * Signatures and validator completion fields are intentionally excluded.
  */
 export function createHtlcLockSigningMessage(networkId, locker, operation) {
-    if (!Number.isInteger(networkId) || networkId < 1 || networkId > 0xFFFFFFFF) {
+    if (!Number.isInteger(networkId) || networkId < 1 || networkId > UINT32_MAX) {
         throw new Error('HTLC network id must be an unsigned non-zero 32-bit integer.');
     }
     if (!operation || !Array.isArray(operation.ss)) {
@@ -104,15 +105,7 @@ export function verifyOrderedHtlcCosignerSignatures(signatures, transactionHash,
     for (const signature of signatures) {
         let matched = false;
         while (signerIndex < signerSet.length) {
-            try {
-                matched = tracCryptoApi.signature.verify(
-                    signature,
-                    transactionHash,
-                    signerSet[signerIndex]
-                );
-            } catch {
-                matched = false;
-            }
+            matched = tracCryptoApi.signature.verify(signature, transactionHash, signerSet[signerIndex]);
             signerIndex++;
             if (matched) break;
         }

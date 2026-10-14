@@ -3,10 +3,12 @@ import tracCryptoApi from 'trac-crypto-api';
 
 import PartialOperationValidator from './PartialOperationValidator.js';
 import {bufferToAddress} from '../../../../../state/utils/address.js';
+import {BALANCE_FEE, PERCENT_75} from '../../../../../state/utils/balance.js';
 import {bufferToBigInt} from '../../../../../../utils/amountSerialization.js';
 import {isZeroBuffer} from '../../../../../../utils/buffer.js';
 import {
     HTLC_MIN_LOCK_DURATION_EPOCHS,
+    EntryType,
     OperationType,
     PUBLIC_KEY_LENGTH,
     ResultCode
@@ -16,10 +18,12 @@ import {V1ProtocolError} from '../../v1/V1ProtocolError.js';
 
 class PartialHtlcValidator extends PartialOperationValidator {
     #config;
+    #selfAddress;
 
     constructor(state, selfAddress, config) {
         super(state, selfAddress, config);
         this.#config = config;
+        this.#selfAddress = selfAddress;
     }
 
     async validate(payload) {
@@ -34,6 +38,7 @@ class PartialHtlcValidator extends PartialOperationValidator {
         this.validateNoSelfValidation(payload);
         this.validateRequesterAddress(payload);
         await this.validateTransactionUniqueness(payload);
+        await this.#validateEscrowUniqueness(payload.hlo.tx);
         await this.validateSignature(payload);
         await this.validateTransactionValidity(payload);
         this.isOperationNotCompleted(payload);
@@ -42,8 +47,16 @@ class PartialHtlcValidator extends PartialOperationValidator {
         this.#validateLockAuthorizations(payload);
         await this.#validateRefundEpoch(payload.hlo);
         await this.#validateLockerBalance(payload);
+        await this.#validateValidatorRewardBalance();
 
         return true;
+    }
+
+    async #validateEscrowUniqueness(lockId) {
+        const escrowKey = EntryType.HTLC_ESCROW + b4a.toString(lockId, 'hex');
+        if (await this.state.get(escrowKey) !== null) {
+            throw new V1ProtocolError(ResultCode.TX_ALREADY_EXISTS, 'HTLC escrow already exists.');
+        }
     }
 
     #validateSettlementAddresses(operation) {
@@ -87,14 +100,18 @@ class PartialHtlcValidator extends PartialOperationValidator {
     }
 
     async #validateRefundEpoch(operation) {
-        const currentEpoch = await this.state.getCurrentEpoch();
-        if (typeof currentEpoch !== 'bigint') {
+        const [signedEpoch, unsignedEpoch] = await Promise.all([
+            this.state.getCurrentEpoch(),
+            this.state.getCurrentEpochUnsigned()
+        ]);
+        if (typeof signedEpoch !== 'bigint' || typeof unsignedEpoch !== 'bigint') {
             throw new V1ProtocolError(
                 ResultCode.TX_INVALID_PAYLOAD,
                 'HTLC locks require an initialized network epoch.'
             );
         }
 
+        const currentEpoch = signedEpoch > unsignedEpoch ? signedEpoch : unsignedEpoch;
         const refundEpoch = b4a.from(operation.re).readBigUInt64BE(0);
         if (refundEpoch < currentEpoch + HTLC_MIN_LOCK_DURATION_EPOCHS) {
             throw new V1ProtocolError(
@@ -125,6 +142,19 @@ class PartialHtlcValidator extends PartialOperationValidator {
             throw new V1ProtocolError(
                 ResultCode.TRANSFER_INSUFFICIENT_BALANCE,
                 'Insufficient balance for HTLC principal, surcharge fee, and network fee.'
+            );
+        }
+    }
+
+    async #validateValidatorRewardBalance() {
+        const validatorEntry = await this.state.getNodeEntryUnsigned(this.#selfAddress);
+        if (!validatorEntry) return;
+
+        const reward = BALANCE_FEE.percentage(PERCENT_75);
+        if (bufferToBigInt(validatorEntry.balance) + bufferToBigInt(reward.value) > this.max_amount) {
+            throw new V1ProtocolError(
+                ResultCode.TRANSFER_RECIPIENT_BALANCE_OVERFLOW,
+                'HTLC validator reward would overflow the validator balance.'
             );
         }
     }
