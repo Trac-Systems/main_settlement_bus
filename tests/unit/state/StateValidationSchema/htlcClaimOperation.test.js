@@ -1,4 +1,5 @@
 import test from 'brittle';
+import b4a from 'b4a';
 
 import StateValidationSchema from '../../../../src/core/state/validators/StateValidationSchema.js';
 import { HCO, not_allowed_data_types } from '../../../fixtures/check.fixtures.js';
@@ -19,6 +20,32 @@ test('validateHtlcClaimOperation - happy path', t => {
         validateHtlcClaimOperation(HCO.valid_htlc_claim_operation),
         'Valid HTLC claim operation should pass validation'
     );
+});
+
+test('validateHtlcClaimOperation accepts partial and complete claims but not partial validator metadata', t => {
+    const partial = HCO.valid_htlc_claim_operation;
+    t.ok(validateHtlcClaimOperation(partial));
+
+    const complete = {
+        ...partial,
+        hco: {
+            ...partial.hco,
+            va: partial.address,
+            vn: partial.hco.in,
+            vs: partial.hco.is
+        }
+    };
+    t.ok(validateHtlcClaimOperation(complete));
+
+    for (const field of ['va', 'vn', 'vs']) {
+        const incomplete = {...complete, hco: {...complete.hco}};
+        delete incomplete.hco[field];
+        t.absent(validateHtlcClaimOperation(incomplete), `${field} is required when validator metadata is present`);
+    }
+    const invalidLength = {...complete, hco: {...complete.hco, vn: b4a.alloc(1)}};
+    t.absent(validateHtlcClaimOperation(invalidLength));
+    const nullMetadata = {...partial, hco: {...partial.hco, va: null, vn: null, vs: null}};
+    t.absent(validateHtlcClaimOperation(nullMetadata));
 });
 
 test('validateHtlcClaimOperation - top level validation', t => {

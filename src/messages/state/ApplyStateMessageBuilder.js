@@ -701,30 +701,27 @@ class ApplyStateMessageBuilder {
             };
         }
 
-        if (this.#operationType === OperationType.HTLC_CLAIM) {
-            this.#requireFields([
-                [this.#txHash, 'Transaction hash'],
-                [this.#txValidity, 'Transaction validity'],
-                [this.#htlcLockId, 'HTLC lock ID'],
-                [this.#htlcPreimage, 'HTLC preimage'],
-                [this.#incomingNonce, 'Incoming nonce'],
-                [this.#incomingSignature, 'Incoming signature']
-            ]);
-            return {
-                tx: this.#txHash,
-                txv: this.#txValidity,
-                li: this.#htlcLockId,
-                pi: this.#htlcPreimage,
-                in: this.#incomingNonce,
-                is: this.#incomingSignature
-            };
-        }
-
         const nonce = tracCryptoApi.nonce.generate();
         let msg;
         let htlcLockFields;
 
         switch (this.#operationType) {
+            case OperationType.HTLC_CLAIM:
+                this.#requireFields([
+                    [this.#txHash, 'Transaction hash'],
+                    [this.#txValidity, 'Transaction validity'],
+                    [this.#htlcLockId, 'HTLC lock ID'],
+                    [this.#htlcPreimage, 'HTLC preimage'],
+                    [this.#incomingNonce, 'Incoming nonce'],
+                    [this.#incomingSignature, 'Incoming signature']
+                ]);
+                msg = createMessage(
+                    this.#config.networkId,
+                    this.#txHash,
+                    nonce,
+                    this.#operationType
+                );
+                break;
             case OperationType.HTLC_LOCK:
                 this.#requireFields([
                     [this.#txHash, 'Transaction hash'],
@@ -956,6 +953,19 @@ class ApplyStateMessageBuilder {
                 txv: this.#txValidity,
                 to: this.#incomingAddress,
                 am: this.#amount,
+                in: this.#incomingNonce,
+                is: this.#incomingSignature,
+                va: validatorAddress,
+                vn: nonce,
+                vs: signature
+            };
+        }
+        if (this.#operationType === OperationType.HTLC_CLAIM) {
+            return {
+                tx: this.#txHash,
+                txv: this.#txValidity,
+                li: this.#htlcLockId,
+                pi: this.#htlcPreimage,
                 in: this.#incomingNonce,
                 is: this.#incomingSignature,
                 va: validatorAddress,
