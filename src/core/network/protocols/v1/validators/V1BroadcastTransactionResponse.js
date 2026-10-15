@@ -94,6 +94,10 @@ class V1BroadcastTransactionResponse extends V1BaseOperation {
                 isValid = this.#stateValidationSchema.validateHtlcLockOperation(validatorDecodedTx) &&
                     [...VALIDATOR_METADATA_FIELDS].every(field => b4a.isBuffer(validatorDecodedTx.hlo[field]));
                 break;
+            case OperationType.HTLC_CLAIM:
+                isValid = this.#stateValidationSchema.validateHtlcClaimOperation(validatorDecodedTx) &&
+                    [...VALIDATOR_METADATA_FIELDS].every(field => b4a.isBuffer(validatorDecodedTx.hco?.[field]));
+                break;
             case OperationType.ADD_WRITER:
             case OperationType.REMOVE_WRITER:
             case OperationType.ADMIN_RECOVERY:
@@ -172,12 +176,12 @@ class V1BroadcastTransactionResponse extends V1BaseOperation {
     }
 
     async validateValidatorCorrectness(validatorDecodedTx, connectionRemotePublicKey, writerKeyFromManifest, validatorAddressCorrelatedWithManifest) {
-        const validatorAddressFromTx = extractRequiredVaFromDecodedTx(validatorDecodedTx);
         const validatorAddressFromConnectionPublicKey = addressToBuffer(
             publicKeyToAddress(connectionRemotePublicKey, this.#config),
             this.#config.addressPrefix
         );
 
+        const validatorAddressFromTx = extractRequiredVaFromDecodedTx(validatorDecodedTx);
         if (!b4a.equals(validatorAddressFromTx, validatorAddressFromConnectionPublicKey)) {
             throw new V1ProtocolError(
                 ResultCode.VALIDATOR_ADDRESS_MISMATCH,

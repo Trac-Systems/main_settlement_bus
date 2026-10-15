@@ -8,6 +8,7 @@ import { OperationType } from '../../../../src/utils/constants.js';
 import {
     normalizeBootstrapDeploymentOperation,
     normalizeDecodedPayloadForJson,
+    normalizeHtlcClaimOperation,
     normalizeHtlcLockOperation,
     normalizeMessageByOperationType,
     normalizeRoleAccessOperation,
@@ -480,6 +481,34 @@ test('normalizeHtlcLockOperation normalizes hex strings and addresses', t => {
     t.ok(b4a.equals(normalized.hlo.cs[0], toBuffer(hex('bb', 64))));
     t.ok(b4a.equals(normalized.hlo.in, toBuffer(hex('cc', 32))));
     t.ok(b4a.equals(normalized.hlo.is, toBuffer(hex('dd', 64))));
+});
+
+test('normalizeHtlcClaimOperation prepares a signed claim for V1 broadcast', t => {
+    const submitter = randomAddress(config.addressPrefix);
+    const payload = {
+        type: OperationType.HTLC_CLAIM,
+        address: submitter,
+        hco: {
+            tx: hex('11', 32),
+            txv: hex('22', 32),
+            li: hex('33', 32),
+            pi: hex('44', 32),
+            in: hex('55', 32),
+            is: hex('66', 64)
+        }
+    };
+
+    const normalized = normalizeMessageByOperationType(payload, config);
+    t.alike(normalized, normalizeHtlcClaimOperation(payload, config));
+    t.ok(b4a.equals(normalized.address, addressToBuffer(submitter, config.addressPrefix)));
+    for (const [field, value] of Object.entries(payload.hco)) {
+        t.ok(b4a.equals(normalized.hco[field], toBuffer(value)), `${field} is preserved`);
+    }
+
+    t.exception(
+        () => normalizeHtlcClaimOperation({...payload, hco: {...payload.hco, pi: undefined}}, config),
+        errorMessageIncludes('Missing required fields')
+    );
 });
 
 test('normalizeDecodedPayloadForJson converts buffers to strings', t => {

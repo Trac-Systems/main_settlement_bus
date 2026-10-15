@@ -1,5 +1,7 @@
 import test from 'brittle';
 import b4a from 'b4a';
+import {safeDecodeApplyOperation, safeEncodeApplyOperation} from '../../../../../src/codecs/apply/applyOperationCodec.js';
+import {sanitizeDecodedPartialTransaction} from '../../../../../src/core/network/protocols/v1/handlers/broadcastTransaction/BroadcastTransactionPayloadUtils.js';
 
 import {
     createBroadcastTransactionOperationStrategies,
@@ -7,10 +9,7 @@ import {
 } from '../../../../../src/core/network/protocols/v1/handlers/broadcastTransaction/BroadcastTransactionOperationStrategies.js';
 import {OperationType, ResultCode} from '../../../../../src/utils/constants.js';
 import {V1ProtocolError} from '../../../../../src/core/network/protocols/v1/V1ProtocolError.js';
-import PartialHtlcValidator from '../../../../../src/core/network/protocols/shared/validators/PartialHtlcValidator.js';
 import applyOperationFixtures from '../../../../fixtures/applyOperation.fixtures.js';
-import {config} from '../../../../helpers/config.js';
-import {createState, expectSharedValidatorError} from '../../utils/sharedValidatorTestUtils.js';
 
 const VALID_ADDR = 'trac123z3gfpr2epjwww7ntm3m6ud2fhmq0tvts27p2f5mx3qkecsutlqfys769';
 const VALID_TO_ADDR = 'trac1mqktwme8fvklrds4hlhfy6lhmsu9qgfn3c3kuhz7c5zwjt8rc3dqj9tx7h';
@@ -20,6 +19,17 @@ const basePayload = () => ({
     txv: b4a.alloc(32),
     in: b4a.alloc(32),
     is: b4a.alloc(64)
+});
+
+test('decoded partial HTLC claims have only submitter fields after broadcast sanitization', t => {
+    const encoded = safeEncodeApplyOperation(applyOperationFixtures.validHtlcClaimOperation);
+    const decoded = safeDecodeApplyOperation(encoded);
+    t.ok(encoded.length > 0);
+    for (const field of ['va', 'vn', 'vs']) t.is(decoded.hco[field], null);
+
+    sanitizeDecodedPartialTransaction(decoded);
+
+    for (const field of ['va', 'vn', 'vs']) t.absent(Object.hasOwn(decoded.hco, field));
 });
 
 function createFakeValidator(name, calls) {
@@ -294,24 +304,4 @@ test('HTLC refund strategy validates and forwards the complete signed refund', a
         decodedOperation.hro.in,
         decodedOperation.hro.is
     ]);
-});
-
-test('unfinished HTLC operations are rejected before broadcast completion', async t => {
-    const factory = createFakeFactory();
-    const strategies = createBroadcastTransactionOperationStrategies({
-        partialHtlcValidator: new PartialHtlcValidator(createState(), undefined, config),
-        createApplyStateMessageFactory: () => factory.createApplyStateMessageFactory()
-    });
-
-    for (const type of [OperationType.HTLC_CLAIM, OperationType.HTLC_REFUND]) {
-        const strategy = resolveBroadcastTransactionOperationStrategy(type, strategies);
-        await expectSharedValidatorError(
-            t,
-            () => strategy.build({...applyOperationFixtures.validHtlcClaimOperation, type}),
-            ResultCode.OPERATION_TYPE_UNKNOWN,
-            'validation is not implemented'
-        );
-    }
-
-    t.is(factory.calls.length, 0, 'no complete transaction is built for an unfinished operation');
 });
