@@ -73,7 +73,7 @@ const withConsoleLogMuted = fn => {
 }
 
 const normalizeDecodedApplyOperation = operation => {
-    const payload = operation.tro || operation.rao || operation.bdo || operation.txo;
+    const payload = operation.tro || operation.rao || operation.bdo || operation.txo || operation.hco;
     if (!payload) return operation;
 
     payload.va ??= null;

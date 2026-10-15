@@ -302,7 +302,10 @@ const validHtlcClaimOperation = {
         li: b4a.from('37d945281373acf4a3c214228ea6bd5a9865b6d8329224870eda8f9d54431b3b', 'hex'),
         pi: b4a.from('24ef8d04c91f8c745b336d12a80929c4863b9a4e6b54fc093bd5849019510adc', 'hex'),
         in: b4a.from('a36760285dcfb6f61ae6bef42b743b73df2d0043aae5e9b08bb4e5cb53fd6764', 'hex'),
-        is: b4a.from('b4215709fee946172b186563b6d3315db71195f1269d4070cc721b8a1bfe824dcc8921fa2ed1c0275526a8edd2752ad3d3be6948a2ee944078694044ca75026b', 'hex')
+        is: b4a.from('b4215709fee946172b186563b6d3315db71195f1269d4070cc721b8a1bfe824dcc8921fa2ed1c0275526a8edd2752ad3d3be6948a2ee944078694044ca75026b', 'hex'),
+        va: null,
+        vn: null,
+        vs: null
     }
 };
 

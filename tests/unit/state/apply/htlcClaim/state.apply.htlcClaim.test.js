@@ -28,13 +28,14 @@ import {
 
 async function buildClaimPayload(context, lockPayload, {
     wallet = context.htlcLockScenario.validatorPeer.wallet,
+    validatorWallet = context.htlcLockScenario.validatorPeer.wallet,
     preimage = DEFAULT_PREIMAGE,
 } = {}) {
     const lockId = decodeHtlcLockPayload(lockPayload).hlo.tx;
     const txValidity = await deriveIndexerSequenceState(context.htlcLockScenario.validatorPeer.base);
     const partial = await applyStateMessageFactory(wallet, config)
         .buildPartialHtlcClaimOperationMessage(wallet.address, txValidity, lockId, preimage);
-    const complete = await applyStateMessageFactory(wallet, config)
+    const complete = await applyStateMessageFactory(validatorWallet, config)
         .buildCompleteHtlcClaimOperationMessage(
             partial.address,
             partial.hco.tx,
@@ -139,6 +140,42 @@ test('State.apply HTLC_CLAIM rejects an invalid submitter signature', async t =>
 
     t.is((await readLockState(validatorPeer.base, lockPayload)).escrow.status, escrowEntryUtils.Status.PENDING);
     t.is(await readClaimRecord(validatorPeer.base, invalidPayload), null, 'invalid signature is not recorded');
+});
+
+test('State.apply HTLC_CLAIM rejects missing and invalid validator metadata', async t => {
+    const context = await setupHtlcLockScenario(t);
+    const {validatorPeer, claimantPeer} = context.htlcLockScenario;
+    const lockPayload = await buildHtlcLockPayload(context);
+    await appendHtlcLock(context, lockPayload);
+    const claim = safeDecodeApplyOperation(await buildClaimPayload(context, lockPayload, {wallet: claimantPeer.wallet}));
+
+    for (const modify of [
+        operation => { delete operation.hco.va; delete operation.hco.vn; delete operation.hco.vs; },
+        operation => { operation.hco.vs = b4a.alloc(operation.hco.vs.length, 0xaa); },
+        operation => { operation.hco.va = operation.address; },
+    ]) {
+        const invalidClaim = {...claim, hco: {...claim.hco}};
+        modify(invalidClaim);
+        await appendHtlcLock(context, safeEncodeApplyOperation(invalidClaim));
+        t.is((await readLockState(validatorPeer.base, lockPayload)).escrow.status, escrowEntryUtils.Status.PENDING);
+        t.is(await readClaimRecord(validatorPeer.base, safeEncodeApplyOperation(invalidClaim)), null);
+    }
+});
+
+test('State.apply HTLC_CLAIM requires the validator signer to own the publishing writer key', async t => {
+    const context = await setupHtlcLockScenario(t);
+    const {validatorPeer, claimantPeer, makerPeer} = context.htlcLockScenario;
+    const lockPayload = await buildHtlcLockPayload(context);
+    await appendHtlcLock(context, lockPayload);
+    const claimPayload = await buildClaimPayload(context, lockPayload, {
+        wallet: makerPeer.wallet,
+        validatorWallet: claimantPeer.wallet
+    });
+
+    await appendHtlcLock(context, claimPayload);
+
+    t.is((await readLockState(validatorPeer.base, lockPayload)).escrow.status, escrowEntryUtils.Status.PENDING);
+    t.is(await readClaimRecord(validatorPeer.base, claimPayload), null);
 });
 
 test('State.apply HTLC_CLAIM stops at the refund epoch', async t => {

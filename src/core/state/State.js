@@ -1020,6 +1020,10 @@ class State extends ReadyResource {
             this.#safeLogApply(OperationType.HTLC_CLAIM, "Contract schema validation failed.", node.from.key);
             return Status.FAILURE;
         }
+        if (!b4a.isBuffer(op.hco.va) || !b4a.isBuffer(op.hco.vn) || !b4a.isBuffer(op.hco.vs)) {
+            this.#safeLogApply(OperationType.HTLC_CLAIM, "Operation is not complete.", node.from.key);
+            return Status.FAILURE;
+        }
 
         const submitterAddress = addressUtils.bufferToAddress(op.address, this.#config.addressPrefix);
         const submitterPublicKey = submitterAddress && tracCryptoApi.address.decodeSafe(submitterAddress);
@@ -1047,6 +1051,29 @@ class State extends ReadyResource {
             !tracCryptoApi.signature.verify(op.hco.is, txHash, submitterPublicKey)
         ) {
             this.#safeLogApply(OperationType.HTLC_CLAIM, "Claim hash or submitter signature is invalid.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        const validatorAddress = addressUtils.bufferToAddress(op.hco.va, this.#config.addressPrefix);
+        const validatorPublicKey = validatorAddress && tracCryptoApi.address.decodeSafe(validatorAddress);
+        if (!isBufferValid(validatorPublicKey, PUBLIC_KEY_LENGTH) || isZeroBuffer(validatorPublicKey)) {
+            this.#safeLogApply(OperationType.HTLC_CLAIM, "Validator address is invalid.", node.from.key);
+            return Status.FAILURE;
+        }
+        const validatorMessage = createMessage(
+            this.#config.networkId,
+            op.hco.tx,
+            op.hco.vn,
+            OperationType.HTLC_CLAIM
+        );
+        const validatorHash = await tracCryptoApi.hash.blake3Safe(validatorMessage);
+        if (!tracCryptoApi.signature.verify(op.hco.vs, validatorHash, validatorPublicKey)) {
+            this.#safeLogApply(OperationType.HTLC_CLAIM, "Validator signature is invalid.", node.from.key);
+            return Status.FAILURE;
+        }
+        const validatorEntry = await this.#getEntryApply(validatorAddress, batch);
+        if (!await this.#isValidatorValidApply(validatorEntry, node, op)) {
+            this.#safeLogApply(OperationType.HTLC_CLAIM, "Validator consistency check failed.", node.from.key);
             return Status.FAILURE;
         }
 
