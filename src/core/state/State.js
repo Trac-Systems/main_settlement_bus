@@ -1015,7 +1015,125 @@ class State extends ReadyResource {
         return Status.SUCCESS;
     }
 
-    async #handleApplyHtlcClaimOperation() {
+    async #handleApplyHtlcClaimOperation(op, view, base, node, batch) {
+        if (!this.#stateValidationSchema.validateHtlcClaimOperation(op)) {
+            this.#safeLogApply(OperationType.HTLC_CLAIM, "Contract schema validation failed.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        const submitterAddress = addressUtils.bufferToAddress(op.address, this.#config.addressPrefix);
+        const submitterPublicKey = submitterAddress && tracCryptoApi.address.decodeSafe(submitterAddress);
+        if (!isBufferValid(submitterPublicKey, PUBLIC_KEY_LENGTH) || isZeroBuffer(submitterPublicKey)) {
+            this.#safeLogApply(OperationType.HTLC_CLAIM, "Submitter address is invalid.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        const message = createMessage(
+            this.#config.networkId,
+            op.hco.txv,
+            op.hco.li,
+            op.hco.pi,
+            op.hco.in,
+            OperationType.HTLC_CLAIM
+        );
+        if (message.length === 0) {
+            this.#safeLogApply(OperationType.HTLC_CLAIM, "Invalid claim message.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        const txHash = await tracCryptoApi.hash.blake3Safe(message);
+        if (
+            !b4a.equals(txHash, op.hco.tx) ||
+            !tracCryptoApi.signature.verify(op.hco.is, txHash, submitterPublicKey)
+        ) {
+            this.#safeLogApply(OperationType.HTLC_CLAIM, "Claim hash or submitter signature is invalid.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        const indexersSequenceState = await this.#getIndexerSequenceStateApply(base);
+        if (indexersSequenceState === null || !b4a.equals(op.hco.txv, indexersSequenceState)) {
+            this.#safeLogApply(OperationType.HTLC_CLAIM, "Transaction was not executed.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        const claimTxHashHex = b4a.toString(op.hco.tx, 'hex');
+        if (await this.#getEntryApply(claimTxHashHex, batch) !== null) {
+            this.#safeLogApply(OperationType.HTLC_CLAIM, "Operation has already been applied.", node.from.key);
+            return Status.IGNORE;
+        }
+
+        const escrowKey = EntryType.HTLC_ESCROW + b4a.toString(op.hco.li, 'hex');
+        const escrowBuffer = await this.#getEntryApply(escrowKey, batch);
+        const escrow = escrowEntryUtils.decode(escrowBuffer, this.#config.addressPrefix);
+        if (!escrow || !b4a.equals(escrow.lockId, op.hco.li)) {
+            this.#safeLogApply(OperationType.HTLC_CLAIM, "HTLC escrow does not exist or is invalid.", node.from.key);
+            return Status.FAILURE;
+        }
+        if (escrow.status !== escrowEntryUtils.Status.PENDING) {
+            this.#safeLogApply(OperationType.HTLC_CLAIM, "HTLC escrow is already settled.", node.from.key);
+            return Status.IGNORE;
+        }
+
+        const currentEpoch = await this.#getEntryApply(EntryType.EPOCH_CURRENT, batch);
+        if (!isBufferValid(currentEpoch, EPOCH_BYTE_LENGTH)) {
+            this.#safeLogApply(OperationType.HTLC_CLAIM, "Current epoch is not initialized or is invalid.", node.from.key);
+            return Status.FAILURE;
+        }
+        if (b4a.compare(currentEpoch, escrow.refundEpoch) >= 0) {
+            this.#safeLogApply(OperationType.HTLC_CLAIM, "Claim window has expired.", node.from.key);
+            return Status.IGNORE;
+        }
+
+        const settlement = escrowEntryUtils.makeClaim(escrowBuffer, op.hco.pi, currentEpoch, this.#config.addressPrefix);
+        if (settlement === null) {
+            this.#safeLogApply(OperationType.HTLC_CLAIM, "HTLC preimage or escrow transition is invalid.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        const credits = new Map();
+        for (const [addressBytes, amount] of [
+            [settlement.address, settlement.amount],
+            [settlement.additionalFeeRecipientAddress, settlement.additionalFeeAmount],
+        ]) {
+            if (addressBytes === null) continue;
+            const address = addressUtils.bufferToAddress(addressBytes, this.#config.addressPrefix);
+            if (address === null || amount === null) {
+                this.#safeLogApply(OperationType.HTLC_CLAIM, "Settlement recipient or amount is invalid.", node.from.key);
+                return Status.FAILURE;
+            }
+            const total = credits.has(address) ? credits.get(address).add(amount) : amount;
+            if (total === null) {
+                this.#safeLogApply(OperationType.HTLC_CLAIM, "Settlement amount overflow.", node.from.key);
+                return Status.FAILURE;
+            }
+            credits.set(address, total);
+        }
+
+        const updatedRecipients = new Map();
+        for (const [address, amount] of credits) {
+            const entryBuffer = await this.#getEntryApply(address, batch);
+            let updatedEntry;
+            if (entryBuffer === null) {
+                updatedEntry = nodeEntryUtils.init(ZERO_WK, nodeRoleUtils.NodeRole.READER, amount.value);
+            } else {
+                const entry = nodeEntryUtils.decode(entryBuffer);
+                const balance = entry ? toBalance(entry.balance) : null;
+                updatedEntry = balance?.add(amount)?.update(entryBuffer) ?? null;
+            }
+            if (!isBufferValid(updatedEntry, NODE_ENTRY_SIZE)) {
+                this.#safeLogApply(OperationType.HTLC_CLAIM, "Failed to credit settlement recipient.", node.from.key);
+                return Status.FAILURE;
+            }
+            updatedRecipients.set(address, updatedEntry);
+        }
+
+        for (const [address, entry] of updatedRecipients) await batch.put(address, entry);
+        await batch.put(escrowKey, settlement.entry);
+        await batch.put(claimTxHashHex, node.value);
+
+        if (this.#config.enableTxApplyLogs) {
+            console.info(`HTLC claim operation: ${claimTxHashHex} has been appended.`);
+        }
         return Status.SUCCESS;
     }
 

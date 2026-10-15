@@ -125,7 +125,7 @@ export function decode(entry, hrp) {
     }
 }
 
-// Pure escrow helpers only; claim/refund operations and apply handlers are not wired here.
+// Pure escrow transitions; network claim admission and refund application are not wired here.
 export function makeClaim(entry, preimage, currentEpoch, hrp) {
     const escrow = decode(entry, hrp);
     if (
