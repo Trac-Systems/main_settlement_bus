@@ -15,6 +15,7 @@ async function runCheckTests() {
     await import('./setConsensusConfigOperation.test.js')
     await import('./htlcClaimOperation.test.js')
     await import('./htlcLockOperation.test.js')
+    await import('./htlcRefundOperation.test.js')
 
     test.resume();
 }
