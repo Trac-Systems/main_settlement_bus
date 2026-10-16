@@ -1,9 +1,12 @@
 import test from 'brittle'
 
+import { OperationType } from '../../../../src/utils/constants.js';
 import StateValidationSchema from '../../../../src/core/state/validators/StateValidationSchema.js';
 import { RAO, not_allowed_data_types } from '../../../fixtures/check.fixtures.js';
 import { topLevelValidationTests, valueLevelValidationTest, addressBufferLengthTest, fieldsBufferLengthTest, partialTypeCommonTests } from './common.test.js';
 import { config } from '../../../helpers/config.js';
+
+import {operationContractTests} from './schemaValidationTestHelpers.js';
 
 const stateValidationSchema = new StateValidationSchema(config)
 
@@ -253,3 +256,15 @@ test('validateRoleAccessOperation - optional fields va, vn, vs', t => {
         'rao'
     )
 })
+
+test('validateRoleAccessOperation - operation contract', t => {
+    operationContractTests(
+        t,
+        stateValidationSchema.validateRoleAccessOperation.bind(stateValidationSchema),
+        RAO.valid_complete_add_writer,
+        'rao',
+        [OperationType.ADD_WRITER, OperationType.REMOVE_WRITER, OperationType.ADMIN_RECOVERY],
+        RAO.required_length_of_fields_for_complete_role_access,
+        true
+    );
+});

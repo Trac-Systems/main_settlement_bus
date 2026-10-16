@@ -1,8 +1,11 @@
 import test from 'brittle'
+import { OperationType } from '../../../../src/utils/constants.js';
 import StateValidationSchema from '../../../../src/core/state/validators/StateValidationSchema.js';
 import { TXO, not_allowed_data_types } from '../../../fixtures/check.fixtures.js';
 import { topLevelValidationTests, valueLevelValidationTest, addressBufferLengthTest, fieldsBufferLengthTest, partialTypeCommonTests } from './common.test.js';
 import { config } from '../../../helpers/config.js';
+
+import {operationContractTests} from './schemaValidationTestHelpers.js';
 
 const stateValidationSchema = new StateValidationSchema(config)
 
@@ -104,4 +107,16 @@ test('validateTransactionOperation - Buffer length validation - VALUE LEVEL (txo
         TXO.required_length_of_fields_for_partial_transaction_operation
     );
 
+});
+
+test('validateTransactionOperation - operation contract', t => {
+    operationContractTests(
+        t,
+        stateValidationSchema.validateTransactionOperation.bind(stateValidationSchema),
+        TXO.valid_complete_transaction_operation,
+        'txo',
+        [OperationType.TX],
+        TXO.required_length_of_fields_for_complete_transaction_operation,
+        true
+    );
 });

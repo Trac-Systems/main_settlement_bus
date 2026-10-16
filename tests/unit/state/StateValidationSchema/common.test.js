@@ -1,6 +1,5 @@
 import b4a from 'b4a';
 
-import { partial_operation_value_type } from "../../../fixtures/check.fixtures.js";
 import { config } from '../../../helpers/config.js';
 
 export const MIN_SAFE_VALIDATION_INTEGER = 0x00000001;
@@ -124,8 +123,6 @@ export function topLevelValidationTests(
 
 export const valueLevelValidationTest = (t, validateFn, validFixture, valueKey, valueFields, notAllowedDataTypes) => {
     for (const field of valueFields) {
-        if (partial_operation_value_type.includes(valueKey) && (field === 'is' || field === 'vn' || field === 'vs')) continue;
-
         const missing = {
             ...validFixture,
             [valueKey]: { ...validFixture[valueKey] }
@@ -253,7 +250,7 @@ export function fieldsBufferLengthTest(
     for (const [field, expectedLen] of Object.entries(requiredFieldLengthsForValue)) {
         const emptyBuffer = b4a.alloc(0);
         const oneTooShort = b4a.alloc(expectedLen - 1, 0x01);
-        const tooShort = b4a.alloc(expectedLen - 2, 0x01);
+        const tooShort = b4a.alloc(Math.max(0, expectedLen - 2), 0x01);
         const exact = b4a.alloc(expectedLen, 0x01);
         const oneTooLong = b4a.alloc(expectedLen + 1, 0x01);
         const tooLong = b4a.alloc(expectedLen + 2, 0x01);

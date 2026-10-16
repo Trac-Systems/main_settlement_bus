@@ -12,12 +12,15 @@ import {
     NETWORK_ID_BYTE_LENGTH,
     PROTOCOL_VERSION_BYTE_LENGTH,
     SIGNATURE_BYTE_LENGTH,
-    VDF_BLOB_PROOF_SIZE
+    VDF_BLOB_PROOF_SIZE,
+    OperationType
 } from '../../../../src/utils/constants.js';
 import { SEO, not_allowed_data_types } from '../../../fixtures/check.fixtures.js';
 import { topLevelValidationTests, valueLevelValidationTest, addressBufferLengthTest } from './common.test.js';
 import { config } from '../../../helpers/config.js';
 import consensusFixtures from '../../../fixtures/consensusV1Operation.fixtures.js';
+
+import {operationContractTests} from './schemaValidationTestHelpers.js';
 
 const stateValidationSchema = new StateValidationSchema(config);
 const UNKNOWN_PROTOBUF_FIELD = b4a.from([0x9a, 0x06, 0x01, 0xff]);
@@ -311,4 +314,56 @@ test('validateSetEpochOperation - approvals validation (seo.app)', t => {
             `approval with zero-filled ${name} should fail`
         );
     }
+});
+
+test('validateSetEpochOperation rejects every truncated proof and approval encoding', t => {
+    const {pd, app} = SEO.valid_set_epoch_operation.seo;
+    for (let length = 0; length < pd.length; length++) {
+        t.is(stateValidationSchema.validateSetEpochOperation(withSetEpochProofData(pd.subarray(0, length))), false,
+            `proof truncated to ${length} bytes`);
+    }
+    for (let length = 0; length < app[0].length; length++) {
+        t.is(stateValidationSchema.validateSetEpochOperation(withApprovals([app[0].subarray(0, length)])), false,
+            `approval truncated to ${length} bytes`);
+    }
+    for (const suffix of [b4a.from([0]), b4a.from([0xff]), b4a.from([0x80, 0x80, 0x80])]) {
+        t.is(stateValidationSchema.validateSetEpochOperation(withSetEpochProofData(b4a.concat([pd, suffix]))), false,
+            'proof rejects trailing junk');
+        t.is(stateValidationSchema.validateSetEpochOperation(withApprovals([b4a.concat([app[0], suffix])])), false,
+            'approval rejects trailing junk');
+    }
+});
+
+test('validateSetEpochOperation checks every approval position without coercing invalid items', t => {
+    const badItems = [
+        ...not_allowed_data_types, Symbol('approval')
+    ];
+    const approval = SEO.valid_set_epoch_operation.seo.app[0];
+    for (const item of badItems) {
+        for (const index of [0, 1, 2]) {
+            const approvals = [approval, approval, approval];
+            approvals[index] = item;
+            t.is(stateValidationSchema.validateSetEpochOperation(withApprovals(approvals)), false,
+                `invalid approval at ${index}`);
+        }
+    }
+    t.is(stateValidationSchema.validateSetEpochOperation(withSetEpochProofData(new Uint8Array(SEO.valid_set_epoch_operation.seo.pd))), true,
+        'valid proof bytes accept Uint8Array');
+    t.is(stateValidationSchema.validateSetEpochOperation(withApprovals([new Uint8Array(approval)])), true,
+        'valid approval bytes accept Uint8Array');
+});
+
+test('validateSetEpochOperation - operation contract', t => {
+    operationContractTests(
+        t,
+        stateValidationSchema.validateSetEpochOperation.bind(stateValidationSchema),
+        SEO.valid_set_epoch_operation,
+        'seo',
+        [OperationType.SET_EPOCH],
+        undefined, // bytes
+        false, // partial
+        [], // zeroAllowed
+        [], // optionalFields
+        ['pd', 'app']
+    );
 });
