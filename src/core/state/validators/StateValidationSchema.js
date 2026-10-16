@@ -62,6 +62,7 @@ class StateValidationSchema {
     #validateConsensusControlOperationSchema;
     #validateHtlcClaimOperationSchema;
     #validateHtlcLockOperationSchema;
+    #validateHtlcRefundOperationSchema;
     #proofDataFields;
     #config;
 
@@ -321,6 +322,7 @@ class StateValidationSchema {
         this.#validateConsensusControlOperationSchema = this.#compileConsensusControlOperationSchema();
         this.#validateHtlcClaimOperationSchema = this.#compileHtlcClaimOperationSchema();
         this.#validateHtlcLockOperationSchema = this.#compileHtlcLockOperationSchema();
+        this.#validateHtlcRefundOperationSchema = this.#compileHtlcRefundOperationSchema();
 
     }
 
@@ -890,6 +892,54 @@ class StateValidationSchema {
 
     validateHtlcLockOperation(op) {
         return this.#validateHtlcLockOperationSchema(op) === true;
+    }
+
+    #compileHtlcRefundOperationSchema() {
+        const schema = {
+            $$strict: true,
+            type: this.#operationTypeDomain(OperationType.HTLC_REFUND),
+            address: {type: 'buffer', length: this.#config.addressLength, required: true},
+            hro: {
+                strict: true,
+                type: 'object',
+                required: true,
+                props: {
+                    tx: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
+                    txv: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
+                    li: {type: 'buffer', length: HTLC_LOCK_ID_BYTE_LENGTH, required: true},
+                    in: {type: 'buffer', length: NONCE_BYTE_LENGTH, required: true},
+                    is: {type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true},
+                    va: {type: 'buffer', length: this.#config.addressLength, optional: true},
+                    vn: {type: 'buffer', length: NONCE_BYTE_LENGTH, optional: true},
+                    vs: {type: 'buffer', length: SIGNATURE_BYTE_LENGTH, optional: true}
+                },
+                custom: (value, errors) => {
+                    if (!value || typeof value !== 'object') return value;
+
+                    const validatorFields = [value.va, value.vn, value.vs];
+                    // The apply codec normalizes absent validator metadata to three nulls.
+                    if (validatorFields.every(field => field === undefined) ||
+                        validatorFields.every(field => field === null)) {
+                        return value;
+                    }
+
+                    if (validatorFields.some(field => field === undefined || field === null)) {
+                        errors.push({
+                            type: 'conditionalDependency',
+                            field: 'hro',
+                            message: 'Fields "va", "vn", and "vs" must all be Buffers, all be undefined, or all be null'
+                        });
+                    }
+
+                    return value;
+                }
+            }
+        };
+        return this.#validator.compile(schema);
+    }
+
+    validateHtlcRefundOperation(op) {
+        return this.#validateHtlcRefundOperationSchema(op) === true;
     }
 
 }
