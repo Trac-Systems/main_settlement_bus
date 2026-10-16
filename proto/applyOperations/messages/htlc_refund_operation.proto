@@ -2,4 +2,13 @@ syntax = "proto3";
 
 package apply.operations;
 
-message HtlcRefundOperation {}
+message HtlcRefundOperation {
+    bytes tx     = 1; // Transaction hash (unique identifier for the refund)
+    bytes txv    = 2; // Transaction validity
+    bytes li     = 3; // HTLC lock identifier
+    bytes in     = 4; // Nonce of the submitter
+    bytes is     = 5; // Signature of the submitter
+    bytes va     = 6; // Validator's address; absent in partial, required in complete transactions
+    bytes vn     = 7; // Validator's nonce; absent in partial, required in complete transactions
+    bytes vs     = 8; // Validator's signature; absent in partial, required in complete transactions
+}
