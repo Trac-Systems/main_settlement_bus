@@ -1,11 +1,9 @@
 /*eslint-disable block-scoped-var, id-length, no-control-regex, no-magic-numbers, no-prototype-builtins, no-redeclare, no-shadow, no-var, sort-vars*/
 "use strict";
-if (typeof globalThis !== 'undefined' && typeof globalThis.self === 'undefined') {
-  globalThis.self = globalThis;
-}
 
+/** @typedef {ReturnType<typeof import("b4a").alloc>} B4aBuffer */
 
-var $protobuf = require("protobufjs/minimal");
+var $protobuf = require("../protobufRuntime.cjs");
 
 // Common aliases
 var $Reader = $protobuf.Reader, $Writer = $protobuf.Writer, $util = $protobuf.util;
@@ -38,7 +36,7 @@ $root.apply = (function() {
              * @memberof apply.operations
              * @interface IOperation
              * @property {apply.operations.OperationType|null} [type] Operation type
-             * @property {Uint8Array|null} [address] Operation address
+             * @property {B4aBuffer|null} [address] Operation address
              * @property {apply.operations.ICoreAdminOperation|null} [cao] Operation cao
              * @property {apply.operations.IAdminControlOperation|null} [aco] Operation aco
              * @property {apply.operations.IBalanceInitializationOperation|null} [bio] Operation bio
@@ -75,7 +73,7 @@ $root.apply = (function() {
 
             /**
              * Operation address.
-             * @member {Uint8Array} address
+             * @member {B4aBuffer} address
              * @memberof apply.operations.Operation
              * @instance
              */
@@ -189,8 +187,7 @@ $root.apply = (function() {
              * @returns {$protobuf.Writer} Writer
              */
             Operation.encode = function encode(message, writer) {
-                if (!writer)
-                    writer = $Writer.create();
+                writer = $Writer.create(writer);
                 if (message.type != null && Object.hasOwnProperty.call(message, "type"))
                     writer.uint32(/* id 1, wireType 0 =*/8).int32(message.type);
                 if (message.address != null && Object.hasOwnProperty.call(message, "address"))
@@ -234,15 +231,14 @@ $root.apply = (function() {
              * @function decode
              * @memberof apply.operations.Operation
              * @static
-             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
              * @param {number} [length] Message length if known beforehand
              * @returns {apply.operations.Operation} Operation
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
             Operation.decode = function decode(reader, length, error) {
-                if (!(reader instanceof $Reader))
-                    reader = $Reader.create(reader);
+                reader = $Reader.create(reader);
                 var end = length === undefined ? reader.len : reader.pos + length, message = new $root.apply.operations.Operation();
                 while (reader.pos < end) {
                     var tag = reader.uint32();
@@ -254,7 +250,7 @@ $root.apply = (function() {
                             break;
                         }
                     case 2: {
-                            message.address = reader.bytes();
+                            message.address = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 3: {
@@ -306,14 +302,13 @@ $root.apply = (function() {
              * @function decodeDelimited
              * @memberof apply.operations.Operation
              * @static
-             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
              * @returns {apply.operations.Operation} Operation
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
             Operation.decodeDelimited = function decodeDelimited(reader) {
-                if (!(reader instanceof $Reader))
-                    reader = new $Reader(reader);
+                reader = $Reader.create(reader);
                 return this.decode(reader, reader.uint32());
             };
 
@@ -353,7 +348,7 @@ $root.apply = (function() {
                         break;
                     }
                 if (message.address != null && message.hasOwnProperty("address"))
-                    if (!(message.address && typeof message.address.length === "number" || $util.isString(message.address)))
+                    if (!$util.isBytes(message.address))
                         return "address: buffer expected";
                 if (message.cao != null && message.hasOwnProperty("cao")) {
                     properties.value = 1;
@@ -456,7 +451,7 @@ $root.apply = (function() {
              */
             Operation.fromObject = function fromObject(object) {
                 if (object instanceof $root.apply.operations.Operation)
-                    return object;
+                    object = Object.assign({}, object);
                 var message = new $root.apply.operations.Operation();
                 switch (object.type) {
                 default:
@@ -535,10 +530,7 @@ $root.apply = (function() {
                     break;
                 }
                 if (object.address != null)
-                    if (typeof object.address === "string")
-                        $util.base64.decode(object.address, message.address = $util.newBuffer($util.base64.length(object.address)), 0);
-                    else if (object.address.length >= 0)
-                        message.address = object.address;
+                    message.address = $util.bytesFrom(object.address);
                 if (object.cao != null) {
                     if (typeof object.cao !== "object")
                         throw TypeError(".apply.operations.Operation.cao: object expected");
@@ -613,7 +605,7 @@ $root.apply = (function() {
                 if (message.type != null && message.hasOwnProperty("type"))
                     object.type = options.enums === String ? $root.apply.operations.OperationType[message.type] === undefined ? message.type : $root.apply.operations.OperationType[message.type] : message.type;
                 if (message.address != null && message.hasOwnProperty("address"))
-                    object.address = options.bytes === String ? $util.base64.encode(message.address, 0, message.address.length) : options.bytes === Array ? Array.prototype.slice.call(message.address) : message.address;
+                    object.address = $util.bytesTo(message.address, options);
                 if (message.cao != null && message.hasOwnProperty("cao")) {
                     object.cao = $root.apply.operations.CoreAdminOperation.toObject(message.cao, options);
                     if (options.oneofs)
@@ -741,11 +733,11 @@ $root.apply = (function() {
              * Properties of a CoreAdminOperation.
              * @memberof apply.operations
              * @interface ICoreAdminOperation
-             * @property {Uint8Array|null} [tx] CoreAdminOperation tx
-             * @property {Uint8Array|null} [txv] CoreAdminOperation txv
-             * @property {Uint8Array|null} [iw] CoreAdminOperation iw
-             * @property {Uint8Array|null} ["in"] CoreAdminOperation in
-             * @property {Uint8Array|null} [is] CoreAdminOperation is
+             * @property {B4aBuffer|null} [tx] CoreAdminOperation tx
+             * @property {B4aBuffer|null} [txv] CoreAdminOperation txv
+             * @property {B4aBuffer|null} [iw] CoreAdminOperation iw
+             * @property {B4aBuffer|null} ["in"] CoreAdminOperation in
+             * @property {B4aBuffer|null} [is] CoreAdminOperation is
              */
 
             /**
@@ -765,7 +757,7 @@ $root.apply = (function() {
 
             /**
              * CoreAdminOperation tx.
-             * @member {Uint8Array} tx
+             * @member {B4aBuffer} tx
              * @memberof apply.operations.CoreAdminOperation
              * @instance
              */
@@ -773,7 +765,7 @@ $root.apply = (function() {
 
             /**
              * CoreAdminOperation txv.
-             * @member {Uint8Array} txv
+             * @member {B4aBuffer} txv
              * @memberof apply.operations.CoreAdminOperation
              * @instance
              */
@@ -781,7 +773,7 @@ $root.apply = (function() {
 
             /**
              * CoreAdminOperation iw.
-             * @member {Uint8Array} iw
+             * @member {B4aBuffer} iw
              * @memberof apply.operations.CoreAdminOperation
              * @instance
              */
@@ -789,7 +781,7 @@ $root.apply = (function() {
 
             /**
              * CoreAdminOperation in.
-             * @member {Uint8Array} in
+             * @member {B4aBuffer} in
              * @memberof apply.operations.CoreAdminOperation
              * @instance
              */
@@ -797,7 +789,7 @@ $root.apply = (function() {
 
             /**
              * CoreAdminOperation is.
-             * @member {Uint8Array} is
+             * @member {B4aBuffer} is
              * @memberof apply.operations.CoreAdminOperation
              * @instance
              */
@@ -825,8 +817,7 @@ $root.apply = (function() {
              * @returns {$protobuf.Writer} Writer
              */
             CoreAdminOperation.encode = function encode(message, writer) {
-                if (!writer)
-                    writer = $Writer.create();
+                writer = $Writer.create(writer);
                 if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
                     writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.tx);
                 if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
@@ -858,15 +849,14 @@ $root.apply = (function() {
              * @function decode
              * @memberof apply.operations.CoreAdminOperation
              * @static
-             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
              * @param {number} [length] Message length if known beforehand
              * @returns {apply.operations.CoreAdminOperation} CoreAdminOperation
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
             CoreAdminOperation.decode = function decode(reader, length, error) {
-                if (!(reader instanceof $Reader))
-                    reader = $Reader.create(reader);
+                reader = $Reader.create(reader);
                 var end = length === undefined ? reader.len : reader.pos + length, message = new $root.apply.operations.CoreAdminOperation();
                 while (reader.pos < end) {
                     var tag = reader.uint32();
@@ -874,23 +864,23 @@ $root.apply = (function() {
                         break;
                     switch (tag >>> 3) {
                     case 1: {
-                            message.tx = reader.bytes();
+                            message.tx = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 2: {
-                            message.txv = reader.bytes();
+                            message.txv = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 3: {
-                            message.iw = reader.bytes();
+                            message.iw = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 4: {
-                            message["in"] = reader.bytes();
+                            message["in"] = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 5: {
-                            message.is = reader.bytes();
+                            message.is = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     default:
@@ -906,14 +896,13 @@ $root.apply = (function() {
              * @function decodeDelimited
              * @memberof apply.operations.CoreAdminOperation
              * @static
-             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
              * @returns {apply.operations.CoreAdminOperation} CoreAdminOperation
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
             CoreAdminOperation.decodeDelimited = function decodeDelimited(reader) {
-                if (!(reader instanceof $Reader))
-                    reader = new $Reader(reader);
+                reader = $Reader.create(reader);
                 return this.decode(reader, reader.uint32());
             };
 
@@ -929,19 +918,19 @@ $root.apply = (function() {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
                 if (message.tx != null && message.hasOwnProperty("tx"))
-                    if (!(message.tx && typeof message.tx.length === "number" || $util.isString(message.tx)))
+                    if (!$util.isBytes(message.tx))
                         return "tx: buffer expected";
                 if (message.txv != null && message.hasOwnProperty("txv"))
-                    if (!(message.txv && typeof message.txv.length === "number" || $util.isString(message.txv)))
+                    if (!$util.isBytes(message.txv))
                         return "txv: buffer expected";
                 if (message.iw != null && message.hasOwnProperty("iw"))
-                    if (!(message.iw && typeof message.iw.length === "number" || $util.isString(message.iw)))
+                    if (!$util.isBytes(message.iw))
                         return "iw: buffer expected";
                 if (message["in"] != null && message.hasOwnProperty("in"))
-                    if (!(message["in"] && typeof message["in"].length === "number" || $util.isString(message["in"])))
+                    if (!$util.isBytes(message["in"]))
                         return "in: buffer expected";
                 if (message.is != null && message.hasOwnProperty("is"))
-                    if (!(message.is && typeof message.is.length === "number" || $util.isString(message.is)))
+                    if (!$util.isBytes(message.is))
                         return "is: buffer expected";
                 return null;
             };
@@ -956,33 +945,18 @@ $root.apply = (function() {
              */
             CoreAdminOperation.fromObject = function fromObject(object) {
                 if (object instanceof $root.apply.operations.CoreAdminOperation)
-                    return object;
+                    object = Object.assign({}, object);
                 var message = new $root.apply.operations.CoreAdminOperation();
                 if (object.tx != null)
-                    if (typeof object.tx === "string")
-                        $util.base64.decode(object.tx, message.tx = $util.newBuffer($util.base64.length(object.tx)), 0);
-                    else if (object.tx.length >= 0)
-                        message.tx = object.tx;
+                    message.tx = $util.bytesFrom(object.tx);
                 if (object.txv != null)
-                    if (typeof object.txv === "string")
-                        $util.base64.decode(object.txv, message.txv = $util.newBuffer($util.base64.length(object.txv)), 0);
-                    else if (object.txv.length >= 0)
-                        message.txv = object.txv;
+                    message.txv = $util.bytesFrom(object.txv);
                 if (object.iw != null)
-                    if (typeof object.iw === "string")
-                        $util.base64.decode(object.iw, message.iw = $util.newBuffer($util.base64.length(object.iw)), 0);
-                    else if (object.iw.length >= 0)
-                        message.iw = object.iw;
+                    message.iw = $util.bytesFrom(object.iw);
                 if (object["in"] != null)
-                    if (typeof object["in"] === "string")
-                        $util.base64.decode(object["in"], message["in"] = $util.newBuffer($util.base64.length(object["in"])), 0);
-                    else if (object["in"].length >= 0)
-                        message["in"] = object["in"];
+                    message["in"] = $util.bytesFrom(object["in"]);
                 if (object.is != null)
-                    if (typeof object.is === "string")
-                        $util.base64.decode(object.is, message.is = $util.newBuffer($util.base64.length(object.is)), 0);
-                    else if (object.is.length >= 0)
-                        message.is = object.is;
+                    message.is = $util.bytesFrom(object.is);
                 return message;
             };
 
@@ -1037,15 +1011,15 @@ $root.apply = (function() {
                     }
                 }
                 if (message.tx != null && message.hasOwnProperty("tx"))
-                    object.tx = options.bytes === String ? $util.base64.encode(message.tx, 0, message.tx.length) : options.bytes === Array ? Array.prototype.slice.call(message.tx) : message.tx;
+                    object.tx = $util.bytesTo(message.tx, options);
                 if (message.txv != null && message.hasOwnProperty("txv"))
-                    object.txv = options.bytes === String ? $util.base64.encode(message.txv, 0, message.txv.length) : options.bytes === Array ? Array.prototype.slice.call(message.txv) : message.txv;
+                    object.txv = $util.bytesTo(message.txv, options);
                 if (message.iw != null && message.hasOwnProperty("iw"))
-                    object.iw = options.bytes === String ? $util.base64.encode(message.iw, 0, message.iw.length) : options.bytes === Array ? Array.prototype.slice.call(message.iw) : message.iw;
+                    object.iw = $util.bytesTo(message.iw, options);
                 if (message["in"] != null && message.hasOwnProperty("in"))
-                    object["in"] = options.bytes === String ? $util.base64.encode(message["in"], 0, message["in"].length) : options.bytes === Array ? Array.prototype.slice.call(message["in"]) : message["in"];
+                    object["in"] = $util.bytesTo(message["in"], options);
                 if (message.is != null && message.hasOwnProperty("is"))
-                    object.is = options.bytes === String ? $util.base64.encode(message.is, 0, message.is.length) : options.bytes === Array ? Array.prototype.slice.call(message.is) : message.is;
+                    object.is = $util.bytesTo(message.is, options);
                 return object;
             };
 
@@ -1084,11 +1058,11 @@ $root.apply = (function() {
              * Properties of an AdminControlOperation.
              * @memberof apply.operations
              * @interface IAdminControlOperation
-             * @property {Uint8Array|null} [tx] AdminControlOperation tx
-             * @property {Uint8Array|null} [txv] AdminControlOperation txv
-             * @property {Uint8Array|null} [ia] AdminControlOperation ia
-             * @property {Uint8Array|null} ["in"] AdminControlOperation in
-             * @property {Uint8Array|null} [is] AdminControlOperation is
+             * @property {B4aBuffer|null} [tx] AdminControlOperation tx
+             * @property {B4aBuffer|null} [txv] AdminControlOperation txv
+             * @property {B4aBuffer|null} [ia] AdminControlOperation ia
+             * @property {B4aBuffer|null} ["in"] AdminControlOperation in
+             * @property {B4aBuffer|null} [is] AdminControlOperation is
              */
 
             /**
@@ -1108,7 +1082,7 @@ $root.apply = (function() {
 
             /**
              * AdminControlOperation tx.
-             * @member {Uint8Array} tx
+             * @member {B4aBuffer} tx
              * @memberof apply.operations.AdminControlOperation
              * @instance
              */
@@ -1116,7 +1090,7 @@ $root.apply = (function() {
 
             /**
              * AdminControlOperation txv.
-             * @member {Uint8Array} txv
+             * @member {B4aBuffer} txv
              * @memberof apply.operations.AdminControlOperation
              * @instance
              */
@@ -1124,7 +1098,7 @@ $root.apply = (function() {
 
             /**
              * AdminControlOperation ia.
-             * @member {Uint8Array} ia
+             * @member {B4aBuffer} ia
              * @memberof apply.operations.AdminControlOperation
              * @instance
              */
@@ -1132,7 +1106,7 @@ $root.apply = (function() {
 
             /**
              * AdminControlOperation in.
-             * @member {Uint8Array} in
+             * @member {B4aBuffer} in
              * @memberof apply.operations.AdminControlOperation
              * @instance
              */
@@ -1140,7 +1114,7 @@ $root.apply = (function() {
 
             /**
              * AdminControlOperation is.
-             * @member {Uint8Array} is
+             * @member {B4aBuffer} is
              * @memberof apply.operations.AdminControlOperation
              * @instance
              */
@@ -1168,8 +1142,7 @@ $root.apply = (function() {
              * @returns {$protobuf.Writer} Writer
              */
             AdminControlOperation.encode = function encode(message, writer) {
-                if (!writer)
-                    writer = $Writer.create();
+                writer = $Writer.create(writer);
                 if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
                     writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.tx);
                 if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
@@ -1201,15 +1174,14 @@ $root.apply = (function() {
              * @function decode
              * @memberof apply.operations.AdminControlOperation
              * @static
-             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
              * @param {number} [length] Message length if known beforehand
              * @returns {apply.operations.AdminControlOperation} AdminControlOperation
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
             AdminControlOperation.decode = function decode(reader, length, error) {
-                if (!(reader instanceof $Reader))
-                    reader = $Reader.create(reader);
+                reader = $Reader.create(reader);
                 var end = length === undefined ? reader.len : reader.pos + length, message = new $root.apply.operations.AdminControlOperation();
                 while (reader.pos < end) {
                     var tag = reader.uint32();
@@ -1217,23 +1189,23 @@ $root.apply = (function() {
                         break;
                     switch (tag >>> 3) {
                     case 1: {
-                            message.tx = reader.bytes();
+                            message.tx = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 2: {
-                            message.txv = reader.bytes();
+                            message.txv = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 3: {
-                            message.ia = reader.bytes();
+                            message.ia = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 4: {
-                            message["in"] = reader.bytes();
+                            message["in"] = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 5: {
-                            message.is = reader.bytes();
+                            message.is = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     default:
@@ -1249,14 +1221,13 @@ $root.apply = (function() {
              * @function decodeDelimited
              * @memberof apply.operations.AdminControlOperation
              * @static
-             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
              * @returns {apply.operations.AdminControlOperation} AdminControlOperation
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
             AdminControlOperation.decodeDelimited = function decodeDelimited(reader) {
-                if (!(reader instanceof $Reader))
-                    reader = new $Reader(reader);
+                reader = $Reader.create(reader);
                 return this.decode(reader, reader.uint32());
             };
 
@@ -1272,19 +1243,19 @@ $root.apply = (function() {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
                 if (message.tx != null && message.hasOwnProperty("tx"))
-                    if (!(message.tx && typeof message.tx.length === "number" || $util.isString(message.tx)))
+                    if (!$util.isBytes(message.tx))
                         return "tx: buffer expected";
                 if (message.txv != null && message.hasOwnProperty("txv"))
-                    if (!(message.txv && typeof message.txv.length === "number" || $util.isString(message.txv)))
+                    if (!$util.isBytes(message.txv))
                         return "txv: buffer expected";
                 if (message.ia != null && message.hasOwnProperty("ia"))
-                    if (!(message.ia && typeof message.ia.length === "number" || $util.isString(message.ia)))
+                    if (!$util.isBytes(message.ia))
                         return "ia: buffer expected";
                 if (message["in"] != null && message.hasOwnProperty("in"))
-                    if (!(message["in"] && typeof message["in"].length === "number" || $util.isString(message["in"])))
+                    if (!$util.isBytes(message["in"]))
                         return "in: buffer expected";
                 if (message.is != null && message.hasOwnProperty("is"))
-                    if (!(message.is && typeof message.is.length === "number" || $util.isString(message.is)))
+                    if (!$util.isBytes(message.is))
                         return "is: buffer expected";
                 return null;
             };
@@ -1299,33 +1270,18 @@ $root.apply = (function() {
              */
             AdminControlOperation.fromObject = function fromObject(object) {
                 if (object instanceof $root.apply.operations.AdminControlOperation)
-                    return object;
+                    object = Object.assign({}, object);
                 var message = new $root.apply.operations.AdminControlOperation();
                 if (object.tx != null)
-                    if (typeof object.tx === "string")
-                        $util.base64.decode(object.tx, message.tx = $util.newBuffer($util.base64.length(object.tx)), 0);
-                    else if (object.tx.length >= 0)
-                        message.tx = object.tx;
+                    message.tx = $util.bytesFrom(object.tx);
                 if (object.txv != null)
-                    if (typeof object.txv === "string")
-                        $util.base64.decode(object.txv, message.txv = $util.newBuffer($util.base64.length(object.txv)), 0);
-                    else if (object.txv.length >= 0)
-                        message.txv = object.txv;
+                    message.txv = $util.bytesFrom(object.txv);
                 if (object.ia != null)
-                    if (typeof object.ia === "string")
-                        $util.base64.decode(object.ia, message.ia = $util.newBuffer($util.base64.length(object.ia)), 0);
-                    else if (object.ia.length >= 0)
-                        message.ia = object.ia;
+                    message.ia = $util.bytesFrom(object.ia);
                 if (object["in"] != null)
-                    if (typeof object["in"] === "string")
-                        $util.base64.decode(object["in"], message["in"] = $util.newBuffer($util.base64.length(object["in"])), 0);
-                    else if (object["in"].length >= 0)
-                        message["in"] = object["in"];
+                    message["in"] = $util.bytesFrom(object["in"]);
                 if (object.is != null)
-                    if (typeof object.is === "string")
-                        $util.base64.decode(object.is, message.is = $util.newBuffer($util.base64.length(object.is)), 0);
-                    else if (object.is.length >= 0)
-                        message.is = object.is;
+                    message.is = $util.bytesFrom(object.is);
                 return message;
             };
 
@@ -1380,15 +1336,15 @@ $root.apply = (function() {
                     }
                 }
                 if (message.tx != null && message.hasOwnProperty("tx"))
-                    object.tx = options.bytes === String ? $util.base64.encode(message.tx, 0, message.tx.length) : options.bytes === Array ? Array.prototype.slice.call(message.tx) : message.tx;
+                    object.tx = $util.bytesTo(message.tx, options);
                 if (message.txv != null && message.hasOwnProperty("txv"))
-                    object.txv = options.bytes === String ? $util.base64.encode(message.txv, 0, message.txv.length) : options.bytes === Array ? Array.prototype.slice.call(message.txv) : message.txv;
+                    object.txv = $util.bytesTo(message.txv, options);
                 if (message.ia != null && message.hasOwnProperty("ia"))
-                    object.ia = options.bytes === String ? $util.base64.encode(message.ia, 0, message.ia.length) : options.bytes === Array ? Array.prototype.slice.call(message.ia) : message.ia;
+                    object.ia = $util.bytesTo(message.ia, options);
                 if (message["in"] != null && message.hasOwnProperty("in"))
-                    object["in"] = options.bytes === String ? $util.base64.encode(message["in"], 0, message["in"].length) : options.bytes === Array ? Array.prototype.slice.call(message["in"]) : message["in"];
+                    object["in"] = $util.bytesTo(message["in"], options);
                 if (message.is != null && message.hasOwnProperty("is"))
-                    object.is = options.bytes === String ? $util.base64.encode(message.is, 0, message.is.length) : options.bytes === Array ? Array.prototype.slice.call(message.is) : message.is;
+                    object.is = $util.bytesTo(message.is, options);
                 return object;
             };
 
@@ -1427,12 +1383,12 @@ $root.apply = (function() {
              * Properties of a BalanceInitializationOperation.
              * @memberof apply.operations
              * @interface IBalanceInitializationOperation
-             * @property {Uint8Array|null} [tx] BalanceInitializationOperation tx
-             * @property {Uint8Array|null} [txv] BalanceInitializationOperation txv
-             * @property {Uint8Array|null} [ia] BalanceInitializationOperation ia
-             * @property {Uint8Array|null} [am] BalanceInitializationOperation am
-             * @property {Uint8Array|null} ["in"] BalanceInitializationOperation in
-             * @property {Uint8Array|null} [is] BalanceInitializationOperation is
+             * @property {B4aBuffer|null} [tx] BalanceInitializationOperation tx
+             * @property {B4aBuffer|null} [txv] BalanceInitializationOperation txv
+             * @property {B4aBuffer|null} [ia] BalanceInitializationOperation ia
+             * @property {B4aBuffer|null} [am] BalanceInitializationOperation am
+             * @property {B4aBuffer|null} ["in"] BalanceInitializationOperation in
+             * @property {B4aBuffer|null} [is] BalanceInitializationOperation is
              */
 
             /**
@@ -1452,7 +1408,7 @@ $root.apply = (function() {
 
             /**
              * BalanceInitializationOperation tx.
-             * @member {Uint8Array} tx
+             * @member {B4aBuffer} tx
              * @memberof apply.operations.BalanceInitializationOperation
              * @instance
              */
@@ -1460,7 +1416,7 @@ $root.apply = (function() {
 
             /**
              * BalanceInitializationOperation txv.
-             * @member {Uint8Array} txv
+             * @member {B4aBuffer} txv
              * @memberof apply.operations.BalanceInitializationOperation
              * @instance
              */
@@ -1468,7 +1424,7 @@ $root.apply = (function() {
 
             /**
              * BalanceInitializationOperation ia.
-             * @member {Uint8Array} ia
+             * @member {B4aBuffer} ia
              * @memberof apply.operations.BalanceInitializationOperation
              * @instance
              */
@@ -1476,7 +1432,7 @@ $root.apply = (function() {
 
             /**
              * BalanceInitializationOperation am.
-             * @member {Uint8Array} am
+             * @member {B4aBuffer} am
              * @memberof apply.operations.BalanceInitializationOperation
              * @instance
              */
@@ -1484,7 +1440,7 @@ $root.apply = (function() {
 
             /**
              * BalanceInitializationOperation in.
-             * @member {Uint8Array} in
+             * @member {B4aBuffer} in
              * @memberof apply.operations.BalanceInitializationOperation
              * @instance
              */
@@ -1492,7 +1448,7 @@ $root.apply = (function() {
 
             /**
              * BalanceInitializationOperation is.
-             * @member {Uint8Array} is
+             * @member {B4aBuffer} is
              * @memberof apply.operations.BalanceInitializationOperation
              * @instance
              */
@@ -1520,8 +1476,7 @@ $root.apply = (function() {
              * @returns {$protobuf.Writer} Writer
              */
             BalanceInitializationOperation.encode = function encode(message, writer) {
-                if (!writer)
-                    writer = $Writer.create();
+                writer = $Writer.create(writer);
                 if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
                     writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.tx);
                 if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
@@ -1555,15 +1510,14 @@ $root.apply = (function() {
              * @function decode
              * @memberof apply.operations.BalanceInitializationOperation
              * @static
-             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
              * @param {number} [length] Message length if known beforehand
              * @returns {apply.operations.BalanceInitializationOperation} BalanceInitializationOperation
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
             BalanceInitializationOperation.decode = function decode(reader, length, error) {
-                if (!(reader instanceof $Reader))
-                    reader = $Reader.create(reader);
+                reader = $Reader.create(reader);
                 var end = length === undefined ? reader.len : reader.pos + length, message = new $root.apply.operations.BalanceInitializationOperation();
                 while (reader.pos < end) {
                     var tag = reader.uint32();
@@ -1571,27 +1525,27 @@ $root.apply = (function() {
                         break;
                     switch (tag >>> 3) {
                     case 1: {
-                            message.tx = reader.bytes();
+                            message.tx = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 2: {
-                            message.txv = reader.bytes();
+                            message.txv = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 3: {
-                            message.ia = reader.bytes();
+                            message.ia = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 4: {
-                            message.am = reader.bytes();
+                            message.am = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 5: {
-                            message["in"] = reader.bytes();
+                            message["in"] = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 6: {
-                            message.is = reader.bytes();
+                            message.is = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     default:
@@ -1607,14 +1561,13 @@ $root.apply = (function() {
              * @function decodeDelimited
              * @memberof apply.operations.BalanceInitializationOperation
              * @static
-             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
              * @returns {apply.operations.BalanceInitializationOperation} BalanceInitializationOperation
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
             BalanceInitializationOperation.decodeDelimited = function decodeDelimited(reader) {
-                if (!(reader instanceof $Reader))
-                    reader = new $Reader(reader);
+                reader = $Reader.create(reader);
                 return this.decode(reader, reader.uint32());
             };
 
@@ -1630,22 +1583,22 @@ $root.apply = (function() {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
                 if (message.tx != null && message.hasOwnProperty("tx"))
-                    if (!(message.tx && typeof message.tx.length === "number" || $util.isString(message.tx)))
+                    if (!$util.isBytes(message.tx))
                         return "tx: buffer expected";
                 if (message.txv != null && message.hasOwnProperty("txv"))
-                    if (!(message.txv && typeof message.txv.length === "number" || $util.isString(message.txv)))
+                    if (!$util.isBytes(message.txv))
                         return "txv: buffer expected";
                 if (message.ia != null && message.hasOwnProperty("ia"))
-                    if (!(message.ia && typeof message.ia.length === "number" || $util.isString(message.ia)))
+                    if (!$util.isBytes(message.ia))
                         return "ia: buffer expected";
                 if (message.am != null && message.hasOwnProperty("am"))
-                    if (!(message.am && typeof message.am.length === "number" || $util.isString(message.am)))
+                    if (!$util.isBytes(message.am))
                         return "am: buffer expected";
                 if (message["in"] != null && message.hasOwnProperty("in"))
-                    if (!(message["in"] && typeof message["in"].length === "number" || $util.isString(message["in"])))
+                    if (!$util.isBytes(message["in"]))
                         return "in: buffer expected";
                 if (message.is != null && message.hasOwnProperty("is"))
-                    if (!(message.is && typeof message.is.length === "number" || $util.isString(message.is)))
+                    if (!$util.isBytes(message.is))
                         return "is: buffer expected";
                 return null;
             };
@@ -1660,38 +1613,20 @@ $root.apply = (function() {
              */
             BalanceInitializationOperation.fromObject = function fromObject(object) {
                 if (object instanceof $root.apply.operations.BalanceInitializationOperation)
-                    return object;
+                    object = Object.assign({}, object);
                 var message = new $root.apply.operations.BalanceInitializationOperation();
                 if (object.tx != null)
-                    if (typeof object.tx === "string")
-                        $util.base64.decode(object.tx, message.tx = $util.newBuffer($util.base64.length(object.tx)), 0);
-                    else if (object.tx.length >= 0)
-                        message.tx = object.tx;
+                    message.tx = $util.bytesFrom(object.tx);
                 if (object.txv != null)
-                    if (typeof object.txv === "string")
-                        $util.base64.decode(object.txv, message.txv = $util.newBuffer($util.base64.length(object.txv)), 0);
-                    else if (object.txv.length >= 0)
-                        message.txv = object.txv;
+                    message.txv = $util.bytesFrom(object.txv);
                 if (object.ia != null)
-                    if (typeof object.ia === "string")
-                        $util.base64.decode(object.ia, message.ia = $util.newBuffer($util.base64.length(object.ia)), 0);
-                    else if (object.ia.length >= 0)
-                        message.ia = object.ia;
+                    message.ia = $util.bytesFrom(object.ia);
                 if (object.am != null)
-                    if (typeof object.am === "string")
-                        $util.base64.decode(object.am, message.am = $util.newBuffer($util.base64.length(object.am)), 0);
-                    else if (object.am.length >= 0)
-                        message.am = object.am;
+                    message.am = $util.bytesFrom(object.am);
                 if (object["in"] != null)
-                    if (typeof object["in"] === "string")
-                        $util.base64.decode(object["in"], message["in"] = $util.newBuffer($util.base64.length(object["in"])), 0);
-                    else if (object["in"].length >= 0)
-                        message["in"] = object["in"];
+                    message["in"] = $util.bytesFrom(object["in"]);
                 if (object.is != null)
-                    if (typeof object.is === "string")
-                        $util.base64.decode(object.is, message.is = $util.newBuffer($util.base64.length(object.is)), 0);
-                    else if (object.is.length >= 0)
-                        message.is = object.is;
+                    message.is = $util.bytesFrom(object.is);
                 return message;
             };
 
@@ -1753,17 +1688,17 @@ $root.apply = (function() {
                     }
                 }
                 if (message.tx != null && message.hasOwnProperty("tx"))
-                    object.tx = options.bytes === String ? $util.base64.encode(message.tx, 0, message.tx.length) : options.bytes === Array ? Array.prototype.slice.call(message.tx) : message.tx;
+                    object.tx = $util.bytesTo(message.tx, options);
                 if (message.txv != null && message.hasOwnProperty("txv"))
-                    object.txv = options.bytes === String ? $util.base64.encode(message.txv, 0, message.txv.length) : options.bytes === Array ? Array.prototype.slice.call(message.txv) : message.txv;
+                    object.txv = $util.bytesTo(message.txv, options);
                 if (message.ia != null && message.hasOwnProperty("ia"))
-                    object.ia = options.bytes === String ? $util.base64.encode(message.ia, 0, message.ia.length) : options.bytes === Array ? Array.prototype.slice.call(message.ia) : message.ia;
+                    object.ia = $util.bytesTo(message.ia, options);
                 if (message.am != null && message.hasOwnProperty("am"))
-                    object.am = options.bytes === String ? $util.base64.encode(message.am, 0, message.am.length) : options.bytes === Array ? Array.prototype.slice.call(message.am) : message.am;
+                    object.am = $util.bytesTo(message.am, options);
                 if (message["in"] != null && message.hasOwnProperty("in"))
-                    object["in"] = options.bytes === String ? $util.base64.encode(message["in"], 0, message["in"].length) : options.bytes === Array ? Array.prototype.slice.call(message["in"]) : message["in"];
+                    object["in"] = $util.bytesTo(message["in"], options);
                 if (message.is != null && message.hasOwnProperty("is"))
-                    object.is = options.bytes === String ? $util.base64.encode(message.is, 0, message.is.length) : options.bytes === Array ? Array.prototype.slice.call(message.is) : message.is;
+                    object.is = $util.bytesTo(message.is, options);
                 return object;
             };
 
@@ -1802,15 +1737,15 @@ $root.apply = (function() {
              * Properties of a TransferOperation.
              * @memberof apply.operations
              * @interface ITransferOperation
-             * @property {Uint8Array|null} [tx] TransferOperation tx
-             * @property {Uint8Array|null} [txv] TransferOperation txv
-             * @property {Uint8Array|null} [to] TransferOperation to
-             * @property {Uint8Array|null} [am] TransferOperation am
-             * @property {Uint8Array|null} ["in"] TransferOperation in
-             * @property {Uint8Array|null} [is] TransferOperation is
-             * @property {Uint8Array|null} [va] TransferOperation va
-             * @property {Uint8Array|null} [vn] TransferOperation vn
-             * @property {Uint8Array|null} [vs] TransferOperation vs
+             * @property {B4aBuffer|null} [tx] TransferOperation tx
+             * @property {B4aBuffer|null} [txv] TransferOperation txv
+             * @property {B4aBuffer|null} [to] TransferOperation to
+             * @property {B4aBuffer|null} [am] TransferOperation am
+             * @property {B4aBuffer|null} ["in"] TransferOperation in
+             * @property {B4aBuffer|null} [is] TransferOperation is
+             * @property {B4aBuffer|null} [va] TransferOperation va
+             * @property {B4aBuffer|null} [vn] TransferOperation vn
+             * @property {B4aBuffer|null} [vs] TransferOperation vs
              */
 
             /**
@@ -1830,7 +1765,7 @@ $root.apply = (function() {
 
             /**
              * TransferOperation tx.
-             * @member {Uint8Array} tx
+             * @member {B4aBuffer} tx
              * @memberof apply.operations.TransferOperation
              * @instance
              */
@@ -1838,7 +1773,7 @@ $root.apply = (function() {
 
             /**
              * TransferOperation txv.
-             * @member {Uint8Array} txv
+             * @member {B4aBuffer} txv
              * @memberof apply.operations.TransferOperation
              * @instance
              */
@@ -1846,7 +1781,7 @@ $root.apply = (function() {
 
             /**
              * TransferOperation to.
-             * @member {Uint8Array} to
+             * @member {B4aBuffer} to
              * @memberof apply.operations.TransferOperation
              * @instance
              */
@@ -1854,7 +1789,7 @@ $root.apply = (function() {
 
             /**
              * TransferOperation am.
-             * @member {Uint8Array} am
+             * @member {B4aBuffer} am
              * @memberof apply.operations.TransferOperation
              * @instance
              */
@@ -1862,7 +1797,7 @@ $root.apply = (function() {
 
             /**
              * TransferOperation in.
-             * @member {Uint8Array} in
+             * @member {B4aBuffer} in
              * @memberof apply.operations.TransferOperation
              * @instance
              */
@@ -1870,7 +1805,7 @@ $root.apply = (function() {
 
             /**
              * TransferOperation is.
-             * @member {Uint8Array} is
+             * @member {B4aBuffer} is
              * @memberof apply.operations.TransferOperation
              * @instance
              */
@@ -1878,7 +1813,7 @@ $root.apply = (function() {
 
             /**
              * TransferOperation va.
-             * @member {Uint8Array} va
+             * @member {B4aBuffer} va
              * @memberof apply.operations.TransferOperation
              * @instance
              */
@@ -1886,7 +1821,7 @@ $root.apply = (function() {
 
             /**
              * TransferOperation vn.
-             * @member {Uint8Array} vn
+             * @member {B4aBuffer} vn
              * @memberof apply.operations.TransferOperation
              * @instance
              */
@@ -1894,7 +1829,7 @@ $root.apply = (function() {
 
             /**
              * TransferOperation vs.
-             * @member {Uint8Array} vs
+             * @member {B4aBuffer} vs
              * @memberof apply.operations.TransferOperation
              * @instance
              */
@@ -1922,8 +1857,7 @@ $root.apply = (function() {
              * @returns {$protobuf.Writer} Writer
              */
             TransferOperation.encode = function encode(message, writer) {
-                if (!writer)
-                    writer = $Writer.create();
+                writer = $Writer.create(writer);
                 if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
                     writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.tx);
                 if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
@@ -1963,15 +1897,14 @@ $root.apply = (function() {
              * @function decode
              * @memberof apply.operations.TransferOperation
              * @static
-             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
              * @param {number} [length] Message length if known beforehand
              * @returns {apply.operations.TransferOperation} TransferOperation
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
             TransferOperation.decode = function decode(reader, length, error) {
-                if (!(reader instanceof $Reader))
-                    reader = $Reader.create(reader);
+                reader = $Reader.create(reader);
                 var end = length === undefined ? reader.len : reader.pos + length, message = new $root.apply.operations.TransferOperation();
                 while (reader.pos < end) {
                     var tag = reader.uint32();
@@ -1979,39 +1912,39 @@ $root.apply = (function() {
                         break;
                     switch (tag >>> 3) {
                     case 1: {
-                            message.tx = reader.bytes();
+                            message.tx = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 2: {
-                            message.txv = reader.bytes();
+                            message.txv = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 3: {
-                            message.to = reader.bytes();
+                            message.to = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 4: {
-                            message.am = reader.bytes();
+                            message.am = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 5: {
-                            message["in"] = reader.bytes();
+                            message["in"] = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 6: {
-                            message.is = reader.bytes();
+                            message.is = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 7: {
-                            message.va = reader.bytes();
+                            message.va = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 8: {
-                            message.vn = reader.bytes();
+                            message.vn = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 9: {
-                            message.vs = reader.bytes();
+                            message.vs = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     default:
@@ -2027,14 +1960,13 @@ $root.apply = (function() {
              * @function decodeDelimited
              * @memberof apply.operations.TransferOperation
              * @static
-             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
              * @returns {apply.operations.TransferOperation} TransferOperation
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
             TransferOperation.decodeDelimited = function decodeDelimited(reader) {
-                if (!(reader instanceof $Reader))
-                    reader = new $Reader(reader);
+                reader = $Reader.create(reader);
                 return this.decode(reader, reader.uint32());
             };
 
@@ -2050,31 +1982,31 @@ $root.apply = (function() {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
                 if (message.tx != null && message.hasOwnProperty("tx"))
-                    if (!(message.tx && typeof message.tx.length === "number" || $util.isString(message.tx)))
+                    if (!$util.isBytes(message.tx))
                         return "tx: buffer expected";
                 if (message.txv != null && message.hasOwnProperty("txv"))
-                    if (!(message.txv && typeof message.txv.length === "number" || $util.isString(message.txv)))
+                    if (!$util.isBytes(message.txv))
                         return "txv: buffer expected";
                 if (message.to != null && message.hasOwnProperty("to"))
-                    if (!(message.to && typeof message.to.length === "number" || $util.isString(message.to)))
+                    if (!$util.isBytes(message.to))
                         return "to: buffer expected";
                 if (message.am != null && message.hasOwnProperty("am"))
-                    if (!(message.am && typeof message.am.length === "number" || $util.isString(message.am)))
+                    if (!$util.isBytes(message.am))
                         return "am: buffer expected";
                 if (message["in"] != null && message.hasOwnProperty("in"))
-                    if (!(message["in"] && typeof message["in"].length === "number" || $util.isString(message["in"])))
+                    if (!$util.isBytes(message["in"]))
                         return "in: buffer expected";
                 if (message.is != null && message.hasOwnProperty("is"))
-                    if (!(message.is && typeof message.is.length === "number" || $util.isString(message.is)))
+                    if (!$util.isBytes(message.is))
                         return "is: buffer expected";
                 if (message.va != null && message.hasOwnProperty("va"))
-                    if (!(message.va && typeof message.va.length === "number" || $util.isString(message.va)))
+                    if (!$util.isBytes(message.va))
                         return "va: buffer expected";
                 if (message.vn != null && message.hasOwnProperty("vn"))
-                    if (!(message.vn && typeof message.vn.length === "number" || $util.isString(message.vn)))
+                    if (!$util.isBytes(message.vn))
                         return "vn: buffer expected";
                 if (message.vs != null && message.hasOwnProperty("vs"))
-                    if (!(message.vs && typeof message.vs.length === "number" || $util.isString(message.vs)))
+                    if (!$util.isBytes(message.vs))
                         return "vs: buffer expected";
                 return null;
             };
@@ -2089,53 +2021,26 @@ $root.apply = (function() {
              */
             TransferOperation.fromObject = function fromObject(object) {
                 if (object instanceof $root.apply.operations.TransferOperation)
-                    return object;
+                    object = Object.assign({}, object);
                 var message = new $root.apply.operations.TransferOperation();
                 if (object.tx != null)
-                    if (typeof object.tx === "string")
-                        $util.base64.decode(object.tx, message.tx = $util.newBuffer($util.base64.length(object.tx)), 0);
-                    else if (object.tx.length >= 0)
-                        message.tx = object.tx;
+                    message.tx = $util.bytesFrom(object.tx);
                 if (object.txv != null)
-                    if (typeof object.txv === "string")
-                        $util.base64.decode(object.txv, message.txv = $util.newBuffer($util.base64.length(object.txv)), 0);
-                    else if (object.txv.length >= 0)
-                        message.txv = object.txv;
+                    message.txv = $util.bytesFrom(object.txv);
                 if (object.to != null)
-                    if (typeof object.to === "string")
-                        $util.base64.decode(object.to, message.to = $util.newBuffer($util.base64.length(object.to)), 0);
-                    else if (object.to.length >= 0)
-                        message.to = object.to;
+                    message.to = $util.bytesFrom(object.to);
                 if (object.am != null)
-                    if (typeof object.am === "string")
-                        $util.base64.decode(object.am, message.am = $util.newBuffer($util.base64.length(object.am)), 0);
-                    else if (object.am.length >= 0)
-                        message.am = object.am;
+                    message.am = $util.bytesFrom(object.am);
                 if (object["in"] != null)
-                    if (typeof object["in"] === "string")
-                        $util.base64.decode(object["in"], message["in"] = $util.newBuffer($util.base64.length(object["in"])), 0);
-                    else if (object["in"].length >= 0)
-                        message["in"] = object["in"];
+                    message["in"] = $util.bytesFrom(object["in"]);
                 if (object.is != null)
-                    if (typeof object.is === "string")
-                        $util.base64.decode(object.is, message.is = $util.newBuffer($util.base64.length(object.is)), 0);
-                    else if (object.is.length >= 0)
-                        message.is = object.is;
+                    message.is = $util.bytesFrom(object.is);
                 if (object.va != null)
-                    if (typeof object.va === "string")
-                        $util.base64.decode(object.va, message.va = $util.newBuffer($util.base64.length(object.va)), 0);
-                    else if (object.va.length >= 0)
-                        message.va = object.va;
+                    message.va = $util.bytesFrom(object.va);
                 if (object.vn != null)
-                    if (typeof object.vn === "string")
-                        $util.base64.decode(object.vn, message.vn = $util.newBuffer($util.base64.length(object.vn)), 0);
-                    else if (object.vn.length >= 0)
-                        message.vn = object.vn;
+                    message.vn = $util.bytesFrom(object.vn);
                 if (object.vs != null)
-                    if (typeof object.vs === "string")
-                        $util.base64.decode(object.vs, message.vs = $util.newBuffer($util.base64.length(object.vs)), 0);
-                    else if (object.vs.length >= 0)
-                        message.vs = object.vs;
+                    message.vs = $util.bytesFrom(object.vs);
                 return message;
             };
 
@@ -2218,23 +2123,23 @@ $root.apply = (function() {
                     }
                 }
                 if (message.tx != null && message.hasOwnProperty("tx"))
-                    object.tx = options.bytes === String ? $util.base64.encode(message.tx, 0, message.tx.length) : options.bytes === Array ? Array.prototype.slice.call(message.tx) : message.tx;
+                    object.tx = $util.bytesTo(message.tx, options);
                 if (message.txv != null && message.hasOwnProperty("txv"))
-                    object.txv = options.bytes === String ? $util.base64.encode(message.txv, 0, message.txv.length) : options.bytes === Array ? Array.prototype.slice.call(message.txv) : message.txv;
+                    object.txv = $util.bytesTo(message.txv, options);
                 if (message.to != null && message.hasOwnProperty("to"))
-                    object.to = options.bytes === String ? $util.base64.encode(message.to, 0, message.to.length) : options.bytes === Array ? Array.prototype.slice.call(message.to) : message.to;
+                    object.to = $util.bytesTo(message.to, options);
                 if (message.am != null && message.hasOwnProperty("am"))
-                    object.am = options.bytes === String ? $util.base64.encode(message.am, 0, message.am.length) : options.bytes === Array ? Array.prototype.slice.call(message.am) : message.am;
+                    object.am = $util.bytesTo(message.am, options);
                 if (message["in"] != null && message.hasOwnProperty("in"))
-                    object["in"] = options.bytes === String ? $util.base64.encode(message["in"], 0, message["in"].length) : options.bytes === Array ? Array.prototype.slice.call(message["in"]) : message["in"];
+                    object["in"] = $util.bytesTo(message["in"], options);
                 if (message.is != null && message.hasOwnProperty("is"))
-                    object.is = options.bytes === String ? $util.base64.encode(message.is, 0, message.is.length) : options.bytes === Array ? Array.prototype.slice.call(message.is) : message.is;
+                    object.is = $util.bytesTo(message.is, options);
                 if (message.va != null && message.hasOwnProperty("va"))
-                    object.va = options.bytes === String ? $util.base64.encode(message.va, 0, message.va.length) : options.bytes === Array ? Array.prototype.slice.call(message.va) : message.va;
+                    object.va = $util.bytesTo(message.va, options);
                 if (message.vn != null && message.hasOwnProperty("vn"))
-                    object.vn = options.bytes === String ? $util.base64.encode(message.vn, 0, message.vn.length) : options.bytes === Array ? Array.prototype.slice.call(message.vn) : message.vn;
+                    object.vn = $util.bytesTo(message.vn, options);
                 if (message.vs != null && message.hasOwnProperty("vs"))
-                    object.vs = options.bytes === String ? $util.base64.encode(message.vs, 0, message.vs.length) : options.bytes === Array ? Array.prototype.slice.call(message.vs) : message.vs;
+                    object.vs = $util.bytesTo(message.vs, options);
                 return object;
             };
 
@@ -2273,14 +2178,14 @@ $root.apply = (function() {
              * Properties of a RoleAccessOperation.
              * @memberof apply.operations
              * @interface IRoleAccessOperation
-             * @property {Uint8Array|null} [tx] RoleAccessOperation tx
-             * @property {Uint8Array|null} [txv] RoleAccessOperation txv
-             * @property {Uint8Array|null} [iw] RoleAccessOperation iw
-             * @property {Uint8Array|null} ["in"] RoleAccessOperation in
-             * @property {Uint8Array|null} [is] RoleAccessOperation is
-             * @property {Uint8Array|null} [va] RoleAccessOperation va
-             * @property {Uint8Array|null} [vn] RoleAccessOperation vn
-             * @property {Uint8Array|null} [vs] RoleAccessOperation vs
+             * @property {B4aBuffer|null} [tx] RoleAccessOperation tx
+             * @property {B4aBuffer|null} [txv] RoleAccessOperation txv
+             * @property {B4aBuffer|null} [iw] RoleAccessOperation iw
+             * @property {B4aBuffer|null} ["in"] RoleAccessOperation in
+             * @property {B4aBuffer|null} [is] RoleAccessOperation is
+             * @property {B4aBuffer|null} [va] RoleAccessOperation va
+             * @property {B4aBuffer|null} [vn] RoleAccessOperation vn
+             * @property {B4aBuffer|null} [vs] RoleAccessOperation vs
              */
 
             /**
@@ -2300,7 +2205,7 @@ $root.apply = (function() {
 
             /**
              * RoleAccessOperation tx.
-             * @member {Uint8Array} tx
+             * @member {B4aBuffer} tx
              * @memberof apply.operations.RoleAccessOperation
              * @instance
              */
@@ -2308,7 +2213,7 @@ $root.apply = (function() {
 
             /**
              * RoleAccessOperation txv.
-             * @member {Uint8Array} txv
+             * @member {B4aBuffer} txv
              * @memberof apply.operations.RoleAccessOperation
              * @instance
              */
@@ -2316,7 +2221,7 @@ $root.apply = (function() {
 
             /**
              * RoleAccessOperation iw.
-             * @member {Uint8Array} iw
+             * @member {B4aBuffer} iw
              * @memberof apply.operations.RoleAccessOperation
              * @instance
              */
@@ -2324,7 +2229,7 @@ $root.apply = (function() {
 
             /**
              * RoleAccessOperation in.
-             * @member {Uint8Array} in
+             * @member {B4aBuffer} in
              * @memberof apply.operations.RoleAccessOperation
              * @instance
              */
@@ -2332,7 +2237,7 @@ $root.apply = (function() {
 
             /**
              * RoleAccessOperation is.
-             * @member {Uint8Array} is
+             * @member {B4aBuffer} is
              * @memberof apply.operations.RoleAccessOperation
              * @instance
              */
@@ -2340,7 +2245,7 @@ $root.apply = (function() {
 
             /**
              * RoleAccessOperation va.
-             * @member {Uint8Array} va
+             * @member {B4aBuffer} va
              * @memberof apply.operations.RoleAccessOperation
              * @instance
              */
@@ -2348,7 +2253,7 @@ $root.apply = (function() {
 
             /**
              * RoleAccessOperation vn.
-             * @member {Uint8Array} vn
+             * @member {B4aBuffer} vn
              * @memberof apply.operations.RoleAccessOperation
              * @instance
              */
@@ -2356,7 +2261,7 @@ $root.apply = (function() {
 
             /**
              * RoleAccessOperation vs.
-             * @member {Uint8Array} vs
+             * @member {B4aBuffer} vs
              * @memberof apply.operations.RoleAccessOperation
              * @instance
              */
@@ -2384,8 +2289,7 @@ $root.apply = (function() {
              * @returns {$protobuf.Writer} Writer
              */
             RoleAccessOperation.encode = function encode(message, writer) {
-                if (!writer)
-                    writer = $Writer.create();
+                writer = $Writer.create(writer);
                 if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
                     writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.tx);
                 if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
@@ -2423,15 +2327,14 @@ $root.apply = (function() {
              * @function decode
              * @memberof apply.operations.RoleAccessOperation
              * @static
-             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
              * @param {number} [length] Message length if known beforehand
              * @returns {apply.operations.RoleAccessOperation} RoleAccessOperation
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
             RoleAccessOperation.decode = function decode(reader, length, error) {
-                if (!(reader instanceof $Reader))
-                    reader = $Reader.create(reader);
+                reader = $Reader.create(reader);
                 var end = length === undefined ? reader.len : reader.pos + length, message = new $root.apply.operations.RoleAccessOperation();
                 while (reader.pos < end) {
                     var tag = reader.uint32();
@@ -2439,35 +2342,35 @@ $root.apply = (function() {
                         break;
                     switch (tag >>> 3) {
                     case 1: {
-                            message.tx = reader.bytes();
+                            message.tx = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 2: {
-                            message.txv = reader.bytes();
+                            message.txv = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 3: {
-                            message.iw = reader.bytes();
+                            message.iw = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 4: {
-                            message["in"] = reader.bytes();
+                            message["in"] = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 5: {
-                            message.is = reader.bytes();
+                            message.is = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 6: {
-                            message.va = reader.bytes();
+                            message.va = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 7: {
-                            message.vn = reader.bytes();
+                            message.vn = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 8: {
-                            message.vs = reader.bytes();
+                            message.vs = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     default:
@@ -2483,14 +2386,13 @@ $root.apply = (function() {
              * @function decodeDelimited
              * @memberof apply.operations.RoleAccessOperation
              * @static
-             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
              * @returns {apply.operations.RoleAccessOperation} RoleAccessOperation
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
             RoleAccessOperation.decodeDelimited = function decodeDelimited(reader) {
-                if (!(reader instanceof $Reader))
-                    reader = new $Reader(reader);
+                reader = $Reader.create(reader);
                 return this.decode(reader, reader.uint32());
             };
 
@@ -2506,28 +2408,28 @@ $root.apply = (function() {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
                 if (message.tx != null && message.hasOwnProperty("tx"))
-                    if (!(message.tx && typeof message.tx.length === "number" || $util.isString(message.tx)))
+                    if (!$util.isBytes(message.tx))
                         return "tx: buffer expected";
                 if (message.txv != null && message.hasOwnProperty("txv"))
-                    if (!(message.txv && typeof message.txv.length === "number" || $util.isString(message.txv)))
+                    if (!$util.isBytes(message.txv))
                         return "txv: buffer expected";
                 if (message.iw != null && message.hasOwnProperty("iw"))
-                    if (!(message.iw && typeof message.iw.length === "number" || $util.isString(message.iw)))
+                    if (!$util.isBytes(message.iw))
                         return "iw: buffer expected";
                 if (message["in"] != null && message.hasOwnProperty("in"))
-                    if (!(message["in"] && typeof message["in"].length === "number" || $util.isString(message["in"])))
+                    if (!$util.isBytes(message["in"]))
                         return "in: buffer expected";
                 if (message.is != null && message.hasOwnProperty("is"))
-                    if (!(message.is && typeof message.is.length === "number" || $util.isString(message.is)))
+                    if (!$util.isBytes(message.is))
                         return "is: buffer expected";
                 if (message.va != null && message.hasOwnProperty("va"))
-                    if (!(message.va && typeof message.va.length === "number" || $util.isString(message.va)))
+                    if (!$util.isBytes(message.va))
                         return "va: buffer expected";
                 if (message.vn != null && message.hasOwnProperty("vn"))
-                    if (!(message.vn && typeof message.vn.length === "number" || $util.isString(message.vn)))
+                    if (!$util.isBytes(message.vn))
                         return "vn: buffer expected";
                 if (message.vs != null && message.hasOwnProperty("vs"))
-                    if (!(message.vs && typeof message.vs.length === "number" || $util.isString(message.vs)))
+                    if (!$util.isBytes(message.vs))
                         return "vs: buffer expected";
                 return null;
             };
@@ -2542,48 +2444,24 @@ $root.apply = (function() {
              */
             RoleAccessOperation.fromObject = function fromObject(object) {
                 if (object instanceof $root.apply.operations.RoleAccessOperation)
-                    return object;
+                    object = Object.assign({}, object);
                 var message = new $root.apply.operations.RoleAccessOperation();
                 if (object.tx != null)
-                    if (typeof object.tx === "string")
-                        $util.base64.decode(object.tx, message.tx = $util.newBuffer($util.base64.length(object.tx)), 0);
-                    else if (object.tx.length >= 0)
-                        message.tx = object.tx;
+                    message.tx = $util.bytesFrom(object.tx);
                 if (object.txv != null)
-                    if (typeof object.txv === "string")
-                        $util.base64.decode(object.txv, message.txv = $util.newBuffer($util.base64.length(object.txv)), 0);
-                    else if (object.txv.length >= 0)
-                        message.txv = object.txv;
+                    message.txv = $util.bytesFrom(object.txv);
                 if (object.iw != null)
-                    if (typeof object.iw === "string")
-                        $util.base64.decode(object.iw, message.iw = $util.newBuffer($util.base64.length(object.iw)), 0);
-                    else if (object.iw.length >= 0)
-                        message.iw = object.iw;
+                    message.iw = $util.bytesFrom(object.iw);
                 if (object["in"] != null)
-                    if (typeof object["in"] === "string")
-                        $util.base64.decode(object["in"], message["in"] = $util.newBuffer($util.base64.length(object["in"])), 0);
-                    else if (object["in"].length >= 0)
-                        message["in"] = object["in"];
+                    message["in"] = $util.bytesFrom(object["in"]);
                 if (object.is != null)
-                    if (typeof object.is === "string")
-                        $util.base64.decode(object.is, message.is = $util.newBuffer($util.base64.length(object.is)), 0);
-                    else if (object.is.length >= 0)
-                        message.is = object.is;
+                    message.is = $util.bytesFrom(object.is);
                 if (object.va != null)
-                    if (typeof object.va === "string")
-                        $util.base64.decode(object.va, message.va = $util.newBuffer($util.base64.length(object.va)), 0);
-                    else if (object.va.length >= 0)
-                        message.va = object.va;
+                    message.va = $util.bytesFrom(object.va);
                 if (object.vn != null)
-                    if (typeof object.vn === "string")
-                        $util.base64.decode(object.vn, message.vn = $util.newBuffer($util.base64.length(object.vn)), 0);
-                    else if (object.vn.length >= 0)
-                        message.vn = object.vn;
+                    message.vn = $util.bytesFrom(object.vn);
                 if (object.vs != null)
-                    if (typeof object.vs === "string")
-                        $util.base64.decode(object.vs, message.vs = $util.newBuffer($util.base64.length(object.vs)), 0);
-                    else if (object.vs.length >= 0)
-                        message.vs = object.vs;
+                    message.vs = $util.bytesFrom(object.vs);
                 return message;
             };
 
@@ -2659,21 +2537,21 @@ $root.apply = (function() {
                     }
                 }
                 if (message.tx != null && message.hasOwnProperty("tx"))
-                    object.tx = options.bytes === String ? $util.base64.encode(message.tx, 0, message.tx.length) : options.bytes === Array ? Array.prototype.slice.call(message.tx) : message.tx;
+                    object.tx = $util.bytesTo(message.tx, options);
                 if (message.txv != null && message.hasOwnProperty("txv"))
-                    object.txv = options.bytes === String ? $util.base64.encode(message.txv, 0, message.txv.length) : options.bytes === Array ? Array.prototype.slice.call(message.txv) : message.txv;
+                    object.txv = $util.bytesTo(message.txv, options);
                 if (message.iw != null && message.hasOwnProperty("iw"))
-                    object.iw = options.bytes === String ? $util.base64.encode(message.iw, 0, message.iw.length) : options.bytes === Array ? Array.prototype.slice.call(message.iw) : message.iw;
+                    object.iw = $util.bytesTo(message.iw, options);
                 if (message["in"] != null && message.hasOwnProperty("in"))
-                    object["in"] = options.bytes === String ? $util.base64.encode(message["in"], 0, message["in"].length) : options.bytes === Array ? Array.prototype.slice.call(message["in"]) : message["in"];
+                    object["in"] = $util.bytesTo(message["in"], options);
                 if (message.is != null && message.hasOwnProperty("is"))
-                    object.is = options.bytes === String ? $util.base64.encode(message.is, 0, message.is.length) : options.bytes === Array ? Array.prototype.slice.call(message.is) : message.is;
+                    object.is = $util.bytesTo(message.is, options);
                 if (message.va != null && message.hasOwnProperty("va"))
-                    object.va = options.bytes === String ? $util.base64.encode(message.va, 0, message.va.length) : options.bytes === Array ? Array.prototype.slice.call(message.va) : message.va;
+                    object.va = $util.bytesTo(message.va, options);
                 if (message.vn != null && message.hasOwnProperty("vn"))
-                    object.vn = options.bytes === String ? $util.base64.encode(message.vn, 0, message.vn.length) : options.bytes === Array ? Array.prototype.slice.call(message.vn) : message.vn;
+                    object.vn = $util.bytesTo(message.vn, options);
                 if (message.vs != null && message.hasOwnProperty("vs"))
-                    object.vs = options.bytes === String ? $util.base64.encode(message.vs, 0, message.vs.length) : options.bytes === Array ? Array.prototype.slice.call(message.vs) : message.vs;
+                    object.vs = $util.bytesTo(message.vs, options);
                 return object;
             };
 
@@ -2712,15 +2590,15 @@ $root.apply = (function() {
              * Properties of a BootstrapDeploymentOperation.
              * @memberof apply.operations
              * @interface IBootstrapDeploymentOperation
-             * @property {Uint8Array|null} [tx] BootstrapDeploymentOperation tx
-             * @property {Uint8Array|null} [txv] BootstrapDeploymentOperation txv
-             * @property {Uint8Array|null} [bs] BootstrapDeploymentOperation bs
-             * @property {Uint8Array|null} [ic] BootstrapDeploymentOperation ic
-             * @property {Uint8Array|null} ["in"] BootstrapDeploymentOperation in
-             * @property {Uint8Array|null} [is] BootstrapDeploymentOperation is
-             * @property {Uint8Array|null} [va] BootstrapDeploymentOperation va
-             * @property {Uint8Array|null} [vn] BootstrapDeploymentOperation vn
-             * @property {Uint8Array|null} [vs] BootstrapDeploymentOperation vs
+             * @property {B4aBuffer|null} [tx] BootstrapDeploymentOperation tx
+             * @property {B4aBuffer|null} [txv] BootstrapDeploymentOperation txv
+             * @property {B4aBuffer|null} [bs] BootstrapDeploymentOperation bs
+             * @property {B4aBuffer|null} [ic] BootstrapDeploymentOperation ic
+             * @property {B4aBuffer|null} ["in"] BootstrapDeploymentOperation in
+             * @property {B4aBuffer|null} [is] BootstrapDeploymentOperation is
+             * @property {B4aBuffer|null} [va] BootstrapDeploymentOperation va
+             * @property {B4aBuffer|null} [vn] BootstrapDeploymentOperation vn
+             * @property {B4aBuffer|null} [vs] BootstrapDeploymentOperation vs
              */
 
             /**
@@ -2740,7 +2618,7 @@ $root.apply = (function() {
 
             /**
              * BootstrapDeploymentOperation tx.
-             * @member {Uint8Array} tx
+             * @member {B4aBuffer} tx
              * @memberof apply.operations.BootstrapDeploymentOperation
              * @instance
              */
@@ -2748,7 +2626,7 @@ $root.apply = (function() {
 
             /**
              * BootstrapDeploymentOperation txv.
-             * @member {Uint8Array} txv
+             * @member {B4aBuffer} txv
              * @memberof apply.operations.BootstrapDeploymentOperation
              * @instance
              */
@@ -2756,7 +2634,7 @@ $root.apply = (function() {
 
             /**
              * BootstrapDeploymentOperation bs.
-             * @member {Uint8Array} bs
+             * @member {B4aBuffer} bs
              * @memberof apply.operations.BootstrapDeploymentOperation
              * @instance
              */
@@ -2764,7 +2642,7 @@ $root.apply = (function() {
 
             /**
              * BootstrapDeploymentOperation ic.
-             * @member {Uint8Array} ic
+             * @member {B4aBuffer} ic
              * @memberof apply.operations.BootstrapDeploymentOperation
              * @instance
              */
@@ -2772,7 +2650,7 @@ $root.apply = (function() {
 
             /**
              * BootstrapDeploymentOperation in.
-             * @member {Uint8Array} in
+             * @member {B4aBuffer} in
              * @memberof apply.operations.BootstrapDeploymentOperation
              * @instance
              */
@@ -2780,7 +2658,7 @@ $root.apply = (function() {
 
             /**
              * BootstrapDeploymentOperation is.
-             * @member {Uint8Array} is
+             * @member {B4aBuffer} is
              * @memberof apply.operations.BootstrapDeploymentOperation
              * @instance
              */
@@ -2788,7 +2666,7 @@ $root.apply = (function() {
 
             /**
              * BootstrapDeploymentOperation va.
-             * @member {Uint8Array} va
+             * @member {B4aBuffer} va
              * @memberof apply.operations.BootstrapDeploymentOperation
              * @instance
              */
@@ -2796,7 +2674,7 @@ $root.apply = (function() {
 
             /**
              * BootstrapDeploymentOperation vn.
-             * @member {Uint8Array} vn
+             * @member {B4aBuffer} vn
              * @memberof apply.operations.BootstrapDeploymentOperation
              * @instance
              */
@@ -2804,7 +2682,7 @@ $root.apply = (function() {
 
             /**
              * BootstrapDeploymentOperation vs.
-             * @member {Uint8Array} vs
+             * @member {B4aBuffer} vs
              * @memberof apply.operations.BootstrapDeploymentOperation
              * @instance
              */
@@ -2832,8 +2710,7 @@ $root.apply = (function() {
              * @returns {$protobuf.Writer} Writer
              */
             BootstrapDeploymentOperation.encode = function encode(message, writer) {
-                if (!writer)
-                    writer = $Writer.create();
+                writer = $Writer.create(writer);
                 if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
                     writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.tx);
                 if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
@@ -2873,15 +2750,14 @@ $root.apply = (function() {
              * @function decode
              * @memberof apply.operations.BootstrapDeploymentOperation
              * @static
-             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
              * @param {number} [length] Message length if known beforehand
              * @returns {apply.operations.BootstrapDeploymentOperation} BootstrapDeploymentOperation
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
             BootstrapDeploymentOperation.decode = function decode(reader, length, error) {
-                if (!(reader instanceof $Reader))
-                    reader = $Reader.create(reader);
+                reader = $Reader.create(reader);
                 var end = length === undefined ? reader.len : reader.pos + length, message = new $root.apply.operations.BootstrapDeploymentOperation();
                 while (reader.pos < end) {
                     var tag = reader.uint32();
@@ -2889,39 +2765,39 @@ $root.apply = (function() {
                         break;
                     switch (tag >>> 3) {
                     case 1: {
-                            message.tx = reader.bytes();
+                            message.tx = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 2: {
-                            message.txv = reader.bytes();
+                            message.txv = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 3: {
-                            message.bs = reader.bytes();
+                            message.bs = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 4: {
-                            message.ic = reader.bytes();
+                            message.ic = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 5: {
-                            message["in"] = reader.bytes();
+                            message["in"] = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 6: {
-                            message.is = reader.bytes();
+                            message.is = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 7: {
-                            message.va = reader.bytes();
+                            message.va = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 8: {
-                            message.vn = reader.bytes();
+                            message.vn = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 9: {
-                            message.vs = reader.bytes();
+                            message.vs = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     default:
@@ -2937,14 +2813,13 @@ $root.apply = (function() {
              * @function decodeDelimited
              * @memberof apply.operations.BootstrapDeploymentOperation
              * @static
-             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
              * @returns {apply.operations.BootstrapDeploymentOperation} BootstrapDeploymentOperation
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
             BootstrapDeploymentOperation.decodeDelimited = function decodeDelimited(reader) {
-                if (!(reader instanceof $Reader))
-                    reader = new $Reader(reader);
+                reader = $Reader.create(reader);
                 return this.decode(reader, reader.uint32());
             };
 
@@ -2960,31 +2835,31 @@ $root.apply = (function() {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
                 if (message.tx != null && message.hasOwnProperty("tx"))
-                    if (!(message.tx && typeof message.tx.length === "number" || $util.isString(message.tx)))
+                    if (!$util.isBytes(message.tx))
                         return "tx: buffer expected";
                 if (message.txv != null && message.hasOwnProperty("txv"))
-                    if (!(message.txv && typeof message.txv.length === "number" || $util.isString(message.txv)))
+                    if (!$util.isBytes(message.txv))
                         return "txv: buffer expected";
                 if (message.bs != null && message.hasOwnProperty("bs"))
-                    if (!(message.bs && typeof message.bs.length === "number" || $util.isString(message.bs)))
+                    if (!$util.isBytes(message.bs))
                         return "bs: buffer expected";
                 if (message.ic != null && message.hasOwnProperty("ic"))
-                    if (!(message.ic && typeof message.ic.length === "number" || $util.isString(message.ic)))
+                    if (!$util.isBytes(message.ic))
                         return "ic: buffer expected";
                 if (message["in"] != null && message.hasOwnProperty("in"))
-                    if (!(message["in"] && typeof message["in"].length === "number" || $util.isString(message["in"])))
+                    if (!$util.isBytes(message["in"]))
                         return "in: buffer expected";
                 if (message.is != null && message.hasOwnProperty("is"))
-                    if (!(message.is && typeof message.is.length === "number" || $util.isString(message.is)))
+                    if (!$util.isBytes(message.is))
                         return "is: buffer expected";
                 if (message.va != null && message.hasOwnProperty("va"))
-                    if (!(message.va && typeof message.va.length === "number" || $util.isString(message.va)))
+                    if (!$util.isBytes(message.va))
                         return "va: buffer expected";
                 if (message.vn != null && message.hasOwnProperty("vn"))
-                    if (!(message.vn && typeof message.vn.length === "number" || $util.isString(message.vn)))
+                    if (!$util.isBytes(message.vn))
                         return "vn: buffer expected";
                 if (message.vs != null && message.hasOwnProperty("vs"))
-                    if (!(message.vs && typeof message.vs.length === "number" || $util.isString(message.vs)))
+                    if (!$util.isBytes(message.vs))
                         return "vs: buffer expected";
                 return null;
             };
@@ -2999,53 +2874,26 @@ $root.apply = (function() {
              */
             BootstrapDeploymentOperation.fromObject = function fromObject(object) {
                 if (object instanceof $root.apply.operations.BootstrapDeploymentOperation)
-                    return object;
+                    object = Object.assign({}, object);
                 var message = new $root.apply.operations.BootstrapDeploymentOperation();
                 if (object.tx != null)
-                    if (typeof object.tx === "string")
-                        $util.base64.decode(object.tx, message.tx = $util.newBuffer($util.base64.length(object.tx)), 0);
-                    else if (object.tx.length >= 0)
-                        message.tx = object.tx;
+                    message.tx = $util.bytesFrom(object.tx);
                 if (object.txv != null)
-                    if (typeof object.txv === "string")
-                        $util.base64.decode(object.txv, message.txv = $util.newBuffer($util.base64.length(object.txv)), 0);
-                    else if (object.txv.length >= 0)
-                        message.txv = object.txv;
+                    message.txv = $util.bytesFrom(object.txv);
                 if (object.bs != null)
-                    if (typeof object.bs === "string")
-                        $util.base64.decode(object.bs, message.bs = $util.newBuffer($util.base64.length(object.bs)), 0);
-                    else if (object.bs.length >= 0)
-                        message.bs = object.bs;
+                    message.bs = $util.bytesFrom(object.bs);
                 if (object.ic != null)
-                    if (typeof object.ic === "string")
-                        $util.base64.decode(object.ic, message.ic = $util.newBuffer($util.base64.length(object.ic)), 0);
-                    else if (object.ic.length >= 0)
-                        message.ic = object.ic;
+                    message.ic = $util.bytesFrom(object.ic);
                 if (object["in"] != null)
-                    if (typeof object["in"] === "string")
-                        $util.base64.decode(object["in"], message["in"] = $util.newBuffer($util.base64.length(object["in"])), 0);
-                    else if (object["in"].length >= 0)
-                        message["in"] = object["in"];
+                    message["in"] = $util.bytesFrom(object["in"]);
                 if (object.is != null)
-                    if (typeof object.is === "string")
-                        $util.base64.decode(object.is, message.is = $util.newBuffer($util.base64.length(object.is)), 0);
-                    else if (object.is.length >= 0)
-                        message.is = object.is;
+                    message.is = $util.bytesFrom(object.is);
                 if (object.va != null)
-                    if (typeof object.va === "string")
-                        $util.base64.decode(object.va, message.va = $util.newBuffer($util.base64.length(object.va)), 0);
-                    else if (object.va.length >= 0)
-                        message.va = object.va;
+                    message.va = $util.bytesFrom(object.va);
                 if (object.vn != null)
-                    if (typeof object.vn === "string")
-                        $util.base64.decode(object.vn, message.vn = $util.newBuffer($util.base64.length(object.vn)), 0);
-                    else if (object.vn.length >= 0)
-                        message.vn = object.vn;
+                    message.vn = $util.bytesFrom(object.vn);
                 if (object.vs != null)
-                    if (typeof object.vs === "string")
-                        $util.base64.decode(object.vs, message.vs = $util.newBuffer($util.base64.length(object.vs)), 0);
-                    else if (object.vs.length >= 0)
-                        message.vs = object.vs;
+                    message.vs = $util.bytesFrom(object.vs);
                 return message;
             };
 
@@ -3128,23 +2976,23 @@ $root.apply = (function() {
                     }
                 }
                 if (message.tx != null && message.hasOwnProperty("tx"))
-                    object.tx = options.bytes === String ? $util.base64.encode(message.tx, 0, message.tx.length) : options.bytes === Array ? Array.prototype.slice.call(message.tx) : message.tx;
+                    object.tx = $util.bytesTo(message.tx, options);
                 if (message.txv != null && message.hasOwnProperty("txv"))
-                    object.txv = options.bytes === String ? $util.base64.encode(message.txv, 0, message.txv.length) : options.bytes === Array ? Array.prototype.slice.call(message.txv) : message.txv;
+                    object.txv = $util.bytesTo(message.txv, options);
                 if (message.bs != null && message.hasOwnProperty("bs"))
-                    object.bs = options.bytes === String ? $util.base64.encode(message.bs, 0, message.bs.length) : options.bytes === Array ? Array.prototype.slice.call(message.bs) : message.bs;
+                    object.bs = $util.bytesTo(message.bs, options);
                 if (message.ic != null && message.hasOwnProperty("ic"))
-                    object.ic = options.bytes === String ? $util.base64.encode(message.ic, 0, message.ic.length) : options.bytes === Array ? Array.prototype.slice.call(message.ic) : message.ic;
+                    object.ic = $util.bytesTo(message.ic, options);
                 if (message["in"] != null && message.hasOwnProperty("in"))
-                    object["in"] = options.bytes === String ? $util.base64.encode(message["in"], 0, message["in"].length) : options.bytes === Array ? Array.prototype.slice.call(message["in"]) : message["in"];
+                    object["in"] = $util.bytesTo(message["in"], options);
                 if (message.is != null && message.hasOwnProperty("is"))
-                    object.is = options.bytes === String ? $util.base64.encode(message.is, 0, message.is.length) : options.bytes === Array ? Array.prototype.slice.call(message.is) : message.is;
+                    object.is = $util.bytesTo(message.is, options);
                 if (message.va != null && message.hasOwnProperty("va"))
-                    object.va = options.bytes === String ? $util.base64.encode(message.va, 0, message.va.length) : options.bytes === Array ? Array.prototype.slice.call(message.va) : message.va;
+                    object.va = $util.bytesTo(message.va, options);
                 if (message.vn != null && message.hasOwnProperty("vn"))
-                    object.vn = options.bytes === String ? $util.base64.encode(message.vn, 0, message.vn.length) : options.bytes === Array ? Array.prototype.slice.call(message.vn) : message.vn;
+                    object.vn = $util.bytesTo(message.vn, options);
                 if (message.vs != null && message.hasOwnProperty("vs"))
-                    object.vs = options.bytes === String ? $util.base64.encode(message.vs, 0, message.vs.length) : options.bytes === Array ? Array.prototype.slice.call(message.vs) : message.vs;
+                    object.vs = $util.bytesTo(message.vs, options);
                 return object;
             };
 
@@ -3183,17 +3031,17 @@ $root.apply = (function() {
              * Properties of a TxOperation.
              * @memberof apply.operations
              * @interface ITxOperation
-             * @property {Uint8Array|null} [tx] TxOperation tx
-             * @property {Uint8Array|null} [txv] TxOperation txv
-             * @property {Uint8Array|null} [iw] TxOperation iw
-             * @property {Uint8Array|null} [ch] TxOperation ch
-             * @property {Uint8Array|null} [bs] TxOperation bs
-             * @property {Uint8Array|null} [mbs] TxOperation mbs
-             * @property {Uint8Array|null} ["in"] TxOperation in
-             * @property {Uint8Array|null} [is] TxOperation is
-             * @property {Uint8Array|null} [va] TxOperation va
-             * @property {Uint8Array|null} [vn] TxOperation vn
-             * @property {Uint8Array|null} [vs] TxOperation vs
+             * @property {B4aBuffer|null} [tx] TxOperation tx
+             * @property {B4aBuffer|null} [txv] TxOperation txv
+             * @property {B4aBuffer|null} [iw] TxOperation iw
+             * @property {B4aBuffer|null} [ch] TxOperation ch
+             * @property {B4aBuffer|null} [bs] TxOperation bs
+             * @property {B4aBuffer|null} [mbs] TxOperation mbs
+             * @property {B4aBuffer|null} ["in"] TxOperation in
+             * @property {B4aBuffer|null} [is] TxOperation is
+             * @property {B4aBuffer|null} [va] TxOperation va
+             * @property {B4aBuffer|null} [vn] TxOperation vn
+             * @property {B4aBuffer|null} [vs] TxOperation vs
              */
 
             /**
@@ -3213,7 +3061,7 @@ $root.apply = (function() {
 
             /**
              * TxOperation tx.
-             * @member {Uint8Array} tx
+             * @member {B4aBuffer} tx
              * @memberof apply.operations.TxOperation
              * @instance
              */
@@ -3221,7 +3069,7 @@ $root.apply = (function() {
 
             /**
              * TxOperation txv.
-             * @member {Uint8Array} txv
+             * @member {B4aBuffer} txv
              * @memberof apply.operations.TxOperation
              * @instance
              */
@@ -3229,7 +3077,7 @@ $root.apply = (function() {
 
             /**
              * TxOperation iw.
-             * @member {Uint8Array} iw
+             * @member {B4aBuffer} iw
              * @memberof apply.operations.TxOperation
              * @instance
              */
@@ -3237,7 +3085,7 @@ $root.apply = (function() {
 
             /**
              * TxOperation ch.
-             * @member {Uint8Array} ch
+             * @member {B4aBuffer} ch
              * @memberof apply.operations.TxOperation
              * @instance
              */
@@ -3245,7 +3093,7 @@ $root.apply = (function() {
 
             /**
              * TxOperation bs.
-             * @member {Uint8Array} bs
+             * @member {B4aBuffer} bs
              * @memberof apply.operations.TxOperation
              * @instance
              */
@@ -3253,7 +3101,7 @@ $root.apply = (function() {
 
             /**
              * TxOperation mbs.
-             * @member {Uint8Array} mbs
+             * @member {B4aBuffer} mbs
              * @memberof apply.operations.TxOperation
              * @instance
              */
@@ -3261,7 +3109,7 @@ $root.apply = (function() {
 
             /**
              * TxOperation in.
-             * @member {Uint8Array} in
+             * @member {B4aBuffer} in
              * @memberof apply.operations.TxOperation
              * @instance
              */
@@ -3269,7 +3117,7 @@ $root.apply = (function() {
 
             /**
              * TxOperation is.
-             * @member {Uint8Array} is
+             * @member {B4aBuffer} is
              * @memberof apply.operations.TxOperation
              * @instance
              */
@@ -3277,7 +3125,7 @@ $root.apply = (function() {
 
             /**
              * TxOperation va.
-             * @member {Uint8Array} va
+             * @member {B4aBuffer} va
              * @memberof apply.operations.TxOperation
              * @instance
              */
@@ -3285,7 +3133,7 @@ $root.apply = (function() {
 
             /**
              * TxOperation vn.
-             * @member {Uint8Array} vn
+             * @member {B4aBuffer} vn
              * @memberof apply.operations.TxOperation
              * @instance
              */
@@ -3293,7 +3141,7 @@ $root.apply = (function() {
 
             /**
              * TxOperation vs.
-             * @member {Uint8Array} vs
+             * @member {B4aBuffer} vs
              * @memberof apply.operations.TxOperation
              * @instance
              */
@@ -3321,8 +3169,7 @@ $root.apply = (function() {
              * @returns {$protobuf.Writer} Writer
              */
             TxOperation.encode = function encode(message, writer) {
-                if (!writer)
-                    writer = $Writer.create();
+                writer = $Writer.create(writer);
                 if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
                     writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.tx);
                 if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
@@ -3366,15 +3213,14 @@ $root.apply = (function() {
              * @function decode
              * @memberof apply.operations.TxOperation
              * @static
-             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
              * @param {number} [length] Message length if known beforehand
              * @returns {apply.operations.TxOperation} TxOperation
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
             TxOperation.decode = function decode(reader, length, error) {
-                if (!(reader instanceof $Reader))
-                    reader = $Reader.create(reader);
+                reader = $Reader.create(reader);
                 var end = length === undefined ? reader.len : reader.pos + length, message = new $root.apply.operations.TxOperation();
                 while (reader.pos < end) {
                     var tag = reader.uint32();
@@ -3382,47 +3228,47 @@ $root.apply = (function() {
                         break;
                     switch (tag >>> 3) {
                     case 1: {
-                            message.tx = reader.bytes();
+                            message.tx = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 2: {
-                            message.txv = reader.bytes();
+                            message.txv = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 3: {
-                            message.iw = reader.bytes();
+                            message.iw = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 4: {
-                            message.ch = reader.bytes();
+                            message.ch = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 5: {
-                            message.bs = reader.bytes();
+                            message.bs = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 6: {
-                            message.mbs = reader.bytes();
+                            message.mbs = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 7: {
-                            message["in"] = reader.bytes();
+                            message["in"] = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 8: {
-                            message.is = reader.bytes();
+                            message.is = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 9: {
-                            message.va = reader.bytes();
+                            message.va = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 10: {
-                            message.vn = reader.bytes();
+                            message.vn = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 11: {
-                            message.vs = reader.bytes();
+                            message.vs = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     default:
@@ -3438,14 +3284,13 @@ $root.apply = (function() {
              * @function decodeDelimited
              * @memberof apply.operations.TxOperation
              * @static
-             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
              * @returns {apply.operations.TxOperation} TxOperation
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
             TxOperation.decodeDelimited = function decodeDelimited(reader) {
-                if (!(reader instanceof $Reader))
-                    reader = new $Reader(reader);
+                reader = $Reader.create(reader);
                 return this.decode(reader, reader.uint32());
             };
 
@@ -3461,37 +3306,37 @@ $root.apply = (function() {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
                 if (message.tx != null && message.hasOwnProperty("tx"))
-                    if (!(message.tx && typeof message.tx.length === "number" || $util.isString(message.tx)))
+                    if (!$util.isBytes(message.tx))
                         return "tx: buffer expected";
                 if (message.txv != null && message.hasOwnProperty("txv"))
-                    if (!(message.txv && typeof message.txv.length === "number" || $util.isString(message.txv)))
+                    if (!$util.isBytes(message.txv))
                         return "txv: buffer expected";
                 if (message.iw != null && message.hasOwnProperty("iw"))
-                    if (!(message.iw && typeof message.iw.length === "number" || $util.isString(message.iw)))
+                    if (!$util.isBytes(message.iw))
                         return "iw: buffer expected";
                 if (message.ch != null && message.hasOwnProperty("ch"))
-                    if (!(message.ch && typeof message.ch.length === "number" || $util.isString(message.ch)))
+                    if (!$util.isBytes(message.ch))
                         return "ch: buffer expected";
                 if (message.bs != null && message.hasOwnProperty("bs"))
-                    if (!(message.bs && typeof message.bs.length === "number" || $util.isString(message.bs)))
+                    if (!$util.isBytes(message.bs))
                         return "bs: buffer expected";
                 if (message.mbs != null && message.hasOwnProperty("mbs"))
-                    if (!(message.mbs && typeof message.mbs.length === "number" || $util.isString(message.mbs)))
+                    if (!$util.isBytes(message.mbs))
                         return "mbs: buffer expected";
                 if (message["in"] != null && message.hasOwnProperty("in"))
-                    if (!(message["in"] && typeof message["in"].length === "number" || $util.isString(message["in"])))
+                    if (!$util.isBytes(message["in"]))
                         return "in: buffer expected";
                 if (message.is != null && message.hasOwnProperty("is"))
-                    if (!(message.is && typeof message.is.length === "number" || $util.isString(message.is)))
+                    if (!$util.isBytes(message.is))
                         return "is: buffer expected";
                 if (message.va != null && message.hasOwnProperty("va"))
-                    if (!(message.va && typeof message.va.length === "number" || $util.isString(message.va)))
+                    if (!$util.isBytes(message.va))
                         return "va: buffer expected";
                 if (message.vn != null && message.hasOwnProperty("vn"))
-                    if (!(message.vn && typeof message.vn.length === "number" || $util.isString(message.vn)))
+                    if (!$util.isBytes(message.vn))
                         return "vn: buffer expected";
                 if (message.vs != null && message.hasOwnProperty("vs"))
-                    if (!(message.vs && typeof message.vs.length === "number" || $util.isString(message.vs)))
+                    if (!$util.isBytes(message.vs))
                         return "vs: buffer expected";
                 return null;
             };
@@ -3506,63 +3351,30 @@ $root.apply = (function() {
              */
             TxOperation.fromObject = function fromObject(object) {
                 if (object instanceof $root.apply.operations.TxOperation)
-                    return object;
+                    object = Object.assign({}, object);
                 var message = new $root.apply.operations.TxOperation();
                 if (object.tx != null)
-                    if (typeof object.tx === "string")
-                        $util.base64.decode(object.tx, message.tx = $util.newBuffer($util.base64.length(object.tx)), 0);
-                    else if (object.tx.length >= 0)
-                        message.tx = object.tx;
+                    message.tx = $util.bytesFrom(object.tx);
                 if (object.txv != null)
-                    if (typeof object.txv === "string")
-                        $util.base64.decode(object.txv, message.txv = $util.newBuffer($util.base64.length(object.txv)), 0);
-                    else if (object.txv.length >= 0)
-                        message.txv = object.txv;
+                    message.txv = $util.bytesFrom(object.txv);
                 if (object.iw != null)
-                    if (typeof object.iw === "string")
-                        $util.base64.decode(object.iw, message.iw = $util.newBuffer($util.base64.length(object.iw)), 0);
-                    else if (object.iw.length >= 0)
-                        message.iw = object.iw;
+                    message.iw = $util.bytesFrom(object.iw);
                 if (object.ch != null)
-                    if (typeof object.ch === "string")
-                        $util.base64.decode(object.ch, message.ch = $util.newBuffer($util.base64.length(object.ch)), 0);
-                    else if (object.ch.length >= 0)
-                        message.ch = object.ch;
+                    message.ch = $util.bytesFrom(object.ch);
                 if (object.bs != null)
-                    if (typeof object.bs === "string")
-                        $util.base64.decode(object.bs, message.bs = $util.newBuffer($util.base64.length(object.bs)), 0);
-                    else if (object.bs.length >= 0)
-                        message.bs = object.bs;
+                    message.bs = $util.bytesFrom(object.bs);
                 if (object.mbs != null)
-                    if (typeof object.mbs === "string")
-                        $util.base64.decode(object.mbs, message.mbs = $util.newBuffer($util.base64.length(object.mbs)), 0);
-                    else if (object.mbs.length >= 0)
-                        message.mbs = object.mbs;
+                    message.mbs = $util.bytesFrom(object.mbs);
                 if (object["in"] != null)
-                    if (typeof object["in"] === "string")
-                        $util.base64.decode(object["in"], message["in"] = $util.newBuffer($util.base64.length(object["in"])), 0);
-                    else if (object["in"].length >= 0)
-                        message["in"] = object["in"];
+                    message["in"] = $util.bytesFrom(object["in"]);
                 if (object.is != null)
-                    if (typeof object.is === "string")
-                        $util.base64.decode(object.is, message.is = $util.newBuffer($util.base64.length(object.is)), 0);
-                    else if (object.is.length >= 0)
-                        message.is = object.is;
+                    message.is = $util.bytesFrom(object.is);
                 if (object.va != null)
-                    if (typeof object.va === "string")
-                        $util.base64.decode(object.va, message.va = $util.newBuffer($util.base64.length(object.va)), 0);
-                    else if (object.va.length >= 0)
-                        message.va = object.va;
+                    message.va = $util.bytesFrom(object.va);
                 if (object.vn != null)
-                    if (typeof object.vn === "string")
-                        $util.base64.decode(object.vn, message.vn = $util.newBuffer($util.base64.length(object.vn)), 0);
-                    else if (object.vn.length >= 0)
-                        message.vn = object.vn;
+                    message.vn = $util.bytesFrom(object.vn);
                 if (object.vs != null)
-                    if (typeof object.vs === "string")
-                        $util.base64.decode(object.vs, message.vs = $util.newBuffer($util.base64.length(object.vs)), 0);
-                    else if (object.vs.length >= 0)
-                        message.vs = object.vs;
+                    message.vs = $util.bytesFrom(object.vs);
                 return message;
             };
 
@@ -3659,27 +3471,27 @@ $root.apply = (function() {
                     }
                 }
                 if (message.tx != null && message.hasOwnProperty("tx"))
-                    object.tx = options.bytes === String ? $util.base64.encode(message.tx, 0, message.tx.length) : options.bytes === Array ? Array.prototype.slice.call(message.tx) : message.tx;
+                    object.tx = $util.bytesTo(message.tx, options);
                 if (message.txv != null && message.hasOwnProperty("txv"))
-                    object.txv = options.bytes === String ? $util.base64.encode(message.txv, 0, message.txv.length) : options.bytes === Array ? Array.prototype.slice.call(message.txv) : message.txv;
+                    object.txv = $util.bytesTo(message.txv, options);
                 if (message.iw != null && message.hasOwnProperty("iw"))
-                    object.iw = options.bytes === String ? $util.base64.encode(message.iw, 0, message.iw.length) : options.bytes === Array ? Array.prototype.slice.call(message.iw) : message.iw;
+                    object.iw = $util.bytesTo(message.iw, options);
                 if (message.ch != null && message.hasOwnProperty("ch"))
-                    object.ch = options.bytes === String ? $util.base64.encode(message.ch, 0, message.ch.length) : options.bytes === Array ? Array.prototype.slice.call(message.ch) : message.ch;
+                    object.ch = $util.bytesTo(message.ch, options);
                 if (message.bs != null && message.hasOwnProperty("bs"))
-                    object.bs = options.bytes === String ? $util.base64.encode(message.bs, 0, message.bs.length) : options.bytes === Array ? Array.prototype.slice.call(message.bs) : message.bs;
+                    object.bs = $util.bytesTo(message.bs, options);
                 if (message.mbs != null && message.hasOwnProperty("mbs"))
-                    object.mbs = options.bytes === String ? $util.base64.encode(message.mbs, 0, message.mbs.length) : options.bytes === Array ? Array.prototype.slice.call(message.mbs) : message.mbs;
+                    object.mbs = $util.bytesTo(message.mbs, options);
                 if (message["in"] != null && message.hasOwnProperty("in"))
-                    object["in"] = options.bytes === String ? $util.base64.encode(message["in"], 0, message["in"].length) : options.bytes === Array ? Array.prototype.slice.call(message["in"]) : message["in"];
+                    object["in"] = $util.bytesTo(message["in"], options);
                 if (message.is != null && message.hasOwnProperty("is"))
-                    object.is = options.bytes === String ? $util.base64.encode(message.is, 0, message.is.length) : options.bytes === Array ? Array.prototype.slice.call(message.is) : message.is;
+                    object.is = $util.bytesTo(message.is, options);
                 if (message.va != null && message.hasOwnProperty("va"))
-                    object.va = options.bytes === String ? $util.base64.encode(message.va, 0, message.va.length) : options.bytes === Array ? Array.prototype.slice.call(message.va) : message.va;
+                    object.va = $util.bytesTo(message.va, options);
                 if (message.vn != null && message.hasOwnProperty("vn"))
-                    object.vn = options.bytes === String ? $util.base64.encode(message.vn, 0, message.vn.length) : options.bytes === Array ? Array.prototype.slice.call(message.vn) : message.vn;
+                    object.vn = $util.bytesTo(message.vn, options);
                 if (message.vs != null && message.hasOwnProperty("vs"))
-                    object.vs = options.bytes === String ? $util.base64.encode(message.vs, 0, message.vs.length) : options.bytes === Array ? Array.prototype.slice.call(message.vs) : message.vs;
+                    object.vs = $util.bytesTo(message.vs, options);
                 return object;
             };
 
@@ -3718,8 +3530,8 @@ $root.apply = (function() {
              * Properties of a SetEpochOperation.
              * @memberof apply.operations
              * @interface ISetEpochOperation
-             * @property {Uint8Array|null} [sv] SetEpochOperation sv
-             * @property {Uint8Array|null} [data] SetEpochOperation data
+             * @property {B4aBuffer|null} [sv] SetEpochOperation sv
+             * @property {B4aBuffer|null} [data] SetEpochOperation data
              */
 
             /**
@@ -3739,7 +3551,7 @@ $root.apply = (function() {
 
             /**
              * SetEpochOperation sv.
-             * @member {Uint8Array} sv
+             * @member {B4aBuffer} sv
              * @memberof apply.operations.SetEpochOperation
              * @instance
              */
@@ -3747,7 +3559,7 @@ $root.apply = (function() {
 
             /**
              * SetEpochOperation data.
-             * @member {Uint8Array} data
+             * @member {B4aBuffer} data
              * @memberof apply.operations.SetEpochOperation
              * @instance
              */
@@ -3775,8 +3587,7 @@ $root.apply = (function() {
              * @returns {$protobuf.Writer} Writer
              */
             SetEpochOperation.encode = function encode(message, writer) {
-                if (!writer)
-                    writer = $Writer.create();
+                writer = $Writer.create(writer);
                 if (message.sv != null && Object.hasOwnProperty.call(message, "sv"))
                     writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.sv);
                 if (message.data != null && Object.hasOwnProperty.call(message, "data"))
@@ -3802,15 +3613,14 @@ $root.apply = (function() {
              * @function decode
              * @memberof apply.operations.SetEpochOperation
              * @static
-             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
              * @param {number} [length] Message length if known beforehand
              * @returns {apply.operations.SetEpochOperation} SetEpochOperation
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
             SetEpochOperation.decode = function decode(reader, length, error) {
-                if (!(reader instanceof $Reader))
-                    reader = $Reader.create(reader);
+                reader = $Reader.create(reader);
                 var end = length === undefined ? reader.len : reader.pos + length, message = new $root.apply.operations.SetEpochOperation();
                 while (reader.pos < end) {
                     var tag = reader.uint32();
@@ -3818,11 +3628,11 @@ $root.apply = (function() {
                         break;
                     switch (tag >>> 3) {
                     case 1: {
-                            message.sv = reader.bytes();
+                            message.sv = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 2: {
-                            message.data = reader.bytes();
+                            message.data = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     default:
@@ -3838,14 +3648,13 @@ $root.apply = (function() {
              * @function decodeDelimited
              * @memberof apply.operations.SetEpochOperation
              * @static
-             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
              * @returns {apply.operations.SetEpochOperation} SetEpochOperation
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
             SetEpochOperation.decodeDelimited = function decodeDelimited(reader) {
-                if (!(reader instanceof $Reader))
-                    reader = new $Reader(reader);
+                reader = $Reader.create(reader);
                 return this.decode(reader, reader.uint32());
             };
 
@@ -3861,10 +3670,10 @@ $root.apply = (function() {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
                 if (message.sv != null && message.hasOwnProperty("sv"))
-                    if (!(message.sv && typeof message.sv.length === "number" || $util.isString(message.sv)))
+                    if (!$util.isBytes(message.sv))
                         return "sv: buffer expected";
                 if (message.data != null && message.hasOwnProperty("data"))
-                    if (!(message.data && typeof message.data.length === "number" || $util.isString(message.data)))
+                    if (!$util.isBytes(message.data))
                         return "data: buffer expected";
                 return null;
             };
@@ -3879,18 +3688,12 @@ $root.apply = (function() {
              */
             SetEpochOperation.fromObject = function fromObject(object) {
                 if (object instanceof $root.apply.operations.SetEpochOperation)
-                    return object;
+                    object = Object.assign({}, object);
                 var message = new $root.apply.operations.SetEpochOperation();
                 if (object.sv != null)
-                    if (typeof object.sv === "string")
-                        $util.base64.decode(object.sv, message.sv = $util.newBuffer($util.base64.length(object.sv)), 0);
-                    else if (object.sv.length >= 0)
-                        message.sv = object.sv;
+                    message.sv = $util.bytesFrom(object.sv);
                 if (object.data != null)
-                    if (typeof object.data === "string")
-                        $util.base64.decode(object.data, message.data = $util.newBuffer($util.base64.length(object.data)), 0);
-                    else if (object.data.length >= 0)
-                        message.data = object.data;
+                    message.data = $util.bytesFrom(object.data);
                 return message;
             };
 
@@ -3924,9 +3727,9 @@ $root.apply = (function() {
                     }
                 }
                 if (message.sv != null && message.hasOwnProperty("sv"))
-                    object.sv = options.bytes === String ? $util.base64.encode(message.sv, 0, message.sv.length) : options.bytes === Array ? Array.prototype.slice.call(message.sv) : message.sv;
+                    object.sv = $util.bytesTo(message.sv, options);
                 if (message.data != null && message.hasOwnProperty("data"))
-                    object.data = options.bytes === String ? $util.base64.encode(message.data, 0, message.data.length) : options.bytes === Array ? Array.prototype.slice.call(message.data) : message.data;
+                    object.data = $util.bytesTo(message.data, options);
                 return object;
             };
 
@@ -3965,11 +3768,11 @@ $root.apply = (function() {
              * Properties of a ConsensusControlOperation.
              * @memberof apply.operations
              * @interface IConsensusControlOperation
-             * @property {Uint8Array|null} [tx] ConsensusControlOperation tx
-             * @property {Uint8Array|null} [txv] ConsensusControlOperation txv
+             * @property {B4aBuffer|null} [tx] ConsensusControlOperation tx
+             * @property {B4aBuffer|null} [txv] ConsensusControlOperation txv
              * @property {common.consensus.IConsensusConfig|null} [cc] ConsensusControlOperation cc
-             * @property {Uint8Array|null} ["in"] ConsensusControlOperation in
-             * @property {Uint8Array|null} [is] ConsensusControlOperation is
+             * @property {B4aBuffer|null} ["in"] ConsensusControlOperation in
+             * @property {B4aBuffer|null} [is] ConsensusControlOperation is
              */
 
             /**
@@ -3989,7 +3792,7 @@ $root.apply = (function() {
 
             /**
              * ConsensusControlOperation tx.
-             * @member {Uint8Array} tx
+             * @member {B4aBuffer} tx
              * @memberof apply.operations.ConsensusControlOperation
              * @instance
              */
@@ -3997,7 +3800,7 @@ $root.apply = (function() {
 
             /**
              * ConsensusControlOperation txv.
-             * @member {Uint8Array} txv
+             * @member {B4aBuffer} txv
              * @memberof apply.operations.ConsensusControlOperation
              * @instance
              */
@@ -4013,7 +3816,7 @@ $root.apply = (function() {
 
             /**
              * ConsensusControlOperation in.
-             * @member {Uint8Array} in
+             * @member {B4aBuffer} in
              * @memberof apply.operations.ConsensusControlOperation
              * @instance
              */
@@ -4021,7 +3824,7 @@ $root.apply = (function() {
 
             /**
              * ConsensusControlOperation is.
-             * @member {Uint8Array} is
+             * @member {B4aBuffer} is
              * @memberof apply.operations.ConsensusControlOperation
              * @instance
              */
@@ -4049,8 +3852,7 @@ $root.apply = (function() {
              * @returns {$protobuf.Writer} Writer
              */
             ConsensusControlOperation.encode = function encode(message, writer) {
-                if (!writer)
-                    writer = $Writer.create();
+                writer = $Writer.create(writer);
                 if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
                     writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.tx);
                 if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
@@ -4082,15 +3884,14 @@ $root.apply = (function() {
              * @function decode
              * @memberof apply.operations.ConsensusControlOperation
              * @static
-             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
              * @param {number} [length] Message length if known beforehand
              * @returns {apply.operations.ConsensusControlOperation} ConsensusControlOperation
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
             ConsensusControlOperation.decode = function decode(reader, length, error) {
-                if (!(reader instanceof $Reader))
-                    reader = $Reader.create(reader);
+                reader = $Reader.create(reader);
                 var end = length === undefined ? reader.len : reader.pos + length, message = new $root.apply.operations.ConsensusControlOperation();
                 while (reader.pos < end) {
                     var tag = reader.uint32();
@@ -4098,11 +3899,11 @@ $root.apply = (function() {
                         break;
                     switch (tag >>> 3) {
                     case 1: {
-                            message.tx = reader.bytes();
+                            message.tx = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 2: {
-                            message.txv = reader.bytes();
+                            message.txv = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 3: {
@@ -4110,11 +3911,11 @@ $root.apply = (function() {
                             break;
                         }
                     case 4: {
-                            message["in"] = reader.bytes();
+                            message["in"] = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 5: {
-                            message.is = reader.bytes();
+                            message.is = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     default:
@@ -4130,14 +3931,13 @@ $root.apply = (function() {
              * @function decodeDelimited
              * @memberof apply.operations.ConsensusControlOperation
              * @static
-             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
              * @returns {apply.operations.ConsensusControlOperation} ConsensusControlOperation
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
             ConsensusControlOperation.decodeDelimited = function decodeDelimited(reader) {
-                if (!(reader instanceof $Reader))
-                    reader = new $Reader(reader);
+                reader = $Reader.create(reader);
                 return this.decode(reader, reader.uint32());
             };
 
@@ -4153,10 +3953,10 @@ $root.apply = (function() {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
                 if (message.tx != null && message.hasOwnProperty("tx"))
-                    if (!(message.tx && typeof message.tx.length === "number" || $util.isString(message.tx)))
+                    if (!$util.isBytes(message.tx))
                         return "tx: buffer expected";
                 if (message.txv != null && message.hasOwnProperty("txv"))
-                    if (!(message.txv && typeof message.txv.length === "number" || $util.isString(message.txv)))
+                    if (!$util.isBytes(message.txv))
                         return "txv: buffer expected";
                 if (message.cc != null && message.hasOwnProperty("cc")) {
                     var error = $root.common.consensus.ConsensusConfig.verify(message.cc);
@@ -4164,10 +3964,10 @@ $root.apply = (function() {
                         return "cc." + error;
                 }
                 if (message["in"] != null && message.hasOwnProperty("in"))
-                    if (!(message["in"] && typeof message["in"].length === "number" || $util.isString(message["in"])))
+                    if (!$util.isBytes(message["in"]))
                         return "in: buffer expected";
                 if (message.is != null && message.hasOwnProperty("is"))
-                    if (!(message.is && typeof message.is.length === "number" || $util.isString(message.is)))
+                    if (!$util.isBytes(message.is))
                         return "is: buffer expected";
                 return null;
             };
@@ -4182,33 +3982,21 @@ $root.apply = (function() {
              */
             ConsensusControlOperation.fromObject = function fromObject(object) {
                 if (object instanceof $root.apply.operations.ConsensusControlOperation)
-                    return object;
+                    object = Object.assign({}, object);
                 var message = new $root.apply.operations.ConsensusControlOperation();
                 if (object.tx != null)
-                    if (typeof object.tx === "string")
-                        $util.base64.decode(object.tx, message.tx = $util.newBuffer($util.base64.length(object.tx)), 0);
-                    else if (object.tx.length >= 0)
-                        message.tx = object.tx;
+                    message.tx = $util.bytesFrom(object.tx);
                 if (object.txv != null)
-                    if (typeof object.txv === "string")
-                        $util.base64.decode(object.txv, message.txv = $util.newBuffer($util.base64.length(object.txv)), 0);
-                    else if (object.txv.length >= 0)
-                        message.txv = object.txv;
+                    message.txv = $util.bytesFrom(object.txv);
                 if (object.cc != null) {
                     if (typeof object.cc !== "object")
                         throw TypeError(".apply.operations.ConsensusControlOperation.cc: object expected");
                     message.cc = $root.common.consensus.ConsensusConfig.fromObject(object.cc);
                 }
                 if (object["in"] != null)
-                    if (typeof object["in"] === "string")
-                        $util.base64.decode(object["in"], message["in"] = $util.newBuffer($util.base64.length(object["in"])), 0);
-                    else if (object["in"].length >= 0)
-                        message["in"] = object["in"];
+                    message["in"] = $util.bytesFrom(object["in"]);
                 if (object.is != null)
-                    if (typeof object.is === "string")
-                        $util.base64.decode(object.is, message.is = $util.newBuffer($util.base64.length(object.is)), 0);
-                    else if (object.is.length >= 0)
-                        message.is = object.is;
+                    message.is = $util.bytesFrom(object.is);
                 return message;
             };
 
@@ -4257,15 +4045,15 @@ $root.apply = (function() {
                     }
                 }
                 if (message.tx != null && message.hasOwnProperty("tx"))
-                    object.tx = options.bytes === String ? $util.base64.encode(message.tx, 0, message.tx.length) : options.bytes === Array ? Array.prototype.slice.call(message.tx) : message.tx;
+                    object.tx = $util.bytesTo(message.tx, options);
                 if (message.txv != null && message.hasOwnProperty("txv"))
-                    object.txv = options.bytes === String ? $util.base64.encode(message.txv, 0, message.txv.length) : options.bytes === Array ? Array.prototype.slice.call(message.txv) : message.txv;
+                    object.txv = $util.bytesTo(message.txv, options);
                 if (message.cc != null && message.hasOwnProperty("cc"))
                     object.cc = $root.common.consensus.ConsensusConfig.toObject(message.cc, options);
                 if (message["in"] != null && message.hasOwnProperty("in"))
-                    object["in"] = options.bytes === String ? $util.base64.encode(message["in"], 0, message["in"].length) : options.bytes === Array ? Array.prototype.slice.call(message["in"]) : message["in"];
+                    object["in"] = $util.bytesTo(message["in"], options);
                 if (message.is != null && message.hasOwnProperty("is"))
-                    object.is = options.bytes === String ? $util.base64.encode(message.is, 0, message.is.length) : options.bytes === Array ? Array.prototype.slice.call(message.is) : message.is;
+                    object.is = $util.bytesTo(message.is, options);
                 return object;
             };
 
@@ -4328,8 +4116,8 @@ $root.common = (function() {
              * Properties of a ConsensusConfig.
              * @memberof common.consensus
              * @interface IConsensusConfig
-             * @property {Uint8Array|null} [sv] ConsensusConfig sv
-             * @property {Uint8Array|null} [cd] ConsensusConfig cd
+             * @property {B4aBuffer|null} [sv] ConsensusConfig sv
+             * @property {B4aBuffer|null} [cd] ConsensusConfig cd
              */
 
             /**
@@ -4349,7 +4137,7 @@ $root.common = (function() {
 
             /**
              * ConsensusConfig sv.
-             * @member {Uint8Array} sv
+             * @member {B4aBuffer} sv
              * @memberof common.consensus.ConsensusConfig
              * @instance
              */
@@ -4357,7 +4145,7 @@ $root.common = (function() {
 
             /**
              * ConsensusConfig cd.
-             * @member {Uint8Array} cd
+             * @member {B4aBuffer} cd
              * @memberof common.consensus.ConsensusConfig
              * @instance
              */
@@ -4385,8 +4173,7 @@ $root.common = (function() {
              * @returns {$protobuf.Writer} Writer
              */
             ConsensusConfig.encode = function encode(message, writer) {
-                if (!writer)
-                    writer = $Writer.create();
+                writer = $Writer.create(writer);
                 if (message.sv != null && Object.hasOwnProperty.call(message, "sv"))
                     writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.sv);
                 if (message.cd != null && Object.hasOwnProperty.call(message, "cd"))
@@ -4412,15 +4199,14 @@ $root.common = (function() {
              * @function decode
              * @memberof common.consensus.ConsensusConfig
              * @static
-             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
              * @param {number} [length] Message length if known beforehand
              * @returns {common.consensus.ConsensusConfig} ConsensusConfig
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
             ConsensusConfig.decode = function decode(reader, length, error) {
-                if (!(reader instanceof $Reader))
-                    reader = $Reader.create(reader);
+                reader = $Reader.create(reader);
                 var end = length === undefined ? reader.len : reader.pos + length, message = new $root.common.consensus.ConsensusConfig();
                 while (reader.pos < end) {
                     var tag = reader.uint32();
@@ -4428,11 +4214,11 @@ $root.common = (function() {
                         break;
                     switch (tag >>> 3) {
                     case 1: {
-                            message.sv = reader.bytes();
+                            message.sv = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 2: {
-                            message.cd = reader.bytes();
+                            message.cd = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     default:
@@ -4448,14 +4234,13 @@ $root.common = (function() {
              * @function decodeDelimited
              * @memberof common.consensus.ConsensusConfig
              * @static
-             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
              * @returns {common.consensus.ConsensusConfig} ConsensusConfig
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
             ConsensusConfig.decodeDelimited = function decodeDelimited(reader) {
-                if (!(reader instanceof $Reader))
-                    reader = new $Reader(reader);
+                reader = $Reader.create(reader);
                 return this.decode(reader, reader.uint32());
             };
 
@@ -4471,10 +4256,10 @@ $root.common = (function() {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
                 if (message.sv != null && message.hasOwnProperty("sv"))
-                    if (!(message.sv && typeof message.sv.length === "number" || $util.isString(message.sv)))
+                    if (!$util.isBytes(message.sv))
                         return "sv: buffer expected";
                 if (message.cd != null && message.hasOwnProperty("cd"))
-                    if (!(message.cd && typeof message.cd.length === "number" || $util.isString(message.cd)))
+                    if (!$util.isBytes(message.cd))
                         return "cd: buffer expected";
                 return null;
             };
@@ -4489,18 +4274,12 @@ $root.common = (function() {
              */
             ConsensusConfig.fromObject = function fromObject(object) {
                 if (object instanceof $root.common.consensus.ConsensusConfig)
-                    return object;
+                    object = Object.assign({}, object);
                 var message = new $root.common.consensus.ConsensusConfig();
                 if (object.sv != null)
-                    if (typeof object.sv === "string")
-                        $util.base64.decode(object.sv, message.sv = $util.newBuffer($util.base64.length(object.sv)), 0);
-                    else if (object.sv.length >= 0)
-                        message.sv = object.sv;
+                    message.sv = $util.bytesFrom(object.sv);
                 if (object.cd != null)
-                    if (typeof object.cd === "string")
-                        $util.base64.decode(object.cd, message.cd = $util.newBuffer($util.base64.length(object.cd)), 0);
-                    else if (object.cd.length >= 0)
-                        message.cd = object.cd;
+                    message.cd = $util.bytesFrom(object.cd);
                 return message;
             };
 
@@ -4534,9 +4313,9 @@ $root.common = (function() {
                     }
                 }
                 if (message.sv != null && message.hasOwnProperty("sv"))
-                    object.sv = options.bytes === String ? $util.base64.encode(message.sv, 0, message.sv.length) : options.bytes === Array ? Array.prototype.slice.call(message.sv) : message.sv;
+                    object.sv = $util.bytesTo(message.sv, options);
                 if (message.cd != null && message.hasOwnProperty("cd"))
-                    object.cd = options.bytes === String ? $util.base64.encode(message.cd, 0, message.cd.length) : options.bytes === Array ? Array.prototype.slice.call(message.cd) : message.cd;
+                    object.cd = $util.bytesTo(message.cd, options);
                 return object;
             };
 

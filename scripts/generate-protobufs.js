@@ -3,33 +3,23 @@ import path from 'path';
 
 import { fileURLToPath } from 'url';
 import { execFileSync } from 'child_process';
+import { transformProtobufs } from './lib/transform-protobufs.js';
 
 function generatePbjsModule(pbjsPath, protoRootPath, entryPaths, outputPath, rootName) {
-    execFileSync(pbjsPath, [
+    const generated = execFileSync(pbjsPath, [
         '-t', 'static-module',
         '-w', 'commonjs',
         '--keep-case',
         '--root', rootName,
         '-p', protoRootPath,
-        '-o', outputPath,
         ...entryPaths
-    ]);
-    console.log(`${outputPath} has been generated.`);
-}
-
-function transformPbjsForBare(outputPath) {
-    let content = fs.readFileSync(outputPath, 'utf-8');
-    const shim = `if (typeof globalThis !== 'undefined' && typeof globalThis.self === 'undefined') {\n  globalThis.self = globalThis;\n}\n`;
-    const strictDirective = '"use strict";';
-
-    if (content.includes(strictDirective)) {
-        content = content.replace(strictDirective, `${strictDirective}\n${shim}`);
-    } else {
-        content = `${strictDirective}\n${shim}${content}`;
-    }
-
+    ], { encoding: 'utf-8', maxBuffer: 8 * 1024 * 1024 });
+    const runtimePath = path.join(path.dirname(fileURLToPath(import.meta.url)), '../src/codecs/protobufRuntime.cjs');
+    let relativeRuntimePath = path.relative(path.dirname(outputPath), runtimePath).split(path.sep).join('/');
+    if (!relativeRuntimePath.startsWith('.')) relativeRuntimePath = `./${relativeRuntimePath}`;
+    const content = transformProtobufs(generated, relativeRuntimePath);
     fs.writeFileSync(outputPath, content, 'utf-8');
-    console.log(`${outputPath} has been modified for bare-compatible protobufjs runtime.`);
+    console.log(`${outputPath} has been generated with b4a-compatible binary handling.`);
 }
 
 function main() {
@@ -59,7 +49,6 @@ function main() {
         generatedApplyOperationsOutputPath,
         'applyOperations'
     );
-    transformPbjsForBare(generatedApplyOperationsOutputPath);
 
     generatePbjsModule(
         pbjsPath,
@@ -68,7 +57,6 @@ function main() {
         generatedNetworkOutputPath,
         'networkV1'
     );
-    transformPbjsForBare(generatedNetworkOutputPath);
 
     generatePbjsModule(
         pbjsPath,
@@ -77,7 +65,6 @@ function main() {
         generatedConsensusOutputPath,
         'consensusV1'
     );
-    transformPbjsForBare(generatedConsensusOutputPath);
 }
 
 main();

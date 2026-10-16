@@ -11,7 +11,6 @@ const {
 const CONSENSUS_TO_OBJECT_OPTIONS = Object.freeze({
     enums: Number,
     longs: Number,
-    bytes: Buffer,
     defaults: false,
     arrays: true,
     oneofs: false

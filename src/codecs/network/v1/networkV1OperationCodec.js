@@ -8,7 +8,6 @@ const networkV1Operations = networkV1Generated.network.v1;
 const NETWORK_TO_OBJECT_OPTIONS = Object.freeze({
     enums: Number,
     longs: Number,
-    bytes: Buffer,
     defaults: true,
     arrays: true,
     oneofs: false

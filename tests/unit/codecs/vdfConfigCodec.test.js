@@ -35,6 +35,18 @@ test('VDF config codec preserves big-endian field bytes', t => {
     t.alike(decoded, config);
 });
 
+test('VDF config decoding normalizes byte views through b4a', t => {
+    const backing = new Uint8Array([42, 1, 2, 3, 4, 5, 6, 43]);
+    const decoded = decodeVdfConfig(backing.subarray(1, -1));
+
+    t.alike(decoded.difficulty, b4a.from([1, 2, 3, 4]));
+    t.alike(decoded.discriminantBitSize, b4a.from([5, 6]));
+    for (const field of Object.values(decoded)) {
+        t.ok(b4a.isBuffer(field));
+        t.is(field.constructor, b4a.alloc(0).constructor);
+    }
+});
+
 test('VDF config codec accepts structurally valid zero values', t => {
     const config = {
         difficulty: b4a.alloc(4, 0x00),

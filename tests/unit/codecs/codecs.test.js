@@ -4,6 +4,8 @@ import { default as test } from 'brittle';
 
 async function runTests() {
     test.pause();
+    await import('./generatedCodecs.test.js');
+    if (!globalThis.Bare) await import('./protobufGeneration.test.js');
     await import('./applyOperationCodec.test.js');
     await import('./epochRecordCodec.test.js');
     await import('./consensusConfigCodec.test.js');

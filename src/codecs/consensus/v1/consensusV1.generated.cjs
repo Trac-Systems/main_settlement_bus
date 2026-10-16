@@ -1,11 +1,9 @@
 /*eslint-disable block-scoped-var, id-length, no-control-regex, no-magic-numbers, no-prototype-builtins, no-redeclare, no-shadow, no-var, sort-vars*/
 "use strict";
-if (typeof globalThis !== 'undefined' && typeof globalThis.self === 'undefined') {
-  globalThis.self = globalThis;
-}
 
+/** @typedef {ReturnType<typeof import("b4a").alloc>} B4aBuffer */
 
-var $protobuf = require("protobufjs/minimal");
+var $protobuf = require("../../protobufRuntime.cjs");
 
 // Common aliases
 var $Reader = $protobuf.Reader, $Writer = $protobuf.Writer, $util = $protobuf.util;
@@ -135,8 +133,7 @@ $root.consensus = (function() {
              * @returns {$protobuf.Writer} Writer
              */
             ConsensusMessageHeader.encode = function encode(message, writer) {
-                if (!writer)
-                    writer = $Writer.create();
+                writer = $Writer.create(writer);
                 if (message.type != null && Object.hasOwnProperty.call(message, "type"))
                     writer.uint32(/* id 1, wireType 0 =*/8).int32(message.type);
                 if (message.session_id != null && Object.hasOwnProperty.call(message, "session_id"))
@@ -168,15 +165,14 @@ $root.consensus = (function() {
              * @function decode
              * @memberof consensus.v1.ConsensusMessageHeader
              * @static
-             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
              * @param {number} [length] Message length if known beforehand
              * @returns {consensus.v1.ConsensusMessageHeader} ConsensusMessageHeader
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
             ConsensusMessageHeader.decode = function decode(reader, length, error) {
-                if (!(reader instanceof $Reader))
-                    reader = $Reader.create(reader);
+                reader = $Reader.create(reader);
                 var end = length === undefined ? reader.len : reader.pos + length, message = new $root.consensus.v1.ConsensusMessageHeader();
                 while (reader.pos < end) {
                     var tag = reader.uint32();
@@ -216,14 +212,13 @@ $root.consensus = (function() {
              * @function decodeDelimited
              * @memberof consensus.v1.ConsensusMessageHeader
              * @static
-             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
              * @returns {consensus.v1.ConsensusMessageHeader} ConsensusMessageHeader
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
             ConsensusMessageHeader.decodeDelimited = function decodeDelimited(reader) {
-                if (!(reader instanceof $Reader))
-                    reader = new $Reader(reader);
+                reader = $Reader.create(reader);
                 return this.decode(reader, reader.uint32());
             };
 
@@ -285,7 +280,7 @@ $root.consensus = (function() {
              */
             ConsensusMessageHeader.fromObject = function fromObject(object) {
                 if (object instanceof $root.consensus.v1.ConsensusMessageHeader)
-                    return object;
+                    object = Object.assign({}, object);
                 var message = new $root.consensus.v1.ConsensusMessageHeader();
                 switch (object.type) {
                 default:
@@ -426,14 +421,14 @@ $root.consensus = (function() {
              * Properties of a ProofProposal.
              * @memberof consensus.v1
              * @interface IProofProposal
-             * @property {Uint8Array|null} [network_id] ProofProposal network_id
-             * @property {Uint8Array|null} [epoch] ProofProposal epoch
-             * @property {Uint8Array|null} [previous_epoch_record_hash] ProofProposal previous_epoch_record_hash
-             * @property {Uint8Array|null} [proposer] ProofProposal proposer
-             * @property {Uint8Array|null} [difficulty] ProofProposal difficulty
-             * @property {Uint8Array|null} [discriminant_bit_size] ProofProposal discriminant_bit_size
-             * @property {Uint8Array|null} [proof] ProofProposal proof
-             * @property {Uint8Array|null} [signature] ProofProposal signature
+             * @property {B4aBuffer|null} [network_id] ProofProposal network_id
+             * @property {B4aBuffer|null} [epoch] ProofProposal epoch
+             * @property {B4aBuffer|null} [previous_epoch_record_hash] ProofProposal previous_epoch_record_hash
+             * @property {B4aBuffer|null} [proposer] ProofProposal proposer
+             * @property {B4aBuffer|null} [difficulty] ProofProposal difficulty
+             * @property {B4aBuffer|null} [discriminant_bit_size] ProofProposal discriminant_bit_size
+             * @property {B4aBuffer|null} [proof] ProofProposal proof
+             * @property {B4aBuffer|null} [signature] ProofProposal signature
              */
 
             /**
@@ -453,7 +448,7 @@ $root.consensus = (function() {
 
             /**
              * ProofProposal network_id.
-             * @member {Uint8Array} network_id
+             * @member {B4aBuffer} network_id
              * @memberof consensus.v1.ProofProposal
              * @instance
              */
@@ -461,7 +456,7 @@ $root.consensus = (function() {
 
             /**
              * ProofProposal epoch.
-             * @member {Uint8Array} epoch
+             * @member {B4aBuffer} epoch
              * @memberof consensus.v1.ProofProposal
              * @instance
              */
@@ -469,7 +464,7 @@ $root.consensus = (function() {
 
             /**
              * ProofProposal previous_epoch_record_hash.
-             * @member {Uint8Array} previous_epoch_record_hash
+             * @member {B4aBuffer} previous_epoch_record_hash
              * @memberof consensus.v1.ProofProposal
              * @instance
              */
@@ -477,7 +472,7 @@ $root.consensus = (function() {
 
             /**
              * ProofProposal proposer.
-             * @member {Uint8Array} proposer
+             * @member {B4aBuffer} proposer
              * @memberof consensus.v1.ProofProposal
              * @instance
              */
@@ -485,7 +480,7 @@ $root.consensus = (function() {
 
             /**
              * ProofProposal difficulty.
-             * @member {Uint8Array} difficulty
+             * @member {B4aBuffer} difficulty
              * @memberof consensus.v1.ProofProposal
              * @instance
              */
@@ -493,7 +488,7 @@ $root.consensus = (function() {
 
             /**
              * ProofProposal discriminant_bit_size.
-             * @member {Uint8Array} discriminant_bit_size
+             * @member {B4aBuffer} discriminant_bit_size
              * @memberof consensus.v1.ProofProposal
              * @instance
              */
@@ -501,7 +496,7 @@ $root.consensus = (function() {
 
             /**
              * ProofProposal proof.
-             * @member {Uint8Array} proof
+             * @member {B4aBuffer} proof
              * @memberof consensus.v1.ProofProposal
              * @instance
              */
@@ -509,7 +504,7 @@ $root.consensus = (function() {
 
             /**
              * ProofProposal signature.
-             * @member {Uint8Array} signature
+             * @member {B4aBuffer} signature
              * @memberof consensus.v1.ProofProposal
              * @instance
              */
@@ -537,8 +532,7 @@ $root.consensus = (function() {
              * @returns {$protobuf.Writer} Writer
              */
             ProofProposal.encode = function encode(message, writer) {
-                if (!writer)
-                    writer = $Writer.create();
+                writer = $Writer.create(writer);
                 if (message.network_id != null && Object.hasOwnProperty.call(message, "network_id"))
                     writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.network_id);
                 if (message.epoch != null && Object.hasOwnProperty.call(message, "epoch"))
@@ -576,15 +570,14 @@ $root.consensus = (function() {
              * @function decode
              * @memberof consensus.v1.ProofProposal
              * @static
-             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
              * @param {number} [length] Message length if known beforehand
              * @returns {consensus.v1.ProofProposal} ProofProposal
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
             ProofProposal.decode = function decode(reader, length, error) {
-                if (!(reader instanceof $Reader))
-                    reader = $Reader.create(reader);
+                reader = $Reader.create(reader);
                 var end = length === undefined ? reader.len : reader.pos + length, message = new $root.consensus.v1.ProofProposal();
                 while (reader.pos < end) {
                     var tag = reader.uint32();
@@ -592,35 +585,35 @@ $root.consensus = (function() {
                         break;
                     switch (tag >>> 3) {
                     case 1: {
-                            message.network_id = reader.bytes();
+                            message.network_id = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 2: {
-                            message.epoch = reader.bytes();
+                            message.epoch = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 3: {
-                            message.previous_epoch_record_hash = reader.bytes();
+                            message.previous_epoch_record_hash = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 4: {
-                            message.proposer = reader.bytes();
+                            message.proposer = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 5: {
-                            message.difficulty = reader.bytes();
+                            message.difficulty = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 6: {
-                            message.discriminant_bit_size = reader.bytes();
+                            message.discriminant_bit_size = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 7: {
-                            message.proof = reader.bytes();
+                            message.proof = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 8: {
-                            message.signature = reader.bytes();
+                            message.signature = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     default:
@@ -636,14 +629,13 @@ $root.consensus = (function() {
              * @function decodeDelimited
              * @memberof consensus.v1.ProofProposal
              * @static
-             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
              * @returns {consensus.v1.ProofProposal} ProofProposal
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
             ProofProposal.decodeDelimited = function decodeDelimited(reader) {
-                if (!(reader instanceof $Reader))
-                    reader = new $Reader(reader);
+                reader = $Reader.create(reader);
                 return this.decode(reader, reader.uint32());
             };
 
@@ -659,28 +651,28 @@ $root.consensus = (function() {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
                 if (message.network_id != null && message.hasOwnProperty("network_id"))
-                    if (!(message.network_id && typeof message.network_id.length === "number" || $util.isString(message.network_id)))
+                    if (!$util.isBytes(message.network_id))
                         return "network_id: buffer expected";
                 if (message.epoch != null && message.hasOwnProperty("epoch"))
-                    if (!(message.epoch && typeof message.epoch.length === "number" || $util.isString(message.epoch)))
+                    if (!$util.isBytes(message.epoch))
                         return "epoch: buffer expected";
                 if (message.previous_epoch_record_hash != null && message.hasOwnProperty("previous_epoch_record_hash"))
-                    if (!(message.previous_epoch_record_hash && typeof message.previous_epoch_record_hash.length === "number" || $util.isString(message.previous_epoch_record_hash)))
+                    if (!$util.isBytes(message.previous_epoch_record_hash))
                         return "previous_epoch_record_hash: buffer expected";
                 if (message.proposer != null && message.hasOwnProperty("proposer"))
-                    if (!(message.proposer && typeof message.proposer.length === "number" || $util.isString(message.proposer)))
+                    if (!$util.isBytes(message.proposer))
                         return "proposer: buffer expected";
                 if (message.difficulty != null && message.hasOwnProperty("difficulty"))
-                    if (!(message.difficulty && typeof message.difficulty.length === "number" || $util.isString(message.difficulty)))
+                    if (!$util.isBytes(message.difficulty))
                         return "difficulty: buffer expected";
                 if (message.discriminant_bit_size != null && message.hasOwnProperty("discriminant_bit_size"))
-                    if (!(message.discriminant_bit_size && typeof message.discriminant_bit_size.length === "number" || $util.isString(message.discriminant_bit_size)))
+                    if (!$util.isBytes(message.discriminant_bit_size))
                         return "discriminant_bit_size: buffer expected";
                 if (message.proof != null && message.hasOwnProperty("proof"))
-                    if (!(message.proof && typeof message.proof.length === "number" || $util.isString(message.proof)))
+                    if (!$util.isBytes(message.proof))
                         return "proof: buffer expected";
                 if (message.signature != null && message.hasOwnProperty("signature"))
-                    if (!(message.signature && typeof message.signature.length === "number" || $util.isString(message.signature)))
+                    if (!$util.isBytes(message.signature))
                         return "signature: buffer expected";
                 return null;
             };
@@ -695,48 +687,24 @@ $root.consensus = (function() {
              */
             ProofProposal.fromObject = function fromObject(object) {
                 if (object instanceof $root.consensus.v1.ProofProposal)
-                    return object;
+                    object = Object.assign({}, object);
                 var message = new $root.consensus.v1.ProofProposal();
                 if (object.network_id != null)
-                    if (typeof object.network_id === "string")
-                        $util.base64.decode(object.network_id, message.network_id = $util.newBuffer($util.base64.length(object.network_id)), 0);
-                    else if (object.network_id.length >= 0)
-                        message.network_id = object.network_id;
+                    message.network_id = $util.bytesFrom(object.network_id);
                 if (object.epoch != null)
-                    if (typeof object.epoch === "string")
-                        $util.base64.decode(object.epoch, message.epoch = $util.newBuffer($util.base64.length(object.epoch)), 0);
-                    else if (object.epoch.length >= 0)
-                        message.epoch = object.epoch;
+                    message.epoch = $util.bytesFrom(object.epoch);
                 if (object.previous_epoch_record_hash != null)
-                    if (typeof object.previous_epoch_record_hash === "string")
-                        $util.base64.decode(object.previous_epoch_record_hash, message.previous_epoch_record_hash = $util.newBuffer($util.base64.length(object.previous_epoch_record_hash)), 0);
-                    else if (object.previous_epoch_record_hash.length >= 0)
-                        message.previous_epoch_record_hash = object.previous_epoch_record_hash;
+                    message.previous_epoch_record_hash = $util.bytesFrom(object.previous_epoch_record_hash);
                 if (object.proposer != null)
-                    if (typeof object.proposer === "string")
-                        $util.base64.decode(object.proposer, message.proposer = $util.newBuffer($util.base64.length(object.proposer)), 0);
-                    else if (object.proposer.length >= 0)
-                        message.proposer = object.proposer;
+                    message.proposer = $util.bytesFrom(object.proposer);
                 if (object.difficulty != null)
-                    if (typeof object.difficulty === "string")
-                        $util.base64.decode(object.difficulty, message.difficulty = $util.newBuffer($util.base64.length(object.difficulty)), 0);
-                    else if (object.difficulty.length >= 0)
-                        message.difficulty = object.difficulty;
+                    message.difficulty = $util.bytesFrom(object.difficulty);
                 if (object.discriminant_bit_size != null)
-                    if (typeof object.discriminant_bit_size === "string")
-                        $util.base64.decode(object.discriminant_bit_size, message.discriminant_bit_size = $util.newBuffer($util.base64.length(object.discriminant_bit_size)), 0);
-                    else if (object.discriminant_bit_size.length >= 0)
-                        message.discriminant_bit_size = object.discriminant_bit_size;
+                    message.discriminant_bit_size = $util.bytesFrom(object.discriminant_bit_size);
                 if (object.proof != null)
-                    if (typeof object.proof === "string")
-                        $util.base64.decode(object.proof, message.proof = $util.newBuffer($util.base64.length(object.proof)), 0);
-                    else if (object.proof.length >= 0)
-                        message.proof = object.proof;
+                    message.proof = $util.bytesFrom(object.proof);
                 if (object.signature != null)
-                    if (typeof object.signature === "string")
-                        $util.base64.decode(object.signature, message.signature = $util.newBuffer($util.base64.length(object.signature)), 0);
-                    else if (object.signature.length >= 0)
-                        message.signature = object.signature;
+                    message.signature = $util.bytesFrom(object.signature);
                 return message;
             };
 
@@ -812,21 +780,21 @@ $root.consensus = (function() {
                     }
                 }
                 if (message.network_id != null && message.hasOwnProperty("network_id"))
-                    object.network_id = options.bytes === String ? $util.base64.encode(message.network_id, 0, message.network_id.length) : options.bytes === Array ? Array.prototype.slice.call(message.network_id) : message.network_id;
+                    object.network_id = $util.bytesTo(message.network_id, options);
                 if (message.epoch != null && message.hasOwnProperty("epoch"))
-                    object.epoch = options.bytes === String ? $util.base64.encode(message.epoch, 0, message.epoch.length) : options.bytes === Array ? Array.prototype.slice.call(message.epoch) : message.epoch;
+                    object.epoch = $util.bytesTo(message.epoch, options);
                 if (message.previous_epoch_record_hash != null && message.hasOwnProperty("previous_epoch_record_hash"))
-                    object.previous_epoch_record_hash = options.bytes === String ? $util.base64.encode(message.previous_epoch_record_hash, 0, message.previous_epoch_record_hash.length) : options.bytes === Array ? Array.prototype.slice.call(message.previous_epoch_record_hash) : message.previous_epoch_record_hash;
+                    object.previous_epoch_record_hash = $util.bytesTo(message.previous_epoch_record_hash, options);
                 if (message.proposer != null && message.hasOwnProperty("proposer"))
-                    object.proposer = options.bytes === String ? $util.base64.encode(message.proposer, 0, message.proposer.length) : options.bytes === Array ? Array.prototype.slice.call(message.proposer) : message.proposer;
+                    object.proposer = $util.bytesTo(message.proposer, options);
                 if (message.difficulty != null && message.hasOwnProperty("difficulty"))
-                    object.difficulty = options.bytes === String ? $util.base64.encode(message.difficulty, 0, message.difficulty.length) : options.bytes === Array ? Array.prototype.slice.call(message.difficulty) : message.difficulty;
+                    object.difficulty = $util.bytesTo(message.difficulty, options);
                 if (message.discriminant_bit_size != null && message.hasOwnProperty("discriminant_bit_size"))
-                    object.discriminant_bit_size = options.bytes === String ? $util.base64.encode(message.discriminant_bit_size, 0, message.discriminant_bit_size.length) : options.bytes === Array ? Array.prototype.slice.call(message.discriminant_bit_size) : message.discriminant_bit_size;
+                    object.discriminant_bit_size = $util.bytesTo(message.discriminant_bit_size, options);
                 if (message.proof != null && message.hasOwnProperty("proof"))
-                    object.proof = options.bytes === String ? $util.base64.encode(message.proof, 0, message.proof.length) : options.bytes === Array ? Array.prototype.slice.call(message.proof) : message.proof;
+                    object.proof = $util.bytesTo(message.proof, options);
                 if (message.signature != null && message.hasOwnProperty("signature"))
-                    object.signature = options.bytes === String ? $util.base64.encode(message.signature, 0, message.signature.length) : options.bytes === Array ? Array.prototype.slice.call(message.signature) : message.signature;
+                    object.signature = $util.bytesTo(message.signature, options);
                 return object;
             };
 
@@ -867,7 +835,7 @@ $root.consensus = (function() {
              * @interface IProofProposalResponse
              * @property {common.v1.ResultCode|null} [result] ProofProposalResponse result
              * @property {consensus.v1.IProofProposalApproval|null} [approval] ProofProposalResponse approval
-             * @property {Uint8Array|null} [response_sig] ProofProposalResponse response_sig
+             * @property {B4aBuffer|null} [response_sig] ProofProposalResponse response_sig
              */
 
             /**
@@ -903,7 +871,7 @@ $root.consensus = (function() {
 
             /**
              * ProofProposalResponse response_sig.
-             * @member {Uint8Array} response_sig
+             * @member {B4aBuffer} response_sig
              * @memberof consensus.v1.ProofProposalResponse
              * @instance
              */
@@ -931,8 +899,7 @@ $root.consensus = (function() {
              * @returns {$protobuf.Writer} Writer
              */
             ProofProposalResponse.encode = function encode(message, writer) {
-                if (!writer)
-                    writer = $Writer.create();
+                writer = $Writer.create(writer);
                 if (message.result != null && Object.hasOwnProperty.call(message, "result"))
                     writer.uint32(/* id 1, wireType 0 =*/8).int32(message.result);
                 if (message.approval != null && Object.hasOwnProperty.call(message, "approval"))
@@ -960,15 +927,14 @@ $root.consensus = (function() {
              * @function decode
              * @memberof consensus.v1.ProofProposalResponse
              * @static
-             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
              * @param {number} [length] Message length if known beforehand
              * @returns {consensus.v1.ProofProposalResponse} ProofProposalResponse
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
             ProofProposalResponse.decode = function decode(reader, length, error) {
-                if (!(reader instanceof $Reader))
-                    reader = $Reader.create(reader);
+                reader = $Reader.create(reader);
                 var end = length === undefined ? reader.len : reader.pos + length, message = new $root.consensus.v1.ProofProposalResponse();
                 while (reader.pos < end) {
                     var tag = reader.uint32();
@@ -984,7 +950,7 @@ $root.consensus = (function() {
                             break;
                         }
                     case 3: {
-                            message.response_sig = reader.bytes();
+                            message.response_sig = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     default:
@@ -1000,14 +966,13 @@ $root.consensus = (function() {
              * @function decodeDelimited
              * @memberof consensus.v1.ProofProposalResponse
              * @static
-             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
              * @returns {consensus.v1.ProofProposalResponse} ProofProposalResponse
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
             ProofProposalResponse.decodeDelimited = function decodeDelimited(reader) {
-                if (!(reader instanceof $Reader))
-                    reader = new $Reader(reader);
+                reader = $Reader.create(reader);
                 return this.decode(reader, reader.uint32());
             };
 
@@ -1111,7 +1076,7 @@ $root.consensus = (function() {
                         return "approval." + error;
                 }
                 if (message.response_sig != null && message.hasOwnProperty("response_sig"))
-                    if (!(message.response_sig && typeof message.response_sig.length === "number" || $util.isString(message.response_sig)))
+                    if (!$util.isBytes(message.response_sig))
                         return "response_sig: buffer expected";
                 return null;
             };
@@ -1126,7 +1091,7 @@ $root.consensus = (function() {
              */
             ProofProposalResponse.fromObject = function fromObject(object) {
                 if (object instanceof $root.consensus.v1.ProofProposalResponse)
-                    return object;
+                    object = Object.assign({}, object);
                 var message = new $root.consensus.v1.ProofProposalResponse();
                 switch (object.result) {
                 default:
@@ -1450,10 +1415,7 @@ $root.consensus = (function() {
                     message.approval = $root.consensus.v1.ProofProposalApproval.fromObject(object.approval);
                 }
                 if (object.response_sig != null)
-                    if (typeof object.response_sig === "string")
-                        $util.base64.decode(object.response_sig, message.response_sig = $util.newBuffer($util.base64.length(object.response_sig)), 0);
-                    else if (object.response_sig.length >= 0)
-                        message.response_sig = object.response_sig;
+                    message.response_sig = $util.bytesFrom(object.response_sig);
                 return message;
             };
 
@@ -1486,7 +1448,7 @@ $root.consensus = (function() {
                 if (message.approval != null && message.hasOwnProperty("approval"))
                     object.approval = $root.consensus.v1.ProofProposalApproval.toObject(message.approval, options);
                 if (message.response_sig != null && message.hasOwnProperty("response_sig"))
-                    object.response_sig = options.bytes === String ? $util.base64.encode(message.response_sig, 0, message.response_sig.length) : options.bytes === Array ? Array.prototype.slice.call(message.response_sig) : message.response_sig;
+                    object.response_sig = $util.bytesTo(message.response_sig, options);
                 return object;
             };
 
@@ -1525,8 +1487,8 @@ $root.consensus = (function() {
              * Properties of a ProofProposalApproval.
              * @memberof consensus.v1
              * @interface IProofProposalApproval
-             * @property {Uint8Array|null} [approver] ProofProposalApproval approver
-             * @property {Uint8Array|null} [approval_sig] ProofProposalApproval approval_sig
+             * @property {B4aBuffer|null} [approver] ProofProposalApproval approver
+             * @property {B4aBuffer|null} [approval_sig] ProofProposalApproval approval_sig
              */
 
             /**
@@ -1546,7 +1508,7 @@ $root.consensus = (function() {
 
             /**
              * ProofProposalApproval approver.
-             * @member {Uint8Array} approver
+             * @member {B4aBuffer} approver
              * @memberof consensus.v1.ProofProposalApproval
              * @instance
              */
@@ -1554,7 +1516,7 @@ $root.consensus = (function() {
 
             /**
              * ProofProposalApproval approval_sig.
-             * @member {Uint8Array} approval_sig
+             * @member {B4aBuffer} approval_sig
              * @memberof consensus.v1.ProofProposalApproval
              * @instance
              */
@@ -1582,8 +1544,7 @@ $root.consensus = (function() {
              * @returns {$protobuf.Writer} Writer
              */
             ProofProposalApproval.encode = function encode(message, writer) {
-                if (!writer)
-                    writer = $Writer.create();
+                writer = $Writer.create(writer);
                 if (message.approver != null && Object.hasOwnProperty.call(message, "approver"))
                     writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.approver);
                 if (message.approval_sig != null && Object.hasOwnProperty.call(message, "approval_sig"))
@@ -1609,15 +1570,14 @@ $root.consensus = (function() {
              * @function decode
              * @memberof consensus.v1.ProofProposalApproval
              * @static
-             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
              * @param {number} [length] Message length if known beforehand
              * @returns {consensus.v1.ProofProposalApproval} ProofProposalApproval
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
             ProofProposalApproval.decode = function decode(reader, length, error) {
-                if (!(reader instanceof $Reader))
-                    reader = $Reader.create(reader);
+                reader = $Reader.create(reader);
                 var end = length === undefined ? reader.len : reader.pos + length, message = new $root.consensus.v1.ProofProposalApproval();
                 while (reader.pos < end) {
                     var tag = reader.uint32();
@@ -1625,11 +1585,11 @@ $root.consensus = (function() {
                         break;
                     switch (tag >>> 3) {
                     case 1: {
-                            message.approver = reader.bytes();
+                            message.approver = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 2: {
-                            message.approval_sig = reader.bytes();
+                            message.approval_sig = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     default:
@@ -1645,14 +1605,13 @@ $root.consensus = (function() {
              * @function decodeDelimited
              * @memberof consensus.v1.ProofProposalApproval
              * @static
-             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
              * @returns {consensus.v1.ProofProposalApproval} ProofProposalApproval
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
             ProofProposalApproval.decodeDelimited = function decodeDelimited(reader) {
-                if (!(reader instanceof $Reader))
-                    reader = new $Reader(reader);
+                reader = $Reader.create(reader);
                 return this.decode(reader, reader.uint32());
             };
 
@@ -1668,10 +1627,10 @@ $root.consensus = (function() {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
                 if (message.approver != null && message.hasOwnProperty("approver"))
-                    if (!(message.approver && typeof message.approver.length === "number" || $util.isString(message.approver)))
+                    if (!$util.isBytes(message.approver))
                         return "approver: buffer expected";
                 if (message.approval_sig != null && message.hasOwnProperty("approval_sig"))
-                    if (!(message.approval_sig && typeof message.approval_sig.length === "number" || $util.isString(message.approval_sig)))
+                    if (!$util.isBytes(message.approval_sig))
                         return "approval_sig: buffer expected";
                 return null;
             };
@@ -1686,18 +1645,12 @@ $root.consensus = (function() {
              */
             ProofProposalApproval.fromObject = function fromObject(object) {
                 if (object instanceof $root.consensus.v1.ProofProposalApproval)
-                    return object;
+                    object = Object.assign({}, object);
                 var message = new $root.consensus.v1.ProofProposalApproval();
                 if (object.approver != null)
-                    if (typeof object.approver === "string")
-                        $util.base64.decode(object.approver, message.approver = $util.newBuffer($util.base64.length(object.approver)), 0);
-                    else if (object.approver.length >= 0)
-                        message.approver = object.approver;
+                    message.approver = $util.bytesFrom(object.approver);
                 if (object.approval_sig != null)
-                    if (typeof object.approval_sig === "string")
-                        $util.base64.decode(object.approval_sig, message.approval_sig = $util.newBuffer($util.base64.length(object.approval_sig)), 0);
-                    else if (object.approval_sig.length >= 0)
-                        message.approval_sig = object.approval_sig;
+                    message.approval_sig = $util.bytesFrom(object.approval_sig);
                 return message;
             };
 
@@ -1731,9 +1684,9 @@ $root.consensus = (function() {
                     }
                 }
                 if (message.approver != null && message.hasOwnProperty("approver"))
-                    object.approver = options.bytes === String ? $util.base64.encode(message.approver, 0, message.approver.length) : options.bytes === Array ? Array.prototype.slice.call(message.approver) : message.approver;
+                    object.approver = $util.bytesTo(message.approver, options);
                 if (message.approval_sig != null && message.hasOwnProperty("approval_sig"))
-                    object.approval_sig = options.bytes === String ? $util.base64.encode(message.approval_sig, 0, message.approval_sig.length) : options.bytes === Array ? Array.prototype.slice.call(message.approval_sig) : message.approval_sig;
+                    object.approval_sig = $util.bytesTo(message.approval_sig, options);
                 return object;
             };
 
@@ -1972,8 +1925,8 @@ $root.common = (function() {
              * Properties of an EpochProofV1.
              * @memberof common.consensus
              * @interface IEpochProofV1
-             * @property {Uint8Array|null} [pd] EpochProofV1 pd
-             * @property {Array.<Uint8Array>|null} [app] EpochProofV1 app
+             * @property {B4aBuffer|null} [pd] EpochProofV1 pd
+             * @property {Array.<B4aBuffer>|null} [app] EpochProofV1 app
              */
 
             /**
@@ -1994,7 +1947,7 @@ $root.common = (function() {
 
             /**
              * EpochProofV1 pd.
-             * @member {Uint8Array} pd
+             * @member {B4aBuffer} pd
              * @memberof common.consensus.EpochProofV1
              * @instance
              */
@@ -2002,7 +1955,7 @@ $root.common = (function() {
 
             /**
              * EpochProofV1 app.
-             * @member {Array.<Uint8Array>} app
+             * @member {Array.<B4aBuffer>} app
              * @memberof common.consensus.EpochProofV1
              * @instance
              */
@@ -2030,8 +1983,7 @@ $root.common = (function() {
              * @returns {$protobuf.Writer} Writer
              */
             EpochProofV1.encode = function encode(message, writer) {
-                if (!writer)
-                    writer = $Writer.create();
+                writer = $Writer.create(writer);
                 if (message.pd != null && Object.hasOwnProperty.call(message, "pd"))
                     writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.pd);
                 if (message.app != null && message.app.length)
@@ -2058,15 +2010,14 @@ $root.common = (function() {
              * @function decode
              * @memberof common.consensus.EpochProofV1
              * @static
-             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
              * @param {number} [length] Message length if known beforehand
              * @returns {common.consensus.EpochProofV1} EpochProofV1
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
             EpochProofV1.decode = function decode(reader, length, error) {
-                if (!(reader instanceof $Reader))
-                    reader = $Reader.create(reader);
+                reader = $Reader.create(reader);
                 var end = length === undefined ? reader.len : reader.pos + length, message = new $root.common.consensus.EpochProofV1();
                 while (reader.pos < end) {
                     var tag = reader.uint32();
@@ -2074,13 +2025,13 @@ $root.common = (function() {
                         break;
                     switch (tag >>> 3) {
                     case 1: {
-                            message.pd = reader.bytes();
+                            message.pd = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 2: {
                             if (!(message.app && message.app.length))
                                 message.app = [];
-                            message.app.push(reader.bytes());
+                            message.app.push($util.bytesFrom(reader.bytes()));
                             break;
                         }
                     default:
@@ -2096,14 +2047,13 @@ $root.common = (function() {
              * @function decodeDelimited
              * @memberof common.consensus.EpochProofV1
              * @static
-             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
              * @returns {common.consensus.EpochProofV1} EpochProofV1
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
             EpochProofV1.decodeDelimited = function decodeDelimited(reader) {
-                if (!(reader instanceof $Reader))
-                    reader = new $Reader(reader);
+                reader = $Reader.create(reader);
                 return this.decode(reader, reader.uint32());
             };
 
@@ -2119,13 +2069,13 @@ $root.common = (function() {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
                 if (message.pd != null && message.hasOwnProperty("pd"))
-                    if (!(message.pd && typeof message.pd.length === "number" || $util.isString(message.pd)))
+                    if (!$util.isBytes(message.pd))
                         return "pd: buffer expected";
                 if (message.app != null && message.hasOwnProperty("app")) {
                     if (!Array.isArray(message.app))
                         return "app: array expected";
                     for (var i = 0; i < message.app.length; ++i)
-                        if (!(message.app[i] && typeof message.app[i].length === "number" || $util.isString(message.app[i])))
+                        if (!$util.isBytes(message.app[i]))
                             return "app: buffer[] expected";
                 }
                 return null;
@@ -2141,22 +2091,16 @@ $root.common = (function() {
              */
             EpochProofV1.fromObject = function fromObject(object) {
                 if (object instanceof $root.common.consensus.EpochProofV1)
-                    return object;
+                    object = Object.assign({}, object);
                 var message = new $root.common.consensus.EpochProofV1();
                 if (object.pd != null)
-                    if (typeof object.pd === "string")
-                        $util.base64.decode(object.pd, message.pd = $util.newBuffer($util.base64.length(object.pd)), 0);
-                    else if (object.pd.length >= 0)
-                        message.pd = object.pd;
+                    message.pd = $util.bytesFrom(object.pd);
                 if (object.app) {
                     if (!Array.isArray(object.app))
                         throw TypeError(".common.consensus.EpochProofV1.app: array expected");
                     message.app = [];
                     for (var i = 0; i < object.app.length; ++i)
-                        if (typeof object.app[i] === "string")
-                            $util.base64.decode(object.app[i], message.app[i] = $util.newBuffer($util.base64.length(object.app[i])), 0);
-                        else if (object.app[i].length >= 0)
-                            message.app[i] = object.app[i];
+                        message.app[i] = $util.bytesFrom(object.app[i]);
                 }
                 return message;
             };
@@ -2185,11 +2129,11 @@ $root.common = (function() {
                             object.pd = $util.newBuffer(object.pd);
                     }
                 if (message.pd != null && message.hasOwnProperty("pd"))
-                    object.pd = options.bytes === String ? $util.base64.encode(message.pd, 0, message.pd.length) : options.bytes === Array ? Array.prototype.slice.call(message.pd) : message.pd;
+                    object.pd = $util.bytesTo(message.pd, options);
                 if (message.app && message.app.length) {
                     object.app = [];
                     for (var j = 0; j < message.app.length; ++j)
-                        object.app[j] = options.bytes === String ? $util.base64.encode(message.app[j], 0, message.app[j].length) : options.bytes === Array ? Array.prototype.slice.call(message.app[j]) : message.app[j];
+                        object.app[j] = $util.bytesTo(message.app[j], options);
                 }
                 return object;
             };

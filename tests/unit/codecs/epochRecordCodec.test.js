@@ -22,7 +22,7 @@ test('Epoch record codec uses the existing SetEpochOperation wire format', t => 
     t.alike(encoded, generated);
     t.is(encoded.toString('hex'), '0a01011203ff007f', 'the envelope has only version and data');
     t.alike(decodeEpochRecord(generated), record);
-    t.alike(SetEpochOperation.toObject(SetEpochOperation.decode(encoded), { bytes: Buffer }), record);
+    t.alike(SetEpochOperation.toObject(SetEpochOperation.decode(encoded)), record);
 });
 
 test('Epoch record codec shares the seo payload with the full apply operation', t => {
