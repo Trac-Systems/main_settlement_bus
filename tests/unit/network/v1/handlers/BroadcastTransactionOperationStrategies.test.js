@@ -68,6 +68,10 @@ function createFakeFactory() {
                 buildCompleteHtlcClaimOperationMessage(...args) {
                     calls.push({args, method: 'buildCompleteHtlcClaimOperationMessage'});
                     return {method: 'buildCompleteHtlcClaimOperationMessage'};
+                },
+                buildCompleteHtlcRefundOperationMessage(...args) {
+                    calls.push({args, method: 'buildCompleteHtlcRefundOperationMessage'});
+                    return {method: 'buildCompleteHtlcRefundOperationMessage'};
                 }
             };
         }
@@ -263,6 +267,32 @@ test('HTLC claim strategy validates and forwards the complete signed claim', asy
         decodedOperation.hco.pi,
         decodedOperation.hco.in,
         decodedOperation.hco.is
+    ]);
+});
+
+test('HTLC refund strategy validates and forwards the complete signed refund', async t => {
+    const validatorCalls = [];
+    const factory = createFakeFactory();
+    const decodedOperation = applyOperationFixtures.validPartialHtlcRefundOperation;
+    const strategies = createBroadcastTransactionOperationStrategies({
+        partialHtlcValidator: createFakeValidator('htlc', validatorCalls),
+        createApplyStateMessageFactory: () => factory.createApplyStateMessageFactory()
+    });
+
+    const strategy = resolveBroadcastTransactionOperationStrategy(OperationType.HTLC_REFUND, strategies);
+    const result = await strategy.build(decodedOperation);
+
+    t.is(strategy.payloadKey, 'hro');
+    t.alike(result, {method: 'buildCompleteHtlcRefundOperationMessage'});
+    t.is(validatorCalls.length, 1);
+    t.is(validatorCalls[0].decodedTransaction, decodedOperation);
+    t.alike(factory.calls[0].args, [
+        decodedOperation.address,
+        decodedOperation.hro.tx,
+        decodedOperation.hro.txv,
+        decodedOperation.hro.li,
+        decodedOperation.hro.in,
+        decodedOperation.hro.is
     ]);
 });
 
