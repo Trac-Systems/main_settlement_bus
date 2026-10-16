@@ -46,9 +46,11 @@ const applyPayloads = new Map([
     ['setEpoch', fixtures.validSetEpochOperation],
     ['htlcClaim', fixtures.validHtlcClaimOperation],
     ['htlcLock', fixtures.validHtlcLockOperation],
+    ['htlcRefundComplete', fixtures.validHtlcRefundOperation],
+    ['htlcRefundPartial', fixtures.validPartialHtlcRefundOperation],
 ]);
 
-const APPLY_PAYLOAD_KEYS = Object.freeze(['txo', 'tro', 'aco', 'cao', 'rao', 'bdo', 'bio', 'seo', 'hco', 'hlo']);
+const APPLY_PAYLOAD_KEYS = Object.freeze(['txo', 'tro', 'aco', 'cao', 'rao', 'bdo', 'bio', 'seo', 'hco', 'hlo', 'hro']);
 
 const formatInvalidPayload = payload => {
     if (typeof payload === 'bigint') return `${payload}n`;
@@ -73,7 +75,7 @@ const withConsoleLogMuted = fn => {
 }
 
 const normalizeDecodedApplyOperation = operation => {
-    const payload = operation.tro || operation.rao || operation.bdo || operation.txo;
+    const payload = operation.tro || operation.rao || operation.bdo || operation.txo || operation.hro;
     if (!payload) return operation;
 
     payload.va ??= null;
