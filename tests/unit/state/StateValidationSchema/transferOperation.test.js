@@ -1,8 +1,11 @@
 import test from 'brittle'
+import { OperationType } from '../../../../src/utils/constants.js';
 import StateValidationSchema from '../../../../src/core/state/validators/StateValidationSchema.js';
 import { TRO, not_allowed_data_types } from '../../../fixtures/check.fixtures.js';
 import { topLevelValidationTests, valueLevelValidationTest, addressBufferLengthTest, fieldsBufferLengthTest, partialTypeCommonTests } from './common.test.js';
 import { config } from '../../../helpers/config.js';
+
+import {operationContractTests} from './schemaValidationTestHelpers.js';
 
 const stateValidationSchema = new StateValidationSchema(config)
 
@@ -99,4 +102,17 @@ test('validateTransferOperation - Buffer length validation - VALUE LEVEL (tro)',
         TRO.required_length_of_fields_for_partial_transfer
     );
 
+});
+
+test('validateTransferOperation - operation contract', t => {
+    operationContractTests(
+        t,
+        stateValidationSchema.validateTransferOperation.bind(stateValidationSchema),
+        TRO.valid_complete_transfer,
+        'tro',
+        [OperationType.TRANSFER],
+        TRO.required_length_of_fields_for_complete_transfer,
+        true,
+        ['am']
+    );
 });

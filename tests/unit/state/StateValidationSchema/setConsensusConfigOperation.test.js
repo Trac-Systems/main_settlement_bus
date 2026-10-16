@@ -2,7 +2,11 @@ import test from 'brittle';
 import b4a from 'b4a';
 
 import StateValidationSchema from '../../../../src/core/state/validators/StateValidationSchema.js';
-import { CONSENSUS_CONFIG_DATA_MAX_SIZE } from '../../../../src/utils/constants.js';
+import {
+    CONSENSUS_CONFIG_DATA_MAX_SIZE,
+    OperationType,
+    CONSENSUS_CONFIG_SCHEMA_VERSION_BYTE_LENGTH
+} from '../../../../src/utils/constants.js';
 import { CCO, not_allowed_data_types } from '../../../fixtures/check.fixtures.js';
 import {
     topLevelValidationTests,
@@ -11,6 +15,8 @@ import {
     fieldsBufferLengthTest
 } from './common.test.js';
 import { config } from '../../../helpers/config.js';
+
+import {operationContractTests, consensusConfigDataTests} from './schemaValidationTestHelpers.js';
 
 const stateValidationSchema = new StateValidationSchema(config);
 
@@ -131,4 +137,29 @@ test('validateConsensusControlOperation - config update schema version uint8 val
     t.absent(validateSchemaVersion(b4a.alloc(0)), 'Empty schema version buffer should fail');
     t.absent(validateSchemaVersion(b4a.from([0x00])), 'Zero schema version should fail');
     t.absent(validateSchemaVersion(b4a.from([0x01, 0x00])), 'Two-byte schema version should fail');
+});
+
+test('validateConsensusControlOperation - operation contract', t => {
+    operationContractTests(
+        t,
+        stateValidationSchema.validateConsensusControlOperation.bind(stateValidationSchema),
+        CCO.valid_set_consensus_config_operation,
+        'cco',
+        [OperationType.SET_GENESIS_EPOCH, OperationType.SET_CONSENSUS_CONFIG],
+        {...CCO.required_length_of_fields_for_set_consensus_config, 'cc.sv': CONSENSUS_CONFIG_SCHEMA_VERSION_BYTE_LENGTH},
+        false, // partial
+        [], // zeroAllowed
+        [], // optionalFields
+        ['cc', 'cc.cd'],
+        ['cc']
+    );
+});
+
+test('consensus configuration contract: opaque data is nonempty and bounded for both operation types', t => {
+    consensusConfigDataTests(
+        t,
+        stateValidationSchema.validateConsensusControlOperation.bind(stateValidationSchema),
+        CCO.valid_set_consensus_config_operation,
+        [OperationType.SET_GENESIS_EPOCH, OperationType.SET_CONSENSUS_CONFIG]
+    );
 });

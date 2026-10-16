@@ -23,6 +23,9 @@ import {
     fieldsBufferLengthTest
 } from './common.test.js';
 
+import {operationContractTests} from './schemaValidationTestHelpers.js';
+import {htlcOperationPipelineTests} from './htlcSchemaTestHelpers.js';
+
 const stateValidationSchema = new StateValidationSchema(config);
 const validate = stateValidationSchema.validateHtlcRefundOperation.bind(stateValidationSchema);
 const submitterFieldLengths = {
@@ -245,4 +248,31 @@ test('validateHtlcRefundOperation rejects incomplete or invalid decoded fields',
         t.is(decoded.hro[field], null, `missing ${field} is normalized to null`);
         t.is(validate(decoded), false, 'decoded mixed validator metadata is rejected');
     }
+});
+
+test('validateHtlcRefundOperation - operation contract', t => {
+    operationContractTests(
+        t,
+        validate,
+        fixtures.validHtlcRefundOperation,
+        'hro',
+        [OperationType.HTLC_REFUND],
+        completeFieldLengths,
+        true,
+        [], // zeroAllowed
+        [], // optionalFields
+        [], // otherRequiredFields
+        [], // objectFields
+        [], // zeroPolicyUnspecified
+        true // decodedNullMetadata
+    );
+});
+
+test('validateHtlcRefundOperation - builder, codec and partial sanitizer', async t => {
+    await htlcOperationPipelineTests(
+        t,
+        validate,
+        fixtures.validHtlcRefundOperation,
+        'hro'
+    );
 });

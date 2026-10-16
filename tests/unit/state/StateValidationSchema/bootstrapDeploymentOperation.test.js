@@ -1,8 +1,11 @@
 import test from 'brittle'
+import { OperationType, CHANNEL_BYTE_LENGTH } from '../../../../src/utils/constants.js';
 import StateValidationSchema from '../../../../src/core/state/validators/StateValidationSchema.js';
 import {BDO, not_allowed_data_types} from '../../../fixtures/check.fixtures.js';
 import { topLevelValidationTests, valueLevelValidationTest, addressBufferLengthTest, fieldsBufferLengthTest, partialTypeCommonTests } from './common.test.js';
 import { config } from '../../../helpers/config.js';
+
+import {operationContractTests} from './schemaValidationTestHelpers.js';
 
 const stateValidationSchema = new StateValidationSchema(config)
 
@@ -100,5 +103,17 @@ test('validateBootstrapDeployment - Buffer length validation - VALUE LEVEL (bdo)
         BDO.valid_partial_bootstrap_deployment,
         'bdo',
         BDO.required_length_of_fields_for_partial_bootstrap_deployment
+    );
+});
+
+test('validateBootstrapDeploymentOperation - operation contract', t => {
+    operationContractTests(
+        t,
+        stateValidationSchema.validateBootstrapDeploymentOperation.bind(stateValidationSchema),
+        BDO.valid_complete_bootstrap_deployment,
+        'bdo',
+        [OperationType.BOOTSTRAP_DEPLOYMENT],
+        {...BDO.required_length_of_fields_for_complete_bootstrap_deployment, ic: CHANNEL_BYTE_LENGTH},
+        true
     );
 });
