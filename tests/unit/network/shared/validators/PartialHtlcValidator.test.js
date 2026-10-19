@@ -5,13 +5,13 @@ import tracCryptoApi from 'trac-crypto-api';
 import PartialHtlcValidator from '../../../../../src/core/network/protocols/shared/validators/PartialHtlcValidator.js';
 import {applyStateMessageFactory} from '../../../../../src/messages/state/applyStateMessageFactory.js';
 import {addressToBuffer} from '../../../../../src/core/state/utils/address.js';
-import {$TNK, BALANCE_FEE, PERCENT_75} from '../../../../../src/core/state/utils/balance.js';
 import * as escrowEntryUtils from '../../../../../src/core/state/utils/escrowEntry.js';
+import nodeEntryUtils from '../../../../../src/core/state/utils/nodeEntry.js';
+import {$TNK, BALANCE_FEE, PERCENT_75} from '../../../../../src/core/state/utils/balance.js';
 import {bigIntToBuffer, uint64ToBuffer, uint8ToBuffer} from '../../../../../src/utils/buffer.js';
-import {EntryType, HTLC_MIN_LOCK_DURATION_EPOCHS, OperationType, ResultCode} from '../../../../../src/utils/constants.js';
+import {EntryType, HTLC_MIN_LOCK_DURATION_EPOCHS, ResultCode} from '../../../../../src/utils/constants.js';
 import {config} from '../../../../helpers/config.js';
 import {createHtlcLockTransactionHash} from '../../../../helpers/htlcLock.js';
-import applyOperationFixtures from '../../../../fixtures/applyOperation.fixtures.js';
 import {
     buildHtlcLockPayload,
     createNodeEntry,
@@ -142,25 +142,6 @@ test('PartialHtlcValidator accepts maker-only and cosigned lock authorizations',
 
     t.ok(await validatorInstance.validate(await buildHtlcLockPayload(maker, claimant.address)));
     t.ok(await validatorInstance.validate(await buildCosignedLock(maker, operator, claimant)));
-});
-
-test('PartialHtlcValidator rejects unfinished refund operations', async t => {
-    const validatorInstance = new PartialHtlcValidator(createState(), undefined, config);
-    const claim = applyOperationFixtures.validHtlcClaimOperation;
-    const lock = applyOperationFixtures.validHtlcLockOperation;
-
-    for (const payload of [
-        {type: OperationType.HTLC_REFUND},
-        {...claim, type: OperationType.HTLC_REFUND},
-        {...lock, type: OperationType.HTLC_REFUND}
-    ]) {
-        await expectSharedValidatorError(
-            t,
-            () => validatorInstance.validate(payload),
-            ResultCode.OPERATION_TYPE_UNKNOWN,
-            'validation is not implemented'
-        );
-    }
 });
 
 async function createClaimScenario({sameRecipient = false} = {}) {
@@ -323,6 +304,107 @@ test('PartialHtlcValidator combines overlapping claim and fee payouts before ove
         ? createNodeEntry({balance: bigIntToBuffer(maxBalance - 105n)})
         : null;
     t.ok(await validatorInstance.validate(claim), 'recipient may reach the maximum balance exactly');
+});
+
+async function createRefundScenario({signedEpoch = 100n, unsignedEpoch = 100n} = {}) {
+    const {requester: maker, validator, recipient: claimant, alternate: relayer} = await getWalletSet();
+    const lock = await buildHtlcLockPayload(maker, claimant.address);
+    const lockId = lock.hlo.tx;
+    const escrowKey = EntryType.HTLC_ESCROW + b4a.toString(lockId, 'hex');
+    const escrow = escrowEntryUtils.init({
+        lockId,
+        lockerAddress: lock.address,
+        claimRecipientAddress: lock.hlo.ca,
+        refundRecipientAddress: lock.hlo.ra,
+        amount: lock.hlo.am,
+        additionalFeeAmount: lock.hlo.fa,
+        hashLock: lock.hlo.hl,
+        refundEpoch: lock.hlo.re,
+    }, config.addressPrefix);
+    const signedEntries = new Map([[escrowKey, escrow]]);
+    const txEntries = new Map([[escrowKey, escrow]]);
+    const state = createState({
+        signedEntries,
+        txEntries,
+        getCurrentEpoch: async () => signedEpoch,
+        getCurrentEpochUnsigned: async () => unsignedEpoch,
+    });
+    const payload = await applyStateMessageFactory(relayer, config)
+        .buildPartialHtlcRefundOperationMessage(relayer.address, b4a.alloc(32, 0x11), lockId);
+    return {maker, validator, relayer, lockId, escrowKey, escrow, signedEntries, txEntries, state, payload};
+}
+
+test('PartialHtlcValidator admits a signed third-party refund at the expiry epoch', async t => {
+    const {validator, relayer, state, payload} = await createRefundScenario();
+    t.ok(await new PartialHtlcValidator(state, validator.address, config).validate(payload));
+    t.not(relayer.address, validator.address, 'submitter need not be the refund recipient or validator');
+});
+
+test('PartialHtlcValidator requires a confirmed pending escrow', async t => {
+    const {validator, state, payload, escrowKey, escrow, signedEntries, txEntries} = await createRefundScenario();
+    const admission = () => new PartialHtlcValidator(state, validator.address, config).validate(payload);
+
+    signedEntries.delete(escrowKey);
+    await expectSharedValidatorError(t, admission, ResultCode.TX_INVALID_PAYLOAD, 'signed state');
+    signedEntries.set(escrowKey, escrow);
+    txEntries.delete(escrowKey);
+    await expectSharedValidatorError(t, admission, ResultCode.TX_INVALID_PAYLOAD, 'current state');
+    txEntries.set(escrowKey, escrowEntryUtils.makeRefund(escrow, uint64ToBuffer(100n), config.addressPrefix).entry);
+    await expectSharedValidatorError(t, admission, ResultCode.TX_ALREADY_EXISTS, 'already settled');
+});
+
+test('PartialHtlcValidator waits for the signed refund epoch', async t => {
+    const {validator, state, payload} = await createRefundScenario({signedEpoch: 99n});
+    await expectSharedValidatorError(
+        t,
+        () => new PartialHtlcValidator(state, validator.address, config).validate(payload),
+        ResultCode.TX_INVALID_PAYLOAD,
+        'not been reached'
+    );
+});
+
+test('PartialHtlcValidator rejects a refund that would overflow the stored recipient', async t => {
+    const {maker, validator, state, payload, txEntries} = await createRefundScenario();
+    const maximumBalance = (1n << 128n) - 1n;
+    txEntries.set(maker.address, nodeEntryUtils.encode(createNodeEntry({balance: bigIntToBuffer(maximumBalance)})));
+
+    await expectSharedValidatorError(
+        t,
+        () => new PartialHtlcValidator(state, validator.address, config).validate(payload),
+        ResultCode.TRANSFER_RECIPIENT_BALANCE_OVERFLOW,
+        'overflow'
+    );
+
+    txEntries.set(maker.address, nodeEntryUtils.encode(createNodeEntry({balance: bigIntToBuffer(maximumBalance - 1n)})));
+    t.ok(await new PartialHtlcValidator(state, validator.address, config).validate(payload),
+        'a recipient balance that reaches the maximum exactly is accepted');
+});
+
+test('PartialHtlcValidator rejects a corrupt refund recipient account but accepts an absent one', async t => {
+    const {maker, validator, state, payload, txEntries} = await createRefundScenario();
+    const admission = () => new PartialHtlcValidator(state, validator.address, config).validate(payload);
+
+    txEntries.set(maker.address, b4a.from([1]));
+    await expectSharedValidatorError(t, admission, ResultCode.TX_INVALID_PAYLOAD, 'recipient account is invalid');
+
+    txEntries.delete(maker.address);
+    t.ok(await admission(), 'a missing refund recipient account can be created during apply');
+});
+
+test('PartialHtlcValidator rejects refund replay, forged signature and self-validation', async t => {
+    const {validator, state, payload, txEntries} = await createRefundScenario();
+    const admission = candidate => new PartialHtlcValidator(state, validator.address, config).validate(candidate);
+
+    txEntries.set(b4a.toString(payload.hro.tx, 'hex'), b4a.from([1]));
+    await expectSharedValidatorError(t, () => admission(payload), ResultCode.TX_ALREADY_EXISTS);
+    txEntries.delete(b4a.toString(payload.hro.tx, 'hex'));
+
+    const forged = {...payload, hro: {...payload.hro, is: b4a.alloc(payload.hro.is.length, 0xaa)}};
+    await expectSharedValidatorError(t, () => admission(forged), ResultCode.TX_SIGNATURE_INVALID);
+
+    const selfPayload = await applyStateMessageFactory(validator, config)
+        .buildPartialHtlcRefundOperationMessage(validator.address, payload.hro.txv, payload.hro.li);
+    await expectSharedValidatorError(t, () => admission(selfPayload), ResultCode.SELF_VALIDATION_FORBIDDEN);
 });
 
 test('PartialHtlcValidator binds signer zero to the locker address', async t => {

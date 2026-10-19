@@ -1203,7 +1203,167 @@ class State extends ReadyResource {
         return Status.SUCCESS;
     }
 
-    async #handleApplyHtlcRefundOperation() {
+    async #handleApplyHtlcRefundOperation(op, view, base, node, batch) {
+        if (!this.#stateValidationSchema.validateHtlcRefundOperation(op)) {
+            this.#safeLogApply(OperationType.HTLC_REFUND, "Contract schema validation failed.", node.from.key);
+            return Status.FAILURE;
+        }
+        if (!b4a.isBuffer(op.hro.va) || !b4a.isBuffer(op.hro.vn) || !b4a.isBuffer(op.hro.vs)) {
+            this.#safeLogApply(OperationType.HTLC_REFUND, "Operation is not complete.", node.from.key);
+            return Status.FAILURE;
+        }
+        if (b4a.equals(op.address, op.hro.va)) {
+            this.#safeLogApply(OperationType.HTLC_REFUND, "Validator cannot sign its own transaction.", node.from.key);
+            return Status.FAILURE;
+        }
+        if (b4a.equals(op.hro.in, op.hro.vn)) {
+            this.#safeLogApply(OperationType.HTLC_REFUND, "Nonces should not be the same.", node.from.key);
+            return Status.FAILURE;
+        }
+        if (b4a.equals(op.hro.is, op.hro.vs)) {
+            this.#safeLogApply(OperationType.HTLC_REFUND, "Signatures should not be the same.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        const submitterAddress = addressUtils.bufferToAddress(op.address, this.#config.addressPrefix);
+        const submitterPublicKey = submitterAddress && tracCryptoApi.address.decodeSafe(submitterAddress);
+        if (!isBufferValid(submitterPublicKey, PUBLIC_KEY_LENGTH) || isZeroBuffer(submitterPublicKey)) {
+            this.#safeLogApply(OperationType.HTLC_REFUND, "Submitter address is invalid.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        const message = createMessage(
+            this.#config.networkId,
+            op.hro.txv,
+            op.hro.li,
+            op.hro.in,
+            OperationType.HTLC_REFUND
+        );
+        if (message.length === 0) {
+            this.#safeLogApply(OperationType.HTLC_REFUND, "Invalid refund message.", node.from.key);
+            return Status.FAILURE;
+        }
+        const txHash = await tracCryptoApi.hash.blake3Safe(message);
+        if (
+            !b4a.equals(txHash, op.hro.tx) ||
+            !tracCryptoApi.signature.verify(op.hro.is, txHash, submitterPublicKey)
+        ) {
+            this.#safeLogApply(OperationType.HTLC_REFUND, "Refund hash or submitter signature is invalid.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        const validatorAddress = addressUtils.bufferToAddress(op.hro.va, this.#config.addressPrefix);
+        if (validatorAddress === null) {
+            this.#safeLogApply(OperationType.HTLC_REFUND, "Validator address is invalid.", node.from.key);
+            return Status.FAILURE;
+        }
+        const validatorPublicKey = tracCryptoApi.address.decodeSafe(validatorAddress);
+        if (!isBufferValid(validatorPublicKey, PUBLIC_KEY_LENGTH) || isZeroBuffer(validatorPublicKey)) {
+            this.#safeLogApply(OperationType.HTLC_REFUND, "Validator public key is invalid.", node.from.key);
+            return Status.FAILURE;
+        }
+        const validatorMessage = createMessage(
+            this.#config.networkId,
+            op.hro.tx,
+            op.hro.vn,
+            OperationType.HTLC_REFUND
+        );
+        if (validatorMessage.length === 0) {
+            this.#safeLogApply(OperationType.HTLC_REFUND, "Invalid validator message.", node.from.key);
+            return Status.FAILURE;
+        }
+        const validatorHash = await tracCryptoApi.hash.blake3Safe(validatorMessage);
+        if (!tracCryptoApi.signature.verify(op.hro.vs, validatorHash, validatorPublicKey)) {
+            this.#safeLogApply(OperationType.HTLC_REFUND, "Validator signature is invalid.", node.from.key);
+            return Status.FAILURE;
+        }
+        const validatorEntry = await this.#getEntryApply(validatorAddress, batch);
+        if (!await this.#isValidatorValidApply(validatorEntry, node, op)) {
+            this.#safeLogApply(OperationType.HTLC_REFUND, "Validator consistency check failed.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        const indexersSequenceState = await this.#getIndexerSequenceStateApply(base);
+        if (indexersSequenceState === null || !b4a.equals(op.hro.txv, indexersSequenceState)) {
+            this.#safeLogApply(OperationType.HTLC_REFUND, "Transaction was not executed.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        const refundTxHashHex = b4a.toString(op.hro.tx, 'hex');
+        if (await this.#getEntryApply(refundTxHashHex, batch) !== null) {
+            this.#safeLogApply(OperationType.HTLC_REFUND, "Operation has already been applied.", node.from.key);
+            return Status.IGNORE;
+        }
+
+        const escrowKey = EntryType.HTLC_ESCROW + b4a.toString(op.hro.li, 'hex');
+        const escrowBuffer = await this.#getEntryApply(escrowKey, batch);
+        const escrow = escrowEntryUtils.decode(escrowBuffer, this.#config.addressPrefix);
+        if (!escrow || !b4a.equals(escrow.lockId, op.hro.li)) {
+            this.#safeLogApply(OperationType.HTLC_REFUND, "HTLC escrow does not exist or is invalid.", node.from.key);
+            return Status.FAILURE;
+        }
+        if (escrow.status !== escrowEntryUtils.Status.PENDING) {
+            this.#safeLogApply(OperationType.HTLC_REFUND, "HTLC escrow is already settled.", node.from.key);
+            return Status.IGNORE;
+        }
+
+        const currentEpoch = await this.#getEntryApply(EntryType.EPOCH_CURRENT, batch);
+        if (!isBufferValid(currentEpoch, EPOCH_BYTE_LENGTH)) {
+            this.#safeLogApply(OperationType.HTLC_REFUND, "Current epoch is not initialized or is invalid.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        if (b4a.compare(currentEpoch, escrow.refundEpoch) < 0) {
+            this.#safeLogApply(OperationType.HTLC_REFUND, "Refund epoch has not been reached.", node.from.key);
+            return Status.IGNORE;
+        }
+
+        const settlement = escrowEntryUtils.makeRefund(escrowBuffer, currentEpoch, this.#config.addressPrefix);
+        if (settlement === null) {
+            this.#safeLogApply(OperationType.HTLC_REFUND, "HTLC refund transition is invalid.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        const recipientAddress = addressUtils.bufferToAddress(settlement.address, this.#config.addressPrefix);
+        if (recipientAddress === null || settlement.amount === null) {
+            this.#safeLogApply(OperationType.HTLC_REFUND, "Refund recipient or amount is invalid.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        const recipientEntryBuffer = await this.#getEntryApply(recipientAddress, batch);
+        let updatedRecipientEntry;
+        if (recipientEntryBuffer === null) {
+            updatedRecipientEntry = nodeEntryUtils.init(ZERO_WK, nodeRoleUtils.NodeRole.READER, settlement.amount.value);
+        } else {
+            const recipientEntry = nodeEntryUtils.decode(recipientEntryBuffer);
+            if (recipientEntry === null) {
+                this.#safeLogApply(OperationType.HTLC_REFUND, "Refund recipient account is invalid.", node.from.key);
+                return Status.FAILURE;
+            }
+            const recipientBalance = toBalance(recipientEntry.balance);
+            if (recipientBalance === null) {
+                this.#safeLogApply(OperationType.HTLC_REFUND, "Refund recipient balance is invalid.", node.from.key);
+                return Status.FAILURE;
+            }
+            const updatedBalance = recipientBalance.add(settlement.amount);
+            if (updatedBalance === null) {
+                this.#safeLogApply(OperationType.HTLC_REFUND, "Refund recipient balance overflow.", node.from.key);
+                return Status.FAILURE;
+            }
+            updatedRecipientEntry = updatedBalance.update(recipientEntryBuffer);
+        }
+        if (!isBufferValid(updatedRecipientEntry, NODE_ENTRY_SIZE)) {
+            this.#safeLogApply(OperationType.HTLC_REFUND, "Failed to credit refund recipient.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        await batch.put(recipientAddress, updatedRecipientEntry);
+        await batch.put(escrowKey, settlement.entry);
+        await batch.put(refundTxHashHex, node.value);
+
+        if (this.#config.enableTxApplyLogs) {
+            console.info(`HTLC refund operation: ${refundTxHashHex} has been appended.`);
+        }
         return Status.SUCCESS;
     }
 

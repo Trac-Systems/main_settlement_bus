@@ -5,6 +5,7 @@ import PartialOperationValidator from './PartialOperationValidator.js';
 import {bufferToAddress} from '../../../../state/utils/address.js';
 import {BALANCE_FEE, PERCENT_75, toBalance} from '../../../../state/utils/balance.js';
 import * as escrowEntryUtils from '../../../../state/utils/escrowEntry.js';
+import nodeEntryUtils from '../../../../state/utils/nodeEntry.js';
 import {bufferToBigInt} from '../../../../../utils/amountSerialization.js';
 import {isZeroBuffer, uint64ToBuffer} from '../../../../../utils/buffer.js';
 import {
@@ -28,15 +29,10 @@ class PartialHtlcValidator extends PartialOperationValidator {
     }
 
     async validate(payload) {
-        if (payload?.type === OperationType.HTLC_REFUND) {
-            throw new V1ProtocolError(
-                ResultCode.OPERATION_TYPE_UNKNOWN,
-                'HTLC refund validation is not implemented.'
-            );
-        }
         if (payload?.type === OperationType.HTLC_CLAIM) {
             return this.#validateClaim(payload);
         }
+        if (payload?.type === OperationType.HTLC_REFUND) return this.#validateRefund(payload);
         this.isPayloadSchemaValid(payload);
         this.validateNoSelfValidation(payload);
         this.validateRequesterAddress(payload);
@@ -134,6 +130,75 @@ class PartialHtlcValidator extends PartialOperationValidator {
                 );
             }
         }
+    }
+
+    async #validateRefund(payload) {
+        this.isPayloadSchemaValid(payload);
+        this.validateNoSelfValidation(payload);
+        this.validateRequesterAddress(payload);
+        await this.validateTransactionUniqueness(payload);
+        await this.validateSignature(payload);
+        await this.validateTransactionValidity(payload);
+        this.isOperationNotCompleted(payload);
+
+        const escrowKey = EntryType.HTLC_ESCROW + b4a.toString(payload.hro.li, 'hex');
+        const signedEscrow = escrowEntryUtils.decode(
+            await this.state.getSigned(escrowKey), this.#config.addressPrefix
+        );
+        if (!signedEscrow || !b4a.equals(signedEscrow.lockId, payload.hro.li)) {
+            throw new V1ProtocolError(ResultCode.TX_INVALID_PAYLOAD, 'HTLC lock is not confirmed in signed state.');
+        }
+        if (signedEscrow.status !== escrowEntryUtils.Status.PENDING) {
+            throw new V1ProtocolError(ResultCode.TX_ALREADY_EXISTS, 'HTLC escrow is already settled.');
+        }
+
+        const escrowBuffer = await this.state.get(escrowKey);
+        const escrow = escrowEntryUtils.decode(escrowBuffer, this.#config.addressPrefix);
+        if (!escrow || !b4a.equals(escrow.lockId, payload.hro.li)) {
+            throw new V1ProtocolError(ResultCode.TX_INVALID_PAYLOAD, 'HTLC escrow is missing from current state.');
+        }
+        if (escrow.status !== escrowEntryUtils.Status.PENDING) {
+            throw new V1ProtocolError(ResultCode.TX_ALREADY_EXISTS, 'HTLC escrow is already settled.');
+        }
+
+        const [signedEpoch, unsignedEpoch] = await Promise.all([
+            this.state.getCurrentEpoch(),
+            this.state.getCurrentEpochUnsigned()
+        ]);
+        if (typeof signedEpoch !== 'bigint' || typeof unsignedEpoch !== 'bigint') {
+            throw new V1ProtocolError(ResultCode.TX_INVALID_PAYLOAD, 'HTLC refunds require an initialized network epoch.');
+        }
+        const refundEpoch = b4a.from(escrow.refundEpoch).readBigUInt64BE(0);
+        if (signedEpoch < refundEpoch || unsignedEpoch < refundEpoch) {
+            throw new V1ProtocolError(ResultCode.TX_INVALID_PAYLOAD, 'HTLC refund epoch has not been reached.');
+        }
+
+        const settlement = escrowEntryUtils.makeRefund(
+            escrowBuffer, uint64ToBuffer(unsignedEpoch), this.#config.addressPrefix
+        );
+        if (!settlement) {
+            throw new V1ProtocolError(ResultCode.TX_INVALID_PAYLOAD, 'HTLC refund transition is invalid.');
+        }
+        const recipientAddress = bufferToAddress(settlement.address, this.#config.addressPrefix);
+        if (recipientAddress === null) {
+            throw new V1ProtocolError(ResultCode.TX_INVALID_PAYLOAD, 'HTLC refund recipient is invalid.');
+        }
+        const recipientBuffer = await this.state.get(recipientAddress);
+        if (recipientBuffer !== null) {
+            const recipient = nodeEntryUtils.decode(recipientBuffer);
+            if (!recipient) {
+                throw new V1ProtocolError(ResultCode.TX_INVALID_PAYLOAD, 'HTLC refund recipient account is invalid.');
+            }
+            const balance = toBalance(recipient.balance);
+            if (!balance || balance.asBigInt() + settlement.amount.asBigInt() > this.max_amount) {
+                throw new V1ProtocolError(
+                    ResultCode.TRANSFER_RECIPIENT_BALANCE_OVERFLOW,
+                    'HTLC refund would overflow the refund recipient balance.'
+                );
+            }
+        }
+
+        return true;
     }
 
     async #validateEscrowUniqueness(lockId) {

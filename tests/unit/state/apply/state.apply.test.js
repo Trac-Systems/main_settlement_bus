@@ -23,6 +23,7 @@ async function runStateTests() {
     await import('./setEpoch/state.apply.setEpoch.test.js');
     await import('./htlcLock/state.apply.htlcLock.test.js');
     await import('./htlcClaim/state.apply.htlcClaim.test.js');
+    await import('./htlcRefund/state.apply.htlcRefund.test.js');
     test.resume();
 }
 
