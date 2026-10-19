@@ -328,10 +328,11 @@ const validHtlcRefundOperation = {
 const validPartialHtlcRefundOperation = {
     ...validHtlcRefundOperation,
     hro: {
-        ...validHtlcRefundOperation.hro,
-        va: null,
-        vn: null,
-        vs: null
+        tx: validHtlcRefundOperation.hro.tx,
+        txv: validHtlcRefundOperation.hro.txv,
+        li: validHtlcRefundOperation.hro.li,
+        in: validHtlcRefundOperation.hro.in,
+        is: validHtlcRefundOperation.hro.is
     }
 };
 

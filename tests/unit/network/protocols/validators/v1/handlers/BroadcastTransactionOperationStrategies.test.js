@@ -10,9 +10,6 @@ import {
 import {OperationType, ResultCode} from '../../../../../../../src/utils/constants.js';
 import {V1ProtocolError} from '../../../../../../../src/core/network/protocols/validators/v1/V1ProtocolError.js';
 import applyOperationFixtures from '../../../../../../fixtures/applyOperation.fixtures.js';
-import PartialHtlcValidator from '../../../../../../../src/core/network/protocols/validators/shared/validators/PartialHtlcValidator.js';
-import {config} from '../../../../../../helpers/config.js';
-import {createState, expectSharedValidatorError} from '../../../../utils/sharedValidatorTestUtils.js';
 
 const VALID_ADDR = 'trac123z3gfpr2epjwww7ntm3m6ud2fhmq0tvts27p2f5mx3qkecsutlqfys769';
 const VALID_TO_ADDR = 'trac1mqktwme8fvklrds4hlhfy6lhmsu9qgfn3c3kuhz7c5zwjt8rc3dqj9tx7h';
@@ -33,6 +30,17 @@ test('decoded partial HTLC claims keep validator metadata absent after broadcast
     sanitizeDecodedPartialTransaction(decoded);
 
     for (const field of ['va', 'vn', 'vs']) t.absent(Object.hasOwn(decoded.hco, field));
+});
+
+test('decoded partial HTLC refunds keep validator metadata absent after broadcast sanitization', t => {
+    const encoded = safeEncodeApplyOperation(applyOperationFixtures.validPartialHtlcRefundOperation);
+    const decoded = safeDecodeApplyOperation(encoded);
+    t.ok(encoded.length > 0);
+    for (const field of ['va', 'vn', 'vs']) t.absent(Object.hasOwn(decoded.hro, field));
+
+    sanitizeDecodedPartialTransaction(decoded);
+
+    for (const field of ['va', 'vn', 'vs']) t.absent(Object.hasOwn(decoded.hro, field));
 });
 
 function createFakeValidator(name, calls) {

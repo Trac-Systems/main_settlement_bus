@@ -3,7 +3,7 @@ import {WalletProvider} from 'trac-wallet';
 
 import {applyStateMessageFactory} from '../../../../src/messages/state/applyStateMessageFactory.js';
 import {safeEncodeApplyOperation, safeDecodeApplyOperation} from '../../../../src/codecs/apply/applyOperationCodec.js';
-import {sanitizeDecodedPartialTransaction} from '../../../../src/core/network/protocols/v1/handlers/broadcastTransaction/BroadcastTransactionPayloadUtils.js';
+import {sanitizeDecodedPartialTransaction} from '../../../../src/core/network/protocols/validators/v1/handlers/broadcastTransaction/BroadcastTransactionPayloadUtils.js';
 import {AMOUNT_BYTE_LENGTH} from '../../../../src/utils/constants.js';
 import {testKeyPair1, testKeyPair2} from '../../../fixtures/apply.fixtures.js';
 import {config} from '../../../helpers/config.js';

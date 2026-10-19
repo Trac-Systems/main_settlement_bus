@@ -60,6 +60,7 @@ export async function buildHtlcLockPayload(
         amount = DEFAULT_PRINCIPAL,
         feeAmount = DEFAULT_SURCHARGE,
         feeRecipient = context.htlcLockScenario.claimantPeer.wallet.address,
+        refundAddress = context.htlcLockScenario.makerPeer.wallet.address,
         hashLock = tracCryptoApi.hash.sha256(DEFAULT_PREIMAGE),
         refundEpoch = DEFAULT_REFUND_EPOCH,
         policyHash = DEFAULT_POLICY_HASH,
@@ -75,7 +76,7 @@ export async function buildHtlcLockPayload(
     const signerSet = [makerPeer.wallet.publicKey];
     const lock = {
         claimAddress: claimantPeer.wallet.address,
-        refundAddress: makerPeer.wallet.address,
+        refundAddress,
         amount,
         feeAmount,
         feeRecipient,
@@ -96,7 +97,7 @@ export async function buildHtlcLockPayload(
         const wireTerms = {
             txv: txValidity,
             ca: addressUtils.addressToBuffer(claimantPeer.wallet.address, config.addressPrefix),
-            ra: addressUtils.addressToBuffer(makerPeer.wallet.address, config.addressPrefix),
+            ra: addressUtils.addressToBuffer(refundAddress, config.addressPrefix),
             am: amount,
             fa: feeAmount,
             ...(feeRecipient && {

@@ -308,7 +308,7 @@ test('ApplyStateMessageBuilder partial HTLC refund signs the canonical fields an
         t.ok(b4a.equals(decoded.hro[field], payload.hro[field]), `encoded hro.${field} is preserved`);
     }
     for (const field of ['va', 'vn', 'vs']) {
-        t.is(decoded.hro[field], null, `partial refund has no ${field}`);
+        t.absent(Object.hasOwn(decoded.hro, field), `partial refund has no ${field}`);
     }
 });
 

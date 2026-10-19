@@ -68,6 +68,8 @@ class PartialOperationValidator {
                 return this.stateValidationSchema.validateHtlcLockOperation.bind(this.stateValidationSchema);
             case OperationType.HTLC_CLAIM:
                 return this.stateValidationSchema.validateHtlcClaimOperation.bind(this.stateValidationSchema);
+            case OperationType.HTLC_REFUND:
+                return this.stateValidationSchema.validateHtlcRefundOperation.bind(this.stateValidationSchema);
             default:
                 throw new V1ProtocolError(
                     ResultCode.OPERATION_TYPE_UNKNOWN,
@@ -142,6 +144,14 @@ class PartialOperationValidator {
                     operation.pi,
                     operation.in,
                     OperationType.HTLC_CLAIM
+                ];
+            case OperationType.HTLC_REFUND:
+                return [
+                    this.#config.networkId,
+                    operation.txv,
+                    operation.li,
+                    operation.in,
+                    OperationType.HTLC_REFUND
                 ];
             default:
                 throw new V1ProtocolError(

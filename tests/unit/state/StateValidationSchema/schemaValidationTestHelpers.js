@@ -1,7 +1,7 @@
 import b4a from 'b4a';
 import {OperationType, CONSENSUS_CONFIG_DATA_MAX_SIZE} from '../../../../src/utils/constants.js';
 import {safeEncodeApplyOperation, safeDecodeApplyOperation} from '../../../../src/codecs/apply/applyOperationCodec.js';
-import {sanitizeDecodedPartialTransaction} from '../../../../src/core/network/protocols/v1/handlers/broadcastTransaction/BroadcastTransactionPayloadUtils.js';
+import {sanitizeDecodedPartialTransaction} from '../../../../src/core/network/protocols/validators/v1/handlers/broadcastTransaction/BroadcastTransactionPayloadUtils.js';
 import {config} from '../../../helpers/config.js';
 import fixtures from '../../../fixtures/applyOperation.fixtures.js';
 import * as checkFixtures from '../../../fixtures/check.fixtures.js';

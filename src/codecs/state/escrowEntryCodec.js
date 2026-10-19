@@ -5,7 +5,6 @@ import stateGenerated from './state.generated.cjs';
 const {EscrowEntry} = stateGenerated.state;
 const TO_OBJECT_OPTIONS = Object.freeze({
     enums: Number,
-    bytes: Buffer,
     defaults: false,
 });
 

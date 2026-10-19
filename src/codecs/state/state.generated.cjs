@@ -1,11 +1,9 @@
 /*eslint-disable block-scoped-var, id-length, no-control-regex, no-magic-numbers, no-prototype-builtins, no-redeclare, no-shadow, no-var, sort-vars*/
 "use strict";
-if (typeof globalThis !== 'undefined' && typeof globalThis.self === 'undefined') {
-  globalThis.self = globalThis;
-}
 
+/** @typedef {ReturnType<typeof import("b4a").alloc>} B4aBuffer */
 
-var $protobuf = require("protobufjs/minimal");
+var $protobuf = require("../protobufRuntime.cjs");
 
 // Common aliases
 var $Reader = $protobuf.Reader, $Writer = $protobuf.Writer, $util = $protobuf.util;
@@ -46,17 +44,17 @@ $root.state = (function() {
          * @interface IEscrowEntry
          * @property {number|null} [version] EscrowEntry version
          * @property {state.EscrowStatus|null} [status] EscrowEntry status
-         * @property {Uint8Array|null} [amount] EscrowEntry amount
-         * @property {Uint8Array|null} [additionalFeeAmount] EscrowEntry additionalFeeAmount
-         * @property {Uint8Array|null} [lockerAddress] EscrowEntry lockerAddress
-         * @property {Uint8Array|null} [claimRecipientAddress] EscrowEntry claimRecipientAddress
-         * @property {Uint8Array|null} [refundRecipientAddress] EscrowEntry refundRecipientAddress
-         * @property {Uint8Array|null} [additionalFeeRecipientAddress] EscrowEntry additionalFeeRecipientAddress
-         * @property {Uint8Array|null} [lockId] EscrowEntry lockId
-         * @property {Uint8Array|null} [hashLock] EscrowEntry hashLock
-         * @property {Uint8Array|null} [preimage] EscrowEntry preimage
-         * @property {Uint8Array|null} [policyHash] EscrowEntry policyHash
-         * @property {Uint8Array|null} [refundEpoch] EscrowEntry refundEpoch
+         * @property {B4aBuffer|null} [amount] EscrowEntry amount
+         * @property {B4aBuffer|null} [additionalFeeAmount] EscrowEntry additionalFeeAmount
+         * @property {B4aBuffer|null} [lockerAddress] EscrowEntry lockerAddress
+         * @property {B4aBuffer|null} [claimRecipientAddress] EscrowEntry claimRecipientAddress
+         * @property {B4aBuffer|null} [refundRecipientAddress] EscrowEntry refundRecipientAddress
+         * @property {B4aBuffer|null} [additionalFeeRecipientAddress] EscrowEntry additionalFeeRecipientAddress
+         * @property {B4aBuffer|null} [lockId] EscrowEntry lockId
+         * @property {B4aBuffer|null} [hashLock] EscrowEntry hashLock
+         * @property {B4aBuffer|null} [preimage] EscrowEntry preimage
+         * @property {B4aBuffer|null} [policyHash] EscrowEntry policyHash
+         * @property {B4aBuffer|null} [refundEpoch] EscrowEntry refundEpoch
          */
 
         /**
@@ -92,7 +90,7 @@ $root.state = (function() {
 
         /**
          * EscrowEntry amount.
-         * @member {Uint8Array} amount
+         * @member {B4aBuffer} amount
          * @memberof state.EscrowEntry
          * @instance
          */
@@ -100,7 +98,7 @@ $root.state = (function() {
 
         /**
          * EscrowEntry additionalFeeAmount.
-         * @member {Uint8Array} additionalFeeAmount
+         * @member {B4aBuffer} additionalFeeAmount
          * @memberof state.EscrowEntry
          * @instance
          */
@@ -108,7 +106,7 @@ $root.state = (function() {
 
         /**
          * EscrowEntry lockerAddress.
-         * @member {Uint8Array} lockerAddress
+         * @member {B4aBuffer} lockerAddress
          * @memberof state.EscrowEntry
          * @instance
          */
@@ -116,7 +114,7 @@ $root.state = (function() {
 
         /**
          * EscrowEntry claimRecipientAddress.
-         * @member {Uint8Array} claimRecipientAddress
+         * @member {B4aBuffer} claimRecipientAddress
          * @memberof state.EscrowEntry
          * @instance
          */
@@ -124,7 +122,7 @@ $root.state = (function() {
 
         /**
          * EscrowEntry refundRecipientAddress.
-         * @member {Uint8Array} refundRecipientAddress
+         * @member {B4aBuffer} refundRecipientAddress
          * @memberof state.EscrowEntry
          * @instance
          */
@@ -132,7 +130,7 @@ $root.state = (function() {
 
         /**
          * EscrowEntry additionalFeeRecipientAddress.
-         * @member {Uint8Array|null|undefined} additionalFeeRecipientAddress
+         * @member {B4aBuffer|null|undefined} additionalFeeRecipientAddress
          * @memberof state.EscrowEntry
          * @instance
          */
@@ -140,7 +138,7 @@ $root.state = (function() {
 
         /**
          * EscrowEntry lockId.
-         * @member {Uint8Array} lockId
+         * @member {B4aBuffer} lockId
          * @memberof state.EscrowEntry
          * @instance
          */
@@ -148,7 +146,7 @@ $root.state = (function() {
 
         /**
          * EscrowEntry hashLock.
-         * @member {Uint8Array} hashLock
+         * @member {B4aBuffer} hashLock
          * @memberof state.EscrowEntry
          * @instance
          */
@@ -156,7 +154,7 @@ $root.state = (function() {
 
         /**
          * EscrowEntry preimage.
-         * @member {Uint8Array|null|undefined} preimage
+         * @member {B4aBuffer|null|undefined} preimage
          * @memberof state.EscrowEntry
          * @instance
          */
@@ -164,7 +162,7 @@ $root.state = (function() {
 
         /**
          * EscrowEntry policyHash.
-         * @member {Uint8Array|null|undefined} policyHash
+         * @member {B4aBuffer|null|undefined} policyHash
          * @memberof state.EscrowEntry
          * @instance
          */
@@ -172,7 +170,7 @@ $root.state = (function() {
 
         /**
          * EscrowEntry refundEpoch.
-         * @member {Uint8Array} refundEpoch
+         * @member {B4aBuffer} refundEpoch
          * @memberof state.EscrowEntry
          * @instance
          */
@@ -227,8 +225,7 @@ $root.state = (function() {
          * @returns {$protobuf.Writer} Writer
          */
         EscrowEntry.encode = function encode(message, writer) {
-            if (!writer)
-                writer = $Writer.create();
+            writer = $Writer.create(writer);
             if (message.version != null && Object.hasOwnProperty.call(message, "version"))
                 writer.uint32(/* id 1, wireType 0 =*/8).uint32(message.version);
             if (message.status != null && Object.hasOwnProperty.call(message, "status"))
@@ -276,15 +273,14 @@ $root.state = (function() {
          * @function decode
          * @memberof state.EscrowEntry
          * @static
-         * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+         * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
          * @param {number} [length] Message length if known beforehand
          * @returns {state.EscrowEntry} EscrowEntry
          * @throws {Error} If the payload is not a reader or valid buffer
          * @throws {$protobuf.util.ProtocolError} If required fields are missing
          */
         EscrowEntry.decode = function decode(reader, length, error) {
-            if (!(reader instanceof $Reader))
-                reader = $Reader.create(reader);
+            reader = $Reader.create(reader);
             var end = length === undefined ? reader.len : reader.pos + length, message = new $root.state.EscrowEntry();
             while (reader.pos < end) {
                 var tag = reader.uint32();
@@ -300,47 +296,47 @@ $root.state = (function() {
                         break;
                     }
                 case 3: {
-                        message.amount = reader.bytes();
+                        message.amount = $util.bytesFrom(reader.bytes());
                         break;
                     }
                 case 4: {
-                        message.additionalFeeAmount = reader.bytes();
+                        message.additionalFeeAmount = $util.bytesFrom(reader.bytes());
                         break;
                     }
                 case 5: {
-                        message.lockerAddress = reader.bytes();
+                        message.lockerAddress = $util.bytesFrom(reader.bytes());
                         break;
                     }
                 case 6: {
-                        message.claimRecipientAddress = reader.bytes();
+                        message.claimRecipientAddress = $util.bytesFrom(reader.bytes());
                         break;
                     }
                 case 7: {
-                        message.refundRecipientAddress = reader.bytes();
+                        message.refundRecipientAddress = $util.bytesFrom(reader.bytes());
                         break;
                     }
                 case 8: {
-                        message.additionalFeeRecipientAddress = reader.bytes();
+                        message.additionalFeeRecipientAddress = $util.bytesFrom(reader.bytes());
                         break;
                     }
                 case 9: {
-                        message.lockId = reader.bytes();
+                        message.lockId = $util.bytesFrom(reader.bytes());
                         break;
                     }
                 case 10: {
-                        message.hashLock = reader.bytes();
+                        message.hashLock = $util.bytesFrom(reader.bytes());
                         break;
                     }
                 case 11: {
-                        message.preimage = reader.bytes();
+                        message.preimage = $util.bytesFrom(reader.bytes());
                         break;
                     }
                 case 12: {
-                        message.policyHash = reader.bytes();
+                        message.policyHash = $util.bytesFrom(reader.bytes());
                         break;
                     }
                 case 13: {
-                        message.refundEpoch = reader.bytes();
+                        message.refundEpoch = $util.bytesFrom(reader.bytes());
                         break;
                     }
                 default:
@@ -356,14 +352,13 @@ $root.state = (function() {
          * @function decodeDelimited
          * @memberof state.EscrowEntry
          * @static
-         * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+         * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
          * @returns {state.EscrowEntry} EscrowEntry
          * @throws {Error} If the payload is not a reader or valid buffer
          * @throws {$protobuf.util.ProtocolError} If required fields are missing
          */
         EscrowEntry.decodeDelimited = function decodeDelimited(reader) {
-            if (!(reader instanceof $Reader))
-                reader = new $Reader(reader);
+            reader = $Reader.create(reader);
             return this.decode(reader, reader.uint32());
         };
 
@@ -394,43 +389,43 @@ $root.state = (function() {
                 }
             }
             if (message.amount != null && message.hasOwnProperty("amount"))
-                if (!(message.amount && typeof message.amount.length === "number" || $util.isString(message.amount)))
+                if (!$util.isBytes(message.amount))
                     return "amount: buffer expected";
             if (message.additionalFeeAmount != null && message.hasOwnProperty("additionalFeeAmount"))
-                if (!(message.additionalFeeAmount && typeof message.additionalFeeAmount.length === "number" || $util.isString(message.additionalFeeAmount)))
+                if (!$util.isBytes(message.additionalFeeAmount))
                     return "additionalFeeAmount: buffer expected";
             if (message.lockerAddress != null && message.hasOwnProperty("lockerAddress"))
-                if (!(message.lockerAddress && typeof message.lockerAddress.length === "number" || $util.isString(message.lockerAddress)))
+                if (!$util.isBytes(message.lockerAddress))
                     return "lockerAddress: buffer expected";
             if (message.claimRecipientAddress != null && message.hasOwnProperty("claimRecipientAddress"))
-                if (!(message.claimRecipientAddress && typeof message.claimRecipientAddress.length === "number" || $util.isString(message.claimRecipientAddress)))
+                if (!$util.isBytes(message.claimRecipientAddress))
                     return "claimRecipientAddress: buffer expected";
             if (message.refundRecipientAddress != null && message.hasOwnProperty("refundRecipientAddress"))
-                if (!(message.refundRecipientAddress && typeof message.refundRecipientAddress.length === "number" || $util.isString(message.refundRecipientAddress)))
+                if (!$util.isBytes(message.refundRecipientAddress))
                     return "refundRecipientAddress: buffer expected";
             if (message.additionalFeeRecipientAddress != null && message.hasOwnProperty("additionalFeeRecipientAddress")) {
                 properties._additionalFeeRecipientAddress = 1;
-                if (!(message.additionalFeeRecipientAddress && typeof message.additionalFeeRecipientAddress.length === "number" || $util.isString(message.additionalFeeRecipientAddress)))
+                if (!$util.isBytes(message.additionalFeeRecipientAddress))
                     return "additionalFeeRecipientAddress: buffer expected";
             }
             if (message.lockId != null && message.hasOwnProperty("lockId"))
-                if (!(message.lockId && typeof message.lockId.length === "number" || $util.isString(message.lockId)))
+                if (!$util.isBytes(message.lockId))
                     return "lockId: buffer expected";
             if (message.hashLock != null && message.hasOwnProperty("hashLock"))
-                if (!(message.hashLock && typeof message.hashLock.length === "number" || $util.isString(message.hashLock)))
+                if (!$util.isBytes(message.hashLock))
                     return "hashLock: buffer expected";
             if (message.preimage != null && message.hasOwnProperty("preimage")) {
                 properties._preimage = 1;
-                if (!(message.preimage && typeof message.preimage.length === "number" || $util.isString(message.preimage)))
+                if (!$util.isBytes(message.preimage))
                     return "preimage: buffer expected";
             }
             if (message.policyHash != null && message.hasOwnProperty("policyHash")) {
                 properties._policyHash = 1;
-                if (!(message.policyHash && typeof message.policyHash.length === "number" || $util.isString(message.policyHash)))
+                if (!$util.isBytes(message.policyHash))
                     return "policyHash: buffer expected";
             }
             if (message.refundEpoch != null && message.hasOwnProperty("refundEpoch"))
-                if (!(message.refundEpoch && typeof message.refundEpoch.length === "number" || $util.isString(message.refundEpoch)))
+                if (!$util.isBytes(message.refundEpoch))
                     return "refundEpoch: buffer expected";
             return null;
         };
@@ -445,7 +440,7 @@ $root.state = (function() {
          */
         EscrowEntry.fromObject = function fromObject(object) {
             if (object instanceof $root.state.EscrowEntry)
-                return object;
+                object = Object.assign({}, object);
             var message = new $root.state.EscrowEntry();
             if (object.version != null)
                 message.version = object.version >>> 0;
@@ -470,60 +465,27 @@ $root.state = (function() {
                 break;
             }
             if (object.amount != null)
-                if (typeof object.amount === "string")
-                    $util.base64.decode(object.amount, message.amount = $util.newBuffer($util.base64.length(object.amount)), 0);
-                else if (object.amount.length >= 0)
-                    message.amount = object.amount;
+                message.amount = $util.bytesFrom(object.amount);
             if (object.additionalFeeAmount != null)
-                if (typeof object.additionalFeeAmount === "string")
-                    $util.base64.decode(object.additionalFeeAmount, message.additionalFeeAmount = $util.newBuffer($util.base64.length(object.additionalFeeAmount)), 0);
-                else if (object.additionalFeeAmount.length >= 0)
-                    message.additionalFeeAmount = object.additionalFeeAmount;
+                message.additionalFeeAmount = $util.bytesFrom(object.additionalFeeAmount);
             if (object.lockerAddress != null)
-                if (typeof object.lockerAddress === "string")
-                    $util.base64.decode(object.lockerAddress, message.lockerAddress = $util.newBuffer($util.base64.length(object.lockerAddress)), 0);
-                else if (object.lockerAddress.length >= 0)
-                    message.lockerAddress = object.lockerAddress;
+                message.lockerAddress = $util.bytesFrom(object.lockerAddress);
             if (object.claimRecipientAddress != null)
-                if (typeof object.claimRecipientAddress === "string")
-                    $util.base64.decode(object.claimRecipientAddress, message.claimRecipientAddress = $util.newBuffer($util.base64.length(object.claimRecipientAddress)), 0);
-                else if (object.claimRecipientAddress.length >= 0)
-                    message.claimRecipientAddress = object.claimRecipientAddress;
+                message.claimRecipientAddress = $util.bytesFrom(object.claimRecipientAddress);
             if (object.refundRecipientAddress != null)
-                if (typeof object.refundRecipientAddress === "string")
-                    $util.base64.decode(object.refundRecipientAddress, message.refundRecipientAddress = $util.newBuffer($util.base64.length(object.refundRecipientAddress)), 0);
-                else if (object.refundRecipientAddress.length >= 0)
-                    message.refundRecipientAddress = object.refundRecipientAddress;
+                message.refundRecipientAddress = $util.bytesFrom(object.refundRecipientAddress);
             if (object.additionalFeeRecipientAddress != null)
-                if (typeof object.additionalFeeRecipientAddress === "string")
-                    $util.base64.decode(object.additionalFeeRecipientAddress, message.additionalFeeRecipientAddress = $util.newBuffer($util.base64.length(object.additionalFeeRecipientAddress)), 0);
-                else if (object.additionalFeeRecipientAddress.length >= 0)
-                    message.additionalFeeRecipientAddress = object.additionalFeeRecipientAddress;
+                message.additionalFeeRecipientAddress = $util.bytesFrom(object.additionalFeeRecipientAddress);
             if (object.lockId != null)
-                if (typeof object.lockId === "string")
-                    $util.base64.decode(object.lockId, message.lockId = $util.newBuffer($util.base64.length(object.lockId)), 0);
-                else if (object.lockId.length >= 0)
-                    message.lockId = object.lockId;
+                message.lockId = $util.bytesFrom(object.lockId);
             if (object.hashLock != null)
-                if (typeof object.hashLock === "string")
-                    $util.base64.decode(object.hashLock, message.hashLock = $util.newBuffer($util.base64.length(object.hashLock)), 0);
-                else if (object.hashLock.length >= 0)
-                    message.hashLock = object.hashLock;
+                message.hashLock = $util.bytesFrom(object.hashLock);
             if (object.preimage != null)
-                if (typeof object.preimage === "string")
-                    $util.base64.decode(object.preimage, message.preimage = $util.newBuffer($util.base64.length(object.preimage)), 0);
-                else if (object.preimage.length >= 0)
-                    message.preimage = object.preimage;
+                message.preimage = $util.bytesFrom(object.preimage);
             if (object.policyHash != null)
-                if (typeof object.policyHash === "string")
-                    $util.base64.decode(object.policyHash, message.policyHash = $util.newBuffer($util.base64.length(object.policyHash)), 0);
-                else if (object.policyHash.length >= 0)
-                    message.policyHash = object.policyHash;
+                message.policyHash = $util.bytesFrom(object.policyHash);
             if (object.refundEpoch != null)
-                if (typeof object.refundEpoch === "string")
-                    $util.base64.decode(object.refundEpoch, message.refundEpoch = $util.newBuffer($util.base64.length(object.refundEpoch)), 0);
-                else if (object.refundEpoch.length >= 0)
-                    message.refundEpoch = object.refundEpoch;
+                message.refundEpoch = $util.bytesFrom(object.refundEpoch);
             return message;
         };
 
@@ -607,36 +569,36 @@ $root.state = (function() {
                     object._status = "status";
             }
             if (message.amount != null && message.hasOwnProperty("amount"))
-                object.amount = options.bytes === String ? $util.base64.encode(message.amount, 0, message.amount.length) : options.bytes === Array ? Array.prototype.slice.call(message.amount) : message.amount;
+                object.amount = $util.bytesTo(message.amount, options);
             if (message.additionalFeeAmount != null && message.hasOwnProperty("additionalFeeAmount"))
-                object.additionalFeeAmount = options.bytes === String ? $util.base64.encode(message.additionalFeeAmount, 0, message.additionalFeeAmount.length) : options.bytes === Array ? Array.prototype.slice.call(message.additionalFeeAmount) : message.additionalFeeAmount;
+                object.additionalFeeAmount = $util.bytesTo(message.additionalFeeAmount, options);
             if (message.lockerAddress != null && message.hasOwnProperty("lockerAddress"))
-                object.lockerAddress = options.bytes === String ? $util.base64.encode(message.lockerAddress, 0, message.lockerAddress.length) : options.bytes === Array ? Array.prototype.slice.call(message.lockerAddress) : message.lockerAddress;
+                object.lockerAddress = $util.bytesTo(message.lockerAddress, options);
             if (message.claimRecipientAddress != null && message.hasOwnProperty("claimRecipientAddress"))
-                object.claimRecipientAddress = options.bytes === String ? $util.base64.encode(message.claimRecipientAddress, 0, message.claimRecipientAddress.length) : options.bytes === Array ? Array.prototype.slice.call(message.claimRecipientAddress) : message.claimRecipientAddress;
+                object.claimRecipientAddress = $util.bytesTo(message.claimRecipientAddress, options);
             if (message.refundRecipientAddress != null && message.hasOwnProperty("refundRecipientAddress"))
-                object.refundRecipientAddress = options.bytes === String ? $util.base64.encode(message.refundRecipientAddress, 0, message.refundRecipientAddress.length) : options.bytes === Array ? Array.prototype.slice.call(message.refundRecipientAddress) : message.refundRecipientAddress;
+                object.refundRecipientAddress = $util.bytesTo(message.refundRecipientAddress, options);
             if (message.additionalFeeRecipientAddress != null && message.hasOwnProperty("additionalFeeRecipientAddress")) {
-                object.additionalFeeRecipientAddress = options.bytes === String ? $util.base64.encode(message.additionalFeeRecipientAddress, 0, message.additionalFeeRecipientAddress.length) : options.bytes === Array ? Array.prototype.slice.call(message.additionalFeeRecipientAddress) : message.additionalFeeRecipientAddress;
+                object.additionalFeeRecipientAddress = $util.bytesTo(message.additionalFeeRecipientAddress, options);
                 if (options.oneofs)
                     object._additionalFeeRecipientAddress = "additionalFeeRecipientAddress";
             }
             if (message.lockId != null && message.hasOwnProperty("lockId"))
-                object.lockId = options.bytes === String ? $util.base64.encode(message.lockId, 0, message.lockId.length) : options.bytes === Array ? Array.prototype.slice.call(message.lockId) : message.lockId;
+                object.lockId = $util.bytesTo(message.lockId, options);
             if (message.hashLock != null && message.hasOwnProperty("hashLock"))
-                object.hashLock = options.bytes === String ? $util.base64.encode(message.hashLock, 0, message.hashLock.length) : options.bytes === Array ? Array.prototype.slice.call(message.hashLock) : message.hashLock;
+                object.hashLock = $util.bytesTo(message.hashLock, options);
             if (message.preimage != null && message.hasOwnProperty("preimage")) {
-                object.preimage = options.bytes === String ? $util.base64.encode(message.preimage, 0, message.preimage.length) : options.bytes === Array ? Array.prototype.slice.call(message.preimage) : message.preimage;
+                object.preimage = $util.bytesTo(message.preimage, options);
                 if (options.oneofs)
                     object._preimage = "preimage";
             }
             if (message.policyHash != null && message.hasOwnProperty("policyHash")) {
-                object.policyHash = options.bytes === String ? $util.base64.encode(message.policyHash, 0, message.policyHash.length) : options.bytes === Array ? Array.prototype.slice.call(message.policyHash) : message.policyHash;
+                object.policyHash = $util.bytesTo(message.policyHash, options);
                 if (options.oneofs)
                     object._policyHash = "policyHash";
             }
             if (message.refundEpoch != null && message.hasOwnProperty("refundEpoch"))
-                object.refundEpoch = options.bytes === String ? $util.base64.encode(message.refundEpoch, 0, message.refundEpoch.length) : options.bytes === Array ? Array.prototype.slice.call(message.refundEpoch) : message.refundEpoch;
+                object.refundEpoch = $util.bytesTo(message.refundEpoch, options);
             return object;
         };
 

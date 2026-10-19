@@ -10,8 +10,8 @@ import {
 import * as escrowEntryUtils from '../../../../../src/core/state/utils/escrowEntry.js';
 import nodeEntryUtils from '../../../../../src/core/state/utils/nodeEntry.js';
 import {$TNK, toBalance} from '../../../../../src/core/state/utils/balance.js';
-import {BALANCE_BYTE_LENGTH, EntryType} from '../../../../../src/utils/constants.js';
-import {bigIntToBuffer, uint64ToBuffer, ZERO_WK} from '../../../../../src/utils/buffer.js';
+import {BALANCE_BYTE_LENGTH, EntryType, OperationType} from '../../../../../src/utils/constants.js';
+import {bigIntToBuffer, createMessage, uint64ToBuffer, ZERO_WK} from '../../../../../src/utils/buffer.js';
 import nodeRoleUtils from '../../../../../src/core/state/utils/roles.js';
 import {deriveIndexerSequenceState, eventFlush} from '../../../../helpers/autobaseTestHelpers.js';
 import {config} from '../../../../helpers/config.js';
@@ -153,6 +153,65 @@ test('State.apply HTLC_CLAIM rejects an invalid submitter signature', async t =>
 
     t.is((await readLockState(validatorPeer.base, lockPayload)).escrow.status, escrowEntryUtils.Status.PENDING);
     t.is(await readClaimRecord(validatorPeer.base, invalidPayload), null, 'invalid signature is not recorded');
+});
+
+test('State.apply HTLC_CLAIM distinguishes hashing failures from transaction and signature errors', async t => {
+    for (const {label, modify, hashMessage, expectedLog} of [
+        {
+            label: 'claim hash failure',
+            hashMessage: operation => createMessage(config.networkId, operation.hco.txv,
+                operation.hco.li, operation.hco.pi, operation.hco.in, OperationType.HTLC_CLAIM),
+            expectedLog: 'Failed to hash claim message.'
+        },
+        {
+            label: 'claim hash mismatch',
+            modify: operation => { operation.hco.tx[0] ^= 1; },
+            expectedLog: 'Claim transaction hash is invalid.'
+        },
+        {
+            label: 'claim submitter signature',
+            modify: operation => { operation.hco.is[0] ^= 1; },
+            expectedLog: 'Claim submitter signature is invalid.'
+        },
+        {
+            label: 'validator hash failure',
+            hashMessage: operation => createMessage(config.networkId, operation.hco.tx,
+                operation.hco.vn, OperationType.HTLC_CLAIM),
+            expectedLog: 'Failed to hash validator message.'
+        }
+    ]) {
+        const context = await setupHtlcLockScenario(t);
+        const {validatorPeer, claimantPeer} = context.htlcLockScenario;
+        const lockPayload = await buildHtlcLockPayload(context);
+        await appendHtlcLock(context, lockPayload);
+        const operation = safeDecodeApplyOperation(await buildClaimPayload(context, lockPayload));
+        modify?.(operation);
+        const payload = safeEncodeApplyOperation(operation);
+        const targetMessage = hashMessage?.(operation);
+        const originalHash = tracCryptoApi.hash.blake3Safe;
+        const originalConsoleError = console.error;
+        const logs = [];
+
+        if (targetMessage) {
+            tracCryptoApi.hash.blake3Safe = async message => b4a.equals(message, targetMessage)
+                ? b4a.alloc(0)
+                : originalHash(message);
+        }
+        console.error = (...args) => logs.push(args.join(' '));
+        try {
+            await appendHtlcLock(context, payload);
+        } finally {
+            tracCryptoApi.hash.blake3Safe = originalHash;
+            console.error = originalConsoleError;
+        }
+
+        t.ok(logs.some(log => log.includes(expectedLog)), `${label}: expected error is logged`);
+        t.is((await readLockState(validatorPeer.base, lockPayload)).escrow.status,
+            escrowEntryUtils.Status.PENDING, `${label}: escrow stays pending`);
+        t.is(await readNodeEntry(validatorPeer.base, claimantPeer.wallet.address), null,
+            `${label}: claimant receives nothing`);
+        t.is(await readClaimRecord(validatorPeer.base, payload), null, `${label}: claim is not recorded`);
+    }
 });
 
 test('State.apply HTLC_CLAIM distinguishes invalid submitter addresses from public keys', async t => {

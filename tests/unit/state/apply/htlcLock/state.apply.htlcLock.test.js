@@ -1,5 +1,6 @@
 import test from 'brittle';
 import b4a from 'b4a';
+import tracCryptoApi from 'trac-crypto-api';
 
 import {
     BALANCE_FEE,
@@ -12,7 +13,10 @@ import {
     safeDecodeApplyOperation,
     safeEncodeApplyOperation,
 } from '../../../../../src/codecs/apply/applyOperationCodec.js';
-import {bigIntToBuffer, uint64ToBuffer} from '../../../../../src/utils/buffer.js';
+import {bigIntToBuffer, createMessage, uint64ToBuffer} from '../../../../../src/utils/buffer.js';
+import {OperationType} from '../../../../../src/utils/constants.js';
+import {createHtlcLockSigningMessage} from '../../../../../src/utils/htlcLock.js';
+import {config} from '../../../../helpers/config.js';
 import {applyWithEntryOverrides} from '../setGenesisEpoch/setGenesisEpochScenarioHelpers.js';
 import {buildTransferPayload, DEFAULT_INITIAL_BALANCE} from '../transfer/transferScenarioHelpers.js';
 import {initializeBalances, whitelistAddress} from '../common/commonScenarioHelper.js';
@@ -318,6 +322,51 @@ test('State.apply HTLC_LOCK rejects malformed signatures, hash, and stale validi
             validatorBefore.balance), `${mutation} pays no reward`);
         t.is((await readLockState(validatorPeer.base, payload)).escrow, null, `${mutation} creates no escrow`);
         t.is((await readLockState(validatorPeer.base, payload)).operation, null, `${mutation} creates no record`);
+    }
+});
+
+test('State.apply HTLC_LOCK reports locker and validator hashing failures separately', async t => {
+    for (const {label, hashMessage, expectedLog} of [
+        {
+            label: 'locker hash failure',
+            hashMessage: operation => createHtlcLockSigningMessage(config.networkId, operation.address, operation.hlo),
+            expectedLog: 'Failed to hash locker message.'
+        },
+        {
+            label: 'validator hash failure',
+            hashMessage: operation => createMessage(config.networkId, operation.hlo.tx,
+                operation.hlo.vn, OperationType.HTLC_LOCK),
+            expectedLog: 'Failed to hash validator message.'
+        }
+    ]) {
+        const context = await setupHtlcLockScenario(t);
+        const {validatorPeer, makerPeer} = context.htlcLockScenario;
+        const payload = await buildHtlcLockPayload(context);
+        const targetMessage = hashMessage(decodeHtlcLockPayload(payload));
+        const makerBefore = await readNodeEntry(validatorPeer.base, makerPeer.wallet.address);
+        const validatorBefore = await readNodeEntry(validatorPeer.base, validatorPeer.wallet.address);
+        const originalHash = tracCryptoApi.hash.blake3Safe;
+        const originalConsoleError = console.error;
+        const logs = [];
+
+        tracCryptoApi.hash.blake3Safe = async message => b4a.equals(message, targetMessage)
+            ? b4a.alloc(0)
+            : originalHash(message);
+        console.error = (...args) => logs.push(args.join(' '));
+        try {
+            await appendHtlcLock(context, payload);
+        } finally {
+            tracCryptoApi.hash.blake3Safe = originalHash;
+            console.error = originalConsoleError;
+        }
+
+        t.ok(logs.some(log => log.includes(expectedLog)), `${label}: expected error is logged`);
+        t.ok(b4a.equals((await readNodeEntry(validatorPeer.base, makerPeer.wallet.address)).balance,
+            makerBefore.balance), `${label}: maker funds stay intact`);
+        t.ok(b4a.equals((await readNodeEntry(validatorPeer.base, validatorPeer.wallet.address)).balance,
+            validatorBefore.balance), `${label}: validator receives no reward`);
+        t.is((await readLockState(validatorPeer.base, payload)).escrow, null, `${label}: no escrow is created`);
+        t.is((await readLockState(validatorPeer.base, payload)).operation, null, `${label}: no lock is recorded`);
     }
 });
 
