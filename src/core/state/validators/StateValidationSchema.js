@@ -699,18 +699,20 @@ class StateValidationSchema {
                 custom: (value, errors) => {
                     if (!value || typeof value !== 'object') return value;
 
-                    const validatorFields = [value.va, value.vn, value.vs];
-                    // The apply codec normalizes absent validator metadata to three nulls.
-                    if (validatorFields.every(field => field === undefined) ||
-                        validatorFields.every(field => field === null)) {
-                        return value;
-                    }
-
-                    if (validatorFields.some(field => field === undefined || field === null)) {
+                    const {va, vn, vs} = value;
+                    const count = [va, vn, vs].filter(field => field !== undefined).length;
+                    if (count !== 0 && count !== 3) {
                         errors.push({
                             type: 'conditionalDependency',
                             field: 'hro',
-                            message: 'Fields "va", "vn", and "vs" must all be Buffers, all be undefined, or all be null'
+                            message: 'Fields "va", "vn", and "vs" must all be present if any one is provided'
+                        });
+                    }
+                    if (va === null || vn === null || vs === null) {
+                        errors.push({
+                            type: 'buffer',
+                            field: 'hro',
+                            message: 'Validator fields cannot be null'
                         });
                     }
 

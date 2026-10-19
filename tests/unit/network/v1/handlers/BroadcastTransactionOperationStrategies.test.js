@@ -32,6 +32,17 @@ test('decoded partial HTLC claims keep validator metadata absent after broadcast
     for (const field of ['va', 'vn', 'vs']) t.absent(Object.hasOwn(decoded.hco, field));
 });
 
+test('decoded partial HTLC refunds keep validator metadata absent after broadcast sanitization', t => {
+    const encoded = safeEncodeApplyOperation(applyOperationFixtures.validPartialHtlcRefundOperation);
+    const decoded = safeDecodeApplyOperation(encoded);
+    t.ok(encoded.length > 0);
+    for (const field of ['va', 'vn', 'vs']) t.absent(Object.hasOwn(decoded.hro, field));
+
+    sanitizeDecodedPartialTransaction(decoded);
+
+    for (const field of ['va', 'vn', 'vs']) t.absent(Object.hasOwn(decoded.hro, field));
+});
+
 function createFakeValidator(name, calls) {
     return {
         async validate(decodedTransaction) {

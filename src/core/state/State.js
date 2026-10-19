@@ -1208,7 +1208,7 @@ class State extends ReadyResource {
             this.#safeLogApply(OperationType.HTLC_REFUND, "Contract schema validation failed.", node.from.key);
             return Status.FAILURE;
         }
-        if (!b4a.isBuffer(op.hro.va) || !b4a.isBuffer(op.hro.vn) || !b4a.isBuffer(op.hro.vs)) {
+        if (!Object.hasOwn(op.hro, "vs") || !Object.hasOwn(op.hro, "va") || !Object.hasOwn(op.hro, "vn")) {
             this.#safeLogApply(OperationType.HTLC_REFUND, "Operation is not complete.", node.from.key);
             return Status.FAILURE;
         }
@@ -1226,9 +1226,13 @@ class State extends ReadyResource {
         }
 
         const submitterAddress = addressUtils.bufferToAddress(op.address, this.#config.addressPrefix);
-        const submitterPublicKey = submitterAddress && tracCryptoApi.address.decodeSafe(submitterAddress);
-        if (!isBufferValid(submitterPublicKey, PUBLIC_KEY_LENGTH) || isZeroBuffer(submitterPublicKey)) {
+        if (submitterAddress === null) {
             this.#safeLogApply(OperationType.HTLC_REFUND, "Submitter address is invalid.", node.from.key);
+            return Status.FAILURE;
+        }
+        const submitterPublicKey = tracCryptoApi.address.decodeSafe(submitterAddress);
+        if (!isBufferValid(submitterPublicKey, PUBLIC_KEY_LENGTH) || isZeroBuffer(submitterPublicKey)) {
+            this.#safeLogApply(OperationType.HTLC_REFUND, "Submitter public key is invalid.", node.from.key);
             return Status.FAILURE;
         }
 

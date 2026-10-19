@@ -3,6 +3,7 @@ import b4a from 'b4a';
 import tracCryptoApi from 'trac-crypto-api';
 
 import PartialHtlcValidator from '../../../../../src/core/network/protocols/shared/validators/PartialHtlcValidator.js';
+import {safeDecodeApplyOperation, safeEncodeApplyOperation} from '../../../../../src/codecs/apply/applyOperationCodec.js';
 import {applyStateMessageFactory} from '../../../../../src/messages/state/applyStateMessageFactory.js';
 import {addressToBuffer} from '../../../../../src/core/state/utils/address.js';
 import * as escrowEntryUtils from '../../../../../src/core/state/utils/escrowEntry.js';
@@ -337,6 +338,9 @@ async function createRefundScenario({signedEpoch = 100n, unsignedEpoch = 100n} =
 test('PartialHtlcValidator admits a signed third-party refund at the expiry epoch', async t => {
     const {validator, relayer, state, payload} = await createRefundScenario();
     t.ok(await new PartialHtlcValidator(state, validator.address, config).validate(payload));
+    const decoded = safeDecodeApplyOperation(safeEncodeApplyOperation(payload));
+    t.ok(await new PartialHtlcValidator(state, validator.address, config).validate(decoded),
+        'protobuf-decoded partial refund is admitted');
     t.not(relayer.address, validator.address, 'submitter need not be the refund recipient or validator');
 });
 
@@ -355,6 +359,16 @@ test('PartialHtlcValidator requires a confirmed pending escrow', async t => {
 
 test('PartialHtlcValidator waits for the signed refund epoch', async t => {
     const {validator, state, payload} = await createRefundScenario({signedEpoch: 99n});
+    await expectSharedValidatorError(
+        t,
+        () => new PartialHtlcValidator(state, validator.address, config).validate(payload),
+        ResultCode.TX_INVALID_PAYLOAD,
+        'not been reached'
+    );
+});
+
+test('PartialHtlcValidator also waits for the unsigned refund epoch', async t => {
+    const {validator, state, payload} = await createRefundScenario({unsignedEpoch: 99n});
     await expectSharedValidatorError(
         t,
         () => new PartialHtlcValidator(state, validator.address, config).validate(payload),

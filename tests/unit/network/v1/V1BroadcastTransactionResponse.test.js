@@ -30,6 +30,13 @@ const completeClaim = () => ({
         vs: b4a.alloc(64, 0x54)
     }
 });
+const completeRefund = () => ({
+    ...protobufFixtures.validHtlcRefundOperation,
+    hro: {
+        ...protobufFixtures.validHtlcRefundOperation.hro,
+        va: remoteAddressBuffer
+    }
+});
 
 const defaultStateOverrides = {
     registeredWriterKeys: new Map([[b4a.toString(writerKey, 'hex'), remoteAddressBuffer]]),
@@ -256,6 +263,10 @@ test('validateDecodedCompletePayloadSchema selects proper validators for support
             called.push('claim');
             return true;
         },
+        validateHtlcRefundOperation: () => {
+            called.push('refund');
+            return true;
+        },
     });
 
     validator.validateDecodedCompletePayloadSchema({ type: OperationType.ADD_WRITER });
@@ -263,8 +274,25 @@ test('validateDecodedCompletePayloadSchema selects proper validators for support
     validator.validateDecodedCompletePayloadSchema({ type: OperationType.TX });
     validator.validateDecodedCompletePayloadSchema({ type: OperationType.TRANSFER });
     validator.validateDecodedCompletePayloadSchema(completeClaim());
+    validator.validateDecodedCompletePayloadSchema(completeRefund());
 
-    t.alike(called, ['role', 'bootstrap', 'tx', 'transfer', 'claim']);
+    t.alike(called, ['role', 'bootstrap', 'tx', 'transfer', 'claim', 'refund']);
+});
+
+test('validateDecodedCompletePayloadSchema requires complete refund validator metadata', t => {
+    const validator = createValidator();
+    validator.validateDecodedCompletePayloadSchema(completeRefund());
+
+    for (const field of ['va', 'vn', 'vs']) {
+        const incomplete = completeRefund();
+        delete incomplete.hro[field];
+        try {
+            validator.validateDecodedCompletePayloadSchema(incomplete);
+            t.fail(`expected missing ${field} to be rejected`);
+        } catch (error) {
+            t.is(error.resultCode, ResultCode.VALIDATOR_RESPONSE_SCHEMA_INVALID);
+        }
+    }
 });
 
 test('validateDecodedCompletePayloadSchema requires complete claim validator metadata', t => {
@@ -298,6 +326,28 @@ test('validate accepts a proven claim with matching validator and writer identit
     const validator = createValidator();
     const requestTxData = unsafeEncodeApplyOperation(protobufFixtures.validHtlcClaimOperation);
     const responseTxData = unsafeEncodeApplyOperation(completeClaim());
+
+    validator.isPayloadSchemaValid = () => true;
+    validator.validateResponseType = () => true;
+    validator.validatePeerCorrectness = () => true;
+    validator.validateSignature = async () => true;
+    validator.verifyProofOfPublication = async () => ({
+        proof: {block: {value: b4a.alloc(1)}, manifest: {}}
+    });
+    overrideFunction(t, Autobase, 'decodeValue', async () => responseTxData);
+    overrideFunction(t, Hypercore, 'key', () => writerKey);
+
+    t.ok(await validator.validate(
+        {broadcast_transaction_response: {result: ResultCode.OK}},
+        {remotePublicKey},
+        {requestTxData},
+    ));
+});
+
+test('validate accepts a proven refund with matching validator and writer identity', async t => {
+    const validator = createValidator();
+    const requestTxData = unsafeEncodeApplyOperation(protobufFixtures.validPartialHtlcRefundOperation);
+    const responseTxData = unsafeEncodeApplyOperation(completeRefund());
 
     validator.isPayloadSchemaValid = () => true;
     validator.validateResponseType = () => true;
@@ -431,6 +481,26 @@ test('assertProofPayloadMatchesRequestPayload rejects a claim with a changed pre
             {requestTxData}
         );
         t.fail('expected changed claim preimage to be rejected');
+    } catch (error) {
+        t.is(error.resultCode, ResultCode.PROOF_PAYLOAD_MISMATCH);
+    }
+});
+
+test('assertProofPayloadMatchesRequestPayload rejects a refund with a changed lock ID', async t => {
+    const validator = createValidator();
+    const requestTxData = unsafeEncodeApplyOperation(protobufFixtures.validPartialHtlcRefundOperation);
+    const changedRefund = {
+        ...completeRefund(),
+        hro: {...completeRefund().hro, li: b4a.alloc(32, 0x71)}
+    };
+    overrideFunction(t, Autobase, 'decodeValue', async () => unsafeEncodeApplyOperation(changedRefund));
+
+    try {
+        await validator.assertProofPayloadMatchesRequestPayload(
+            {proof: {block: {value: b4a.alloc(1)}, manifest: {}}},
+            {requestTxData}
+        );
+        t.fail('expected changed refund lock ID to be rejected');
     } catch (error) {
         t.is(error.resultCode, ResultCode.PROOF_PAYLOAD_MISMATCH);
     }

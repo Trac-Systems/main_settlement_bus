@@ -52,18 +52,17 @@ function makeValidOperation(mode = 'complete') {
     for (const field of Object.keys(validatorFieldLengths)) {
         if (mode === 'partial') delete operation.hro[field];
         if (mode === 'undefined') operation.hro[field] = undefined;
-        if (mode === 'decoded partial') operation.hro[field] = null;
     }
     return operation;
 }
 
 test('validateHtlcRefundOperation accepts complete and partial representations', t => {
-    for (const mode of ['complete', 'partial', 'undefined', 'decoded partial']) {
+    for (const mode of ['complete', 'partial', 'undefined']) {
         t.is(validate(makeValidOperation(mode)), true, `${mode} is valid`);
     }
 });
 
-for (const mode of ['complete', 'partial', 'decoded partial']) {
+for (const mode of ['complete', 'partial']) {
     const fieldLengths = mode === 'complete' ? completeFieldLengths : submitterFieldLengths;
 
     test(`validateHtlcRefundOperation - ${mode} top level validation`, t => {
@@ -181,7 +180,7 @@ test('validateHtlcRefundOperation enforces all validator metadata combinations',
                         ? b4a.from(validMetadata[field])
                         : representation === 'null' ? null : undefined;
                 }
-                const expected = va === vn && vn === vs;
+                const expected = va === vn && vn === vs && va !== 'null';
                 t.is(validate(operation), expected, `va=${va}, vn=${vn}, vs=${vs}`);
             }
         }
@@ -192,16 +191,13 @@ test('validateHtlcRefundOperation treats omitted validator fields like undefined
     const fields = Object.keys(validatorFieldLengths);
     for (let mask = 0; mask < 8; mask++) {
         const complete = makeValidOperation();
-        const decodedPartial = makeValidOperation('decoded partial');
         const partial = makeValidOperation('undefined');
         for (let index = 0; index < fields.length; index++) {
             if ((mask & (1 << index)) === 0) continue;
             delete complete.hro[fields[index]];
-            delete decodedPartial.hro[fields[index]];
             delete partial.hro[fields[index]];
         }
         t.is(validate(complete), mask === 0 || mask === 7, `complete deletion mask ${mask}`);
-        t.is(validate(decodedPartial), mask === 0 || mask === 7, `decoded partial deletion mask ${mask}`);
         t.is(validate(partial), true, `undefined partial deletion mask ${mask}`);
     }
 });
@@ -216,7 +212,7 @@ test('validateHtlcRefundOperation accepts Uint8Array bytes consistently with oth
 });
 
 test('validateHtlcRefundOperation validates decoded partial and complete operations', t => {
-    for (const mode of ['complete', 'partial', 'decoded partial']) {
+    for (const mode of ['complete', 'partial']) {
         const operation = makeValidOperation(mode);
         const encoded = safeEncodeApplyOperation(operation);
         t.ok(encoded.length > 0, `${mode} encodes successfully`);
@@ -225,7 +221,7 @@ test('validateHtlcRefundOperation validates decoded partial and complete operati
         t.is(validate(decoded), true, `${mode} validates after protobuf roundtrip`);
         if (mode !== 'complete') {
             for (const field of Object.keys(validatorFieldLengths)) {
-                t.is(decoded.hro[field], null, `decoded partial hro.${field} is null`);
+                t.absent(Object.hasOwn(decoded.hro, field), `decoded partial hro.${field} is absent`);
             }
         }
     }
@@ -245,7 +241,7 @@ test('validateHtlcRefundOperation rejects incomplete or invalid decoded fields',
         const operation = makeValidOperation();
         delete operation.hro[field];
         const decoded = safeDecodeApplyOperation(safeEncodeApplyOperation(operation));
-        t.is(decoded.hro[field], null, `missing ${field} is normalized to null`);
+        t.absent(Object.hasOwn(decoded.hro, field), `missing ${field} stays absent`);
         t.is(validate(decoded), false, 'decoded mixed validator metadata is rejected');
     }
 });
@@ -263,8 +259,7 @@ test('validateHtlcRefundOperation - operation contract', t => {
         [], // optionalFields
         [], // otherRequiredFields
         [], // objectFields
-        [], // zeroPolicyUnspecified
-        true // decodedNullMetadata
+        [] // zeroPolicyUnspecified
     );
 });
 

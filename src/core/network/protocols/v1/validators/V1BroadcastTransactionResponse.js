@@ -98,6 +98,10 @@ class V1BroadcastTransactionResponse extends V1BaseOperation {
                 isValid = this.#stateValidationSchema.validateHtlcClaimOperation(validatorDecodedTx) &&
                     [...VALIDATOR_METADATA_FIELDS].every(field => b4a.isBuffer(validatorDecodedTx.hco?.[field]));
                 break;
+            case OperationType.HTLC_REFUND:
+                isValid = this.#stateValidationSchema.validateHtlcRefundOperation(validatorDecodedTx) &&
+                    [...VALIDATOR_METADATA_FIELDS].every(field => b4a.isBuffer(validatorDecodedTx.hro?.[field]));
+                break;
             case OperationType.ADD_WRITER:
             case OperationType.REMOVE_WRITER:
             case OperationType.ADMIN_RECOVERY:
@@ -148,7 +152,8 @@ class V1BroadcastTransactionResponse extends V1BaseOperation {
         const stateTxDecodedFromResponse = unsafeDecodeApplyOperation(stateTxEncodedFromResponse);
         const strippedValidatorPayload = stripValidatorMetadata(
             stateTxDecodedFromResponse,
-            stateTxDecodedFromRequest.type === OperationType.HTLC_CLAIM
+            stateTxDecodedFromRequest.type === OperationType.HTLC_CLAIM ||
+                stateTxDecodedFromRequest.type === OperationType.HTLC_REFUND
         );
 
         if (!isDeepEqualApplyPayload(stateTxDecodedFromRequest, strippedValidatorPayload)) {

@@ -1,5 +1,6 @@
 import test from 'brittle';
 import b4a from 'b4a';
+import tracCryptoApi from 'trac-crypto-api';
 
 import {applyStateMessageFactory} from '../../../../../src/messages/state/applyStateMessageFactory.js';
 import {safeDecodeApplyOperation, safeEncodeApplyOperation} from '../../../../../src/codecs/apply/applyOperationCodec.js';
@@ -153,6 +154,38 @@ test('State.apply HTLC_REFUND rejects an invalid submitter signature', async t =
     t.is(await readRefundRecord(validatorPeer.base, invalidPayload), null);
 });
 
+test('State.apply HTLC_REFUND distinguishes invalid submitter addresses from public keys', async t => {
+    const context = await setupHtlcLockScenario(t);
+    const {validatorPeer, makerPeer} = context.htlcLockScenario;
+    const lockPayload = await buildHtlcLockPayload(context);
+    await appendHtlcLock(context, lockPayload);
+    const refund = safeDecodeApplyOperation(await buildRefundPayload(context, lockPayload));
+    const refundEpoch = decodeHtlcLockPayload(lockPayload).hlo.re;
+    const makerBefore = await readNodeEntry(validatorPeer.base, makerPeer.wallet.address);
+
+    for (const [address, expectedLog] of [
+        [b4a.alloc(config.addressLength, 0x78), 'Submitter address is invalid.'],
+        [b4a.from(tracCryptoApi.address.encode(config.addressPrefix, b4a.alloc(32)), 'ascii'),
+            'Submitter public key is invalid.'],
+    ]) {
+        const payload = safeEncodeApplyOperation({...refund, address});
+        const originalConsoleError = console.error;
+        const logs = [];
+        console.error = (...args) => logs.push(args.join(' '));
+        try {
+            await applyWithEntryOverrides(context, payload, new Map([[EntryType.EPOCH_CURRENT, refundEpoch]]));
+        } finally {
+            console.error = originalConsoleError;
+        }
+
+        t.ok(logs.some(log => log.includes(expectedLog)), `expected apply log "${expectedLog}" was emitted`);
+        t.is((await readLockState(validatorPeer.base, lockPayload)).escrow.status, escrowEntryUtils.Status.PENDING);
+        t.ok(b4a.equals((await readNodeEntry(validatorPeer.base, makerPeer.wallet.address)).balance,
+            makerBefore.balance));
+        t.is(await readRefundRecord(validatorPeer.base, payload), null);
+    }
+});
+
 test('State.apply HTLC_REFUND rejects missing or forged validator metadata', async t => {
     const context = await setupHtlcLockScenario(t);
     const {validatorPeer} = context.htlcLockScenario;
@@ -164,6 +197,7 @@ test('State.apply HTLC_REFUND rejects missing or forged validator metadata', asy
     for (const modify of [
         operation => { delete operation.hro.va; delete operation.hro.vn; delete operation.hro.vs; },
         operation => { operation.hro.vs = b4a.alloc(operation.hro.vs.length, 0xaa); },
+        operation => { operation.hro.va = operation.address; },
     ]) {
         const invalidRefund = {...refund, hro: {...refund.hro}};
         modify(invalidRefund);
@@ -174,6 +208,51 @@ test('State.apply HTLC_REFUND rejects missing or forged validator metadata', asy
             new Map([[EntryType.EPOCH_CURRENT, refundEpoch]])
         );
         t.is((await readLockState(validatorPeer.base, lockPayload)).escrow.status, escrowEntryUtils.Status.PENDING);
+        t.is(await readRefundRecord(validatorPeer.base, payload), null);
+    }
+});
+
+test('State.apply HTLC_REFUND requires the validator signer to own the publishing writer key', async t => {
+    const context = await setupHtlcLockScenario(t);
+    const {validatorPeer, claimantPeer, makerPeer} = context.htlcLockScenario;
+    const lockPayload = await buildHtlcLockPayload(context);
+    await appendHtlcLock(context, lockPayload);
+    const refundPayload = await buildRefundPayload(context, lockPayload, {
+        wallet: makerPeer.wallet,
+        validatorWallet: claimantPeer.wallet
+    });
+    const makerBefore = await readNodeEntry(validatorPeer.base, makerPeer.wallet.address);
+
+    await applyWithEntryOverrides(context, refundPayload,
+        new Map([[EntryType.EPOCH_CURRENT, decodeHtlcLockPayload(lockPayload).hlo.re]]));
+
+    t.is((await readLockState(validatorPeer.base, lockPayload)).escrow.status, escrowEntryUtils.Status.PENDING);
+    t.ok(b4a.equals((await readNodeEntry(validatorPeer.base, makerPeer.wallet.address)).balance,
+        makerBefore.balance));
+    t.is(await readRefundRecord(validatorPeer.base, refundPayload), null);
+});
+
+test('State.apply HTLC_REFUND rejects matching submitter and validator nonces or signatures', async t => {
+    const context = await setupHtlcLockScenario(t);
+    const {validatorPeer, makerPeer} = context.htlcLockScenario;
+    const lockPayload = await buildHtlcLockPayload(context);
+    await appendHtlcLock(context, lockPayload);
+    const refund = safeDecodeApplyOperation(await buildRefundPayload(context, lockPayload));
+    const makerBefore = await readNodeEntry(validatorPeer.base, makerPeer.wallet.address);
+
+    for (const modify of [
+        operation => { operation.hro.vn = operation.hro.in; },
+        operation => { operation.hro.vs = operation.hro.is; },
+    ]) {
+        const invalidRefund = {...refund, hro: {...refund.hro}};
+        modify(invalidRefund);
+        const payload = safeEncodeApplyOperation(invalidRefund);
+        await applyWithEntryOverrides(context, payload,
+            new Map([[EntryType.EPOCH_CURRENT, decodeHtlcLockPayload(lockPayload).hlo.re]]));
+
+        t.is((await readLockState(validatorPeer.base, lockPayload)).escrow.status, escrowEntryUtils.Status.PENDING);
+        t.ok(b4a.equals((await readNodeEntry(validatorPeer.base, makerPeer.wallet.address)).balance,
+            makerBefore.balance));
         t.is(await readRefundRecord(validatorPeer.base, payload), null);
     }
 });
