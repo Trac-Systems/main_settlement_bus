@@ -21,11 +21,11 @@ const basePayload = () => ({
     is: b4a.alloc(64)
 });
 
-test('decoded partial HTLC claims have only submitter fields after broadcast sanitization', t => {
+test('decoded partial HTLC claims keep validator metadata absent after broadcast sanitization', t => {
     const encoded = safeEncodeApplyOperation(applyOperationFixtures.validHtlcClaimOperation);
     const decoded = safeDecodeApplyOperation(encoded);
     t.ok(encoded.length > 0);
-    for (const field of ['va', 'vn', 'vs']) t.is(decoded.hco[field], null);
+    for (const field of ['va', 'vn', 'vs']) t.absent(Object.hasOwn(decoded.hco, field));
 
     sanitizeDecodedPartialTransaction(decoded);
 
