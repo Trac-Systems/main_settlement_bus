@@ -524,7 +524,18 @@ class ApplyStateMessageBuilder {
                 );
                 break;
             case OperationType.HTLC_REFUND:
-                return {};
+                this.#requireFields([
+                    [this.#txValidity, 'Transaction validity'],
+                    [this.#htlcLockId, 'HTLC lock ID']
+                ]);
+                msg = createMessage(
+                    this.#config.networkId,
+                    this.#txValidity,
+                    this.#htlcLockId,
+                    nonce,
+                    OperationType.HTLC_REFUND
+                );
+                break;
             case OperationType.HTLC_CLAIM:
                 this.#requireFields([
                     [this.#txValidity, 'Transaction validity'],
@@ -675,6 +686,15 @@ class ApplyStateMessageBuilder {
                 is: signature
             };
         }
+        if (this.#operationType === OperationType.HTLC_REFUND) {
+            return {
+                tx,
+                txv: this.#txValidity,
+                li: this.#htlcLockId,
+                in: nonce,
+                is: signature
+            };
+        }
 
         throw new Error(`No corresponding value type for operation: ${this.#operationType}`);
     }
@@ -742,7 +762,20 @@ class ApplyStateMessageBuilder {
                 );
                 break;
             case OperationType.HTLC_REFUND:
-                return {};
+                this.#requireFields([
+                    [this.#txHash, 'Transaction hash'],
+                    [this.#txValidity, 'Transaction validity'],
+                    [this.#htlcLockId, 'HTLC lock ID'],
+                    [this.#incomingNonce, 'Incoming nonce'],
+                    [this.#incomingSignature, 'Incoming signature']
+                ]);
+                msg = createMessage(
+                    this.#config.networkId,
+                    this.#txHash,
+                    nonce,
+                    OperationType.HTLC_REFUND
+                );
+                break;
             case OperationType.ADD_ADMIN:
             case OperationType.DISABLE_INITIALIZATION:
                 this.#requireFields([
@@ -964,6 +997,18 @@ class ApplyStateMessageBuilder {
                 vs: signature
             };
         }
+        if (this.#operationType === OperationType.HTLC_REFUND) {
+            return {
+                tx: this.#txHash,
+                txv: this.#txValidity,
+                li: this.#htlcLockId,
+                in: this.#incomingNonce,
+                is: this.#incomingSignature,
+                va: validatorAddress,
+                vn: nonce,
+                vs: signature
+            };
+        }
         if (isBalanceInitialization(this.#operationType)) {
             return {
                 tx,
@@ -1068,6 +1113,17 @@ class ApplyStateMessageBuilder {
 
                 return {...base, hlo: htlcLock};
             }
+            case 'hro':
+                return {
+                    ...base,
+                    hro: {
+                        tx: toHex(body.tx),
+                        txv: toHex(body.txv),
+                        li: toHex(body.li),
+                        in: toHex(body.in),
+                        is: toHex(body.is)
+                    }
+                };
             default:
                 throw new Error(`JSON output is not supported for payload ${this.#payloadKey}.`);
         }

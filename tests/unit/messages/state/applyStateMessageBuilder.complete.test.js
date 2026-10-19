@@ -578,6 +578,76 @@ test('ApplyStateMessageBuilder complete HTLC claim preserves the submitter-signe
     t.ok(requesterWallet.verify(complete.hco.is, complete.hco.tx, requesterWallet.publicKey), 'submitter signature remains valid');
 });
 
+test('ApplyStateMessageBuilder complete HTLC refund preserves the submission and adds a validator signature', async t => {
+    const requesterWallet = await createWallet(testKeyPair1.mnemonic);
+    const validatorWallet = await createWallet(testKeyPair2.mnemonic);
+    const { txv, li } = applyOperationFixtures.validPartialHtlcRefundOperation.hro;
+    const incomingNonce = b4a.alloc(32, 0x42);
+    const tx = await tracCryptoApi.hash.blake3(createMessage(
+        config.networkId, txv, li, incomingNonce, OperationType.HTLC_REFUND
+    ));
+    const submission = { tx, txv, li, in: incomingNonce, is: requesterWallet.sign(tx) };
+
+    for (const inputFormat of ['buffer', 'hex']) {
+        const input = value => inputFormat === 'hex' ? b4a.toString(value, 'hex') : value;
+        const builder = new ApplyStateMessageBuilder(validatorWallet, config);
+        await builder
+            .setPhase('complete')
+            .setOutput('buffer')
+            .setOperationType(OperationType.HTLC_REFUND)
+            .setAddress(requesterWallet.address)
+            .setTxHash(input(submission.tx))
+            .setTxValidity(input(submission.txv))
+            .setHtlcLockId(input(submission.li))
+            .setIncomingNonce(input(submission.in))
+            .setIncomingSignature(input(submission.is))
+            .build();
+
+        const complete = builder.getPayload();
+        const decoded = safeDecodeApplyOperation(safeEncodeApplyOperation(complete));
+        const validatorHash = await tracCryptoApi.hash.blake3(createMessage(
+            config.networkId, tx, complete.hro.vn, OperationType.HTLC_REFUND
+        ));
+
+        t.is(complete.type, OperationType.HTLC_REFUND);
+        t.ok(b4a.equals(complete.address, addressToBuffer(requesterWallet.address, config.addressPrefix)));
+        expectPayloadKeys(t, complete, 'hro');
+        expectKeys(t, complete.hro, ['tx', 'txv', 'li', 'in', 'is', 'va', 'vn', 'vs'], 'hro');
+        for (const field of Object.keys(submission)) {
+            t.ok(b4a.equals(complete.hro[field], submission[field]), `${inputFormat} hro.${field} is preserved`);
+        }
+        t.alike(decoded, complete, 'complete refund survives protobuf roundtrip');
+        t.ok(b4a.equals(complete.hro.va, addressToBuffer(validatorWallet.address, config.addressPrefix)));
+        expectBufferField(t, complete.hro.vn, 32, 'hro.vn');
+        expectBufferField(t, complete.hro.vs, 64, 'hro.vs');
+        t.absent(b4a.equals(complete.hro.vn, submission.in), 'validator has a fresh nonce');
+        t.ok(requesterWallet.verify(complete.hro.is, complete.hro.tx, requesterWallet.publicKey), 'submitter signature remains valid');
+        t.ok(validatorWallet.verify(complete.hro.vs, validatorHash, validatorWallet.publicKey), 'validator signs the confirmation hash');
+    }
+});
+
+test('ApplyStateMessageBuilder complete HTLC refund requires all submission fields', async t => {
+    const wallet = await createWallet(testKeyPair1.mnemonic);
+    const fields = [
+        ['setTxHash', b4a.alloc(32, 1), 'Transaction hash'],
+        ['setTxValidity', b4a.alloc(32, 2), 'Transaction validity'],
+        ['setHtlcLockId', b4a.alloc(32, 3), 'HTLC lock ID'],
+        ['setIncomingNonce', b4a.alloc(32, 4), 'Incoming nonce'],
+        ['setIncomingSignature', b4a.alloc(64, 5), 'Incoming signature']
+    ];
+    for (const [missingSetter, , label] of fields) {
+        const builder = new ApplyStateMessageBuilder(wallet, config)
+            .setPhase('complete')
+            .setOutput('buffer')
+            .setOperationType(OperationType.HTLC_REFUND)
+            .setAddress(wallet.address);
+        for (const [setter, value] of fields) {
+            if (setter !== missingSetter) builder[setter](value);
+        }
+        await t.exception(() => builder.build(), new RegExp(`${label} must be set before build`));
+    }
+});
+
 test('ApplyStateMessageBuilder complete set epoch operation (seo)', async t => {
     const wallet = await createWallet(testKeyPair1.mnemonic);
     const schemaVersion = b4a.from([0x01]);

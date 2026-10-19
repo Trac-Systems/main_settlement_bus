@@ -148,7 +148,12 @@ export function createBroadcastTransactionOperationStrategies({
                 'hro',
                 partialHtlcValidator,
                 decodedOperation => createApplyStateMessageFactory().buildCompleteHtlcRefundOperationMessage(
-                    decodedOperation.address
+                    decodedOperation.address,
+                    decodedOperation.hro.tx,
+                    decodedOperation.hro.txv,
+                    decodedOperation.hro.li,
+                    decodedOperation.hro.in,
+                    decodedOperation.hro.is
                 )
             )
         ]
