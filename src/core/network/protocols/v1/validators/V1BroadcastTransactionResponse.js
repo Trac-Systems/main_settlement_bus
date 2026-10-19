@@ -12,20 +12,20 @@ import {V1ProtocolError} from "../V1ProtocolError.js";
 
 const VALIDATOR_METADATA_FIELDS = new Set(["va", "vn", "vs"]);
 
-const stripValidatorMetadata = (value) => {
+const stripValidatorMetadata = (value, omitFields = false) => {
 
     if (value === null || value === undefined) return value;
     if (b4a.isBuffer(value)) return value;
-    if (Array.isArray(value)) return value.map(stripValidatorMetadata);
+    if (Array.isArray(value)) return value.map(item => stripValidatorMetadata(item, omitFields));
     if (typeof value !== "object") return value;
 
     const result = {};
     for (const [key, nestedValue] of Object.entries(value)) {
         if (VALIDATOR_METADATA_FIELDS.has(key)) {
-            result[key] = null;
+            if (!omitFields) result[key] = null;
             continue;
         }
-        result[key] = stripValidatorMetadata(nestedValue);
+        result[key] = stripValidatorMetadata(nestedValue, omitFields);
     }
     return result;
 };
@@ -94,6 +94,10 @@ class V1BroadcastTransactionResponse extends V1BaseOperation {
                 isValid = this.#stateValidationSchema.validateHtlcLockOperation(validatorDecodedTx) &&
                     [...VALIDATOR_METADATA_FIELDS].every(field => b4a.isBuffer(validatorDecodedTx.hlo[field]));
                 break;
+            case OperationType.HTLC_CLAIM:
+                isValid = this.#stateValidationSchema.validateHtlcClaimOperation(validatorDecodedTx) &&
+                    [...VALIDATOR_METADATA_FIELDS].every(field => b4a.isBuffer(validatorDecodedTx.hco?.[field]));
+                break;
             case OperationType.ADD_WRITER:
             case OperationType.REMOVE_WRITER:
             case OperationType.ADMIN_RECOVERY:
@@ -142,7 +146,10 @@ class V1BroadcastTransactionResponse extends V1BaseOperation {
 
         const stateTxDecodedFromRequest = unsafeDecodeApplyOperation(stateTxEncodedFromRequest);
         const stateTxDecodedFromResponse = unsafeDecodeApplyOperation(stateTxEncodedFromResponse);
-        const strippedValidatorPayload = stripValidatorMetadata(stateTxDecodedFromResponse);
+        const strippedValidatorPayload = stripValidatorMetadata(
+            stateTxDecodedFromResponse,
+            stateTxDecodedFromRequest.type === OperationType.HTLC_CLAIM
+        );
 
         if (!isDeepEqualApplyPayload(stateTxDecodedFromRequest, strippedValidatorPayload)) {
             throw new V1ProtocolError(
@@ -172,12 +179,12 @@ class V1BroadcastTransactionResponse extends V1BaseOperation {
     }
 
     async validateValidatorCorrectness(validatorDecodedTx, connectionRemotePublicKey, writerKeyFromManifest, validatorAddressCorrelatedWithManifest) {
-        const validatorAddressFromTx = extractRequiredVaFromDecodedTx(validatorDecodedTx);
         const validatorAddressFromConnectionPublicKey = addressToBuffer(
             publicKeyToAddress(connectionRemotePublicKey, this.#config),
             this.#config.addressPrefix
         );
 
+        const validatorAddressFromTx = extractRequiredVaFromDecodedTx(validatorDecodedTx);
         if (!b4a.equals(validatorAddressFromTx, validatorAddressFromConnectionPublicKey)) {
             throw new V1ProtocolError(
                 ResultCode.VALIDATOR_ADDRESS_MISMATCH,

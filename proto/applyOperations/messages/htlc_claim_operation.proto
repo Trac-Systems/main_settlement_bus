@@ -9,4 +9,7 @@ message HtlcClaimOperation {
     bytes pi     = 4; // Hashlock preimage
     bytes in     = 5; // Nonce of the submitter
     bytes is     = 6; // Signature of the submitter
+    bytes va     = 7; // Validator's address; absent in partial, required in complete transactions
+    bytes vn     = 8; // Validator's nonce; absent in partial, required in complete transactions
+    bytes vs     = 9; // Validator's signature; absent in partial, required in complete transactions
 }

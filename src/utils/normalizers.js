@@ -249,6 +249,33 @@ export function normalizeHtlcLockOperation(payload, config) {
     };
 }
 
+export function normalizeHtlcClaimOperation(payload, config) {
+    if (!payload || typeof payload !== 'object' || !payload.hco) {
+        throw new Error('Invalid payload for HTLC claim operation normalization.');
+    }
+    const {type, address, hco} = payload;
+    if (
+        type !== OperationType.HTLC_CLAIM ||
+        !address || !hco.tx || !hco.txv || !hco.li ||
+        !hco.pi || !hco.in || !hco.is
+    ) {
+        throw new Error('Missing required fields in HTLC claim operation payload.');
+    }
+
+    return {
+        type,
+        address: addressToBuffer(address, config.addressPrefix),
+        hco: {
+            tx: normalizeHex(hco.tx),
+            txv: normalizeHex(hco.txv),
+            li: normalizeHex(hco.li),
+            pi: normalizeHex(hco.pi),
+            in: normalizeHex(hco.in),
+            is: normalizeHex(hco.is)
+        }
+    };
+}
+
 /**
  * Normalizes an incoming partial operation message based on its operation type.
  *
@@ -285,6 +312,10 @@ export function normalizeMessageByOperationType(message, config) {
 
     if (type === OperationType.HTLC_LOCK) {
         return normalizeHtlcLockOperation(message, config);
+    }
+
+    if (type === OperationType.HTLC_CLAIM) {
+        return normalizeHtlcClaimOperation(message, config);
     }
 
     throw new Error(`Unsupported operation type for normalization: ${type}`);

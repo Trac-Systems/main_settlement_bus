@@ -678,7 +678,7 @@ class ApplyStateMessageDirector {
     }
 
     /**
-     * Preserve a validated, submitter-signed HTLC claim for state application.
+     * Complete a submitter-signed HTLC claim with validator metadata.
      * @param {string|Buffer} invokerAddress
      * @param {string|Buffer} transactionHash
      * @param {string|Buffer} txValidity

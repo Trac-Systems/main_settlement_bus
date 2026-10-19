@@ -127,6 +127,9 @@ test('ApplyStateMessageDirector builds and preserves a signed HTLC claim', async
     for (const field of ['tx', 'txv', 'li', 'pi', 'in', 'is']) {
         t.ok(b4a.equals(complete.hco[field], partial.hco[field]), `hco.${field} is preserved`);
     }
+    t.ok(b4a.equals(complete.hco.va, addressToBuffer(validatorWallet.address, config.addressPrefix)));
+    t.ok(b4a.isBuffer(complete.hco.vn));
+    t.ok(b4a.isBuffer(complete.hco.vs));
 });
 
 test('applyStateMessageFactory builds partial and complete signed HTLC refunds', async t => {

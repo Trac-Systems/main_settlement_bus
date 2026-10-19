@@ -508,6 +508,29 @@ class StateValidationSchema {
                     pi: {type: 'buffer', length: HTLC_PREIMAGE_BYTE_LENGTH, required: true},
                     in: {type: 'buffer', length: NONCE_BYTE_LENGTH, required: true},
                     is: {type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true},
+                    va: {type: 'buffer', length: this.#config.addressLength, optional: true},
+                    vn: {type: 'buffer', length: NONCE_BYTE_LENGTH, optional: true},
+                    vs: {type: 'buffer', length: SIGNATURE_BYTE_LENGTH, optional: true}
+                },
+                custom: (value, errors) => {
+                    if (!value || typeof value !== 'object') return value;
+                    const {va, vn, vs} = value;
+                    const count = [va, vn, vs].filter(field => field !== undefined).length;
+                    if (count !== 0 && count !== 3) {
+                        errors.push({
+                            type: 'conditionalDependency',
+                            field: 'hco',
+                            message: 'Fields "va", "vn", and "vs" must all be present if any one is provided'
+                        });
+                    }
+                    if (va === null || vn === null || vs === null) {
+                        errors.push({
+                            type: 'buffer',
+                            field: 'hco',
+                            message: 'Validator fields cannot be null'
+                        });
+                    }
+                    return value;
                 }
             }
         };

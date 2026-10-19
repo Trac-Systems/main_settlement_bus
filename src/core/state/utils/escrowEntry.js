@@ -125,9 +125,9 @@ export function decode(entry, hrp) {
     }
 }
 
-// Pure escrow helpers only; claim/refund operations and apply handlers are not wired here.
-export function makeClaim(entry, preimage, currentEpoch, hrp) {
-    const escrow = decode(entry, hrp);
+// Pure escrow transitions; network claim admission and refund application are not wired here.
+export function makeClaim(escrowBuffer, preimage, currentEpoch, hrp) {
+    const escrow = decode(escrowBuffer, hrp);
     if (
         !escrow ||
         escrow.status !== Status.PENDING ||
@@ -147,7 +147,7 @@ export function makeClaim(entry, preimage, currentEpoch, hrp) {
         amount: toBalance(escrow.amount),
         additionalFeeRecipientAddress: escrow.additionalFeeRecipientAddress,
         additionalFeeAmount: toBalance(escrow.additionalFeeAmount),
-        entry: claimedEntry,
+        claimedEscrowEntry: claimedEntry,
     };
 }
 
