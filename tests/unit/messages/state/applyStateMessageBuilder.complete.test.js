@@ -533,7 +533,7 @@ test('ApplyStateMessageBuilder complete transfer operation (tro)', async t => {
     t.ok(b4a.equals(payload.tro.is, incomingSignature));
 });
 
-test('ApplyStateMessageBuilder complete HTLC claim preserves the submitter-signed operation', async t => {
+test('ApplyStateMessageBuilder complete HTLC claim preserves the submitter signature and adds validator metadata', async t => {
     const requesterWallet = await createWallet(testKeyPair1.mnemonic);
     const validatorWallet = await createWallet(testKeyPair2.mnemonic);
     const { txv, li: lockId, pi: preimage } = applyOperationFixtures.validHtlcClaimOperation.hco;
@@ -570,12 +570,23 @@ test('ApplyStateMessageBuilder complete HTLC claim preserves the submitter-signe
 
     t.is(complete.type, OperationType.HTLC_CLAIM);
     expectPayloadKeys(t, complete, 'hco');
-    expectKeys(t, complete.hco, ['tx', 'txv', 'li', 'pi', 'in', 'is'], 'hco');
+    expectKeys(t, complete.hco, ['tx', 'txv', 'li', 'pi', 'in', 'is', 'va', 'vn', 'vs'], 'hco');
     for (const field of ['tx', 'txv', 'li', 'pi', 'in', 'is']) {
         t.ok(b4a.equals(complete.hco[field], partial.hco[field]), `hco.${field} is preserved`);
         t.ok(b4a.equals(decoded.hco[field], partial.hco[field]), `encoded hco.${field} is preserved`);
     }
     t.ok(requesterWallet.verify(complete.hco.is, complete.hco.tx, requesterWallet.publicKey), 'submitter signature remains valid');
+    t.ok(b4a.equals(complete.hco.va, addressToBuffer(validatorWallet.address, config.addressPrefix)));
+    const validatorHash = await tracCryptoApi.hash.blake3(createMessage(
+        config.networkId,
+        complete.hco.tx,
+        complete.hco.vn,
+        OperationType.HTLC_CLAIM
+    ));
+    t.ok(validatorWallet.verify(complete.hco.vs, validatorHash, validatorWallet.publicKey));
+    for (const field of ['va', 'vn', 'vs']) {
+        t.ok(b4a.equals(decoded.hco[field], complete.hco[field]), `encoded hco.${field} is preserved`);
+    }
 });
 
 test('ApplyStateMessageBuilder complete HTLC refund preserves the submission and adds a validator signature', async t => {

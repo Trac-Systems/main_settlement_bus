@@ -21,6 +21,15 @@ import { testKeyPair1 } from '../../../../../fixtures/apply.fixtures.js';
 const remotePublicKey = b4a.from(testKeyPair1.publicKey, 'hex');
 const remoteAddressBuffer = addressToBuffer(publicKeyToAddress(remotePublicKey, config), config.addressPrefix);
 const writerKey = b4a.alloc(32, 2);
+const completeClaim = () => ({
+    ...protobufFixtures.validHtlcClaimOperation,
+    hco: {
+        ...protobufFixtures.validHtlcClaimOperation.hco,
+        va: remoteAddressBuffer,
+        vn: b4a.alloc(32, 0x53),
+        vs: b4a.alloc(64, 0x54)
+    }
+});
 
 const defaultStateOverrides = {
     registeredWriterKeys: new Map([[b4a.toString(writerKey, 'hex'), remoteAddressBuffer]]),
@@ -243,14 +252,68 @@ test('validateDecodedCompletePayloadSchema selects proper validators for support
             called.push('transfer');
             return true;
         },
+        validateHtlcClaimOperation: () => {
+            called.push('claim');
+            return true;
+        },
     });
 
     validator.validateDecodedCompletePayloadSchema({ type: OperationType.ADD_WRITER });
     validator.validateDecodedCompletePayloadSchema({ type: OperationType.BOOTSTRAP_DEPLOYMENT });
     validator.validateDecodedCompletePayloadSchema({ type: OperationType.TX });
     validator.validateDecodedCompletePayloadSchema({ type: OperationType.TRANSFER });
+    validator.validateDecodedCompletePayloadSchema(completeClaim());
 
-    t.alike(called, ['role', 'bootstrap', 'tx', 'transfer']);
+    t.alike(called, ['role', 'bootstrap', 'tx', 'transfer', 'claim']);
+});
+
+test('validateDecodedCompletePayloadSchema requires complete claim validator metadata', t => {
+    const validator = createValidator();
+    validator.validateDecodedCompletePayloadSchema(completeClaim());
+
+    for (const field of ['va', 'vn', 'vs']) {
+        const incomplete = completeClaim();
+        delete incomplete.hco[field];
+        try {
+            validator.validateDecodedCompletePayloadSchema(incomplete);
+            t.fail(`expected missing ${field} to be rejected`);
+        } catch (error) {
+            t.is(error.resultCode, ResultCode.VALIDATOR_RESPONSE_SCHEMA_INVALID);
+        }
+    }
+
+    const invalid = {
+        ...completeClaim(),
+        hco: {...completeClaim().hco, li: b4a.alloc(1)}
+    };
+    try {
+        validator.validateDecodedCompletePayloadSchema(invalid);
+        t.fail('expected invalid claim lock ID to be rejected');
+    } catch (error) {
+        t.is(error.resultCode, ResultCode.VALIDATOR_RESPONSE_SCHEMA_INVALID);
+    }
+});
+
+test('validate accepts a proven claim with matching validator and writer identity', async t => {
+    const validator = createValidator();
+    const requestTxData = unsafeEncodeApplyOperation(protobufFixtures.validHtlcClaimOperation);
+    const responseTxData = unsafeEncodeApplyOperation(completeClaim());
+
+    validator.isPayloadSchemaValid = () => true;
+    validator.validateResponseType = () => true;
+    validator.validatePeerCorrectness = () => true;
+    validator.validateSignature = async () => true;
+    validator.verifyProofOfPublication = async () => ({
+        proof: {block: {value: b4a.alloc(1)}, manifest: {}}
+    });
+    overrideFunction(t, Autobase, 'decodeValue', async () => responseTxData);
+    overrideFunction(t, Hypercore, 'key', () => writerKey);
+
+    t.ok(await validator.validate(
+        {broadcast_transaction_response: {result: ResultCode.OK}},
+        {remotePublicKey},
+        {requestTxData},
+    ));
 });
 
 test('validateDecodedCompletePayloadSchema throws VALIDATOR_RESPONSE_SCHEMA_INVALID when selected validator fails', t => {
@@ -348,6 +411,26 @@ test('assertProofPayloadMatchesRequestPayload throws PROOF_PAYLOAD_MISMATCH when
             { requestTxData }
         );
         t.fail('expected payload mismatch');
+    } catch (error) {
+        t.is(error.resultCode, ResultCode.PROOF_PAYLOAD_MISMATCH);
+    }
+});
+
+test('assertProofPayloadMatchesRequestPayload rejects a claim with a changed preimage', async t => {
+    const validator = createValidator();
+    const requestTxData = unsafeEncodeApplyOperation(protobufFixtures.validHtlcClaimOperation);
+    const changedClaim = {
+        ...protobufFixtures.validHtlcClaimOperation,
+        hco: {...protobufFixtures.validHtlcClaimOperation.hco, pi: b4a.alloc(32, 0x71)}
+    };
+    overrideFunction(t, Autobase, 'decodeValue', async () => unsafeEncodeApplyOperation(changedClaim));
+
+    try {
+        await validator.assertProofPayloadMatchesRequestPayload(
+            {proof: {block: {value: b4a.alloc(1)}, manifest: {}}},
+            {requestTxData}
+        );
+        t.fail('expected changed claim preimage to be rejected');
     } catch (error) {
         t.is(error.resultCode, ResultCode.PROOF_PAYLOAD_MISMATCH);
     }
@@ -527,6 +610,48 @@ test('validateValidatorCorrectness passes when validator address and writer key 
     );
 
     t.pass();
+});
+
+test('validateValidatorCorrectness binds claim validator metadata to the proven writer', async t => {
+    const validator = createValidator();
+    const claim = completeClaim();
+
+    await validator.validateValidatorCorrectness(claim, remotePublicKey, writerKey, remoteAddressBuffer);
+    t.pass('connected writer and claim validator address match');
+
+    try {
+        await validator.validateValidatorCorrectness(
+            {...claim, hco: {...claim.hco, va: b4a.alloc(remoteAddressBuffer.length, 8)}},
+            remotePublicKey,
+            writerKey,
+            remoteAddressBuffer
+        );
+        t.fail('expected a mismatched claim validator address to be rejected');
+    } catch (error) {
+        t.is(error.resultCode, ResultCode.VALIDATOR_ADDRESS_MISMATCH);
+    }
+
+    try {
+        await validator.validateValidatorCorrectness(
+            claim,
+            remotePublicKey,
+            writerKey,
+            b4a.alloc(remoteAddressBuffer.length, 8)
+        );
+        t.fail('expected a mismatched proof writer to be rejected');
+    } catch (error) {
+        t.is(error.resultCode, ResultCode.VALIDATOR_ADDRESS_MISMATCH);
+    }
+
+    const nonWriterValidator = createValidator({
+        getNodeEntry: async () => ({isWriter: false, wk: writerKey})
+    });
+    try {
+        await nonWriterValidator.validateValidatorCorrectness(claim, remotePublicKey, writerKey, remoteAddressBuffer);
+        t.fail('expected a non-writer responder to be rejected');
+    } catch (error) {
+        t.is(error.resultCode, ResultCode.VALIDATOR_NODE_NOT_WRITER);
+    }
 });
 
 test('validateIfResultCodeIsValidatorInternalError throws only for TX_COMMITTED_RECEIPT_MISSING', t => {

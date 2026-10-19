@@ -33,9 +33,9 @@ export const DEFAULT_POLICY_HASH = b4a.alloc(32, 0x41);
 
 export async function setupHtlcLockScenario(
     t,
-    {initializeEpoch = true, makerBalance = $TNK(10n)} = {}
+    {initializeEpoch = true, makerBalance = $TNK(10n), nodes = 3} = {}
 ) {
-    const context = await setupAdminNetwork(t, {nodes: 3});
+    const context = await setupAdminNetwork(t, {nodes});
     const validatorPeer = context.adminBootstrap;
     const makerPeer = context.peers[1];
     const claimantPeer = context.peers[2];
@@ -65,10 +65,13 @@ export async function buildHtlcLockPayload(
         policyHash = DEFAULT_POLICY_HASH,
         nonce,
         cosignerPeer = null,
+        txValidity: suppliedTxValidity = null,
+        signingValidatorPeer = context.htlcLockScenario.validatorPeer,
     } = {}
 ) {
-    const {validatorPeer, makerPeer, claimantPeer} = context.htlcLockScenario;
-    const txValidity = await deriveIndexerSequenceState(validatorPeer.base);
+    const {makerPeer, claimantPeer} = context.htlcLockScenario;
+    const validatorPeer = signingValidatorPeer;
+    const txValidity = suppliedTxValidity ?? await deriveIndexerSequenceState(validatorPeer.base);
     const signerSet = [makerPeer.wallet.publicKey];
     const lock = {
         claimAddress: claimantPeer.wallet.address,

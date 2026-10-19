@@ -137,7 +137,7 @@ test('Escrow Entry - fee and policy fields have canonical empty representations'
     const claimed = makeClaim(entry, inputs.preimage, uint64ToBuffer(99));
     t.is(claimed.additionalFeeRecipientAddress, null);
     t.is(claimed.additionalFeeAmount.asBigInt(), 0n);
-    t.is(decode(claimed.entry).policyHash, null);
+    t.is(decode(claimed.claimedEscrowEntry).policyHash, null);
 
     const refunded = makeRefund(entry, uint64ToBuffer(100));
     t.is(refunded.amount.asBigInt(), 100n);
@@ -154,7 +154,7 @@ test('Escrow Entry - protobuf encoding is deterministic and variable-length', t 
     t.ok(feeFreeEntry.length < entry.length, 'omitted optional fields reduce storage size');
 
     const claimed = makeClaim(entry, inputs.preimage, uint64ToBuffer(99));
-    t.ok(claimed.entry.length > entry.length, 'claimed storage includes the revealed preimage');
+    t.ok(claimed.claimedEscrowEntry.length > entry.length, 'claimed storage includes the revealed preimage');
 });
 
 test('Escrow Entry - decoded byte fields are independent of the stored input', t => {
@@ -208,7 +208,7 @@ test('Escrow Entry - claim pays stored recipients and records the preimage befor
     const inputs = makeInputs();
     const entry = init(inputs);
     const result = makeClaim(entry, inputs.preimage, uint64ToBuffer(99));
-    const claimed = decode(result.entry);
+    const claimed = decode(result.claimedEscrowEntry);
 
     t.ok(b4a.equals(result.address, inputs.claimRecipientAddress));
     t.ok(b4a.equals(result.amount.value, inputs.amount));
@@ -217,8 +217,8 @@ test('Escrow Entry - claim pays stored recipients and records the preimage befor
     t.is(claimed.status, Status.CLAIMED);
     t.ok(b4a.equals(claimed.preimage, inputs.preimage));
     t.is(decode(entry).status, Status.PENDING, 'input entry is not mutated');
-    t.is(makeClaim(result.entry, inputs.preimage, uint64ToBuffer(99)), null, 'claim is one-shot');
-    t.is(makeRefund(result.entry, uint64ToBuffer(100)), null, 'claimed lock cannot be refunded');
+    t.is(makeClaim(result.claimedEscrowEntry, inputs.preimage, uint64ToBuffer(99)), null, 'claim is one-shot');
+    t.is(makeRefund(result.claimedEscrowEntry, uint64ToBuffer(100)), null, 'claimed lock cannot be refunded');
 });
 
 test('Escrow Entry - claim enforces the hashlock and exclusive claim window', t => {

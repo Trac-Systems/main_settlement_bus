@@ -1,9 +1,12 @@
 import test from 'brittle';
 import b4a from 'b4a';
+import tracCryptoApi from 'trac-crypto-api';
 
 import PartialHtlcValidator from '../../../../../../../src/core/network/protocols/validators/shared/validators/PartialHtlcValidator.js';
+import {applyStateMessageFactory} from '../../../../../../../src/messages/state/applyStateMessageFactory.js';
 import {addressToBuffer} from '../../../../../../../src/core/state/utils/address.js';
 import {$TNK, BALANCE_FEE, PERCENT_75} from '../../../../../../../src/core/state/utils/balance.js';
+import * as escrowEntryUtils from '../../../../../../../src/core/state/utils/escrowEntry.js';
 import {bigIntToBuffer, uint64ToBuffer, uint8ToBuffer} from '../../../../../../../src/utils/buffer.js';
 import {EntryType, HTLC_MIN_LOCK_DURATION_EPOCHS, OperationType, ResultCode} from '../../../../../../../src/utils/constants.js';
 import {config} from '../../../../../../helpers/config.js';
@@ -13,6 +16,7 @@ import {
     buildHtlcLockPayload,
     createNodeEntry,
     createState,
+    DEFAULT_TX_VALIDITY,
     expectSharedValidatorError,
     getWalletSet,
 } from '../../../../utils/sharedValidatorTestUtils.js';
@@ -140,21 +144,185 @@ test('PartialHtlcValidator accepts maker-only and cosigned lock authorizations',
     t.ok(await validatorInstance.validate(await buildCosignedLock(maker, operator, claimant)));
 });
 
-test('PartialHtlcValidator rejects unfinished claim and refund operations', async t => {
+test('PartialHtlcValidator rejects unfinished refund operations', async t => {
     const validatorInstance = new PartialHtlcValidator(createState(), undefined, config);
     const claim = applyOperationFixtures.validHtlcClaimOperation;
     const lock = applyOperationFixtures.validHtlcLockOperation;
 
-    for (const type of [OperationType.HTLC_CLAIM, OperationType.HTLC_REFUND]) {
-        for (const payload of [{type}, {...claim, type}, {...lock, type}]) {
-            await expectSharedValidatorError(
-                t,
-                () => validatorInstance.validate(payload),
-                ResultCode.OPERATION_TYPE_UNKNOWN,
-                'validation is not implemented'
-            );
-        }
+    for (const payload of [
+        {type: OperationType.HTLC_REFUND},
+        {...claim, type: OperationType.HTLC_REFUND},
+        {...lock, type: OperationType.HTLC_REFUND}
+    ]) {
+        await expectSharedValidatorError(
+            t,
+            () => validatorInstance.validate(payload),
+            ResultCode.OPERATION_TYPE_UNKNOWN,
+            'validation is not implemented'
+        );
     }
+});
+
+async function createClaimScenario({sameRecipient = false} = {}) {
+    const {requester: maker, validator, recipient: claimant, alternate: submitter} = await getWalletSet();
+    const lockId = b4a.alloc(32, 0x71);
+    const preimage = b4a.alloc(32, 0x72);
+    const escrowKey = EntryType.HTLC_ESCROW + b4a.toString(lockId, 'hex');
+    const escrow = escrowEntryUtils.init({
+        lockId,
+        lockerAddress: addressToBuffer(maker.address, config.addressPrefix),
+        claimRecipientAddress: addressToBuffer(claimant.address, config.addressPrefix),
+        refundRecipientAddress: addressToBuffer(maker.address, config.addressPrefix),
+        amount: bigIntToBuffer(100n),
+        additionalFeeAmount: bigIntToBuffer(5n),
+        additionalFeeRecipientAddress: addressToBuffer(
+            sameRecipient ? claimant.address : maker.address,
+            config.addressPrefix
+        ),
+        hashLock: tracCryptoApi.hash.sha256(preimage),
+        refundEpoch: uint64ToBuffer(20n)
+    }, config.addressPrefix);
+    const txEntries = new Map([[escrowKey, escrow]]);
+    const signedEntries = new Map([[escrowKey, escrow]]);
+    const state = createState({
+        txEntries,
+        signedEntries,
+        getCurrentEpoch: async () => 10n,
+        getCurrentEpochUnsigned: async () => 10n
+    });
+    const buildClaim = (secret = preimage) => applyStateMessageFactory(submitter, config)
+        .buildPartialHtlcClaimOperationMessage(submitter.address, DEFAULT_TX_VALIDITY, lockId, secret);
+
+    return {maker, validator, claimant, submitter, lockId, preimage, escrowKey, escrow, txEntries, signedEntries, state, buildClaim};
+}
+
+test('PartialHtlcValidator admits a claim signed by an unfunded third party', async t => {
+    const {validator, submitter, state, buildClaim} = await createClaimScenario();
+    const claim = await buildClaim();
+
+    t.is(await state.getNodeEntryUnsigned(submitter.address), null, 'submitter has no account');
+    t.ok(await new PartialHtlcValidator(state, validator.address, config).validate(claim));
+});
+
+test('PartialHtlcValidator requires a signed lock before admitting a claim', async t => {
+    const {validator, escrowKey, signedEntries, state, buildClaim} = await createClaimScenario();
+    const claim = await buildClaim();
+    signedEntries.delete(escrowKey);
+
+    await expectSharedValidatorError(
+        t,
+        () => new PartialHtlcValidator(state, validator.address, config).validate(claim),
+        ResultCode.TX_INVALID_PAYLOAD,
+        'not confirmed in signed state'
+    );
+});
+
+test('PartialHtlcValidator rejects a validator signing its own claim', async t => {
+    const {submitter, state, buildClaim} = await createClaimScenario();
+    const claim = await buildClaim();
+
+    await expectSharedValidatorError(
+        t,
+        () => new PartialHtlcValidator(state, submitter.address, config).validate(claim),
+        ResultCode.SELF_VALIDATION_FORBIDDEN
+    );
+});
+
+test('PartialHtlcValidator rejects missing and already settled escrows', async t => {
+    const {validator, escrowKey, escrow, preimage, txEntries, state, buildClaim} = await createClaimScenario();
+    const claim = await buildClaim();
+    const validatorInstance = new PartialHtlcValidator(state, validator.address, config);
+
+    txEntries.delete(escrowKey);
+    await expectSharedValidatorError(t, () => validatorInstance.validate(claim), ResultCode.TX_INVALID_PAYLOAD, 'does not exist');
+
+    const settled = escrowEntryUtils.makeClaim(escrow, preimage, uint64ToBuffer(10n), config.addressPrefix);
+    txEntries.set(escrowKey, settled.claimedEscrowEntry);
+    await expectSharedValidatorError(t, () => validatorInstance.validate(claim), ResultCode.TX_ALREADY_EXISTS, 'already settled');
+});
+
+test('PartialHtlcValidator rejects an already recorded claim transaction', async t => {
+    const {validator, txEntries, state, buildClaim} = await createClaimScenario();
+    const claim = await buildClaim();
+    txEntries.set(b4a.toString(claim.hco.tx, 'hex'), b4a.from([1]));
+
+    await expectSharedValidatorError(
+        t,
+        () => new PartialHtlcValidator(state, validator.address, config).validate(claim),
+        ResultCode.TX_ALREADY_EXISTS,
+        'already exists'
+    );
+});
+
+test('PartialHtlcValidator checks signed and unsigned claim epochs', async t => {
+    const {validator, state, buildClaim} = await createClaimScenario();
+    const claim = await buildClaim();
+    const validatorInstance = new PartialHtlcValidator(state, validator.address, config);
+
+    state.getCurrentEpochUnsigned = async () => 20n;
+    await expectSharedValidatorError(t, () => validatorInstance.validate(claim), ResultCode.TX_EXPIRED, 'expired');
+
+    state.getCurrentEpochUnsigned = async () => 10n;
+    state.getCurrentEpoch = async () => 20n;
+    await expectSharedValidatorError(t, () => validatorInstance.validate(claim), ResultCode.TX_EXPIRED, 'expired');
+
+    state.getCurrentEpoch = async () => null;
+    await expectSharedValidatorError(t, () => validatorInstance.validate(claim), ResultCode.TX_INVALID_PAYLOAD, 'initialized');
+});
+
+test('PartialHtlcValidator rejects a wrong preimage and an invalid submitter signature', async t => {
+    const {validator, state, buildClaim} = await createClaimScenario();
+    const validatorInstance = new PartialHtlcValidator(state, validator.address, config);
+    const wrongPreimageClaim = await buildClaim(b4a.alloc(32, 0x73));
+
+    await expectSharedValidatorError(
+        t,
+        () => validatorInstance.validate(wrongPreimageClaim),
+        ResultCode.TX_INVALID_PAYLOAD,
+        'preimage'
+    );
+
+    const claim = await buildClaim();
+    claim.hco.is = b4a.alloc(claim.hco.is.length, 0xaa);
+    await expectSharedValidatorError(t, () => validatorInstance.validate(claim), ResultCode.TX_SIGNATURE_INVALID);
+});
+
+test('PartialHtlcValidator rejects a claim that would overflow a payout account', async t => {
+    const {validator, claimant, state, buildClaim} = await createClaimScenario();
+    const maxBalance = (1n << 128n) - 1n;
+    const claim = await buildClaim();
+    state.getNodeEntryUnsigned = async address => address === claimant.address
+        ? createNodeEntry({balance: bigIntToBuffer(maxBalance - 99n)})
+        : null;
+
+    await expectSharedValidatorError(
+        t,
+        () => new PartialHtlcValidator(state, validator.address, config).validate(claim),
+        ResultCode.TRANSFER_RECIPIENT_BALANCE_OVERFLOW,
+        'overflow'
+    );
+});
+
+test('PartialHtlcValidator combines overlapping claim and fee payouts before overflow checking', async t => {
+    const {validator, claimant, state, buildClaim} = await createClaimScenario({sameRecipient: true});
+    const maxBalance = (1n << 128n) - 1n;
+    const claim = await buildClaim();
+    const validatorInstance = new PartialHtlcValidator(state, validator.address, config);
+
+    state.getNodeEntryUnsigned = async address => address === claimant.address
+        ? createNodeEntry({balance: bigIntToBuffer(maxBalance - 104n)})
+        : null;
+    await expectSharedValidatorError(
+        t,
+        () => validatorInstance.validate(claim),
+        ResultCode.TRANSFER_RECIPIENT_BALANCE_OVERFLOW,
+        'overflow'
+    );
+
+    state.getNodeEntryUnsigned = async address => address === claimant.address
+        ? createNodeEntry({balance: bigIntToBuffer(maxBalance - 105n)})
+        : null;
+    t.ok(await validatorInstance.validate(claim), 'recipient may reach the maximum balance exactly');
 });
 
 test('PartialHtlcValidator binds signer zero to the locker address', async t => {

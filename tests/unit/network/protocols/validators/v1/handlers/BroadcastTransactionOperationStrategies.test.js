@@ -1,5 +1,7 @@
 import test from 'brittle';
 import b4a from 'b4a';
+import {safeDecodeApplyOperation, safeEncodeApplyOperation} from '../../../../../../../src/codecs/apply/applyOperationCodec.js';
+import {sanitizeDecodedPartialTransaction} from '../../../../../../../src/core/network/protocols/validators/v1/handlers/broadcastTransaction/BroadcastTransactionPayloadUtils.js';
 
 import {
     createBroadcastTransactionOperationStrategies,
@@ -20,6 +22,17 @@ const basePayload = () => ({
     txv: b4a.alloc(32),
     in: b4a.alloc(32),
     is: b4a.alloc(64)
+});
+
+test('decoded partial HTLC claims keep validator metadata absent after broadcast sanitization', t => {
+    const encoded = safeEncodeApplyOperation(applyOperationFixtures.validHtlcClaimOperation);
+    const decoded = safeDecodeApplyOperation(encoded);
+    t.ok(encoded.length > 0);
+    for (const field of ['va', 'vn', 'vs']) t.absent(Object.hasOwn(decoded.hco, field));
+
+    sanitizeDecodedPartialTransaction(decoded);
+
+    for (const field of ['va', 'vn', 'vs']) t.absent(Object.hasOwn(decoded.hco, field));
 });
 
 function createFakeValidator(name, calls) {
@@ -294,24 +307,4 @@ test('HTLC refund strategy validates and forwards the complete signed refund', a
         decodedOperation.hro.in,
         decodedOperation.hro.is
     ]);
-});
-
-test('unfinished HTLC operations are rejected before broadcast completion', async t => {
-    const factory = createFakeFactory();
-    const strategies = createBroadcastTransactionOperationStrategies({
-        partialHtlcValidator: new PartialHtlcValidator(createState(), undefined, config),
-        createApplyStateMessageFactory: () => factory.createApplyStateMessageFactory()
-    });
-
-    for (const type of [OperationType.HTLC_CLAIM, OperationType.HTLC_REFUND]) {
-        const strategy = resolveBroadcastTransactionOperationStrategy(type, strategies);
-        await expectSharedValidatorError(
-            t,
-            () => strategy.build({...applyOperationFixtures.validHtlcClaimOperation, type}),
-            ResultCode.OPERATION_TYPE_UNKNOWN,
-            'validation is not implemented'
-        );
-    }
-
-    t.is(factory.calls.length, 0, 'no complete transaction is built for an unfinished operation');
 });
