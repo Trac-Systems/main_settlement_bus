@@ -15,6 +15,7 @@ export function createState(overrides = {}) {
     return {
         getIndexerSequenceState: async () => txValidity,
         get: async key => txEntries.get(key) ?? null,
+        getSigned: async key => signedEntries.get(key) ?? null,
         getNodeEntry: async address => signedEntries.get(address) ?? null,
         getNodeEntryUnsigned: async address => unsignedEntries.get(address) ?? null,
         getRegisteredWriterKey: async key => registeredWriterKeys.get(key) ?? null,

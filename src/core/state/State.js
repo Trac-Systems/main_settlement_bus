@@ -1020,15 +1020,32 @@ class State extends ReadyResource {
             this.#safeLogApply(OperationType.HTLC_CLAIM, "Contract schema validation failed.", node.from.key);
             return Status.FAILURE;
         }
-        if (!b4a.isBuffer(op.hco.va) || !b4a.isBuffer(op.hco.vn) || !b4a.isBuffer(op.hco.vs)) {
+        if (!Object.hasOwn(op.hco, "vs") || !Object.hasOwn(op.hco, "va") || !Object.hasOwn(op.hco, "vn")) {
             this.#safeLogApply(OperationType.HTLC_CLAIM, "Operation is not complete.", node.from.key);
+            return Status.FAILURE;
+        }
+        if (b4a.equals(op.address, op.hco.va)) {
+            this.#safeLogApply(OperationType.HTLC_CLAIM, "Validator cannot sign its own transaction.", node.from.key);
+            return Status.FAILURE;
+        }
+        if (b4a.equals(op.hco.in, op.hco.vn)) {
+            this.#safeLogApply(OperationType.HTLC_CLAIM, "Nonces should not be the same.", node.from.key);
+            return Status.FAILURE;
+        }
+        if (b4a.equals(op.hco.is, op.hco.vs)) {
+            this.#safeLogApply(OperationType.HTLC_CLAIM, "Signatures should not be the same.", node.from.key);
             return Status.FAILURE;
         }
 
         const submitterAddress = addressUtils.bufferToAddress(op.address, this.#config.addressPrefix);
-        const submitterPublicKey = submitterAddress && tracCryptoApi.address.decodeSafe(submitterAddress);
-        if (!isBufferValid(submitterPublicKey, PUBLIC_KEY_LENGTH) || isZeroBuffer(submitterPublicKey)) {
+        if (submitterAddress === null) {
             this.#safeLogApply(OperationType.HTLC_CLAIM, "Submitter address is invalid.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        const submitterPublicKey = tracCryptoApi.address.decodeSafe(submitterAddress);
+        if (!isBufferValid(submitterPublicKey, PUBLIC_KEY_LENGTH) || isZeroBuffer(submitterPublicKey)) {
+            this.#safeLogApply(OperationType.HTLC_CLAIM, "Submitter public key is invalid.", node.from.key);
             return Status.FAILURE;
         }
 
@@ -1055,9 +1072,13 @@ class State extends ReadyResource {
         }
 
         const validatorAddress = addressUtils.bufferToAddress(op.hco.va, this.#config.addressPrefix);
-        const validatorPublicKey = validatorAddress && tracCryptoApi.address.decodeSafe(validatorAddress);
-        if (!isBufferValid(validatorPublicKey, PUBLIC_KEY_LENGTH) || isZeroBuffer(validatorPublicKey)) {
+        if (validatorAddress === null) {
             this.#safeLogApply(OperationType.HTLC_CLAIM, "Validator address is invalid.", node.from.key);
+            return Status.FAILURE;
+        }
+        const validatorPublicKey = tracCryptoApi.address.decodeSafe(validatorAddress);
+        if (!isBufferValid(validatorPublicKey, PUBLIC_KEY_LENGTH) || isZeroBuffer(validatorPublicKey)) {
+            this.#safeLogApply(OperationType.HTLC_CLAIM, "Validator public key is invalid.", node.from.key);
             return Status.FAILURE;
         }
         const validatorMessage = createMessage(
@@ -1066,6 +1087,10 @@ class State extends ReadyResource {
             op.hco.vn,
             OperationType.HTLC_CLAIM
         );
+        if (validatorMessage.length === 0) {
+            this.#safeLogApply(OperationType.HTLC_CLAIM, "Invalid validator message.", node.from.key);
+            return Status.FAILURE;
+        }
         const validatorHash = await tracCryptoApi.hash.blake3Safe(validatorMessage);
         if (!tracCryptoApi.signature.verify(op.hco.vs, validatorHash, validatorPublicKey)) {
             this.#safeLogApply(OperationType.HTLC_CLAIM, "Validator signature is invalid.", node.from.key);
@@ -1117,11 +1142,12 @@ class State extends ReadyResource {
             return Status.FAILURE;
         }
 
-        const credits = new Map();
-        for (const [addressBytes, amount] of [
+        const payouts = [
             [settlement.address, settlement.amount],
             [settlement.additionalFeeRecipientAddress, settlement.additionalFeeAmount],
-        ]) {
+        ];
+        const credits = new Map();
+        for (const [addressBytes, amount] of payouts) {
             if (addressBytes === null) continue;
             const address = addressUtils.bufferToAddress(addressBytes, this.#config.addressPrefix);
             if (address === null || amount === null) {
@@ -1144,8 +1170,21 @@ class State extends ReadyResource {
                 updatedEntry = nodeEntryUtils.init(ZERO_WK, nodeRoleUtils.NodeRole.READER, amount.value);
             } else {
                 const entry = nodeEntryUtils.decode(entryBuffer);
-                const balance = entry ? toBalance(entry.balance) : null;
-                updatedEntry = balance?.add(amount)?.update(entryBuffer) ?? null;
+                if (entry === null) {
+                    this.#safeLogApply(OperationType.HTLC_CLAIM, "Settlement recipient account is invalid.", node.from.key);
+                    return Status.FAILURE;
+                }
+                const balance = toBalance(entry.balance);
+                if (balance === null) {
+                    this.#safeLogApply(OperationType.HTLC_CLAIM, "Settlement recipient balance is invalid.", node.from.key);
+                    return Status.FAILURE;
+                }
+                const updatedBalance = balance.add(amount);
+                if (updatedBalance === null) {
+                    this.#safeLogApply(OperationType.HTLC_CLAIM, "Settlement recipient balance overflow.", node.from.key);
+                    return Status.FAILURE;
+                }
+                updatedEntry = updatedBalance.update(entryBuffer);
             }
             if (!isBufferValid(updatedEntry, NODE_ENTRY_SIZE)) {
                 this.#safeLogApply(OperationType.HTLC_CLAIM, "Failed to credit settlement recipient.", node.from.key);
@@ -1155,7 +1194,7 @@ class State extends ReadyResource {
         }
 
         for (const [address, entry] of updatedRecipients) await batch.put(address, entry);
-        await batch.put(escrowKey, settlement.entry);
+        await batch.put(escrowKey, settlement.claimedEscrowEntry);
         await batch.put(claimTxHashHex, node.value);
 
         if (this.#config.enableTxApplyLogs) {

@@ -65,10 +65,13 @@ export async function buildHtlcLockPayload(
         policyHash = DEFAULT_POLICY_HASH,
         nonce,
         cosignerPeer = null,
+        txValidity: suppliedTxValidity = null,
+        signingValidatorPeer = context.htlcLockScenario.validatorPeer,
     } = {}
 ) {
-    const {validatorPeer, makerPeer, claimantPeer} = context.htlcLockScenario;
-    const txValidity = await deriveIndexerSequenceState(validatorPeer.base);
+    const {makerPeer, claimantPeer} = context.htlcLockScenario;
+    const validatorPeer = signingValidatorPeer;
+    const txValidity = suppliedTxValidity ?? await deriveIndexerSequenceState(validatorPeer.base);
     const signerSet = [makerPeer.wallet.publicKey];
     const lock = {
         claimAddress: claimantPeer.wallet.address,

@@ -57,6 +57,7 @@ class PartialHtlcValidator extends PartialOperationValidator {
 
     async #validateClaim(payload) {
         this.isPayloadSchemaValid(payload);
+        this.validateNoSelfValidation(payload);
         this.validateRequesterAddress(payload);
         await this.validateTransactionUniqueness(payload);
         await this.validateSignature(payload);
@@ -64,6 +65,15 @@ class PartialHtlcValidator extends PartialOperationValidator {
         this.isOperationNotCompleted(payload);
 
         const escrowKey = EntryType.HTLC_ESCROW + b4a.toString(payload.hco.li, 'hex');
+        const signedEscrowBuffer = await this.state.getSigned(escrowKey);
+        const signedEscrow = escrowEntryUtils.decode(signedEscrowBuffer, this.#config.addressPrefix);
+        if (!signedEscrow || !b4a.equals(signedEscrow.lockId, payload.hco.li)) {
+            throw new V1ProtocolError(ResultCode.TX_INVALID_PAYLOAD, 'HTLC lock is not confirmed in signed state.');
+        }
+        if (signedEscrow.status !== escrowEntryUtils.Status.PENDING) {
+            throw new V1ProtocolError(ResultCode.TX_ALREADY_EXISTS, 'HTLC escrow is already settled.');
+        }
+
         const escrowBuffer = await this.state.get(escrowKey);
         const escrow = escrowEntryUtils.decode(escrowBuffer, this.#config.addressPrefix);
         if (!escrow || !b4a.equals(escrow.lockId, payload.hco.li)) {

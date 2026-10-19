@@ -183,15 +183,17 @@ async function createClaimScenario({sameRecipient = false} = {}) {
         refundEpoch: uint64ToBuffer(20n)
     }, config.addressPrefix);
     const txEntries = new Map([[escrowKey, escrow]]);
+    const signedEntries = new Map([[escrowKey, escrow]]);
     const state = createState({
         txEntries,
+        signedEntries,
         getCurrentEpoch: async () => 10n,
         getCurrentEpochUnsigned: async () => 10n
     });
     const buildClaim = (secret = preimage) => applyStateMessageFactory(submitter, config)
         .buildPartialHtlcClaimOperationMessage(submitter.address, DEFAULT_TX_VALIDITY, lockId, secret);
 
-    return {maker, validator, claimant, submitter, lockId, preimage, escrowKey, escrow, txEntries, state, buildClaim};
+    return {maker, validator, claimant, submitter, lockId, preimage, escrowKey, escrow, txEntries, signedEntries, state, buildClaim};
 }
 
 test('PartialHtlcValidator admits a claim signed by an unfunded third party', async t => {
@@ -200,6 +202,30 @@ test('PartialHtlcValidator admits a claim signed by an unfunded third party', as
 
     t.is(await state.getNodeEntryUnsigned(submitter.address), null, 'submitter has no account');
     t.ok(await new PartialHtlcValidator(state, validator.address, config).validate(claim));
+});
+
+test('PartialHtlcValidator requires a signed lock before admitting a claim', async t => {
+    const {validator, escrowKey, signedEntries, state, buildClaim} = await createClaimScenario();
+    const claim = await buildClaim();
+    signedEntries.delete(escrowKey);
+
+    await expectSharedValidatorError(
+        t,
+        () => new PartialHtlcValidator(state, validator.address, config).validate(claim),
+        ResultCode.TX_INVALID_PAYLOAD,
+        'not confirmed in signed state'
+    );
+});
+
+test('PartialHtlcValidator rejects a validator signing its own claim', async t => {
+    const {submitter, state, buildClaim} = await createClaimScenario();
+    const claim = await buildClaim();
+
+    await expectSharedValidatorError(
+        t,
+        () => new PartialHtlcValidator(state, submitter.address, config).validate(claim),
+        ResultCode.SELF_VALIDATION_FORBIDDEN
+    );
 });
 
 test('PartialHtlcValidator rejects missing and already settled escrows', async t => {
@@ -211,7 +237,7 @@ test('PartialHtlcValidator rejects missing and already settled escrows', async t
     await expectSharedValidatorError(t, () => validatorInstance.validate(claim), ResultCode.TX_INVALID_PAYLOAD, 'does not exist');
 
     const settled = escrowEntryUtils.makeClaim(escrow, preimage, uint64ToBuffer(10n), config.addressPrefix);
-    txEntries.set(escrowKey, settled.entry);
+    txEntries.set(escrowKey, settled.claimedEscrowEntry);
     await expectSharedValidatorError(t, () => validatorInstance.validate(claim), ResultCode.TX_ALREADY_EXISTS, 'already settled');
 });
 

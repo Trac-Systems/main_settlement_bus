@@ -7,11 +7,17 @@ import {
     toBalance,
 } from '../../../../../src/core/state/utils/balance.js';
 import * as escrowEntryUtils from '../../../../../src/core/state/utils/escrowEntry.js';
+import nodeEntryUtils from '../../../../../src/core/state/utils/nodeEntry.js';
 import {
     safeDecodeApplyOperation,
     safeEncodeApplyOperation,
 } from '../../../../../src/codecs/apply/applyOperationCodec.js';
-import {uint64ToBuffer} from '../../../../../src/utils/buffer.js';
+import {bigIntToBuffer, uint64ToBuffer} from '../../../../../src/utils/buffer.js';
+import {applyWithEntryOverrides} from '../setGenesisEpoch/setGenesisEpochScenarioHelpers.js';
+import {buildTransferPayload, DEFAULT_INITIAL_BALANCE} from '../transfer/transferScenarioHelpers.js';
+import {initializeBalances, whitelistAddress} from '../common/commonScenarioHelper.js';
+import {promotePeerToWriter} from '../addWriter/addWriterScenarioHelpers.js';
+import {eventFlush} from '../../../../helpers/autobaseTestHelpers.js';
 import {
     appendHtlcLock,
     appendHtlcLockAtCurrentEpoch,
@@ -173,4 +179,225 @@ test('State.apply HTLC_LOCK prevents same-batch escrow overspending', async t =>
     t.is(secondState.escrow, null, 'second escrow is not created');
     t.is(secondState.operation, null, 'second operation is not recorded');
     t.ok(b4a.equals(validatorAfter.balance, expectedValidatorBalance.value), 'validator receives only one network fee reward');
+});
+
+test('State.apply HTLC_LOCK prevents escrow overspending across separate batches', async t => {
+    const oneLockBalance = toBalance(DEFAULT_PRINCIPAL).add(toBalance(DEFAULT_SURCHARGE)).add(BALANCE_FEE);
+    const context = await setupHtlcLockScenario(t, {makerBalance: oneLockBalance.value});
+    const {validatorPeer, makerPeer} = context.htlcLockScenario;
+    const first = await buildHtlcLockPayload(context);
+    const second = await buildHtlcLockPayload(context);
+    const validatorBefore = await readNodeEntry(validatorPeer.base, validatorPeer.wallet.address);
+
+    await appendHtlcLock(context, first);
+    await appendHtlcLock(context, second);
+
+    t.ok((await readLockState(validatorPeer.base, first)).escrow);
+    t.is((await readLockState(validatorPeer.base, second)).escrow, null);
+    t.is((await readLockState(validatorPeer.base, second)).operation, null);
+    t.ok(toBalance((await readNodeEntry(validatorPeer.base, makerPeer.wallet.address)).balance)
+        .equals(toBalance(b4a.alloc(16))));
+    const validatorAfter = await readNodeEntry(validatorPeer.base, validatorPeer.wallet.address);
+    t.ok(b4a.equals(validatorAfter.balance,
+        toBalance(validatorBefore.balance).add(BALANCE_FEE.percentage(PERCENT_75)).value));
+});
+
+test('State.apply cannot spend the same funds with a lock and transfer in either order', async t => {
+    for (const firstType of ['lock', 'transfer']) {
+        for (const sameBatch of [true, false]) {
+            const spend = toBalance(DEFAULT_PRINCIPAL).add(toBalance(DEFAULT_SURCHARGE));
+            const context = await setupHtlcLockScenario(t, {makerBalance: spend.add(BALANCE_FEE).value});
+            const {validatorPeer, makerPeer, claimantPeer} = context.htlcLockScenario;
+            const lockPayload = await buildHtlcLockPayload(context);
+            const transferPayload = await buildTransferPayload(context, {
+                senderPeer: makerPeer,
+                validatorPeer,
+                recipientPeer: claimantPeer,
+                amount: spend.value
+            });
+            const payloads = firstType === 'lock'
+                ? [lockPayload, transferPayload]
+                : [transferPayload, lockPayload];
+
+            if (sameBatch) await appendHtlcLockBatch(context, payloads);
+            else for (const payload of payloads) await appendHtlcLock(context, payload);
+
+            const lockState = await readLockState(validatorPeer.base, lockPayload);
+            const transferHash = b4a.toString(safeDecodeApplyOperation(transferPayload).tro.tx, 'hex');
+            const transferRecord = await validatorPeer.base.view.get(transferHash);
+            const transferRecipient = await readNodeEntry(validatorPeer.base, claimantPeer.wallet.address);
+            t.is(Boolean(lockState.escrow), firstType === 'lock', `${firstType} wins (${sameBatch ? 'same' : 'separate'} batch)`);
+            t.is(Boolean(transferRecord), firstType === 'transfer', 'only the first operation is recorded');
+            t.is(Boolean(transferRecipient), firstType === 'transfer', 'transfer recipient is paid only if transfer wins');
+            t.ok(toBalance((await readNodeEntry(validatorPeer.base, makerPeer.wallet.address)).balance)
+                .equals(toBalance(b4a.alloc(16))), 'one spend consumes the available balance');
+        }
+    }
+});
+
+test('State.apply HTLC_LOCK settles a cosigned lock with the stored terms', async t => {
+    const context = await setupHtlcLockScenario(t);
+    const {validatorPeer, makerPeer, claimantPeer} = context.htlcLockScenario;
+    const payload = await buildHtlcLockPayload(context, {cosignerPeer: claimantPeer});
+    const makerBefore = await readNodeEntry(validatorPeer.base, makerPeer.wallet.address);
+
+    await appendHtlcLock(context, payload);
+
+    const state = await readLockState(validatorPeer.base, payload);
+    const operation = decodeHtlcLockPayload(payload);
+    t.is(state.escrow.status, escrowEntryUtils.Status.PENDING);
+    t.ok(b4a.equals(state.escrow.lockId, operation.hlo.tx));
+    t.ok(b4a.equals(state.escrow.policyHash, operation.hlo.ph));
+    t.is(operation.hlo.ss.length, 2);
+    t.is(operation.hlo.cs.length, 1);
+    t.ok(b4a.equals((await readNodeEntry(validatorPeer.base, makerPeer.wallet.address)).balance,
+        toBalance(makerBefore.balance).sub(
+            toBalance(DEFAULT_PRINCIPAL).add(toBalance(DEFAULT_SURCHARGE)).add(BALANCE_FEE)
+        ).value));
+});
+
+test('State.apply HTLC_LOCK rejects a corrupted locker account without reserving funds', async t => {
+    const context = await setupHtlcLockScenario(t);
+    const {validatorPeer, makerPeer} = context.htlcLockScenario;
+    const payload = await buildHtlcLockPayload(context);
+    const makerBefore = await readNodeEntry(validatorPeer.base, makerPeer.wallet.address);
+
+    await applyWithEntryOverrides(context, payload,
+        new Map([[makerPeer.wallet.address, b4a.from([1])]]));
+
+    t.ok(b4a.equals((await readNodeEntry(validatorPeer.base, makerPeer.wallet.address)).balance,
+        makerBefore.balance));
+    t.is((await readLockState(validatorPeer.base, payload)).escrow, null);
+    t.is((await readLockState(validatorPeer.base, payload)).operation, null);
+});
+
+test('State.apply HTLC_LOCK rejects validator reward overflow without reserving funds', async t => {
+    const context = await setupHtlcLockScenario(t);
+    const {validatorPeer, makerPeer} = context.htlcLockScenario;
+    const payload = await buildHtlcLockPayload(context);
+    const makerBefore = await readNodeEntry(validatorPeer.base, makerPeer.wallet.address);
+    const validatorBefore = await readNodeEntry(validatorPeer.base, validatorPeer.wallet.address);
+    const nearMaxValidator = nodeEntryUtils.encode({
+        ...validatorBefore,
+        balance: bigIntToBuffer((1n << 128n) - 1n)
+    });
+
+    await applyWithEntryOverrides(context, payload,
+        new Map([[validatorPeer.wallet.address, nearMaxValidator]]));
+
+    t.ok(b4a.equals((await readNodeEntry(validatorPeer.base, makerPeer.wallet.address)).balance,
+        makerBefore.balance));
+    t.ok(b4a.equals((await readNodeEntry(validatorPeer.base, validatorPeer.wallet.address)).balance,
+        validatorBefore.balance));
+    t.is((await readLockState(validatorPeer.base, payload)).escrow, null);
+    t.is((await readLockState(validatorPeer.base, payload)).operation, null);
+});
+
+test('State.apply HTLC_LOCK rejects malformed signatures, hash, and stale validity', async t => {
+    for (const mutation of ['hash', 'maker signature', 'validator signature', 'stale validity', 'self-validation']) {
+        const context = await setupHtlcLockScenario(t);
+        const {validatorPeer, makerPeer} = context.htlcLockScenario;
+        let payload = await buildHtlcLockPayload(context, mutation === 'stale validity'
+            ? {txValidity: b4a.alloc(32, 0x7f)} : {});
+        if (mutation !== 'stale validity') {
+            const operation = safeDecodeApplyOperation(payload);
+            if (mutation === 'hash') operation.hlo.tx[0] ^= 1;
+            if (mutation === 'maker signature') operation.hlo.is[0] ^= 1;
+            if (mutation === 'validator signature') operation.hlo.vs[0] ^= 1;
+            if (mutation === 'self-validation') operation.address = operation.hlo.va;
+            payload = safeEncodeApplyOperation(operation);
+        }
+        const makerBefore = await readNodeEntry(validatorPeer.base, makerPeer.wallet.address);
+        const validatorBefore = await readNodeEntry(validatorPeer.base, validatorPeer.wallet.address);
+
+        await appendHtlcLock(context, payload);
+
+        t.ok(b4a.equals((await readNodeEntry(validatorPeer.base, makerPeer.wallet.address)).balance,
+            makerBefore.balance), `${mutation} leaves maker funds intact`);
+        t.ok(b4a.equals((await readNodeEntry(validatorPeer.base, validatorPeer.wallet.address)).balance,
+            validatorBefore.balance), `${mutation} pays no reward`);
+        t.is((await readLockState(validatorPeer.base, payload)).escrow, null, `${mutation} creates no escrow`);
+        t.is((await readLockState(validatorPeer.base, payload)).operation, null, `${mutation} creates no record`);
+    }
+});
+
+test('State.apply HTLC_LOCK rejects principal and fee overflow before any write', async t => {
+    const maxAmount = (1n << 128n) - 1n;
+    for (const [amount, feeAmount] of [
+        [maxAmount, 1n],
+        [maxAmount - 1n, 1n]
+    ]) {
+        const context = await setupHtlcLockScenario(t);
+        const {validatorPeer, makerPeer} = context.htlcLockScenario;
+        const payload = await buildHtlcLockPayload(context, {
+            amount: bigIntToBuffer(amount),
+            feeAmount: bigIntToBuffer(feeAmount)
+        });
+        const makerBefore = await readNodeEntry(validatorPeer.base, makerPeer.wallet.address);
+        const validatorBefore = await readNodeEntry(validatorPeer.base, validatorPeer.wallet.address);
+
+        await appendHtlcLock(context, payload);
+
+        t.ok(b4a.equals((await readNodeEntry(validatorPeer.base, makerPeer.wallet.address)).balance,
+            makerBefore.balance));
+        t.ok(b4a.equals((await readNodeEntry(validatorPeer.base, validatorPeer.wallet.address)).balance,
+            validatorBefore.balance));
+        t.is((await readLockState(validatorPeer.base, payload)).escrow, null);
+        t.is((await readLockState(validatorPeer.base, payload)).operation, null);
+    }
+});
+
+test('State.apply HTLC_LOCK rejects a missing locker account', async t => {
+    const context = await setupHtlcLockScenario(t);
+    const {validatorPeer, makerPeer} = context.htlcLockScenario;
+    const payload = await buildHtlcLockPayload(context);
+    const makerBefore = await readNodeEntry(validatorPeer.base, makerPeer.wallet.address);
+
+    await applyWithEntryOverrides(context, payload, new Map([[makerPeer.wallet.address, null]]));
+
+    t.ok(b4a.equals((await readNodeEntry(validatorPeer.base, makerPeer.wallet.address)).balance,
+        makerBefore.balance));
+    t.is((await readLockState(validatorPeer.base, payload)).escrow, null);
+    t.is((await readLockState(validatorPeer.base, payload)).operation, null);
+});
+
+test('State.apply HTLC_LOCK rejects a second validator spending locked funds', async t => {
+    const oneLockBalance = toBalance(DEFAULT_PRINCIPAL).add(toBalance(DEFAULT_SURCHARGE)).add(BALANCE_FEE);
+    const context = await setupHtlcLockScenario(t, {nodes: 5, makerBalance: oneLockBalance.value});
+    const {validatorPeer, makerPeer} = context.htlcLockScenario;
+    const secondaryValidator = context.peers[3];
+    const writerInitialBalance = DEFAULT_INITIAL_BALANCE;
+    context.addWriterScenario = {writerInitialBalance};
+    await initializeBalances(context, [[secondaryValidator.wallet.address, writerInitialBalance]]);
+    await whitelistAddress(context, secondaryValidator.wallet.address);
+    await promotePeerToWriter(t, context, {
+        readerPeer: secondaryValidator,
+        validatorPeer,
+        expectedWriterIndex: 1
+    });
+    await context.sync();
+
+    const first = await buildHtlcLockPayload(context, {signingValidatorPeer: validatorPeer});
+    const second = await buildHtlcLockPayload(context, {signingValidatorPeer: secondaryValidator});
+    await validatorPeer.base.append(first);
+    await validatorPeer.base.update();
+    await eventFlush();
+    await context.sync();
+    await secondaryValidator.base.append(second);
+    await secondaryValidator.base.update();
+    await eventFlush();
+    await context.sync();
+
+    const firstState = await readLockState(validatorPeer.base, first);
+    const secondState = await readLockState(validatorPeer.base, second);
+    t.is(Number(Boolean(firstState.escrow)) + Number(Boolean(secondState.escrow)), 1,
+        'only one competing lock reserves the funds');
+    for (const peer of [validatorPeer, secondaryValidator, makerPeer]) {
+        const peerFirst = await readLockState(peer.base, first);
+        const peerSecond = await readLockState(peer.base, second);
+        t.is(Boolean(peerFirst.escrow), Boolean(firstState.escrow), 'first lock agrees across peers');
+        t.is(Boolean(peerSecond.escrow), Boolean(secondState.escrow), 'second lock agrees across peers');
+        t.ok(toBalance((await readNodeEntry(peer.base, makerPeer.wallet.address)).balance)
+            .equals(toBalance(b4a.alloc(16))), 'the maker spends only once');
+    }
 });
