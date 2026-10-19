@@ -8,8 +8,8 @@ import * as escrowEntryUtils from '../../../../../src/core/state/utils/escrowEnt
 import nodeEntryUtils from '../../../../../src/core/state/utils/nodeEntry.js';
 import nodeRoleUtils from '../../../../../src/core/state/utils/roles.js';
 import {toBalance} from '../../../../../src/core/state/utils/balance.js';
-import {BALANCE_BYTE_LENGTH, EntryType} from '../../../../../src/utils/constants.js';
-import {bigIntToBuffer, uint64ToBuffer, ZERO_WK} from '../../../../../src/utils/buffer.js';
+import {BALANCE_BYTE_LENGTH, EntryType, OperationType} from '../../../../../src/utils/constants.js';
+import {bigIntToBuffer, createMessage, uint64ToBuffer, ZERO_WK} from '../../../../../src/utils/buffer.js';
 import {deriveIndexerSequenceState} from '../../../../helpers/autobaseTestHelpers.js';
 import {config} from '../../../../helpers/config.js';
 import {applyWithEntryOverrides} from '../setGenesisEpoch/setGenesisEpochScenarioHelpers.js';
@@ -152,6 +152,72 @@ test('State.apply HTLC_REFUND rejects an invalid submitter signature', async t =
 
     t.is((await readLockState(validatorPeer.base, lockPayload)).escrow.status, escrowEntryUtils.Status.PENDING);
     t.is(await readRefundRecord(validatorPeer.base, invalidPayload), null);
+});
+
+test('State.apply HTLC_REFUND reports hash failures, hash mismatches, and signature errors separately', async t => {
+    for (const {label, modify, hashMessage, expectedLog} of [
+        {
+            label: 'refund hash failure',
+            hashMessage: operation => createMessage(config.networkId, operation.hro.txv,
+                operation.hro.li, operation.hro.in, OperationType.HTLC_REFUND),
+            expectedLog: 'Failed to hash refund message.'
+        },
+        {
+            label: 'refund hash mismatch',
+            modify: operation => { operation.hro.tx[0] ^= 1; },
+            expectedLog: 'Refund transaction hash is invalid.'
+        },
+        {
+            label: 'refund submitter signature',
+            modify: operation => { operation.hro.is[0] ^= 1; },
+            expectedLog: 'Refund submitter signature is invalid.'
+        },
+        {
+            label: 'validator hash failure',
+            hashMessage: operation => createMessage(config.networkId, operation.hro.tx,
+                operation.hro.vn, OperationType.HTLC_REFUND),
+            expectedLog: 'Failed to hash validator message.'
+        },
+        {
+            label: 'validator signature',
+            modify: operation => { operation.hro.vs[0] ^= 1; },
+            expectedLog: 'Validator signature is invalid.'
+        }
+    ]) {
+        const context = await setupHtlcLockScenario(t);
+        const {validatorPeer, makerPeer} = context.htlcLockScenario;
+        const lockPayload = await buildHtlcLockPayload(context);
+        await appendHtlcLock(context, lockPayload);
+        const operation = safeDecodeApplyOperation(await buildRefundPayload(context, lockPayload));
+        modify?.(operation);
+        const payload = safeEncodeApplyOperation(operation);
+        const targetMessage = hashMessage?.(operation);
+        const makerBefore = await readNodeEntry(validatorPeer.base, makerPeer.wallet.address);
+        const originalHash = tracCryptoApi.hash.blake3Safe;
+        const originalConsoleError = console.error;
+        const logs = [];
+
+        if (targetMessage) {
+            tracCryptoApi.hash.blake3Safe = async message => b4a.equals(message, targetMessage)
+                ? b4a.alloc(0)
+                : originalHash(message);
+        }
+        console.error = (...args) => logs.push(args.join(' '));
+        try {
+            await applyWithEntryOverrides(context, payload,
+                new Map([[EntryType.EPOCH_CURRENT, decodeHtlcLockPayload(lockPayload).hlo.re]]));
+        } finally {
+            tracCryptoApi.hash.blake3Safe = originalHash;
+            console.error = originalConsoleError;
+        }
+
+        t.ok(logs.some(log => log.includes(expectedLog)), `${label}: expected error is logged`);
+        t.is((await readLockState(validatorPeer.base, lockPayload)).escrow.status,
+            escrowEntryUtils.Status.PENDING, `${label}: escrow stays pending`);
+        t.ok(b4a.equals((await readNodeEntry(validatorPeer.base, makerPeer.wallet.address)).balance,
+            makerBefore.balance), `${label}: refund recipient is not credited`);
+        t.is(await readRefundRecord(validatorPeer.base, payload), null, `${label}: refund is not recorded`);
+    }
 });
 
 test('State.apply HTLC_REFUND distinguishes invalid submitter addresses from public keys', async t => {

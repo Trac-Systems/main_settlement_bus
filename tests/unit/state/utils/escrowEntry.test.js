@@ -141,7 +141,7 @@ test('Escrow Entry - fee and policy fields have canonical empty representations'
 
     const refunded = makeRefund(entry, uint64ToBuffer(100));
     t.is(refunded.amount.asBigInt(), 100n);
-    t.is(decode(refunded.entry).additionalFeeRecipientAddress, null);
+    t.is(decode(refunded.refundedEscrowEntry).additionalFeeRecipientAddress, null);
 });
 
 test('Escrow Entry - protobuf encoding is deterministic and variable-length', t => {
@@ -239,10 +239,10 @@ test('Escrow Entry - refund returns principal and surcharge at or after expiry',
     const result = makeRefund(entry, uint64ToBuffer(100));
     t.ok(b4a.equals(result.address, inputs.refundRecipientAddress));
     t.is(result.amount.asBigInt(), 105n);
-    t.is(decode(result.entry).status, Status.REFUNDED);
+    t.is(decode(result.refundedEscrowEntry).status, Status.REFUNDED);
     t.is(decode(entry).status, Status.PENDING, 'input entry is not mutated');
-    t.is(makeRefund(result.entry, uint64ToBuffer(101)), null, 'refund is one-shot');
-    t.is(makeClaim(result.entry, inputs.preimage, uint64ToBuffer(99)), null, 'refunded lock cannot be claimed');
+    t.is(makeRefund(result.refundedEscrowEntry, uint64ToBuffer(101)), null, 'refund is one-shot');
+    t.is(makeClaim(result.refundedEscrowEntry, inputs.preimage, uint64ToBuffer(99)), null, 'refunded lock cannot be claimed');
 });
 
 test('Escrow Entry - decode and settlement reject malformed entries', t => {

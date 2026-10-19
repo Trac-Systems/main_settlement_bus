@@ -353,7 +353,7 @@ test('PartialHtlcValidator requires a confirmed pending escrow', async t => {
     signedEntries.set(escrowKey, escrow);
     txEntries.delete(escrowKey);
     await expectSharedValidatorError(t, admission, ResultCode.TX_INVALID_PAYLOAD, 'current state');
-    txEntries.set(escrowKey, escrowEntryUtils.makeRefund(escrow, uint64ToBuffer(100n), config.addressPrefix).entry);
+    txEntries.set(escrowKey, escrowEntryUtils.makeRefund(escrow, uint64ToBuffer(100n), config.addressPrefix).refundedEscrowEntry);
     await expectSharedValidatorError(t, admission, ResultCode.TX_ALREADY_EXISTS, 'already settled');
 });
 

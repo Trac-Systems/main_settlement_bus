@@ -834,6 +834,10 @@ class State extends ReadyResource {
         }
 
         const regeneratedTxHash = await tracCryptoApi.hash.blake3Safe(lockerMessage);
+        if (!isBufferValid(regeneratedTxHash, HASH_BYTE_LENGTH)) {
+            this.#safeLogApply(OperationType.HTLC_LOCK, "Failed to hash locker message.", node.from.key);
+            return Status.FAILURE;
+        }
         if (!b4a.equals(regeneratedTxHash, op.hlo.tx)) {
             this.#safeLogApply(OperationType.HTLC_LOCK, "Message hash does not match the tx_hash.", node.from.key);
             return Status.FAILURE;
@@ -885,6 +889,10 @@ class State extends ReadyResource {
         }
 
         const validatorMessageHash = await tracCryptoApi.hash.blake3Safe(validatorMessage);
+        if (!isBufferValid(validatorMessageHash, HASH_BYTE_LENGTH)) {
+            this.#safeLogApply(OperationType.HTLC_LOCK, "Failed to hash validator message.", node.from.key);
+            return Status.FAILURE;
+        }
         if (!tracCryptoApi.signature.verify(op.hlo.vs, validatorMessageHash, validatorPublicKey)) {
             this.#safeLogApply(OperationType.HTLC_LOCK, "Failed to verify validator signature.", node.from.key);
             return Status.FAILURE;
@@ -1063,11 +1071,16 @@ class State extends ReadyResource {
         }
 
         const txHash = await tracCryptoApi.hash.blake3Safe(message);
-        if (
-            !b4a.equals(txHash, op.hco.tx) ||
-            !tracCryptoApi.signature.verify(op.hco.is, txHash, submitterPublicKey)
-        ) {
-            this.#safeLogApply(OperationType.HTLC_CLAIM, "Claim hash or submitter signature is invalid.", node.from.key);
+        if (!isBufferValid(txHash, HASH_BYTE_LENGTH)) {
+            this.#safeLogApply(OperationType.HTLC_CLAIM, "Failed to hash claim message.", node.from.key);
+            return Status.FAILURE;
+        }
+        if (!b4a.equals(txHash, op.hco.tx)) {
+            this.#safeLogApply(OperationType.HTLC_CLAIM, "Claim transaction hash is invalid.", node.from.key);
+            return Status.FAILURE;
+        }
+        if (!tracCryptoApi.signature.verify(op.hco.is, txHash, submitterPublicKey)) {
+            this.#safeLogApply(OperationType.HTLC_CLAIM, "Claim submitter signature is invalid.", node.from.key);
             return Status.FAILURE;
         }
 
@@ -1092,6 +1105,10 @@ class State extends ReadyResource {
             return Status.FAILURE;
         }
         const validatorHash = await tracCryptoApi.hash.blake3Safe(validatorMessage);
+        if (!isBufferValid(validatorHash, HASH_BYTE_LENGTH)) {
+            this.#safeLogApply(OperationType.HTLC_CLAIM, "Failed to hash validator message.", node.from.key);
+            return Status.FAILURE;
+        }
         if (!tracCryptoApi.signature.verify(op.hco.vs, validatorHash, validatorPublicKey)) {
             this.#safeLogApply(OperationType.HTLC_CLAIM, "Validator signature is invalid.", node.from.key);
             return Status.FAILURE;
@@ -1116,9 +1133,13 @@ class State extends ReadyResource {
 
         const escrowKey = EntryType.HTLC_ESCROW + b4a.toString(op.hco.li, 'hex');
         const escrowBuffer = await this.#getEntryApply(escrowKey, batch);
+        if (escrowBuffer === null) {
+            this.#safeLogApply(OperationType.HTLC_CLAIM, "HTLC escrow does not exist.", node.from.key);
+            return Status.FAILURE;
+        }
         const escrow = escrowEntryUtils.decode(escrowBuffer, this.#config.addressPrefix);
         if (!escrow || !b4a.equals(escrow.lockId, op.hco.li)) {
-            this.#safeLogApply(OperationType.HTLC_CLAIM, "HTLC escrow does not exist or is invalid.", node.from.key);
+            this.#safeLogApply(OperationType.HTLC_CLAIM, "HTLC escrow is invalid.", node.from.key);
             return Status.FAILURE;
         }
         if (escrow.status !== escrowEntryUtils.Status.PENDING) {
@@ -1248,11 +1269,16 @@ class State extends ReadyResource {
             return Status.FAILURE;
         }
         const txHash = await tracCryptoApi.hash.blake3Safe(message);
-        if (
-            !b4a.equals(txHash, op.hro.tx) ||
-            !tracCryptoApi.signature.verify(op.hro.is, txHash, submitterPublicKey)
-        ) {
-            this.#safeLogApply(OperationType.HTLC_REFUND, "Refund hash or submitter signature is invalid.", node.from.key);
+        if (!isBufferValid(txHash, HASH_BYTE_LENGTH)) {
+            this.#safeLogApply(OperationType.HTLC_REFUND, "Failed to hash refund message.", node.from.key);
+            return Status.FAILURE;
+        }
+        if (!b4a.equals(txHash, op.hro.tx)) {
+            this.#safeLogApply(OperationType.HTLC_REFUND, "Refund transaction hash is invalid.", node.from.key);
+            return Status.FAILURE;
+        }
+        if (!tracCryptoApi.signature.verify(op.hro.is, txHash, submitterPublicKey)) {
+            this.#safeLogApply(OperationType.HTLC_REFUND, "Refund submitter signature is invalid.", node.from.key);
             return Status.FAILURE;
         }
 
@@ -1277,6 +1303,10 @@ class State extends ReadyResource {
             return Status.FAILURE;
         }
         const validatorHash = await tracCryptoApi.hash.blake3Safe(validatorMessage);
+        if (!isBufferValid(validatorHash, HASH_BYTE_LENGTH)) {
+            this.#safeLogApply(OperationType.HTLC_REFUND, "Failed to hash validator message.", node.from.key);
+            return Status.FAILURE;
+        }
         if (!tracCryptoApi.signature.verify(op.hro.vs, validatorHash, validatorPublicKey)) {
             this.#safeLogApply(OperationType.HTLC_REFUND, "Validator signature is invalid.", node.from.key);
             return Status.FAILURE;
@@ -1301,9 +1331,13 @@ class State extends ReadyResource {
 
         const escrowKey = EntryType.HTLC_ESCROW + b4a.toString(op.hro.li, 'hex');
         const escrowBuffer = await this.#getEntryApply(escrowKey, batch);
+        if (escrowBuffer === null) {
+            this.#safeLogApply(OperationType.HTLC_REFUND, "HTLC escrow does not exist.", node.from.key);
+            return Status.FAILURE;
+        }
         const escrow = escrowEntryUtils.decode(escrowBuffer, this.#config.addressPrefix);
         if (!escrow || !b4a.equals(escrow.lockId, op.hro.li)) {
-            this.#safeLogApply(OperationType.HTLC_REFUND, "HTLC escrow does not exist or is invalid.", node.from.key);
+            this.#safeLogApply(OperationType.HTLC_REFUND, "HTLC escrow is invalid.", node.from.key);
             return Status.FAILURE;
         }
         if (escrow.status !== escrowEntryUtils.Status.PENDING) {
@@ -1362,7 +1396,7 @@ class State extends ReadyResource {
         }
 
         await batch.put(recipientAddress, updatedRecipientEntry);
-        await batch.put(escrowKey, settlement.entry);
+        await batch.put(escrowKey, settlement.refundedEscrowEntry);
         await batch.put(refundTxHashHex, node.value);
 
         if (this.#config.enableTxApplyLogs) {

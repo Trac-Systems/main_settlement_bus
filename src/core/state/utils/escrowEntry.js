@@ -151,8 +151,8 @@ export function makeClaim(escrowBuffer, preimage, currentEpoch, hrp) {
     };
 }
 
-export function makeRefund(entry, currentEpoch, hrp) {
-    const escrow = decode(entry, hrp);
+export function makeRefund(escrowBuffer, currentEpoch, hrp) {
+    const escrow = decode(escrowBuffer, hrp);
     if (
         !escrow ||
         escrow.status !== Status.PENDING ||
@@ -164,12 +164,12 @@ export function makeRefund(entry, currentEpoch, hrp) {
 
     const refundAmount = toBalance(escrow.amount)?.add(toBalance(escrow.additionalFeeAmount));
     if (!refundAmount) return null;
-    const refundedEntry = safeEncodeEscrowEntry({...escrow, status: Status.REFUNDED});
-    if (refundedEntry.length === 0) return null;
+    const refundedEscrowEntry = safeEncodeEscrowEntry({...escrow, status: Status.REFUNDED});
+    if (refundedEscrowEntry.length === 0) return null;
 
     return {
         address: escrow.refundRecipientAddress,
         amount: refundAmount,
-        entry: refundedEntry,
+        refundedEscrowEntry,
     };
 }
