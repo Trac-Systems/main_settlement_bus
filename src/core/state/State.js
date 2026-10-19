@@ -700,58 +700,58 @@ class State extends ReadyResource {
 
     async #apply(nodes, view, base) {
         const batch = view.batch();
-        const batchInvoker = nodes[0].from.key;
+        try {
+            const batchInvoker = nodes[0].from.key;
 
-
-        if (nodes.length > BATCH_SIZE) {
-            await this.#validatorPenaltyApply(batchInvoker, batch, base, OVERSIZED_BATCH_PENALTY_MULTIPLIER);
-            await batch.flush();
-            await batch.close();
-            return;
-        }
-
-        let invalidOperations = 0;
-
-        for (const node of nodes) {
-
-            if (b4a.byteLength(node.value) > transactionUtils.MAXIMUM_OPERATION_PAYLOAD_SIZE) {
-                this.#safeLogApply("Node payload exceeds the maximum operation payload size.", node.from.key)
-                invalidOperations++;
-                continue;
+            if (nodes.length > BATCH_SIZE) {
+                await this.#validatorPenaltyApply(batchInvoker, batch, base, OVERSIZED_BATCH_PENALTY_MULTIPLIER);
+                await batch.flush();
+                return;
             }
 
-            const op = safeDecodeApplyOperation(node.value);
+            let invalidOperations = 0;
 
-            if (!op) {
-                this.#safeLogApply("Failed to decode operation.", node.from.key)
-                invalidOperations++;
-                continue;
-            }
-
-            const handler = this.#getApplyOperationHandler(op.type);
-
-            if (handler) {
-                const result = await handler(op, view, base, node, batch);
-                if (result === Status.FAILURE) {
+            for (const node of nodes) {
+                if (b4a.byteLength(node.value) > transactionUtils.MAXIMUM_OPERATION_PAYLOAD_SIZE) {
+                    this.#safeLogApply("Node payload exceeds the maximum operation payload size.", node.from.key)
                     invalidOperations++;
-                } else if (result === Status.IGNORE) {
                     continue;
-                } else if (result !== Status.SUCCESS) {
-                    this.#safeLogApply(`Unknown operation status: ${result}`, node.from.key);
+                }
+
+                const op = safeDecodeApplyOperation(node.value);
+
+                if (!op) {
+                    this.#safeLogApply("Failed to decode operation.", node.from.key)
+                    invalidOperations++;
+                    continue;
+                }
+
+                const handler = this.#getApplyOperationHandler(op.type);
+
+                if (handler) {
+                    const result = await handler(op, view, base, node, batch);
+                    if (result === Status.FAILURE) {
+                        invalidOperations++;
+                    } else if (result === Status.IGNORE) {
+                        continue;
+                    } else if (result !== Status.SUCCESS) {
+                        this.#safeLogApply(`Unknown operation status: ${result}`, node.from.key);
+                        invalidOperations++;
+                    }
+                } else {
+                    this.#safeLogApply(`Unknown operation type: ${op.type}`, node.from.key)
                     invalidOperations++;
                 }
-            } else {
-                this.#safeLogApply(`Unknown operation type: ${op.type}`, node.from.key)
-                invalidOperations++;
             }
-        }
-        if (invalidOperations > 0) {
-            await this.#validatorPenaltyApply(batchInvoker, batch, base, invalidOperations);
-            this.#safeLogApply(`Applied with ${invalidOperations} invalid operations.`)
-        }
+            if (invalidOperations > 0) {
+                await this.#validatorPenaltyApply(batchInvoker, batch, base, invalidOperations);
+                this.#safeLogApply(`Applied with ${invalidOperations} invalid operations.`)
+            }
 
-        await batch.flush();
-        await batch.close();
+            await batch.flush();
+        } finally {
+            await batch.close();
+        }
     }
 
     #getApplyOperationHandler(type) {
@@ -1042,7 +1042,6 @@ class State extends ReadyResource {
             this.#safeLogApply(OperationType.HTLC_CLAIM, "Submitter address is invalid.", node.from.key);
             return Status.FAILURE;
         }
-
         const submitterPublicKey = tracCryptoApi.address.decodeSafe(submitterAddress);
         if (!isBufferValid(submitterPublicKey, PUBLIC_KEY_LENGTH) || isZeroBuffer(submitterPublicKey)) {
             this.#safeLogApply(OperationType.HTLC_CLAIM, "Submitter public key is invalid.", node.from.key);
