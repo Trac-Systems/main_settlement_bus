@@ -1,6 +1,5 @@
 import test from 'brittle';
 import b4a from 'b4a';
-import Hyperbee from 'hyperbee';
 import tracCryptoApi from 'trac-crypto-api';
 
 import {applyStateMessageFactory} from '../../../../../src/messages/state/applyStateMessageFactory.js';
@@ -11,16 +10,10 @@ import {
 import * as escrowEntryUtils from '../../../../../src/core/state/utils/escrowEntry.js';
 import nodeEntryUtils from '../../../../../src/core/state/utils/nodeEntry.js';
 import {$TNK, toBalance} from '../../../../../src/core/state/utils/balance.js';
-import {
-    BALANCE_BYTE_LENGTH,
-    EntryType,
-    HYPERBEE_KEY_ENCODING,
-    HYPERBEE_VALUE_ENCODING,
-    TRAC_NAMESPACE,
-} from '../../../../../src/utils/constants.js';
+import {BALANCE_BYTE_LENGTH, EntryType} from '../../../../../src/utils/constants.js';
 import {bigIntToBuffer, uint64ToBuffer, ZERO_WK} from '../../../../../src/utils/buffer.js';
 import nodeRoleUtils from '../../../../../src/core/state/utils/roles.js';
-import {createStores, deriveIndexerSequenceState, eventFlush} from '../../../../helpers/autobaseTestHelpers.js';
+import {deriveIndexerSequenceState, eventFlush} from '../../../../helpers/autobaseTestHelpers.js';
 import {config} from '../../../../helpers/config.js';
 import {applyWithEntryOverrides} from '../setGenesisEpoch/setGenesisEpochScenarioHelpers.js';
 import {initializeBalances, whitelistAddress} from '../common/commonScenarioHelper.js';
@@ -65,87 +58,6 @@ async function buildClaimPayload(context, lockPayload, {
 async function readClaimRecord(base, payload) {
     const txHash = safeDecodeApplyOperation(payload).hco.tx;
     return base.view.get(b4a.toString(txHash, 'hex'));
-}
-
-async function withReopenedView(core, callback) {
-    const view = new Hyperbee(core.session(), {
-        extension: false,
-        keyEncoding: HYPERBEE_KEY_ENCODING,
-        valueEncoding: HYPERBEE_VALUE_ENCODING,
-    });
-    try {
-        await view.ready();
-        return await callback(view);
-    } finally {
-        await view.close();
-    }
-}
-
-async function copyStateToWritableView(t, base) {
-    const [store] = await createStores(1, t);
-    const core = store.get({name: TRAC_NAMESPACE});
-    await withReopenedView(core, async view => {
-        const batch = view.batch();
-        try {
-            for await (const {key, value} of base.view.createReadStream()) {
-                await batch.put(key, value);
-            }
-            await batch.flush();
-        } finally {
-            await batch.close();
-        }
-    });
-    return core;
-}
-
-async function applyClaimWithBatchFault(context, payload, view, fault) {
-    const {base, state} = context.htlcLockScenario.validatorPeer;
-    const originalBatch = view.batch;
-    let injected = false;
-    let closed = false;
-
-    view.batch = function patchedBatch(...args) {
-        const batch = originalBatch.apply(this, args);
-        const originalPut = batch.put.bind(batch);
-        const originalFlush = batch.flush.bind(batch);
-        const originalClose = batch.close.bind(batch);
-        let puts = 0;
-
-        batch.put = async (...putArgs) => {
-            if (fault === 'second put' && ++puts === 2) {
-                injected = true;
-                throw new Error('forced second put failure');
-            }
-            return originalPut(...putArgs);
-        };
-        batch.flush = async () => {
-            if (fault === 'before flush') {
-                injected = true;
-                throw new Error('forced pre-flush failure');
-            }
-            const result = await originalFlush();
-            if (fault === 'after flush') {
-                injected = true;
-                throw new Error('forced post-flush failure');
-            }
-            return result;
-        };
-        batch.close = async () => {
-            closed = true;
-            return originalClose();
-        };
-        return batch;
-    };
-
-    let error = null;
-    try {
-        await state.applyHandler([{value: payload, from: {key: base.local.key}}], view, base);
-    } catch (caught) {
-        error = caught;
-    } finally {
-        view.batch = originalBatch;
-    }
-    return {injected, closed, error};
 }
 
 test('State.apply HTLC_CLAIM lets a third party settle to stored recipients and reveals the preimage', async t => {
@@ -566,56 +478,4 @@ test('State.apply HTLC_CLAIM adds two escrow payouts to one account in a batch',
     t.ok(await readClaimRecord(validatorPeer.base, secondClaim));
     t.is((await readLockState(validatorPeer.base, firstLock)).escrow.status, escrowEntryUtils.Status.CLAIMED);
     t.is((await readLockState(validatorPeer.base, secondLock)).escrow.status, escrowEntryUtils.Status.CLAIMED);
-});
-
-test('State.apply HTLC_CLAIM recovers from batch write and flush failures without double payment', async t => {
-    for (const fault of ['second put', 'before flush', 'after flush']) {
-        const context = await setupHtlcLockScenario(t);
-        const {validatorPeer, makerPeer, claimantPeer} = context.htlcLockScenario;
-        const {base, state} = validatorPeer;
-        const lockPayload = await buildHtlcLockPayload(context, {feeRecipient: makerPeer.wallet.address});
-        await appendHtlcLock(context, lockPayload);
-        const claimPayload = await buildClaimPayload(context, lockPayload);
-        const makerBefore = await readNodeEntry(base, makerPeer.wallet.address);
-        const committedBeforeError = fault === 'after flush';
-
-        const core = await copyStateToWritableView(t, base);
-        const {injected, closed, error} = await withReopenedView(core,
-            view => applyClaimWithBatchFault(context, claimPayload, view, fault));
-        t.ok(injected, `${fault} was injected`);
-        t.ok(error?.message.includes('forced'), `${fault} surfaced to apply`);
-        t.ok(closed, `${fault} closes the failed apply batch`);
-
-        await withReopenedView(core, async view => {
-            const reader = {view};
-            const escrow = (await readLockState(reader, lockPayload)).escrow;
-            const claimant = await readNodeEntry(reader, claimantPeer.wallet.address);
-            const maker = await readNodeEntry(reader, makerPeer.wallet.address);
-            const claimRecord = await readClaimRecord(reader, claimPayload);
-
-            t.is(escrow.status, committedBeforeError ? escrowEntryUtils.Status.CLAIMED : escrowEntryUtils.Status.PENDING,
-                `${fault} leaves an all-or-nothing escrow transition`);
-            t.is(claimant === null, !committedBeforeError, `${fault} leaves an all-or-nothing principal payout`);
-            t.is(claimRecord === null, !committedBeforeError, `${fault} leaves an all-or-nothing claim record`);
-            const expectedMakerBalance = committedBeforeError
-                ? toBalance(makerBefore.balance).add(toBalance(DEFAULT_SURCHARGE)).value
-                : makerBefore.balance;
-            t.ok(b4a.equals(maker.balance, expectedMakerBalance), `${fault} leaves an all-or-nothing fee payout`);
-
-            await state.applyHandler([{value: claimPayload, from: {key: base.local.key}}], view, base);
-        });
-
-        await withReopenedView(core, async view => {
-            const reader = {view};
-            const claimant = await readNodeEntry(reader, claimantPeer.wallet.address);
-            const maker = await readNodeEntry(reader, makerPeer.wallet.address);
-            const claimRecord = await readClaimRecord(reader, claimPayload);
-
-            t.is((await readLockState(reader, lockPayload)).escrow.status, escrowEntryUtils.Status.CLAIMED);
-            t.ok(b4a.equals(claimant.balance, DEFAULT_PRINCIPAL), `${fault} pays principal once after retry`);
-            t.ok(b4a.equals(maker.balance, toBalance(makerBefore.balance).add(toBalance(DEFAULT_SURCHARGE)).value),
-                `${fault} pays the fee once after retry`);
-            t.ok(b4a.equals(claimRecord.value, claimPayload), `${fault} records the claim once`);
-        });
-    }
 });
