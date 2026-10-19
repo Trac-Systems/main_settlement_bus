@@ -29,6 +29,7 @@ function main() {
     const applyOutputDir = path.join(directoryName, '../src/codecs/apply');
     const networkOutputDir = path.join(directoryName, '../src/codecs/network/v1');
     const consensusOutputDir = path.join(directoryName, '../src/codecs/consensus/v1');
+    const stateOutputDir = path.join(directoryName, '../src/codecs/state');
     const pbjsPath = path.join(directoryName, '../node_modules/.bin/pbjs');
     const applyOperationsEntryPath = path.join(inputDir, 'applyOperations/applyOperations.proto');
     const generatedApplyOperationsOutputPath = path.join(applyOutputDir, 'applyOperations.generated.cjs');
@@ -37,10 +38,13 @@ function main() {
     const consensusEntryPath = path.join(inputDir, 'consensus/v1/consensus_message_header.proto');
     const epochProofV1EntryPath = path.join(inputDir, 'common/consensus/epoch_proof_v1.proto');
     const generatedConsensusOutputPath = path.join(consensusOutputDir, 'consensusV1.generated.cjs');
+    const stateEntryPath = path.join(inputDir, 'state/escrow_entry.proto');
+    const generatedStateOutputPath = path.join(stateOutputDir, 'state.generated.cjs');
 
     fs.mkdirSync(applyOutputDir, { recursive: true });
     fs.mkdirSync(networkOutputDir, { recursive: true });
     fs.mkdirSync(consensusOutputDir, { recursive: true });
+    fs.mkdirSync(stateOutputDir, { recursive: true });
 
     generatePbjsModule(
         pbjsPath,
@@ -64,6 +68,13 @@ function main() {
         [consensusEntryPath, epochProofV1EntryPath],
         generatedConsensusOutputPath,
         'consensusV1'
+    );
+    generatePbjsModule(
+        pbjsPath,
+        inputDir,
+        [stateEntryPath],
+        generatedStateOutputPath,
+        'state'
     );
 }
 

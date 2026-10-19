@@ -24,6 +24,7 @@ export const EntryType = Object.freeze({
     EPOCH_HASH: `/epochHash/`,     // Versioned epoch records are stored under `/epochHash/<epochHashHex>`
     CONSENSUS_CONFIG_CURRENT: '/consensus/config/current',
     CONSENSUS_CONFIG_RECORD: '/consensus/config/record/',
+    HTLC_ESCROW: '/htlc/escrow/',
 
 });
 
@@ -45,6 +46,9 @@ export const OperationType = Object.freeze({
     SET_EPOCH: ApplyOperationType.SET_EPOCH,
     SET_GENESIS_EPOCH: ApplyOperationType.SET_GENESIS_EPOCH,
     SET_CONSENSUS_CONFIG: ApplyOperationType.SET_CONSENSUS_CONFIG,
+    HTLC_LOCK: ApplyOperationType.HTLC_LOCK,
+    HTLC_CLAIM: ApplyOperationType.HTLC_CLAIM,
+    HTLC_REFUND: ApplyOperationType.HTLC_REFUND,
 });
 
 export const NetworkOperationType = Object.freeze({
@@ -208,6 +212,11 @@ export const BOOTSTRAP_BYTE_LENGTH = 32;
 export const CHANNEL_BYTE_LENGTH = 32;
 export const NONCE_BYTE_LENGTH = 32;
 export const HASH_BYTE_LENGTH = 32;
+export const HTLC_LOCK_ID_BYTE_LENGTH = 32;
+export const HTLC_PREIMAGE_BYTE_LENGTH = 32;
+export const HTLC_THRESHOLD_BYTE_LENGTH = 1;
+export const HTLC_MAX_SIGNERS = 8;
+export const HTLC_MIN_LOCK_DURATION_EPOCHS = 1n;
 export const BALANCE_BYTE_LENGTH = 16;
 export const SIGNATURE_BYTE_LENGTH = 64;
 export const PEER_PUBLIC_KEY_HEX_LENGTH = 64;

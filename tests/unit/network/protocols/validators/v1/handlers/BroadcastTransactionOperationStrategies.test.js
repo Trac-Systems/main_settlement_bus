@@ -1,5 +1,7 @@
 import test from 'brittle';
 import b4a from 'b4a';
+import {safeDecodeApplyOperation, safeEncodeApplyOperation} from '../../../../../../../src/codecs/apply/applyOperationCodec.js';
+import {sanitizeDecodedPartialTransaction} from '../../../../../../../src/core/network/protocols/validators/v1/handlers/broadcastTransaction/BroadcastTransactionPayloadUtils.js';
 
 import {
     createBroadcastTransactionOperationStrategies,
@@ -7,6 +9,7 @@ import {
 } from '../../../../../../../src/core/network/protocols/validators/v1/handlers/broadcastTransaction/BroadcastTransactionOperationStrategies.js';
 import {OperationType, ResultCode} from '../../../../../../../src/utils/constants.js';
 import {V1ProtocolError} from '../../../../../../../src/core/network/protocols/validators/v1/V1ProtocolError.js';
+import applyOperationFixtures from '../../../../../../fixtures/applyOperation.fixtures.js';
 
 const VALID_ADDR = 'trac123z3gfpr2epjwww7ntm3m6ud2fhmq0tvts27p2f5mx3qkecsutlqfys769';
 const VALID_TO_ADDR = 'trac1mqktwme8fvklrds4hlhfy6lhmsu9qgfn3c3kuhz7c5zwjt8rc3dqj9tx7h';
@@ -16,6 +19,28 @@ const basePayload = () => ({
     txv: b4a.alloc(32),
     in: b4a.alloc(32),
     is: b4a.alloc(64)
+});
+
+test('decoded partial HTLC claims keep validator metadata absent after broadcast sanitization', t => {
+    const encoded = safeEncodeApplyOperation(applyOperationFixtures.validHtlcClaimOperation);
+    const decoded = safeDecodeApplyOperation(encoded);
+    t.ok(encoded.length > 0);
+    for (const field of ['va', 'vn', 'vs']) t.absent(Object.hasOwn(decoded.hco, field));
+
+    sanitizeDecodedPartialTransaction(decoded);
+
+    for (const field of ['va', 'vn', 'vs']) t.absent(Object.hasOwn(decoded.hco, field));
+});
+
+test('decoded partial HTLC refunds keep validator metadata absent after broadcast sanitization', t => {
+    const encoded = safeEncodeApplyOperation(applyOperationFixtures.validPartialHtlcRefundOperation);
+    const decoded = safeDecodeApplyOperation(encoded);
+    t.ok(encoded.length > 0);
+    for (const field of ['va', 'vn', 'vs']) t.absent(Object.hasOwn(decoded.hro, field));
+
+    sanitizeDecodedPartialTransaction(decoded);
+
+    for (const field of ['va', 'vn', 'vs']) t.absent(Object.hasOwn(decoded.hro, field));
 });
 
 function createFakeValidator(name, calls) {
@@ -56,6 +81,18 @@ function createFakeFactory() {
                 buildCompleteTransferOperationMessage(...args) {
                     calls.push({args, method: 'buildCompleteTransferOperationMessage'});
                     return {method: 'buildCompleteTransferOperationMessage'};
+                },
+                buildCompleteHtlcLockOperationMessage(...args) {
+                    calls.push({args, method: 'buildCompleteHtlcLockOperationMessage'});
+                    return {method: 'buildCompleteHtlcLockOperationMessage'};
+                },
+                buildCompleteHtlcClaimOperationMessage(...args) {
+                    calls.push({args, method: 'buildCompleteHtlcClaimOperationMessage'});
+                    return {method: 'buildCompleteHtlcClaimOperationMessage'};
+                },
+                buildCompleteHtlcRefundOperationMessage(...args) {
+                    calls.push({args, method: 'buildCompleteHtlcRefundOperationMessage'});
+                    return {method: 'buildCompleteHtlcRefundOperationMessage'};
                 }
             };
         }
@@ -70,6 +107,7 @@ test('resolveBroadcastTransactionOperationStrategy selects and builds all suppor
         partialBootstrapDeploymentValidator: createFakeValidator('bootstrap-deployment', validatorCalls),
         partialTransactionValidator: createFakeValidator('transaction', validatorCalls),
         partialTransferValidator: createFakeValidator('transfer', validatorCalls),
+        partialHtlcValidator: createFakeValidator('htlc', validatorCalls),
         createApplyStateMessageFactory: () => factory.createApplyStateMessageFactory()
     });
 
@@ -162,6 +200,28 @@ test('resolveBroadcastTransactionOperationStrategy selects and builds all suppor
                     am: b4a.alloc(16, 10)
                 }
             }
+        },
+        {
+            type: OperationType.HTLC_LOCK,
+            payloadKey: 'hlo',
+            validator: 'htlc',
+            builderMethod: 'buildCompleteHtlcLockOperationMessage',
+            decodedTransaction: {
+                address: VALID_ADDR,
+                type: OperationType.HTLC_LOCK,
+                hlo: {
+                    ...basePayload(),
+                    ca: VALID_TO_ADDR,
+                    ra: VALID_ADDR,
+                    am: b4a.alloc(16, 1),
+                    fa: b4a.alloc(16),
+                    hl: b4a.alloc(32, 2),
+                    re: b4a.alloc(8, 3),
+                    ss: [b4a.alloc(32, 5)],
+                    th: b4a.from([1]),
+                    app: []
+                }
+            }
         }
     ];
 
@@ -177,6 +237,9 @@ test('resolveBroadcastTransactionOperationStrategy selects and builds all suppor
         t.is(lastValidatorCall.decodedTransaction, scenario.decodedTransaction, `${scenario.builderMethod} validates the incoming payload`);
         t.is(lastFactoryCall.method, scenario.builderMethod, `${scenario.builderMethod} selects the expected completion builder`);
         t.is(lastFactoryCall.args[0], scenario.decodedTransaction.address, `${scenario.builderMethod} forwards the requester address`);
+        if (scenario.type === OperationType.HTLC_LOCK) {
+            t.is(lastFactoryCall.args[1], scenario.decodedTransaction.hlo, 'HTLC completion receives the full lock body');
+        }
     }
 });
 
@@ -186,6 +249,7 @@ test('resolveBroadcastTransactionOperationStrategy rejects unsupported transacti
         partialBootstrapDeploymentValidator: createFakeValidator('bootstrap-deployment', []),
         partialTransactionValidator: createFakeValidator('transaction', []),
         partialTransferValidator: createFakeValidator('transfer', []),
+        partialHtlcValidator: createFakeValidator('htlc', []),
         createApplyStateMessageFactory: () => createFakeFactory().createApplyStateMessageFactory()
     });
 
@@ -199,4 +263,56 @@ test('resolveBroadcastTransactionOperationStrategy rejects unsupported transacti
     t.ok(error instanceof V1ProtocolError);
     t.is(error.resultCode, ResultCode.TX_INVALID_PAYLOAD);
     t.is(error.message, 'Unsupported transaction type: 9999');
+});
+
+test('HTLC claim strategy validates and forwards the complete signed claim', async t => {
+    const validatorCalls = [];
+    const factory = createFakeFactory();
+    const decodedOperation = applyOperationFixtures.validHtlcClaimOperation;
+    const strategies = createBroadcastTransactionOperationStrategies({
+        partialHtlcValidator: createFakeValidator('htlc', validatorCalls),
+        createApplyStateMessageFactory: () => factory.createApplyStateMessageFactory()
+    });
+
+    const strategy = resolveBroadcastTransactionOperationStrategy(OperationType.HTLC_CLAIM, strategies);
+    const result = await strategy.build(decodedOperation);
+
+    t.alike(result, {method: 'buildCompleteHtlcClaimOperationMessage'});
+    t.is(validatorCalls.length, 1);
+    t.is(validatorCalls[0].decodedTransaction, decodedOperation);
+    t.alike(factory.calls[0].args, [
+        decodedOperation.address,
+        decodedOperation.hco.tx,
+        decodedOperation.hco.txv,
+        decodedOperation.hco.li,
+        decodedOperation.hco.pi,
+        decodedOperation.hco.in,
+        decodedOperation.hco.is
+    ]);
+});
+
+test('HTLC refund strategy validates and forwards the complete signed refund', async t => {
+    const validatorCalls = [];
+    const factory = createFakeFactory();
+    const decodedOperation = applyOperationFixtures.validPartialHtlcRefundOperation;
+    const strategies = createBroadcastTransactionOperationStrategies({
+        partialHtlcValidator: createFakeValidator('htlc', validatorCalls),
+        createApplyStateMessageFactory: () => factory.createApplyStateMessageFactory()
+    });
+
+    const strategy = resolveBroadcastTransactionOperationStrategy(OperationType.HTLC_REFUND, strategies);
+    const result = await strategy.build(decodedOperation);
+
+    t.is(strategy.payloadKey, 'hro');
+    t.alike(result, {method: 'buildCompleteHtlcRefundOperationMessage'});
+    t.is(validatorCalls.length, 1);
+    t.is(validatorCalls[0].decodedTransaction, decodedOperation);
+    t.alike(factory.calls[0].args, [
+        decodedOperation.address,
+        decodedOperation.hro.tx,
+        decodedOperation.hro.txv,
+        decodedOperation.hro.li,
+        decodedOperation.hro.in,
+        decodedOperation.hro.is
+    ]);
 });

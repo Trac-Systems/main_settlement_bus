@@ -22,6 +22,7 @@ import { topLevelValidationTests, addressBufferLengthTest } from './common.test.
 import { config } from '../../../helpers/config.js';
 import consensusFixtures from '../../../fixtures/consensusV1Operation.fixtures.js';
 
+
 const stateValidationSchema = new StateValidationSchema(config);
 const UNKNOWN_PROTOBUF_FIELD = b4a.from([0x9a, 0x06, 0x01, 0xff]);
 
@@ -45,7 +46,6 @@ const proofDataPayload = overrides => ({
     ...consensusFixtures.proofProposal,
     ...overrides
 });
-
 const encodedProofData = overrides => encodeProofProposal({
     ...proofDataPayload(overrides)
 });

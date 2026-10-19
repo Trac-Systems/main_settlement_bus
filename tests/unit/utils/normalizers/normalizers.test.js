@@ -8,6 +8,9 @@ import { OperationType } from '../../../../src/utils/constants.js';
 import {
     normalizeBootstrapDeploymentOperation,
     normalizeDecodedPayloadForJson,
+    normalizeHtlcClaimOperation,
+    normalizeHtlcLockOperation,
+    normalizeMessageByOperationType,
     normalizeRoleAccessOperation,
     normalizeTransactionOperation,
     normalizeTransferOperation
@@ -429,6 +432,82 @@ test('normalizeBootstrapDeploymentOperation throws on invalid hex string', t => 
     t.exception(
         () => normalizeBootstrapDeploymentOperation(payload, config),
         errorMessageIncludes('Invalid hex string')
+    );
+});
+
+test('normalizeHtlcLockOperation normalizes hex strings and addresses', t => {
+    const sender = randomAddress(config.addressPrefix);
+    const refundAddress = randomAddress(config.addressPrefix);
+    const claimantAddress = randomAddress(config.addressPrefix);
+    const feeRecipient = randomAddress(config.addressPrefix);
+    const payload = {
+        type: OperationType.HTLC_LOCK,
+        address: sender,
+        hlo: {
+            tx: hex('11', 32),
+            txv: hex('22', 32),
+            ca: claimantAddress,
+            ra: refundAddress,
+            am: hex('33', 16),
+            fa: hex('44', 16),
+            fr: feeRecipient,
+            hl: hex('55', 32),
+            re: hex('66', 8),
+            ph: hex('88', 32),
+            ss: [hex('99', 32), hex('aa', 32)],
+            th: '02',
+            cs: [hex('bb', 64)],
+            in: hex('cc', 32),
+            is: hex('dd', 64)
+        }
+    };
+
+    const normalized = normalizeMessageByOperationType(payload, config);
+    t.alike(normalized, normalizeHtlcLockOperation(payload, config));
+    t.is(normalized.type, OperationType.HTLC_LOCK);
+    t.ok(b4a.equals(normalized.address, addressToBuffer(sender, config.addressPrefix)));
+    t.ok(b4a.equals(normalized.hlo.tx, toBuffer(hex('11', 32))));
+    t.ok(b4a.equals(normalized.hlo.txv, toBuffer(hex('22', 32))));
+    t.ok(b4a.equals(normalized.hlo.ca, addressToBuffer(claimantAddress, config.addressPrefix)));
+    t.ok(b4a.equals(normalized.hlo.ra, addressToBuffer(refundAddress, config.addressPrefix)));
+    t.ok(b4a.equals(normalized.hlo.am, toBuffer(hex('33', 16))));
+    t.ok(b4a.equals(normalized.hlo.fa, toBuffer(hex('44', 16))));
+    t.ok(b4a.equals(normalized.hlo.fr, addressToBuffer(feeRecipient, config.addressPrefix)));
+    t.ok(b4a.equals(normalized.hlo.hl, toBuffer(hex('55', 32))));
+    t.ok(b4a.equals(normalized.hlo.re, toBuffer(hex('66', 8))));
+    t.ok(b4a.equals(normalized.hlo.ph, toBuffer(hex('88', 32))));
+    t.ok(b4a.equals(normalized.hlo.ss[1], toBuffer(hex('aa', 32))));
+    t.ok(b4a.equals(normalized.hlo.th, toBuffer('02')));
+    t.ok(b4a.equals(normalized.hlo.cs[0], toBuffer(hex('bb', 64))));
+    t.ok(b4a.equals(normalized.hlo.in, toBuffer(hex('cc', 32))));
+    t.ok(b4a.equals(normalized.hlo.is, toBuffer(hex('dd', 64))));
+});
+
+test('normalizeHtlcClaimOperation prepares a signed claim for V1 broadcast', t => {
+    const submitter = randomAddress(config.addressPrefix);
+    const payload = {
+        type: OperationType.HTLC_CLAIM,
+        address: submitter,
+        hco: {
+            tx: hex('11', 32),
+            txv: hex('22', 32),
+            li: hex('33', 32),
+            pi: hex('44', 32),
+            in: hex('55', 32),
+            is: hex('66', 64)
+        }
+    };
+
+    const normalized = normalizeMessageByOperationType(payload, config);
+    t.alike(normalized, normalizeHtlcClaimOperation(payload, config));
+    t.ok(b4a.equals(normalized.address, addressToBuffer(submitter, config.addressPrefix)));
+    for (const [field, value] of Object.entries(payload.hco)) {
+        t.ok(b4a.equals(normalized.hco[field], toBuffer(value)), `${field} is preserved`);
+    }
+
+    t.exception(
+        () => normalizeHtlcClaimOperation({...payload, hco: {...payload.hco, pi: undefined}}, config),
+        errorMessageIncludes('Missing required fields')
     );
 });
 

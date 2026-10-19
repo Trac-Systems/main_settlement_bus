@@ -10,21 +10,25 @@ import {
     BOOTSTRAP_BYTE_LENGTH,
     CHANNEL_BYTE_LENGTH,
     AMOUNT_BYTE_LENGTH,
-    NETWORK_ID_BYTE_LENGTH,
     EPOCH_BYTE_LENGTH,
-    VDF_DIFFICULTY_SIZE,
-    VDF_DISCRIMINANT_SIZE,
-    VDF_PROOF_BYTE_LENGTHS,
     CONSENSUS_CONFIG_SCHEMA_VERSION_BYTE_LENGTH,
     CONSENSUS_CONFIG_DATA_MAX_SIZE,
     SET_EPOCH_DATA_MAX_SIZE,
+    HTLC_LOCK_ID_BYTE_LENGTH,
+    HTLC_MAX_SIGNERS,
+    HTLC_PREIMAGE_BYTE_LENGTH,
+    HTLC_THRESHOLD_BYTE_LENGTH,
+    PUBLIC_KEY_LENGTH,
 } from '../../../utils/constants.js';
 import {
-    decodeProofProposalApproval,
-    decodeProofProposal,
-    encodeProofProposalApproval,
-    encodeProofProposal
-} from '../../../codecs/consensus/v1/consensusV1OperationCodec.js';
+    boundedHtlcBufferArray,
+    registerStrictTypeRules,
+    bufferRule,
+    bufferMaxLengthRule,
+    bufferAmountRule,
+    createProofDataRule,
+    createProofProposalApprovalRule
+} from './stateValidationRules.js';
 
 class StateValidationSchema {
     #validator;
@@ -38,24 +42,17 @@ class StateValidationSchema {
     #validateSetEpochOperationSchema;
     #validateEpochProofV1Schema;
     #validateConsensusControlOperationSchema;
-    #proofDataFields;
+    #validateHtlcClaimOperationSchema;
+    #validateHtlcLockOperationSchema;
+    #validateHtlcRefundOperationSchema;
     #config;
 
     /**
      * @param {Config} config
      **/
     constructor(config) {
-        this.#config = config
+        this.#config = config;
 
-        this.#proofDataFields = Object.freeze([
-            {name: 'network_id', length: NETWORK_ID_BYTE_LENGTH},
-            {name: 'epoch', length: EPOCH_BYTE_LENGTH},
-            {name: 'previous_epoch_record_hash', length: HASH_BYTE_LENGTH},
-            {name: 'proposer', length: this.#config.addressLength},
-            {name: 'difficulty', length: VDF_DIFFICULTY_SIZE},
-            {name: 'discriminant_bit_size', length: VDF_DISCRIMINANT_SIZE},
-            {name: 'signature', length: SIGNATURE_BYTE_LENGTH}
-        ]);
         this.#validator = new Validator({
             useNewCustomCheckerFunction: true,
             messages: {
@@ -68,254 +65,13 @@ class StateValidationSchema {
                 proofProposalApproval: "The '{field}' field must be an encoded ProofProposalApproval buffer.",
             },
         });
-        const isBuffer = b4a.isBuffer;
-        const equals = b4a.equals;
-        const decodeApproval = decodeProofProposalApproval;
-        const encodeApproval = encodeProofProposalApproval;
-        const decodeProofData = decodeProofProposal;
-        const encodeProofData = encodeProofProposal;
-        const proofDataFields = this.#proofDataFields;
-        const proofByteLengths = VDF_PROOF_BYTE_LENGTHS;
-        const addressLength = this.#config.addressLength;
-        this.#validator.add("buffer", function ({schema, messages}, _path, _context) {
-            return {
-                source:
-                    `
-                        if (!${isBuffer}(value)) {
-                            ${this.makeError({type: "buffer", actual: "value", messages})}
-                        }
-                        if (value.length !== ${schema.length}) {
-                            ${this.makeError({
-        type: "bufferLength",
-        expected: schema.length,
-        actual: "value.length",
-        messages
-    })}
-                        }
-                        let isEmpty = true;
-                            for (let i = 0; i < value.length; i++) {
-                                if (value[i] !== 0) {
-                                    isEmpty = false;
-                                    break;
-                                }
-                            }
-                            if (isEmpty) {
-                                ${this.makeError({type: "emptyBuffer", actual: "value", messages})}
-                            }
-                            return value;
-                    `
-            };
-        });
 
-        this.#validator.add("buffer_max_length", function ({schema, messages}, _path, _context) {
-            return {
-                source:
-                    `
-                        if (!${isBuffer}(value)) {
-                            ${this.makeError({type: "buffer", actual: "value", messages})}
-                        }
-                        if (value.length === 0 || value.length > ${schema.maxLength}) {
-                            ${this.makeError({
-        type: "bufferMaxLength",
-        expected: schema.maxLength,
-        actual: "value.length",
-        messages
-    })}
-                        }
-                        return value;
-                    `
-            };
-        });
-
-        this.#validator.add("buffer_amount", function ({schema, messages}, _path, _context) {
-            return {
-                source:
-                    `
-                        if (!${isBuffer}(value)) {
-                            ${this.makeError({type: "buffer", actual: "value", messages})}
-                        }
-                        if (value.length !== ${schema.length}) {
-                            ${this.makeError({
-        type: "bufferLength",
-        expected: schema.length,
-        actual: "value.length",
-        messages
-    })}
-                        }
-                        return value;
-                    `
-            };
-        });
-        this.#validator.add("proof_data", function ({schema, messages, index}, _path, _context) {
-            _context.customs[index] = {
-                schema,
-                decodeProofData,
-                encodeProofData,
-                equals,
-                isBuffer,
-                fields: proofDataFields,
-                proofByteLengths
-            };
-
-            return {
-                source:
-                    `
-                        const proofDataRule = context.customs[${index}];
-                        if (!proofDataRule.isBuffer(value) || value.length === 0) {
-                            ${this.makeError({type: "proofData", actual: "value", messages})}
-                            return value;
-                        }
-
-                        let proofData;
-                        try {
-                            proofData = proofDataRule.decodeProofData(value);
-                        } catch {
-                            ${this.makeError({type: "proofData", actual: "value", messages})}
-                            return value;
-                        }
-
-                        const reencodedProofDataInput = {};
-                        for (const field of proofDataRule.fields) {
-                            const fieldValue = proofData[field.name];
-                            if (!proofDataRule.isBuffer(fieldValue) || fieldValue.length !== field.length) {
-                                ${this.makeError({type: "proofData", actual: "value", messages})}
-                                return value;
-                            }
-
-                            let fieldIsZeroFilled = true;
-                            for (let i = 0; i < fieldValue.length; i++) {
-                                if (fieldValue[i] !== 0) {
-                                    fieldIsZeroFilled = false;
-                                    break;
-                                }
-                            }
-
-                            if (fieldIsZeroFilled) {
-                                ${this.makeError({type: "proofData", actual: "value", messages})}
-                                return value;
-                            }
-
-                            reencodedProofDataInput[field.name] = fieldValue;
-                        }
-
-                        const discriminantBitSize = proofData.discriminant_bit_size.readUInt16BE(0);
-                        const expectedProofLength = proofDataRule.proofByteLengths[discriminantBitSize];
-                        const proof = proofData.proof;
-
-                        if (
-                            !Number.isInteger(expectedProofLength) ||
-                            !proofDataRule.isBuffer(proof) ||
-                            proof.length !== expectedProofLength
-                        ) {
-                            ${this.makeError({type: "proofData", actual: "value", messages})}
-                            return value;
-                        }
-
-                        let proofIsZeroFilled = true;
-                        for (let i = 0; i < proof.length; i++) {
-                            if (proof[i] !== 0) {
-                                proofIsZeroFilled = false;
-                                break;
-                            }
-                        }
-
-                        if (proofIsZeroFilled) {
-                            ${this.makeError({type: "proofData", actual: "value", messages})}
-                            return value;
-                        }
-
-                        reencodedProofDataInput.proof = proof;
-
-                        const reencodedProofData = proofDataRule.encodeProofData(reencodedProofDataInput);
-                        if (!proofDataRule.equals(value, reencodedProofData)) {
-                            ${this.makeError({type: "proofData", actual: "value", messages})}
-                        }
-
-                        return value;
-                    `
-            };
-        });
-
-        // index is a number assigned by fastest-validator to this compiled rule.
-        // Use it as a key for helpers needed by the generated validator function.
-        // Example: index = 6 -> _context.customs[6] stores decodeApproval.
-        this.#validator.add("proof_proposal_approval", function ({schema, messages, index}, _path, _context) {
-            _context.customs[index] = {
-                schema,
-                decodeApproval,
-                encodeApproval,
-                equals,
-                isBuffer,
-                addressLength,
-                signatureByteLength: SIGNATURE_BYTE_LENGTH
-            };
-
-            return {
-                source:
-                    `
-                        // If index was 6 during compilation, this becomes context.customs[6].
-                        const proofProposalApprovalRule = context.customs[${index}];
-                        if (!proofProposalApprovalRule.isBuffer(value) || value.length === 0) {
-                            ${this.makeError({type: "proofProposalApproval", actual: "value", messages})}
-                            return value;
-                        }
-
-                        let approval;
-                        try {
-                            approval = proofProposalApprovalRule.decodeApproval(value);
-                        } catch {
-                            ${this.makeError({type: "proofProposalApproval", actual: "value", messages})}
-                            return value;
-                        }
-
-                        const approver = approval.approver;
-                        const approvalSignature = approval.approval_sig;
-
-                        if (!proofProposalApprovalRule.isBuffer(approver) || approver.length !== proofProposalApprovalRule.addressLength) {
-                            ${this.makeError({type: "proofProposalApproval", actual: "value", messages})}
-                            return value;
-                        }
-
-                        if (!proofProposalApprovalRule.isBuffer(approvalSignature) || approvalSignature.length !== proofProposalApprovalRule.signatureByteLength) {
-                            ${this.makeError({type: "proofProposalApproval", actual: "value", messages})}
-                            return value;
-                        }
-
-                        let approverIsEmpty = true;
-                        for (let i = 0; i < approver.length; i++) {
-                            if (approver[i] !== 0) {
-                                approverIsEmpty = false;
-                                break;
-                            }
-                        }
-
-                        let approvalSignatureIsEmpty = true;
-                        for (let i = 0; i < approvalSignature.length; i++) {
-                            if (approvalSignature[i] !== 0) {
-                                approvalSignatureIsEmpty = false;
-                                break;
-                            }
-                        }
-
-                        if (approverIsEmpty || approvalSignatureIsEmpty) {
-                            ${this.makeError({type: "proofProposalApproval", actual: "value", messages})}
-                            return value;
-                        }
-
-                        const reencodedApproval = proofProposalApprovalRule.encodeApproval({
-                            approver,
-                            approval_sig: approvalSignature
-                        });
-
-                        if (!proofProposalApprovalRule.equals(value, reencodedApproval)) {
-                            ${this.makeError({type: "proofProposalApproval", actual: "value", messages})}
-                        }
-
-                        return value;
-                    `
-            };
-        });
-
+        registerStrictTypeRules(this.#validator);
+        this.#validator.add('buffer', bufferRule);
+        this.#validator.add('buffer_max_length', bufferMaxLengthRule);
+        this.#validator.add('buffer_amount', bufferAmountRule);
+        this.#validator.add('proof_data', createProofDataRule(config.addressLength));
+        this.#validator.add('proof_proposal_approval', createProofProposalApprovalRule(config.addressLength));
 
         this.#validateCoreAdminOperationSchema = this.#compileCoreAdminOperationSchema();
         this.#validateAdminControlOperationSchema = this.#compileAdminControlOperationSchema();
@@ -327,7 +83,9 @@ class StateValidationSchema {
         this.#validateSetEpochOperationSchema = this.#compileSetEpochOperationSchema();
         this.#validateEpochProofV1Schema = this.#compileEpochProofV1Schema();
         this.#validateConsensusControlOperationSchema = this.#compileConsensusControlOperationSchema();
-
+        this.#validateHtlcClaimOperationSchema = this.#compileHtlcClaimOperationSchema();
+        this.#validateHtlcLockOperationSchema = this.#compileHtlcLockOperationSchema();
+        this.#validateHtlcRefundOperationSchema = this.#compileHtlcRefundOperationSchema();
     }
 
     #getOperationTypeName(operationType) {
@@ -343,6 +101,7 @@ class StateValidationSchema {
             type: 'number',
             required: true,
             custom: (value, errors) => {
+                if (typeof value !== 'number') return value;
                 if (!values.includes(value)) {
                     const singleValue = values.length === 1;
                     const expectedOperationType = values[0];
@@ -756,6 +515,240 @@ class StateValidationSchema {
 
     validateConsensusControlOperation(op) {
         return this.#validateConsensusControlOperationSchema(op) === true;
+    }
+
+    #compileHtlcClaimOperationSchema() {
+        const schema = {
+            $$strict: true,
+            type: this.#operationTypeDomain(OperationType.HTLC_CLAIM),
+            address: {type: 'buffer', length: this.#config.addressLength, required: true},
+            hco: {
+                strict: true,
+                type: 'object',
+                props: {
+                    tx: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
+                    txv: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
+                    li: {type: 'buffer', length: HTLC_LOCK_ID_BYTE_LENGTH, required: true},
+                    pi: {type: 'buffer', length: HTLC_PREIMAGE_BYTE_LENGTH, required: true},
+                    in: {type: 'buffer', length: NONCE_BYTE_LENGTH, required: true},
+                    is: {type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true},
+                    va: {type: 'buffer', length: this.#config.addressLength, optional: true},
+                    vn: {type: 'buffer', length: NONCE_BYTE_LENGTH, optional: true},
+                    vs: {type: 'buffer', length: SIGNATURE_BYTE_LENGTH, optional: true}
+                },
+                custom: (value, errors) => {
+                    if (!value || typeof value !== 'object') return value;
+                    const {va, vn, vs} = value;
+                    const count = [va, vn, vs].filter(field => field !== undefined).length;
+                    if (count !== 0 && count !== 3) {
+                        errors.push({
+                            type: 'conditionalDependency',
+                            field: 'hco',
+                            message: 'Fields "va", "vn", and "vs" must all be present if any one is provided'
+                        });
+                    }
+                    if (va === null || vn === null || vs === null) {
+                        errors.push({
+                            type: 'buffer',
+                            field: 'hco',
+                            message: 'Validator fields cannot be null'
+                        });
+                    }
+                    return value;
+                }
+            }
+        };
+        return this.#validator.compile(schema);
+    }
+
+    validateHtlcClaimOperation(op) {
+        return this.#validateHtlcClaimOperationSchema(op) === true;
+    }
+
+    #compileHtlcLockOperationSchema() {
+        const schema = {
+            $$strict: true,
+            type: this.#operationTypeDomain(OperationType.HTLC_LOCK),
+            address: {type: 'buffer', length: this.#config.addressLength, required: true},
+            hlo: {
+                strict: true,
+                type: 'object',
+                props: {
+                    tx: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
+                    txv: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
+                    ca: {type: 'buffer', length: this.#config.addressLength, required: true},
+                    ra: {type: 'buffer', length: this.#config.addressLength, required: true},
+                    am: {type: 'buffer', length: AMOUNT_BYTE_LENGTH, required: true},
+                    fa: {type: 'buffer_amount', length: AMOUNT_BYTE_LENGTH, required: true},
+                    fr: {type: 'buffer', length: this.#config.addressLength, optional: true},
+                    hl: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
+                    re: {type: 'buffer', length: EPOCH_BYTE_LENGTH, required: true},
+                    ph: {type: 'buffer', length: HASH_BYTE_LENGTH, optional: true},
+                    ss: boundedHtlcBufferArray(1, HTLC_MAX_SIGNERS, PUBLIC_KEY_LENGTH),
+                    th: {type: 'buffer', length: HTLC_THRESHOLD_BYTE_LENGTH, required: true},
+                    cs: boundedHtlcBufferArray(0, HTLC_MAX_SIGNERS - 1, SIGNATURE_BYTE_LENGTH),
+                    in: {type: 'buffer', length: NONCE_BYTE_LENGTH, required: true},
+                    is: {type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true},
+                    va: {type: 'buffer', length: this.#config.addressLength, optional: true},
+                    vn: {type: 'buffer', length: NONCE_BYTE_LENGTH, optional: true},
+                    vs: {type: 'buffer', length: SIGNATURE_BYTE_LENGTH, optional: true}
+                },
+                custom: (value, errors) => {
+                    if (!value || typeof value !== 'object') return value;
+
+                    const {fa, fr, ph, ss, th, cs, va, vn, vs} = value;
+                    if (fr === null || ph === null) {
+                        errors.push({
+                            type: 'buffer',
+                            field: 'hlo',
+                            message: 'Optional HTLC lock fields must be a Buffer or undefined'
+                        });
+                    }
+
+                    if (b4a.isBuffer(fa) && fa.length === AMOUNT_BYTE_LENGTH) {
+                        const feeIsZero = fa.every(byte => byte === 0);
+                        if (feeIsZero === (fr !== undefined)) {
+                            errors.push({
+                                type: 'conditionalDependency',
+                                field: 'hlo.fr',
+                                message: 'Fee recipient must be present exactly when the HTLC fee amount is non-zero'
+                            });
+                        }
+                    }
+
+                    if (Array.isArray(ss) && ss.length <= HTLC_MAX_SIGNERS) {
+                        const uniqueSignerKeys = new Set();
+                        for (let index = 0; index < ss.length; index++) {
+                            const signer = ss[index];
+                            if (!b4a.isBuffer(signer) || signer.length !== PUBLIC_KEY_LENGTH) continue;
+
+                            const signerHex = b4a.toString(signer, 'hex');
+                            if (uniqueSignerKeys.has(signerHex)) {
+                                errors.push({
+                                    type: 'duplicateSigner',
+                                    field: 'hlo.ss',
+                                    message: 'HTLC signer set must not contain duplicate public keys'
+                                });
+                                break;
+                            }
+                            uniqueSignerKeys.add(signerHex);
+
+                            if (
+                                index > 1 &&
+                                b4a.isBuffer(ss[index - 1]) &&
+                                ss[index - 1].length === PUBLIC_KEY_LENGTH &&
+                                b4a.compare(ss[index - 1], signer) >= 0
+                            ) {
+                                errors.push({
+                                    type: 'signerOrder',
+                                    field: 'hlo.ss',
+                                    message: 'HTLC cosigner public keys must be sorted by raw bytes'
+                                });
+                                break;
+                            }
+                        }
+                    }
+
+                    if (b4a.isBuffer(th) && th.length === HTLC_THRESHOLD_BYTE_LENGTH && Array.isArray(ss)) {
+                        const threshold = th[0];
+                        if (threshold < 1 || threshold > ss.length) {
+                            errors.push({
+                                type: 'threshold',
+                                field: 'hlo.th',
+                                message: 'HTLC threshold must be between one and the signer-set size'
+                            });
+                        } else if (Array.isArray(cs) && 1 + cs.length < threshold) {
+                            errors.push({
+                                type: 'threshold',
+                                field: 'hlo.cs',
+                                message: 'HTLC signatures do not satisfy the declared threshold'
+                            });
+                        }
+                    }
+
+                    if (Array.isArray(cs) && Array.isArray(ss) && cs.length > ss.length - 1) {
+                        errors.push({
+                            type: 'signatureCount',
+                            field: 'hlo.cs',
+                            message: 'HTLC cosigner signatures cannot outnumber the cosigner keys'
+                        });
+                    }
+
+                    const validatorFieldsPresent = [va, vn, vs].filter(field => field !== undefined).length;
+                    if (validatorFieldsPresent > 0 && validatorFieldsPresent < 3) {
+                        errors.push({
+                            type: 'conditionalDependency',
+                            field: 'hlo',
+                            message: 'Fields "va", "vn", and "vs" must all be present if any one is provided'
+                        });
+                    }
+                    if (va === null || vn === null || vs === null) {
+                        errors.push({
+                            type: 'buffer',
+                            field: 'hlo',
+                            message: 'Validator fields cannot be null, must be a Buffer or undefined'
+                        });
+                    }
+
+                    return value;
+                }
+            }
+        };
+        return this.#validator.compile(schema);
+    }
+
+    validateHtlcLockOperation(op) {
+        return this.#validateHtlcLockOperationSchema(op) === true;
+    }
+
+    #compileHtlcRefundOperationSchema() {
+        const schema = {
+            $$strict: true,
+            type: this.#operationTypeDomain(OperationType.HTLC_REFUND),
+            address: {type: 'buffer', length: this.#config.addressLength, required: true},
+            hro: {
+                strict: true,
+                type: 'object',
+                required: true,
+                props: {
+                    tx: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
+                    txv: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
+                    li: {type: 'buffer', length: HTLC_LOCK_ID_BYTE_LENGTH, required: true},
+                    in: {type: 'buffer', length: NONCE_BYTE_LENGTH, required: true},
+                    is: {type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true},
+                    va: {type: 'buffer', length: this.#config.addressLength, optional: true},
+                    vn: {type: 'buffer', length: NONCE_BYTE_LENGTH, optional: true},
+                    vs: {type: 'buffer', length: SIGNATURE_BYTE_LENGTH, optional: true}
+                },
+                custom: (value, errors) => {
+                    if (!value || typeof value !== 'object') return value;
+
+                    const {va, vn, vs} = value;
+                    const count = [va, vn, vs].filter(field => field !== undefined).length;
+                    if (count !== 0 && count !== 3) {
+                        errors.push({
+                            type: 'conditionalDependency',
+                            field: 'hro',
+                            message: 'Fields "va", "vn", and "vs" must all be present if any one is provided'
+                        });
+                    }
+                    if (va === null || vn === null || vs === null) {
+                        errors.push({
+                            type: 'buffer',
+                            field: 'hro',
+                            message: 'Validator fields cannot be null'
+                        });
+                    }
+
+                    return value;
+                }
+            }
+        };
+        return this.#validator.compile(schema);
+    }
+
+    validateHtlcRefundOperation(op) {
+        return this.#validateHtlcRefundOperationSchema(op) === true;
     }
 
 }
