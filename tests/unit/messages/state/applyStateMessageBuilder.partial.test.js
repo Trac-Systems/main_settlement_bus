@@ -6,10 +6,11 @@ import ApplyStateMessageBuilder from '../../../../src/messages/state/ApplyStateM
 import { OperationType } from '../../../../src/utils/constants.js';
 import { isHexString } from '../../../../src/utils/helpers.js';
 import { createMessage } from '../../../../src/utils/buffer.js';
+import { safeDecodeApplyOperation, safeEncodeApplyOperation } from '../../../../src/codecs/apply/applyOperationCodec.js';
 import { config } from '../../../helpers/config.js';
 import { testKeyPair1, testKeyPair2 } from '../../../fixtures/apply.fixtures.js';
 import applyOperationFixtures from '../../../fixtures/applyOperation.fixtures.js';
-import { isAddressValid } from '../../../../src/core/state/utils/address.js';
+import { addressToBuffer, isAddressValid } from '../../../../src/core/state/utils/address.js';
 
 const hex = (value, bytes) => value.repeat(bytes);
 
@@ -272,4 +273,98 @@ test('ApplyStateMessageBuilder partial HTLC claim operation (hco)', async t => {
     expectBufferField(t, payload.hco.in, 32, 'hco.in');
     expectBufferField(t, payload.hco.is, 64, 'hco.is');
     t.ok(wallet.verify(payload.hco.is, payload.hco.tx, wallet.publicKey), 'hco.is signs hco.tx');
+});
+
+test('ApplyStateMessageBuilder partial HTLC refund signs the canonical fields and survives encoding', async t => {
+    const wallet = await createWallet(testKeyPair1.mnemonic);
+    const { txv, li: lockId } = applyOperationFixtures.validPartialHtlcRefundOperation.hro;
+    const builder = new ApplyStateMessageBuilder(wallet, config);
+    await builder
+        .setPhase('partial')
+        .setOutput('buffer')
+        .setOperationType(OperationType.HTLC_REFUND)
+        .setAddress(wallet.address)
+        .setTxValidity(txv)
+        .setHtlcLockId(lockId)
+        .build();
+
+    const payload = builder.getPayload();
+    const expectedTx = await tracCryptoApi.hash.blake3(createMessage(
+        config.networkId, txv, lockId, payload.hro.in, OperationType.HTLC_REFUND
+    ));
+    const decoded = safeDecodeApplyOperation(safeEncodeApplyOperation(payload));
+
+    t.is(payload.type, OperationType.HTLC_REFUND);
+    t.ok(b4a.equals(payload.address, addressToBuffer(wallet.address, config.addressPrefix)));
+    expectPayloadKeys(t, payload, 'hro');
+    expectKeys(t, payload.hro, ['tx', 'txv', 'li', 'in', 'is'], 'hro');
+    t.ok(b4a.equals(payload.hro.tx, expectedTx), 'refund hash binds the canonical fields');
+    t.ok(b4a.equals(payload.hro.txv, txv));
+    t.ok(b4a.equals(payload.hro.li, lockId));
+    expectBufferField(t, payload.hro.in, 32, 'hro.in');
+    expectBufferField(t, payload.hro.is, 64, 'hro.is');
+    t.ok(wallet.verify(payload.hro.is, expectedTx, wallet.publicKey), 'submitter signs the refund hash');
+    for (const field of ['tx', 'txv', 'li', 'in', 'is']) {
+        t.ok(b4a.equals(decoded.hro[field], payload.hro[field]), `encoded hro.${field} is preserved`);
+    }
+    for (const field of ['va', 'vn', 'vs']) {
+        t.is(decoded.hro[field], null, `partial refund has no ${field}`);
+    }
+});
+
+test('ApplyStateMessageBuilder partial HTLC refund accepts hex inputs and produces JSON', async t => {
+    const wallet = await createWallet(testKeyPair1.mnemonic);
+    const txv = hex('11', 32);
+    const lockId = hex('22', 32);
+    const nonce = hex('33', 32);
+    const builder = new ApplyStateMessageBuilder(wallet, config);
+    await builder
+        .setPhase('partial')
+        .setOutput('json')
+        .setOperationType(OperationType.HTLC_REFUND)
+        .setAddress(wallet.address)
+        .setTxValidity(txv)
+        .setHtlcLockId(lockId)
+        .setNonce(nonce)
+        .build();
+
+    const payload = builder.getPayload();
+    const expectedTx = await tracCryptoApi.hash.blake3(createMessage(
+        config.networkId,
+        b4a.from(txv, 'hex'),
+        b4a.from(lockId, 'hex'),
+        b4a.from(nonce, 'hex'),
+        OperationType.HTLC_REFUND
+    ));
+    t.is(payload.address, wallet.address);
+    expectPayloadKeys(t, payload, 'hro');
+    expectKeys(t, payload.hro, ['tx', 'txv', 'li', 'in', 'is'], 'hro');
+    for (const field of ['tx', 'txv', 'li', 'in']) {
+        expectHexField(t, payload.hro[field], 32, `hro.${field}`);
+    }
+    expectHexField(t, payload.hro.is, 64, 'hro.is');
+    t.is(payload.hro.tx, b4a.toString(expectedTx, 'hex'));
+    t.is(payload.hro.txv, txv);
+    t.is(payload.hro.li, lockId);
+    t.is(payload.hro.in, nonce);
+    t.ok(wallet.verify(b4a.from(payload.hro.is, 'hex'), expectedTx, wallet.publicKey));
+});
+
+test('ApplyStateMessageBuilder partial HTLC refund requires transaction validity and lock ID', async t => {
+    const wallet = await createWallet(testKeyPair1.mnemonic);
+    const fields = [
+        ['setTxValidity', b4a.alloc(32, 1), 'Transaction validity'],
+        ['setHtlcLockId', b4a.alloc(32, 2), 'HTLC lock ID']
+    ];
+    for (const [missingSetter, , label] of fields) {
+        const builder = new ApplyStateMessageBuilder(wallet, config)
+            .setPhase('partial')
+            .setOutput('buffer')
+            .setOperationType(OperationType.HTLC_REFUND)
+            .setAddress(wallet.address);
+        for (const [setter, value] of fields) {
+            if (setter !== missingSetter) builder[setter](value);
+        }
+        await t.exception(() => builder.build(), new RegExp(`${label} must be set before build`));
+    }
 });

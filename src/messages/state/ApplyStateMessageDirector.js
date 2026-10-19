@@ -644,17 +644,6 @@ class ApplyStateMessageDirector {
         return this.#builder.getPayload();
     }
 
-    async buildPartialHtlcRefundOperationMessage(invokerAddress) {
-        if (!this.#builder) throw new Error('Builder has not been set.');
-        await this.#builder
-            .setPhase('partial')
-            .setOutput('buffer')
-            .setOperationType(OperationType.HTLC_REFUND)
-            .setAddress(invokerAddress)
-            .build();
-        return this.#builder.getPayload();
-    }
-
     /**
      * Add validator metadata to an already validated partial HTLC lock operation.
      *
@@ -724,13 +713,56 @@ class ApplyStateMessageDirector {
         return this.#builder.getPayload();
     }
 
-    async buildCompleteHtlcRefundOperationMessage(invokerAddress) {
+    /**
+     * Build a signed partial HTLC refund payload.
+     * @param {string|Buffer} invokerAddress
+     * @param {string|Buffer} txValidity
+     * @param {string|Buffer} lockId
+     * @param {'json'|'buffer'} output
+     * @returns {Promise<object>}
+     */
+    async buildPartialHtlcRefundOperationMessage(invokerAddress, txValidity, lockId, output = 'buffer') {
+        if (!this.#builder) throw new Error('Builder has not been set.');
+        await this.#builder
+            .setPhase('partial')
+            .setOutput(output)
+            .setOperationType(OperationType.HTLC_REFUND)
+            .setAddress(invokerAddress)
+            .setTxValidity(txValidity)
+            .setHtlcLockId(lockId)
+            .build();
+        return this.#builder.getPayload();
+    }
+
+    /**
+     * Add validator metadata to a validated, submitter-signed HTLC refund.
+     * @param {string|Buffer} invokerAddress
+     * @param {string|Buffer} transactionHash
+     * @param {string|Buffer} txValidity
+     * @param {string|Buffer} lockId
+     * @param {string|Buffer} incomingNonce
+     * @param {string|Buffer} incomingSignature
+     * @returns {Promise<object>}
+     */
+    async buildCompleteHtlcRefundOperationMessage(
+        invokerAddress,
+        transactionHash,
+        txValidity,
+        lockId,
+        incomingNonce,
+        incomingSignature
+    ) {
         if (!this.#builder) throw new Error('Builder has not been set.');
         await this.#builder
             .setPhase('complete')
             .setOutput('buffer')
             .setOperationType(OperationType.HTLC_REFUND)
             .setAddress(invokerAddress)
+            .setTxHash(transactionHash)
+            .setTxValidity(txValidity)
+            .setHtlcLockId(lockId)
+            .setIncomingNonce(incomingNonce)
+            .setIncomingSignature(incomingSignature)
             .build();
         return this.#builder.getPayload();
     }
