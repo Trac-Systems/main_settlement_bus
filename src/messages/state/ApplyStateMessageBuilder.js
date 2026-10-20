@@ -15,8 +15,7 @@ import {
     PUBLIC_KEY_LENGTH,
     SIGNATURE_BYTE_LENGTH,
 } from '../../utils/constants.js';
-import { addressToBuffer, bufferToAddress } from '../../core/state/utils/address.js';
-import { isAddressValid } from "../../core/state/utils/address.js";
+import { addressToBuffer, bufferToAddress, isAddressDecodable } from '../../core/state/utils/address.js';
 import {
     isAdminControl,
     isBalanceInitialization,
@@ -90,7 +89,7 @@ class ApplyStateMessageBuilder {
         if (!wallet || typeof wallet !== 'object') {
             throw new Error('Wallet must be a valid wallet object');
         }
-        if (!isAddressValid(wallet.address, this.#config.addressPrefix)) {
+        if (!isAddressDecodable(wallet.address, this.#config.addressPrefix)) {
             throw new Error('Wallet should have a valid TRAC address.');
         }
 
@@ -413,9 +412,9 @@ class ApplyStateMessageBuilder {
     #normalizeAddress(address) {
         if (b4a.isBuffer(address)) {
             const addr = bufferToAddress(address, this.#config.addressPrefix);
-            return addr ? address : null;
+            return addr && isAddressDecodable(addr, this.#config.addressPrefix) ? address : null;
         }
-        if (!isAddressValid(address, this.#config.addressPrefix)) {
+        if (!isAddressDecodable(address, this.#config.addressPrefix)) {
             return null;
         }
         return addressToBuffer(address, this.#config.addressPrefix);

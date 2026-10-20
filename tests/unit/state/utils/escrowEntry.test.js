@@ -89,7 +89,7 @@ test('Escrow Entry - validates canonical recipient addresses instead of public k
     }
 });
 
-test.skip('Escrow Entry - rejects high-bit address aliases', t => {
+test('Escrow Entry - rejects high-bit address aliases', t => {
     const inputs = makeInputs();
     for (const field of ['lockerAddress', 'claimRecipientAddress', 'refundRecipientAddress', 'additionalFeeRecipientAddress']) {
         const highBitAlias = b4a.from(inputs[field]);

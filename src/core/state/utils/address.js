@@ -27,6 +27,21 @@ export function isAddressValid(address, hrp) {
     return !_.isError(res) && res
 }
 
+/** Validates a new address input, including its bech32m checksum. */
+export function isAddressDecodable(address, hrp) {
+    const decodedAddress = b4a.isBuffer(address) ? bufferToAddress(address, hrp) : address;
+    return typeof decodedAddress === 'string' &&
+        isAddressValid(decodedAddress, hrp) &&
+        addressApi.canDecode(decodedAddress);
+}
+
+/** Converts a new address input to bytes, or returns an empty buffer when invalid. */
+export function addressToBufferIfDecodable(address, hrp) {
+    return isAddressDecodable(address, hrp)
+        ? addressToBuffer(address, hrp)
+        : b4a.alloc(0);
+}
+
 
 /**
  * Converts a valid bech32m address string to a buffer.
@@ -69,6 +84,8 @@ export function bufferToAddress(dataBuffer, hrp) {
 
 export default {
     isAddressValid,
+    isAddressDecodable,
     addressToBuffer,
+    addressToBufferIfDecodable,
     bufferToAddress,
 };

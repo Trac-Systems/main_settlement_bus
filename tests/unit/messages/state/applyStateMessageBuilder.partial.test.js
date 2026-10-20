@@ -13,6 +13,7 @@ import applyOperationFixtures from '../../../fixtures/applyOperation.fixtures.js
 import { addressToBuffer, isAddressValid } from '../../../../src/core/state/utils/address.js';
 
 const hex = (value, bytes) => value.repeat(bytes);
+const invalidChecksumAddress = 'trac1wyu9uw02wmefzt63c36wa0fgc2xn99x5hw46w4frl7jd6mqw2f5q57tt90';
 
 async function createWallet(mnemonic) {
     return await new WalletProvider(config).fromMnemonic({ mnemonic, derivationPath: config.derivationPath })
@@ -42,6 +43,25 @@ function expectKeys(t, value, keys, label) {
 function expectPayloadKeys(t, payload, bodyKey) {
     expectKeys(t, payload, ['type', 'address', bodyKey], 'payload');
 }
+
+test('ApplyStateMessageBuilder rejects checksum-invalid addresses across operation fields', async t => {
+    const wallet = await createWallet(testKeyPair1.mnemonic);
+    const builder = new ApplyStateMessageBuilder(wallet, config);
+
+    for (const setter of [
+        'setAddress',
+        'setIncomingAddress',
+        'setHtlcClaimAddress',
+        'setHtlcRefundAddress',
+        'setHtlcFeeRecipient'
+    ]) {
+        t.exception(() => builder[setter](invalidChecksumAddress), `${setter} rejects invalid checksum`);
+    }
+    t.exception(
+        () => new ApplyStateMessageBuilder({ address: invalidChecksumAddress }, config),
+        'invalid wallet address is rejected'
+    );
+});
 
 test('ApplyStateMessageBuilder partial add writer (rao)', async t => {
     const wallet = await createWallet(testKeyPair1.mnemonic);

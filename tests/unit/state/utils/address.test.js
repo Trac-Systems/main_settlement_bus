@@ -83,3 +83,21 @@ test('address buffer rejects high-bit ASCII aliases', t => {
         'non-canonical address bytes cannot be normalized into a valid address'
     );
 });
+
+test('new address inputs require a valid checksum and canonical bytes', t => {
+    const hrp = 'trac';
+    const valid = randomAddress(hrp);
+    const invalidChecksum = 'trac1wyu9uw02wmefzt63c36wa0fgc2xn99x5hw46w4frl7jd6mqw2f5q57tt90';
+    const canonical = b4a.from(valid, 'ascii');
+    const aliased = b4a.from(canonical);
+    aliased[0] |= 0x80;
+
+    t.ok(addressUtils.isAddressDecodable(valid, hrp));
+    t.ok(addressUtils.isAddressDecodable(canonical, hrp));
+    t.ok(b4a.equals(addressUtils.addressToBufferIfDecodable(valid, hrp), canonical));
+    t.ok(addressUtils.isAddressValid(invalidChecksum, hrp), 'historical shape-only check is unchanged');
+    t.absent(addressUtils.isAddressDecodable(invalidChecksum, hrp));
+    t.is(addressUtils.addressToBufferIfDecodable(invalidChecksum, hrp).length, 0);
+    t.absent(addressUtils.isAddressDecodable(aliased, hrp));
+    t.is(addressUtils.addressToBufferIfDecodable(aliased, hrp).length, 0);
+});

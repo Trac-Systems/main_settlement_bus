@@ -96,6 +96,51 @@ test('PartialTransferValidator.validate rejects invalid recipient address or pub
     t.ok(payload.tro.to);
 });
 
+test('PartialTransferValidator rejects high-bit address aliases', async t => {
+    const {requester, recipient, validator} = await getWalletSet();
+
+    for (const [field, expectedCode] of [
+        ['address', ResultCode.REQUESTER_ADDRESS_INVALID],
+        ['recipient', ResultCode.TRANSFER_RECIPIENT_ADDRESS_INVALID]
+    ]) {
+        const payload = await buildTransferPayload(requester, recipient.address, bigIntToBuffer(1n));
+        const addressBytes = field === 'address' ? payload.address : payload.tro.to;
+        const alias = b4a.from(addressBytes);
+        alias[0] |= 0x80;
+        if (field === 'address') payload.address = alias;
+        else payload.tro.to = alias;
+
+        const state = createState({
+            unsignedEntries: new Map([[requester.address, createNodeEntry({balance: bigIntToBuffer(10n)})]])
+        });
+        const transferValidator = new PartialTransferValidator(state, validator.address, config);
+        transferValidator.validateSignature = async () => true;
+        await expectSharedValidatorError(t, () => transferValidator.validate(payload), expectedCode);
+    }
+});
+
+test('PartialTransferValidator rejects checksum-invalid recipient addresses', async t => {
+    const {requester, recipient, validator} = await getWalletSet();
+
+    for (const address of [
+        'trac1wyu9uw02wmefzt63c36wa0fgc2xn99x5hw46w4frl7jd6mqw2f5q57tt90',
+        'trac1jsmnrdn258ndcy2s06xntd43e80d79ly943qsa0pel45gk346ruggpxmzx'
+    ]) {
+        const payload = await buildTransferPayload(requester, recipient.address, bigIntToBuffer(1n));
+        payload.tro.to = b4a.from(address, 'ascii');
+        const state = createState({
+            unsignedEntries: new Map([[requester.address, createNodeEntry({balance: bigIntToBuffer(10n)})]])
+        });
+        const transferValidator = new PartialTransferValidator(state, validator.address, config);
+        transferValidator.validateSignature = async () => true;
+        await expectSharedValidatorError(
+            t,
+            () => transferValidator.validate(payload),
+            ResultCode.TRANSFER_RECIPIENT_PUBLIC_KEY_INVALID
+        );
+    }
+});
+
 test('PartialTransferValidator.validate rejects transfer amount and state balance edge cases', async t => {
     const { requester, recipient, validator } = await getWalletSet();
     const payload = await buildTransferPayload(requester, recipient.address, bigIntToBuffer(2n));

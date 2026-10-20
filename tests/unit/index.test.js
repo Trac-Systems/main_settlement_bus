@@ -175,6 +175,49 @@ if (isBareRuntime) {
         await msb.close();
     });
 
+    test('MainSettlementBus rejects checksum-invalid transfer recipients before submission', async t => {
+        const config = buildGenesisConfig();
+        const wallet = await createWallet(config);
+        const loaded = await loadMainSettlementBus();
+        const msb = new loaded.MainSettlementBus(config, wallet);
+
+        for (const address of [
+            'trac1wyu9uw02wmefzt63c36wa0fgc2xn99x5hw46w4frl7jd6mqw2f5q57tt90',
+            'trac1jsmnrdn258ndcy2s06xntd43e80d79ly943qsa0pel45gk346ruggpxmzx'
+        ]) {
+            t.ok(tracCryptoApi.address.isValid(address), 'address passes the format-only check');
+            t.absent(tracCryptoApi.address.canDecode(address), 'address has an invalid checksum');
+            await t.exception(
+                () => msb.prepareTransferOperation(address, '1'),
+                errorMessageIncludes('Invalid recipient address')
+            );
+        }
+    });
+
+    test('MainSettlementBus rejects checksum-invalid addresses in admin operations', async t => {
+        const config = buildGenesisConfig();
+        const wallet = await createWallet(config);
+        const loaded = await loadMainSettlementBus();
+        const msb = new loaded.MainSettlementBus(config, wallet);
+        const invalid = 'trac1wyu9uw02wmefzt63c36wa0fgc2xn99x5hw46w4frl7jd6mqw2f5q57tt90';
+
+        await msb.ready();
+        loaded.state.getAdminEntry.resolves(adminEntryFor(wallet, loaded.state));
+        loaded.state.getNodeEntry.resetHistory();
+
+        await t.exception(
+            () => msb.updateWriterToIndexerRole(invalid, true),
+            errorMessageIncludes('invalid address')
+        );
+        await t.exception(
+            () => msb.banValidator(invalid),
+            errorMessageIncludes('invalid address')
+        );
+        t.ok(loaded.state.getNodeEntry.notCalled, 'invalid address is rejected before a state lookup');
+
+        await msb.close();
+    });
+
     test('MainSettlementBus appends genesis epoch initialization with generic consensus config', async t => {
         const consoleLog = sinon.stub(console, 'log');
         t.teardown(() => consoleLog.restore());

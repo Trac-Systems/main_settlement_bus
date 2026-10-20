@@ -7,7 +7,7 @@ import {
     uint32ToBuffer
 } from "../../../utils/buffer.js";
 import {NetworkOperationType, NetworkResultCode} from '../../../utils/constants.js';
-import {isAddressValid} from "../../../core/state/utils/address.js";
+import {isAddressDecodable} from "../../../core/state/utils/address.js";
 import {encodeCapabilities} from "../../../utils/buffer.js";
 
 /**
@@ -39,7 +39,7 @@ class NetworkMessageBuilder {
         if (!wallet || typeof wallet !== 'object') {
             throw new Error('Wallet must be a valid wallet object');
         }
-        if (!isAddressValid(wallet.address, this.#config.addressPrefix)) {
+        if (!isAddressDecodable(wallet.address, this.#config.addressPrefix)) {
             throw new Error('Wallet should have a valid TRAC address.');
         }
 

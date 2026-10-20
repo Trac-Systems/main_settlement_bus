@@ -24,6 +24,11 @@ async function createWallet() {
     return await new WalletProvider(config).fromSecretKey(testKeyPair1.secretKey)
 }
 
+test('NetworkMessageBuilder rejects a wallet address with an invalid checksum', t => {
+    const address = 'trac1wyu9uw02wmefzt63c36wa0fgc2xn99x5hw46w4frl7jd6mqw2f5q57tt90';
+    t.exception(() => new NetworkMessageBuilder({ address }, config), 'invalid wallet address is rejected');
+});
+
 function uniqueResultCodes() {
     return [...new Set(Object.values(NetworkResultCode))].sort((a, b) => a - b);
 }
