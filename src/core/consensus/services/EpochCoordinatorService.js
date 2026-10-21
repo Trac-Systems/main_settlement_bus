@@ -18,6 +18,7 @@ class EpochCoordinatorService extends SchedulableService {
     #configReload = null;
     #cancelReloadDelay = null;
     #configChangeListener;
+    #appenderSelector;
 
     /**
      * Creates the coordinator and its VDF manager.
@@ -28,12 +29,13 @@ class EpochCoordinatorService extends SchedulableService {
      * @param {object} config
      * @param {object} manager
      */
-    constructor(state, wallet, config, manager) {
+    constructor(state, wallet, config, manager, appenderSelector = null) {
         super();
         this.#state = state;
         this.#wallet = wallet;
         this.#config = config;
         this.#manager = manager;
+        this.#appenderSelector = appenderSelector;
         this.#intervalMs = config.epochInterval;
         this.#logger = new Logger(config);
         this.#vdfManager = new VDFServiceManager(state, wallet, config);
@@ -144,6 +146,7 @@ class EpochCoordinatorService extends SchedulableService {
             logger: this.#logger,
             operations,
             intervalMs: this.#intervalMs,
+            appenderSelector: this.#appenderSelector,
         });
 
         this.#replaceCurrentRound(round);

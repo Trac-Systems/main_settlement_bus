@@ -5,6 +5,7 @@ package consensus.v1;
 import "consensus/v1/enums/message_type.proto";
 import "consensus/v1/messages/proof_proposal.proto";
 import "consensus/v1/messages/proof_proposal_response.proto";
+import "consensus/v1/messages/epoch_append.proto";
 
 message ConsensusMessageHeader {
   MessageType type = 1;
@@ -13,5 +14,7 @@ message ConsensusMessageHeader {
   oneof field {
     ProofProposal                         proof_proposal = 4;
     ProofProposalResponse                 proof_proposal_response = 5;
+    EpochAppendRequest                    request = 6;
+    EpochAppendReply                      reply = 7;
   }
 }

@@ -27,6 +27,9 @@ class IndexerConnectionManager extends PeerConnectionManager {
 
     async connect() {
         const entries = await this.#state.getIndexersEntry();
+        // Promotion events can precede Autobase's membership update. Refresh the
+        // capacity from the same snapshot used for discovery on every retry.
+        this.setMax(Math.max(0, entries.length - 1));
 
         for (const entry of entries) {
             const writerKeyHex = b4a.toString(entry.key, 'hex');

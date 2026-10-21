@@ -9,6 +9,15 @@ import {
 import { addressToBuffer } from '../../state/utils/address.js';
 import { EpochRoundListeners } from './EpochRoundListeners.js';
 import { calculateQuorum } from '../quorum.js';
+import {
+    sameSelectionContext,
+    EpochAppenderSelectionPhase,
+    EpochAppendOutcome,
+} from '../epochAppenderSelection/epochAppenderSelectionState.js';
+import {
+    EpochAppenderSelectionError,
+    EpochAppenderSelectionErrorCode,
+} from '../epochAppenderSelection/EpochAppenderSelectionError.js';
 
 const INACTIVE_ROUND_ERROR = new Error('Epoch coordination round is no longer active');
 
@@ -27,6 +36,12 @@ export class EpochCoordinationRound {
     #finished = false;
     #remoteProposalWait = null;
     #backoffWait = null;
+    #appendAttempt = null;
+    #appenderSelector;
+    #appendRequest = null;
+    #coordinated = false;
+    #outcomeTimer = null;
+    #checkingOutcome = false;
 
     /**
      * Creates one state machine round.
@@ -34,7 +49,7 @@ export class EpochCoordinationRound {
      *
      * @param {object} dependencies round dependencies supplied by EpochCoordinatorService
      */
-    constructor({ state, wallet, config, manager, logger, operations, intervalMs }) {
+    constructor({ state, wallet, config, manager, logger, operations, intervalMs, appenderSelector = null }) {
         this.#state = state;
         this.#wallet = wallet;
         this.#config = config;
@@ -42,10 +57,15 @@ export class EpochCoordinationRound {
         this.#logger = logger;
         this.#operations = operations;
         this.#intervalMs = intervalMs;
+        this.#appenderSelector = appenderSelector;
         this.#machine = new EpochStateMachine(this.#buildHandlers());
         this.#machine.on(EPOCH_EVENTS.APPROVAL_COLLECTION_FAILED, ({ context }) => {
             this.#closeApprovalCollection();
             this.#logApprovalBackoff(context);
+        });
+        this.#machine.on('*', ({ prev }) => {
+            // Invalidate the callback as soon as its append state is left, before a retry can enter it.
+            if (prev === EPOCH_STATES.APPEND_SET_EPOCH) this.#appendAttempt = null;
         });
         this.#listeners = new EpochRoundListeners({
             state,
@@ -54,6 +74,8 @@ export class EpochCoordinationRound {
             intervalMs,
             machine: this.#machine,
             isRoundActive: () => this.#isActive(),
+            isAppendCoordinated: () => this.#coordinated,
+            onEpochProgress: () => this.#checkCoordinatedProgress(),
         });
     }
 
@@ -74,6 +96,21 @@ export class EpochCoordinationRound {
             return;
         }
 
+        if (!this.#appenderSelector) {
+            throw new EpochAppenderSelectionError(
+                EpochAppenderSelectionErrorCode.SELECTOR_UNAVAILABLE,
+                'Epoch appender selection is required but its selector is unavailable'
+            );
+        }
+        this.#coordinated = this.#appenderSelector.enabledFor(currentEpoch + 1n);
+        if (this.#coordinated) {
+            await this.#appenderSelector.reconcile();
+            if (!this.#isActive()) return;
+            if (this.#appenderSelector.active) {
+                await this.#finish(next, this.#intervalMs);
+                return;
+            }
+        }
         this.#listeners.start();
         await this.#machine.enter({
             next: (delay) => this.#finish(next, delay),
@@ -86,14 +123,16 @@ export class EpochCoordinationRound {
      *
      * @returns {Promise<void>}
      */
-    cancel() {
+    async cancel() {
         if (this.#cancelled) return this.#machine.close();
 
         this.#cancelled = true;
         this.#closeApprovalCollection();
         this.#cancelRemoteProposalWait();
         this.#cancelBackoffWait();
-        return this.#machine.close();
+        clearTimeout(this.#outcomeTimer);
+        await this.#machine.close();
+        await this.#withdrawAppendRequest();
     }
 
     /**
@@ -111,7 +150,9 @@ export class EpochCoordinationRound {
         this.#closeApprovalCollection();
         this.#cancelRemoteProposalWait();
         this.#cancelBackoffWait();
+        clearTimeout(this.#outcomeTimer);
         await this.#machine.close();
+        await this.#withdrawAppendRequest();
 
         if (this.#cancelled) return false;
         next(delay);
@@ -188,7 +229,7 @@ export class EpochCoordinationRound {
     }
 
     /** Waits before retrying consensus work after a failed attempt. */
-    #waitForBackoff() {
+    #waitForBackoff(delayMs = this.#config.epochBackoffDelay) {
         return new Promise((resolve) => {
             const complete = () => {
                 this.#backoffWait = null;
@@ -196,7 +237,7 @@ export class EpochCoordinationRound {
             };
 
             this.#backoffWait = {
-                timer: setTimeout(complete, this.#config.epochBackoffDelay),
+                timer: setTimeout(complete, delayMs),
                 complete,
             };
         });
@@ -367,31 +408,59 @@ export class EpochCoordinationRound {
         const latestEpochBeforeAppend = await this.#state.getCurrentEpoch();
         this.#assertActive();
         if (latestEpochBeforeAppend !== context.currentEpoch) {
+            await this.#withdrawAppendRequest();
+            this.#assertActive();
             await machine.send(EPOCH_EVENTS.TARGET_EPOCH_ALREADY_SIGNED);
             return;
         }
 
-        const indexers = await this.#state.getIndexersEntry();
+        let indexers = await this.#state.getIndexersEntry();
+        if (this.#coordinated) {
+            const snapshot = await this.#state.getEpochAppenderSelectionContext();
+            this.#assertActive();
+            const { configData } = await this.#state.requireSignedConsensusConfig();
+            this.#assertActive();
+            if (!sameSelectionContext(snapshot, this.#appendRequest) ||
+                configData.difficulty !== context.vdfDifficulty ||
+                configData.discriminantBitSize !== context.vdfDiscriminantSize) {
+                await this.#withdrawAppendRequest();
+                this.#assertActive();
+                await machine.send(EPOCH_EVENTS.TARGET_EPOCH_ALREADY_SIGNED);
+                return;
+            }
+            indexers = snapshot.currentWriterKeys.map(key => ({ key: b4a.from(key, 'hex') }));
+        }
         this.#assertActive();
         const membershipChanged = indexers.length !== context.indexerKeys.size ||
             indexers.some(({ key }) => !context.indexerKeys.has(b4a.toString(key, 'hex')));
+        if (membershipChanged) {
+            await this.#withdrawAppendRequest();
+            this.#assertActive();
+        }
         await machine.send(membershipChanged ? EPOCH_EVENTS.INDEXERS_CHANGED : EPOCH_EVENTS.TARGET_EPOCH_ABSENT);
     }
 
     /** Appends SET_EPOCH locally. The event or timeout decides the final result. */
     async #handleAppendSetEpoch(context, machine) {
+        if (this.#coordinated) {
+            await this.#startSelectedAppend(machine);
+            return;
+        }
+        const appendAttempt = {};
+        this.#appendAttempt = appendAttempt;
         try {
             await this.#operations.appendSetEpoch(context.setEpochPayload);
             this.#assertActive();
             // append() stores the operation locally. The event or timeout decides if it succeeded.
         } catch (error) {
             this.#assertActive();
+            if (this.#appendAttempt !== appendAttempt) return;
             this.#logger.error(error);
             await machine.send(EPOCH_EVENTS.APPEND_FAILED);
         }
     }
 
-    /** Ends the round after the append result has already been broadcast. */
+    1    /** Ends the round after the append result has already been broadcast. */
     async #handleSendAppendSignal(context) {
         await context.next(this.#intervalMs);
     }
@@ -413,8 +482,12 @@ export class EpochCoordinationRound {
     }
 
     /** Continues epoch processing after backoff. */
-    async #handleBackoff(_context, machine) {
-        await this.#waitForBackoff();
+    async #handleBackoff(context, machine) {
+        const delay = context.appendElectionRetry
+            ? Math.max(100, Math.min(this.#config.epochBackoffDelay, 1000))
+            : this.#config.epochBackoffDelay;
+        machine.appendContext({ appendElectionRetry: false });
+        await this.#waitForBackoff(delay);
         this.#assertActive();
         await machine.send(EPOCH_EVENTS.BACKOFF_ELAPSED);
     }
@@ -455,8 +528,10 @@ export class EpochCoordinationRound {
             [EPOCH_STATES.QUORUM_DECISION]: this.#handleQuorumDecision.bind(this),
             [EPOCH_STATES.SEND_PROPOSAL_TO_INDEXERS]: this.#handleSendProposalToIndexers.bind(this),
             [EPOCH_STATES.BUILD_SET_EPOCH]: this.#handleBuildSetEpoch.bind(this),
+            [EPOCH_STATES.WAIT_FOR_APPEND_REPLIES]: this.#handleWaitForAppendReplies.bind(this),
             [EPOCH_STATES.REFRESH_SIGNED_STATE_BEFORE_APPEND]: this.#handleRefreshSignedStateBeforeAppend.bind(this),
             [EPOCH_STATES.APPEND_SET_EPOCH]: this.#handleAppendSetEpoch.bind(this),
+            [EPOCH_STATES.WAIT_FOR_APPEND_OUTCOME]: this.#handleWaitForAppendOutcome.bind(this),
             [EPOCH_STATES.SEND_APPEND_SIGNAL]: this.#handleSendAppendSignal.bind(this),
             [EPOCH_STATES.REFRESH_SIGNED_STATE]: this.#handleRefreshSignedState.bind(this),
             [EPOCH_STATES.BACKOFF]: this.#handleBackoff.bind(this),
@@ -468,4 +543,164 @@ export class EpochCoordinationRound {
         );
     }
 
+    async #withdrawAppendRequest() {
+        const request = this.#appendRequest;
+        this.#appendRequest = null;
+        if (request) {
+            await this.#appenderSelector.cancel(request.requestId);
+        }
+    }
+
+    async #handleWaitForAppendReplies(context, machine) {
+        if (!this.#coordinated) {
+            await machine.send(EPOCH_EVENTS.APPEND_REPLIES_COLLECTED);
+            return;
+        }
+        try {
+            const snapshot = await this.#state.getEpochAppenderSelectionContext();
+            this.#assertActive();
+            if (
+                BigInt(snapshot.targetEpoch) !== context.currentEpoch + 1n ||
+                snapshot.parentHash !== context.currentEpochHash.toString('hex')
+            ) {
+                await machine.send(EPOCH_EVENTS.TARGET_EPOCH_ALREADY_SIGNED);
+                return;
+            }
+            const request = await this.#appenderSelector.createRequest(snapshot, context.setEpochPayload);
+            if (!this.#isActive()) {
+                await this.#appenderSelector.cancel(request.requestId);
+                return;
+            }
+            this.#appendRequest = request;
+            await this.#appenderSelector.waitForReplies(request);
+            this.#assertActive();
+            if (this.#appendRequest !== request || machine.state !== EPOCH_STATES.WAIT_FOR_APPEND_REPLIES) {
+                return;
+            }
+            await machine.send(EPOCH_EVENTS.APPEND_REPLIES_COLLECTED);
+        } catch (error) {
+            this.#assertActive();
+            await this.#withdrawAppendRequest();
+            const latestEpoch = await this.#state.getCurrentEpoch();
+            this.#assertActive();
+            if (latestEpoch > context.currentEpoch) {
+                await machine.send(EPOCH_EVENTS.TARGET_EPOCH_ALREADY_SIGNED);
+                return;
+            }
+            const message = `[EpochCoordinationRound] append replies unavailable: ${error.message}`;
+            if (error.code === EpochAppenderSelectionErrorCode.ELECTION_BUSY ||
+                error.code === EpochAppenderSelectionErrorCode.REPLIES_INCOMPLETE ||
+                error.code === EpochAppenderSelectionErrorCode.ELECTION_SUPERSEDED) {
+                this.#logger.debug?.(message);
+            } else {
+                this.#logger.warn(message);
+            }
+            machine.appendContext({ appendElectionRetry: true });
+            await machine.send(EPOCH_EVENTS.APPEND_REPLY_COLLECTION_FAILED);
+        }
+    }
+
+    async #startSelectedAppend(machine) {
+        if (machine.state !== EPOCH_STATES.APPEND_SET_EPOCH || !this.#appendRequest) {
+            return;
+        }
+        const request = this.#appendRequest;
+        // Observe without awaiting the local write. Signed completion or election expiry
+        // ends this attempt; neither a timeout nor a newer term cancels the pending append.
+        this.#appendSelectedPayload(request)
+            .catch(error => this.#handlePublicationFailure(request, machine, error))
+            .catch(error => this.#logger.error(error));
+        await machine.send(EPOCH_EVENTS.APPEND_STARTED);
+    }
+
+    async #appendSelectedPayload(request) {
+        const payload = await this.#appenderSelector.getSelectedPayload(request.requestId);
+        this.#assertActive();
+        if (this.#appendRequest !== request) {
+            return;
+        }
+        return this.#operations.appendSetEpoch(payload, location => {
+            return this.#appenderSelector.authorizeAppend(request.requestId, location);
+        });
+    }
+
+    async #handlePublicationFailure(request, machine, error) {
+        if (!this.#isActive() || this.#appendRequest !== request) {
+            return;
+        }
+        this.#logger.error(`[EpochCoordinationRound] append outcome unresolved: ${error.message}`);
+        const active = this.#appenderSelector.active;
+        if (active?.phase === EpochAppenderSelectionPhase.HELD) {
+            // Without the durable marker no append could have started, so cancellation is safe.
+            const released = await this.#appenderSelector.cancel(request.requestId);
+            if (released && this.#isActive() && this.#appendRequest === request) {
+                this.#appendRequest = null;
+                await machine.send(EPOCH_EVENTS.APPEND_REJECTED);
+            }
+            return;
+        }
+        if (!active && !this.#appenderSelector.outcomeFor(request.requestId)) {
+            this.#appendRequest = null;
+            await machine.send(EPOCH_EVENTS.APPEND_REJECTED);
+        }
+    }
+
+    async #handleWaitForAppendOutcome() {
+        await this.#checkCoordinatedProgress();
+        this.#scheduleOutcomeCheck();
+    }
+
+    #scheduleOutcomeCheck() {
+        clearTimeout(this.#outcomeTimer);
+        if (!this.#isActive() || this.#machine.state !== EPOCH_STATES.WAIT_FOR_APPEND_OUTCOME) return;
+        this.#outcomeTimer = setTimeout(async () => {
+            await this.#checkCoordinatedProgress();
+            this.#scheduleOutcomeCheck();
+        }, Math.max(100, Math.min(this.#config.epochAppendTimeout, 1000)));
+    }
+
+    async #checkCoordinatedProgress() {
+        if (!this.#coordinated || !this.#isActive() || this.#checkingOutcome) return;
+        this.#checkingOutcome = true;
+        const request = this.#appendRequest;
+        try {
+            await this.#appenderSelector.reconcile();
+            if (!this.#isActive() || this.#appendRequest !== request) return;
+            const observing = this.#machine.state === EPOCH_STATES.WAIT_FOR_APPEND_OUTCOME;
+            const outcome = request && this.#appenderSelector.outcomeFor(request.requestId);
+            if (observing && outcome) {
+                let event;
+                switch (outcome.status) {
+                    case EpochAppendOutcome.REJECTED:
+                        event = EPOCH_EVENTS.APPEND_REJECTED;
+                        break;
+                    case EpochAppendOutcome.EPOCH_ADVANCED:
+                        event = EPOCH_EVENTS.APPEND_ACCEPTED;
+                        break;
+                    case EpochAppendOutcome.SELECTION_EXPIRED:
+                        this.#machine.appendContext({ appendElectionRetry: true });
+                        event = EPOCH_EVENTS.APPENDER_SELECTION_EXPIRED;
+                        break;
+                    default:
+                        return;
+                }
+                clearTimeout(this.#outcomeTimer);
+                this.#appendRequest = null;
+                await this.#machine.send(event);
+                return;
+            }
+            // The event itself may come from speculative apply. Read signed state.
+            if (!observing && this.#machine.state !== EPOCH_STATES.APPEND_SET_EPOCH) {
+                const epoch = await this.#state.getCurrentEpoch();
+                if (!this.#isActive() || this.#appendRequest !== request) return;
+                if (epoch > this.#machine.context.currentEpoch) {
+                    await this.#machine.context.next(this.#intervalMs);
+                }
+            }
+        } catch (error) {
+            this.#logger.error(`[EpochCoordinationRound] cannot confirm append outcome: ${error.message}`);
+        } finally {
+            this.#checkingOutcome = false;
+        }
+    }
 }

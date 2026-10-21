@@ -61,6 +61,7 @@ async function loadNetwork({ isIndexer = false, currentEpoch = null, indexerCoun
     let validatorConnectionManagerInstance = null;
     let indexerConnectionManagerInstance = null;
     let epochCoordinatorServiceInstance = null;
+    const epochAppenderSelector = { open: sinon.stub().resolves(), close: sinon.stub().resolves() };
     let validatorPendingRequestServiceInstance = null;
     let indexerPendingRequestServiceInstance = null;
     let consensusMessagesInstance = null;
@@ -259,6 +260,9 @@ async function loadNetwork({ isIndexer = false, currentEpoch = null, indexerCoun
         '../../../src/core/network/services/TransactionCommitService.js': { default: TransactionCommitServiceMock },
         '../../../src/core/network/services/ValidatorHealthCheckService.js': { default: ValidatorHealthCheckServiceMock },
         '../../../src/core/consensus/services/EpochCoordinatorService.js': { default: EpochCoordinatorServiceMock },
+        '../../../src/core/consensus/epochAppenderSelection/createEpochAppenderSelector.js': {
+            createEpochAppenderSelector: () => epochAppenderSelector,
+        },
         '../../../src/core/network/services/IndexerConnectionManager.js': { default: IndexerConnectionManagerMock },
         '../../../src/core/network/protocols/validators/ValidatorMessages.js': { default: ValidatorMessagesMock },
         '../../../src/core/network/protocols/consensus/IndexerMessages.js': { default: IndexerMessagesMock },
@@ -307,6 +311,7 @@ async function loadNetwork({ isIndexer = false, currentEpoch = null, indexerCoun
         validatorConnectionManagerInstance,
         indexerConnectionManagerInstance,
         epochCoordinatorServiceInstance,
+        epochAppenderSelector,
         validatorPendingRequestServiceInstance,
         indexerPendingRequestServiceInstance,
         consensusMessagesInstance,
@@ -321,13 +326,15 @@ if (isBareRuntime) {
     });
 } else {
     test('Network does not start the epoch coordinator before genesis initialization', async t => {
-        const { network, epochCoordinatorServiceInstance } = await loadNetwork({
+        const { network, epochCoordinatorServiceInstance, epochAppenderSelector } = await loadNetwork({
             isIndexer: true,
             currentEpoch: null
         });
 
         t.absent(epochCoordinatorServiceInstance.start.called);
+        t.is(epochAppenderSelector.open.callCount, 1, 'the shared append coordinator is opened with the network');
         await network.close();
+        t.is(epochAppenderSelector.close.callCount, 1, 'the shared append coordinator closes with the network');
     });
 
     test('Network starts the epoch coordinator for an initialized indexer', async t => {

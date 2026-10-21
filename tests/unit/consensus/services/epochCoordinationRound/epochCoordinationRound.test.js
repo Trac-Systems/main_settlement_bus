@@ -59,6 +59,7 @@ function setupRound(overrides = {}) {
             logger,
             operations,
             intervalMs: config.epochInterval,
+            appenderSelector: { enabledFor: () => false },
         });
         rounds.push(round);
         return round;
@@ -486,6 +487,105 @@ test('append failure retries within the same round using the local VDF', async t
         clock.restore();
     }
 });
+
+test('a late append failure cannot interrupt the next attempt or change its timeout', async t => {
+    const clock = sinon.useFakeTimers();
+    const firstAppend = deferred();
+    const appendSetEpoch = sinon.stub().resolves();
+    appendSetEpoch.onFirstCall().returns(firstAppend.promise);
+    const context = setupRound({ opsOverrides: { appendSetEpoch } });
+    const next = sinon.stub();
+    try {
+        const running = context.runRound(next);
+        await clock.tickAsync(0);
+        t.is(appendSetEpoch.callCount, 1);
+
+        await clock.tickAsync(CONFIG.epochAppendTimeout + CONFIG.epochBackoffDelay);
+        t.is(appendSetEpoch.callCount, 2, 'the second attempt starts after timeout and backoff');
+
+        firstAppend.reject(new Error('late append failure'));
+        await clock.tickAsync(CONFIG.epochBackoffDelay);
+        await running;
+
+        t.is(appendSetEpoch.callCount, 2, 'the old failure does not start a third attempt');
+        t.is(context.state.refresh.callCount, 1, 'the old failure does not trigger another refresh');
+        t.absent(context.logger.error.called, 'the old failure is ignored');
+        t.absent(next.called, 'the current round remains active');
+
+        await clock.tickAsync(CONFIG.epochAppendTimeout - CONFIG.epochBackoffDelay - 1);
+        t.is(context.state.refresh.callCount, 1, 'the second attempt keeps its full append timeout');
+        await clock.tickAsync(1);
+        await clock.tickAsync(CONFIG.epochBackoffDelay - 1);
+        t.is(appendSetEpoch.callCount, 2, 'the second timeout still observes the backoff delay');
+        await clock.tickAsync(1);
+        t.is(appendSetEpoch.callCount, 3, 'the second timeout still starts a retry at its original deadline');
+    } finally {
+        await context.closeRounds();
+        clock.restore();
+    }
+});
+
+test('a late append failure during backoff is ignored before the next append starts', async t => {
+    const clock = sinon.useFakeTimers();
+    const firstAppend = deferred();
+    const appendSetEpoch = sinon.stub().resolves();
+    appendSetEpoch.onFirstCall().returns(firstAppend.promise);
+    const context = setupRound({ opsOverrides: { appendSetEpoch } });
+    try {
+        const running = context.runRound();
+        await clock.tickAsync(0);
+        await clock.tickAsync(CONFIG.epochAppendTimeout);
+
+        firstAppend.reject(new Error('late append failure during backoff'));
+        await clock.tickAsync(0);
+        await running;
+
+        t.absent(context.logger.error.called, 'the timed-out operation is already obsolete during backoff');
+        await clock.tickAsync(CONFIG.epochBackoffDelay - 1);
+        t.is(appendSetEpoch.callCount, 1);
+        t.absent(context.state.refresh.called);
+        await clock.tickAsync(1);
+        t.is(appendSetEpoch.callCount, 2, 'the original backoff still starts the second attempt on time');
+    } finally {
+        await context.closeRounds();
+        clock.restore();
+    }
+});
+
+for (const localProposer of [true, false]) {
+    test(`a late append completion still allows ${localProposer ? 'local' : 'peer'} ledger progress during the next attempt`, async t => {
+        const clock = sinon.useFakeTimers();
+        const firstAppend = deferred();
+        const appendSetEpoch = sinon.stub().returns(new Promise(() => {}));
+        appendSetEpoch.onFirstCall().returns(firstAppend.promise);
+        const context = setupRound({ opsOverrides: { appendSetEpoch } });
+        const next = sinon.stub();
+        try {
+            const running = context.runRound(next);
+            await clock.tickAsync(0);
+            await clock.tickAsync(CONFIG.epochAppendTimeout + CONFIG.epochBackoffDelay);
+            t.is(appendSetEpoch.callCount, 2);
+
+            firstAppend.resolve();
+            await running;
+            t.absent(next.called, 'a completed local append still waits for ledger progress');
+
+            await context.state.emit(CustomEventType.EPOCH_CREATED, {
+                epoch: uint64ToBuffer(6n),
+                proposerAddress: localProposer ? context.wallet.address : 'trac1peer',
+            });
+            await clock.tickAsync(0);
+            t.ok(next.calledOnceWithExactly(CONFIG.epochInterval), 'ledger progress ends the round while the second append is pending');
+
+            await clock.tickAsync(CONFIG.epochAppendTimeout + CONFIG.epochBackoffDelay);
+            t.is(appendSetEpoch.callCount, 2, 'ledger progress clears the retry timer');
+            t.ok(next.calledOnce);
+        } finally {
+            await context.closeRounds();
+            clock.restore();
+        }
+    });
+}
 
 test('append completion waits for the target EPOCH_CREATED event', async t => {
     const context = setupRound();

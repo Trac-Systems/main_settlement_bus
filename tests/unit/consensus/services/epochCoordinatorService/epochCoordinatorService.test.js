@@ -79,7 +79,7 @@ async function setup(overrides = {}) {
     const { default: esmock } = await import('esmock');
     const { default: Service } = await esmock(SVC_PATH, mocks);
 
-    const service = new Service(state, wallet, config, manager);
+    const service = new Service(state, wallet, config, manager, { enabledFor: () => false });
     await service.ready();
 
     return {

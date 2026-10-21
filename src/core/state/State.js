@@ -77,6 +77,7 @@ import {decodeVersionedConsensusConfig} from '../../utils/consensusConfig.js';
 import {safeDecodeVdfConfig} from '../../codecs/consensus/v1/vdfConfigCodec.js';
 import _ from 'lodash';
 import {StateEventQueue} from './StateEventQueue.js';
+import { readEpochAppenderSelectionContext, readEpochAppendOutcome } from '../consensus/epochAppenderSelection/epochAppenderSelectionLedgerReader.js';
 
 const OVERSIZED_BATCH_PENALTY_MULTIPLIER = BATCH_SIZE;
 
@@ -4902,6 +4903,29 @@ class State extends ReadyResource {
         return Status.SUCCESS;
     }
 
+    /** @returns {Promise<import('../consensus/epochAppenderSelection/epochAppenderSelectionState.js').EpochAppenderSelectionContext>} Signed arbitration context. */
+    getEpochAppenderSelectionContext() {
+        return readEpochAppenderSelectionContext(this.#base, this.#config);
+    }
+
+    /**
+     * @param {import('../consensus/epochAppenderSelection/epochAppenderSelectionState.js').EpochAppendPublication} publication
+     * @returns {Promise<import('../consensus/epochAppenderSelection/epochAppenderSelectionState.js').EpochAppendOutcomeResult>}
+     */
+    getEpochAppendOutcome(publication) {
+        return readEpochAppendOutcome(this.#base, publication);
+    }
+
+    /** Persist publication intent inside the writer queue, before invoking Autobase. */
+    appendEpoch(payload, beforeAppend) {
+        return this.#writeQueue.add(async () => {
+            await beforeAppend({
+                writerKey: this.#base.local.key.toString('hex'),
+                from: this.#base.local.length,
+            });
+            return this.#base.append(payload);
+        });
+    }
 }
 
 export default State;

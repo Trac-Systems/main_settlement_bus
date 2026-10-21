@@ -126,8 +126,11 @@ export class EpochCoordinatorOperations {
         return encodeApplyOperation(message);
     }
 
-    /** Appends the SET_EPOCH payload to local state. */
-    appendSetEpoch(payload) {
+    /** Appends SET_EPOCH, authorizing a selected appender inside the writer queue. */
+    appendSetEpoch(payload, beforeAppend) {
+        if (beforeAppend) {
+            return this.#state.appendEpoch(payload, beforeAppend);
+        }
         return this.#state.append(payload);
     }
 

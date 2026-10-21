@@ -1,4 +1,5 @@
 import b4a from 'b4a';
+import { appendSignatureData, toAppendIntent } from './epochAppendMessage.js';
 import tracCryptoApi from 'trac-crypto-api';
 import { encodeProofProposalApproval } from '../../../codecs/consensus/v1/consensusV1OperationCodec.js';
 import { addressToBuffer, isAddressValid } from "../../../core/state/utils/address.js";
@@ -31,6 +32,8 @@ class ConsensusMessageBuilder {
     #body;
     #payloadKey;
     #requester_proof_signature;
+    #appendIntent;
+    #appendVote;
 
     constructor(wallet, config) {
         this.#config = config;
@@ -303,10 +306,16 @@ class ConsensusMessageBuilder {
         this.#setPayload('proof_proposal_response', response);
     }
 
+
     async buildPayload() {
         this.#setHeader();
 
         switch (this.#type) {
+            case ConsensusOperationType.REQUEST:
+            case ConsensusOperationType.REPLY: {
+                await this.#buildAppendPayload();
+                break;
+            }
             case ConsensusOperationType.PROOF_PROPOSAL: {
                 await this.#buildProofProposalPayload();
                 break;
@@ -331,7 +340,29 @@ class ConsensusMessageBuilder {
         };
     }
 
+    setAppendIntent(request) {
+        this.#appendIntent = toAppendIntent(request);
+        this.#appendVote = request.vote ? {
+            vote_status: request.voteStatus,
+            observed_counter: uint64ToBuffer(BigInt(request.observedCounter)),
+            vote: toAppendIntent(request.vote),
+        } : null;
+        return this;
+    }
 
+    async #buildAppendPayload() {
+        const payloadKey = this.#type === ConsensusOperationType.REQUEST ? 'request' : 'reply';
+        const body = { intent: this.#appendIntent };
+        if (this.#type === ConsensusOperationType.REPLY) {
+            if (!this.#appendVote) throw new Error('An appender reply requires a persisted vote decision');
+            body.responder = tracCryptoApi.address.decode(this.#wallet.address);
+            Object.assign(body, this.#appendVote);
+        }
+        const signatureData = appendSignatureData({ ...this.#header, [payloadKey]: body });
+        const hash = await tracCryptoApi.hash.blake3(signatureData);
+        body.signature = this.#wallet.sign(hash);
+        this.#setPayload(payloadKey, body);
+    }
 }
 
 export default ConsensusMessageBuilder;

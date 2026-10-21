@@ -21,15 +21,19 @@ export class EpochRoundListeners {
     #intervalMs;
     #isRoundActive;
     #cleanups = [];
+    #isAppendCoordinated;
+    #onEpochProgress;
 
     /** Creates listeners for one state machine round. */
-    constructor({ state, machine, wallet, config, intervalMs, isRoundActive }) {
+    constructor({ state, machine, wallet, config, intervalMs, isRoundActive, isAppendCoordinated = () => false, onEpochProgress }) {
         this.#state = state;
         this.#machine = machine;
         this.#wallet = wallet;
         this.#config = config;
         this.#intervalMs = intervalMs;
         this.#isRoundActive = isRoundActive;
+        this.#isAppendCoordinated = isAppendCoordinated;
+        this.#onEpochProgress = onEpochProgress;
     }
 
     /**
@@ -74,6 +78,10 @@ export class EpochRoundListeners {
         this.#cleanups.push(
             listenTo(this.#state, CustomEventType.EPOCH_CREATED, async () => {
                 if (!this.#isRoundActive()) return;
+                if (this.#isAppendCoordinated()) {
+                    await this.#onEpochProgress();
+                    return;
+                }
                 if (this.#machine.state !== EPOCH_STATES.APPEND_SET_EPOCH) {
                     await this.#machine.close();
                     await this.#machine.context.next(this.#intervalMs);
@@ -107,7 +115,7 @@ export class EpochRoundListeners {
                 clearTimeout(signatureTimer);
             }
 
-            if (next === EPOCH_STATES.APPEND_SET_EPOCH) {
+            if (next === EPOCH_STATES.APPEND_SET_EPOCH && !this.#isAppendCoordinated()) {
                 appendTimer = setTimeout(
                     () => {
                         if (this.#isRoundActive()) this.#machine.send(EPOCH_EVENTS.APPEND_FAILED);

@@ -11,6 +11,8 @@ import tracCryptoApi from "trac-crypto-api";
 import {createMessage} from "../../../../../../utils/buffer.js";
 import {bufferToAddress} from "../../../../../state/utils/address.js";
 import b4a from "b4a";
+import { appendSignatureData, fromAppendIntent } from '../../../../../../messages/consensus/v1/epochAppendMessage.js';
+import { sameSelectionContext } from '../../../../../consensus/epochAppenderSelection/epochAppenderSelectionState.js';
 
 class V1BaseConsensusOperation {
     #consensusValidationSchema;
@@ -157,6 +159,9 @@ class V1BaseConsensusOperation {
         }
 
         switch (type) {
+            case ConsensusOperationType.REQUEST:
+            case ConsensusOperationType.REPLY:
+                return this.#consensusValidationSchema.validateEpochAppendMessage.bind(this.#consensusValidationSchema);
             case ConsensusOperationType.UNSPECIFIED:
                 throw new V1ConsensusProtocolError(
                     ConsensusResultCode.OPERATION_TYPE_INVALID,
@@ -180,7 +185,7 @@ class V1BaseConsensusOperation {
      * Builds the canonical request or approval signature message, hashes it with
      * BLAKE3, and verifies the signature using the supplied public key.
      *
-     * @param {object} payload Decoded proof proposal request or approval payload.
+     * @param {object} payload Decoded consensus operation payload.
      * @param {Buffer} remotePublicKey Public key received from the peer connection.
      * @param {object} [proofProposal] Original proof proposal required for approval verification.
      * @param {number} [invalidSignatureResultCode] ConsensusResultCode to use when the signature is invalid.
@@ -245,6 +250,7 @@ class V1BaseConsensusOperation {
      *
      * A proposal message covers the VDF challenge and proof. An approval message
      * additionally covers the approver and the original proposal signature.
+     * Appender selection messages use their own header and vote signature framing.
      *
      * @param {object} payload Decoded consensus operation payload.
      * @param {object} [proofProposalContext] Original proposal used for an approval message.
@@ -260,6 +266,11 @@ class V1BaseConsensusOperation {
         }
 
         switch (payload.type) {
+            case ConsensusOperationType.REQUEST:
+            case ConsensusOperationType.REPLY: {
+                const body = payload.type === ConsensusOperationType.REQUEST ? payload.request : payload.reply;
+                return { signature: body.signature, message: appendSignatureData(payload) };
+            }
             case ConsensusOperationType.UNSPECIFIED:
                 throw new V1ConsensusProtocolError(
                     ConsensusResultCode.OPERATION_TYPE_INVALID,
@@ -377,6 +388,38 @@ class V1BaseConsensusOperation {
                 'Local node is not an indexer and cannot approve proposals.'
             )
         }
+    }
+
+    /**
+     * Resolve membership locally from signed state; it is not supplied by the peer.
+     * @returns {Promise<import('../../../../../consensus/epochAppenderSelection/epochAppenderSelectionState.js').EpochAppendRequest>}
+     */
+    async validateAppendContext(intent, remotePublicKey) {
+        const request = fromAppendIntent(intent);
+        const context = await this._state.getEpochAppenderSelectionContext();
+        const peer = b4a.toString(remotePublicKey, 'hex');
+        const includesPeer = context.members.some(member => member.publicKey === peer);
+        const includesRequester = context.members.some(member => member.publicKey === request.requester);
+        if (!sameSelectionContext(request, context) || !includesPeer || !includesRequester) {
+            throw new V1ConsensusProtocolError(ConsensusResultCode.EPOCH_INVALID, 'Stale or foreign append context');
+        }
+        return { ...request, members: context.members };
+    }
+
+    /** Authenticate REQUEST/REPLY before reading the signed election context. */
+    async validateAppendMessage(message, remotePublicKey, expectedType) {
+        if (message?.type !== expectedType) {
+            throw new V1ConsensusProtocolError(ConsensusResultCode.INVALID_PAYLOAD, 'Unexpected epoch append message type');
+        }
+        this.isPayloadSchemaValid(message);
+        const isRequest = expectedType === ConsensusOperationType.REQUEST;
+        const body = isRequest ? message.request : message.reply;
+        const author = isRequest ? body.intent.requester : body.responder;
+        if (!b4a.equals(author, remotePublicKey)) {
+            throw new V1ConsensusProtocolError(ConsensusResultCode.PUBLIC_KEY_MISMATCH, 'Append message author mismatch');
+        }
+        await this.validateSignature(message, remotePublicKey, undefined, ConsensusResultCode.RESPONSE_SIGNATURE_INVALID);
+        return this.validateAppendContext(body.intent, remotePublicKey);
     }
 }
 

@@ -20,6 +20,7 @@ import { CustomEventType } from '../../utils/constants.js';
 import tracCryptoApi from 'trac-crypto-api'
 import IndexerMessages from './protocols/consensus/IndexerMessages.js';
 import IndexerPendingRequestService from './protocols/consensus/v1/IndexerPendingRequestService.js';
+import { createEpochAppenderSelector } from '../consensus/epochAppenderSelection/createEpochAppenderSelector.js';
 
 const wakeup = new w();
 
@@ -44,6 +45,7 @@ class Network extends ReadyResource {
     #indexerMessages;
     #indexerConnectionManager;
     #consensusPeerBanRequestedListener;
+    #epochAppenderSelector;
 
     /**
      * @param {State} state
@@ -94,10 +96,21 @@ class Network extends ReadyResource {
 
     async _open() {
         this.#logger.info('Network initialization...');        
-        this.transactionPoolService.start();
 
         const { wallet: wrappedWallet, keyPair } = await this.#getOrGenerateWallet();
         this.#wallet = wrappedWallet
+
+        // Recover durable votes before starting network resources.
+        this.#epochAppenderSelector = createEpochAppenderSelector(
+            this.#state,
+            this.#wallet,
+            this.#config,
+            () => this.#indexerConnectionManager,
+            this.#logger,
+            this.#indexerPendingRequestService
+        );
+        await this.#epochAppenderSelector.open();
+        this.transactionPoolService.start();
 
         this.#swarm = new Hyperswarm({
             keyPair,
@@ -126,7 +139,7 @@ class Network extends ReadyResource {
 
         this.#indexerMessages = new IndexerMessages(
             this.#state, this.#wallet, this.#config, this.#indexerPendingRequestService,
-            this.#handleConsensusSessionClosed.bind(this)
+            this.#handleConsensusSessionClosed.bind(this), this.#epochAppenderSelector,
         );
 
         const indexerCount = await this.#state.indexerCount();
@@ -141,7 +154,9 @@ class Network extends ReadyResource {
         );
         await this.#indexerConnectionManager.ready();
 
-        this.#epochCoordinatorService = new EpochCoordinatorService(this.#state, this.#wallet, this.#config, this.#indexerConnectionManager);
+        this.#epochCoordinatorService = new EpochCoordinatorService(
+            this.#state, this.#wallet, this.#config, this.#indexerConnectionManager, this.#epochAppenderSelector,
+        );
         await this.#epochCoordinatorService.ready();
 
         this.#logger.info(`Channel: ${b4a.toString(this.#config.channel)}`);
@@ -162,6 +177,7 @@ class Network extends ReadyResource {
         this.#logger.info('Network: closing gracefully...');
         this.#state.off(CustomEventType.CONSENSUS_PEER_BAN_REQUESTED, this.#consensusPeerBanRequestedListener);
         await this.#epochCoordinatorService.close();
+        await this.#epochAppenderSelector.close();
         await this.transactionPoolService.stop();
         await sleep(100);
         await this.#validatorObserverService.stop();

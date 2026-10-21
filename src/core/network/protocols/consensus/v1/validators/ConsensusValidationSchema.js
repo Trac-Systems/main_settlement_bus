@@ -12,6 +12,7 @@ import {
     VDF_DISCRIMINANT_SIZE
 } from '../../../../../../utils/constants.js';
 import { V1ConsensusProtocolError } from '../V1ConsensusProtocolError.js';
+import { EPOCH_APPENDER_SELECTION_VERSION, EpochAppenderVoteStatus } from '../../../../../consensus/epochAppenderSelection/epochAppenderSelectionState.js';
 
 const ALLOWED_RESULT_CODES = Object.values(ConsensusResultCode);
 
@@ -20,6 +21,7 @@ class ConsensusValidationSchema {
     #validator;
     #validateConsensusV1ProofProposalSchema;
     #validateConsensusV1ProposalApproval;
+    #appendSchemas;
 
     constructor(config) {
         this.#config = config;
@@ -81,6 +83,10 @@ class ConsensusValidationSchema {
         });
         this.#validateConsensusV1ProofProposalSchema = this.#compileV1EpochProofProposalRequestSchema();
         this.#validateConsensusV1ProposalApproval = this.#compileConsensusV1ProposalApprovalSchema();
+        this.#appendSchemas = new Map([
+            [ConsensusOperationType.REQUEST, this.#compileAppendSchema(ConsensusOperationType.REQUEST)],
+            [ConsensusOperationType.REPLY, this.#compileAppendSchema(ConsensusOperationType.REPLY)],
+        ]);
     }
 
     #compileV1EpochProofProposalRequestSchema() {
@@ -210,6 +216,53 @@ class ConsensusValidationSchema {
         }
 
         return true;
+    }
+    #compileAppendSchema(messageType) {
+        const bufferSchema = length => ({ type: 'buffer', length });
+        const intent = {
+            type: 'object',
+            strict: true,
+            props: {
+                network_id: bufferSchema(NETWORK_ID_BYTE_LENGTH),
+                bootstrap: bufferSchema(HASH_BYTE_LENGTH),
+                epoch: bufferSchema(EPOCH_BYTE_LENGTH),
+                parent_hash: bufferSchema(HASH_BYTE_LENGTH),
+                membership_context: bufferSchema(HASH_BYTE_LENGTH),
+                config_hash: bufferSchema(HASH_BYTE_LENGTH),
+                request_id: { type: 'string', min: 1, max: 64 },
+                payload_hash: bufferSchema(HASH_BYTE_LENGTH),
+                logical_counter: bufferSchema(EPOCH_BYTE_LENGTH),
+                requester: bufferSchema(32),
+                selection_version: { type: 'equal', value: EPOCH_APPENDER_SELECTION_VERSION },
+            },
+        };
+        const bodyProperties = {
+            intent,
+            signature: bufferSchema(SIGNATURE_BYTE_LENGTH),
+        };
+        let payloadKey = 'request';
+        if (messageType === ConsensusOperationType.REPLY) {
+            payloadKey = 'reply';
+            bodyProperties.responder = bufferSchema(32);
+            bodyProperties.vote_status = { type: 'enum', values: Object.values(EpochAppenderVoteStatus) };
+            bodyProperties.observed_counter = bufferSchema(EPOCH_BYTE_LENGTH);
+            bodyProperties.vote = intent;
+        }
+        return this.#validator.compile({
+            $$strict: true,
+            type: { type: 'equal', value: messageType },
+            session_id: { type: 'string', min: 1, max: 64 },
+            timestamp: { type: 'number', integer: true, min: 1, max: Number.MAX_SAFE_INTEGER },
+            [payloadKey]: {
+                type: 'object',
+                strict: true,
+                props: bodyProperties,
+            },
+        });
+    }
+
+    validateEpochAppendMessage(message) {
+        return this.#appendSchemas.get(message.type)?.(message) === true;
     }
 }
 

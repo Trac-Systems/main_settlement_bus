@@ -9,6 +9,9 @@ import IndexerMessages from '../../../../src/core/network/protocols/consensus/In
 import IndexerConnectionManager from '../../../../src/core/network/services/IndexerConnectionManager.js';
 import IndexerPendingRequestService from '../../../../src/core/network/protocols/consensus/v1/IndexerPendingRequestService.js';
 import { EpochCoordinationRound } from '../../../../src/core/consensus/services/EpochCoordinationRound.js';
+import {
+    createEpochAppenderSelector,
+} from '../../../../src/core/consensus/epochAppenderSelection/createEpochAppenderSelector.js';
 import { VDFServiceManager } from '../../../../src/core/consensus/services/VDFServiceManager.js';
 import { applyStateMessageFactory } from '../../../../src/messages/state/applyStateMessageFactory.js';
 import { encodeApplyOperation, encodeConsensusConfig } from '../../../../src/codecs/apply/applyOperationCodec.js';
@@ -32,7 +35,9 @@ export async function waitFor(description, predicate) {
 }
 
 /** Real State/Autobase nodes over local Noise streams; only peer discovery is replaced. */
-export async function createConsensusNetwork(t, { indexerCount = 5, prepareConnections = true } = {}) {
+export async function createConsensusNetwork(t, {
+    indexerCount = 5, prepareConnections = true, coordination = false, beforeMembership, timings = {},
+} = {}) {
     const nodes = [];
     const links = [];
     const rounds = [];
@@ -63,6 +68,7 @@ export async function createConsensusNetwork(t, { indexerCount = 5, prepareConne
         // Keep cleanup in one callback: Brittle does not sort teardown order after a thrown error.
         for (const release of gates) release();
         for (const node of nodes) {
+            await close(node.appenderSelector);
             await close(node.vdfManager);
             await close(node.pending);
         }
@@ -83,21 +89,21 @@ export async function createConsensusNetwork(t, { indexerCount = 5, prepareConne
     // Register directory cleanup after resource cleanup, including for failed tests.
     const directory = await t.tmp();
 
-    async function waitForReplication(description, predicate) {
+    async function waitForReplication(description, predicate, participants = nodes) {
         let acknowledger = 0;
         try {
             await waitFor(description, async () => {
                 if (errors.length) throw errors[0];
-                await Promise.all(nodes.map(node => node.state.refresh()));
+                await Promise.all(participants.map(node => node.state.refresh()));
                 if (await predicate()) return true;
 
                 // Let every node process the same heads before adding another ACK.
-                const heads = nodes.map(node => node.state.base.heads()
+                const heads = participants.map(node => node.state.base.heads()
                     .map(({ key, length }) => `${key.toString('hex')}:${length}`).sort().join(','));
                 if (!heads.every(value => value === heads[0])) return false;
 
-                const node = nodes[acknowledger];
-                acknowledger = (acknowledger + 1) % nodes.length;
+                const node = participants[acknowledger];
+                acknowledger = (acknowledger + 1) % participants.length;
                 // Include writers awaiting promotion; their first ACK completes Autobase membership.
                 if (node.state.base.writable) await node.state.append(null);
                 return false;
@@ -137,6 +143,7 @@ export async function createConsensusNetwork(t, { indexerCount = 5, prepareConne
         const link = links.find(link => !link.disconnected && (
             (link.a === node && link.b === other) || (link.b === node && link.a === other)
         ));
+        if (!link) return null;
         return link.a === node ? link.left.noiseStream : link.right.noiseStream;
     }
 
@@ -174,8 +181,11 @@ export async function createConsensusNetwork(t, { indexerCount = 5, prepareConne
             enableLogTimestamp: false,
         });
         // No timeout is an expected transition in these tests. Leave time for slow CI.
-        for (const name of ['epochSignatureTimeout', 'epochAppendTimeout', 'indexerPendingRequestTimeout']) {
-            Object.defineProperty(node.config, name, { value: 60_000 });
+        for (const [name, value] of Object.entries({
+            epochSignatureTimeout: 60_000, epochAppendTimeout: 60_000, indexerPendingRequestTimeout: 60_000,
+            ...timings,
+        })) {
+            Object.defineProperty(node.config, name, { value });
         }
         node.wallet = await new WalletProvider(node.config).generate({ derivationPath: node.config.derivationPath });
         node.state = new State(store, node.wallet, node.config);
@@ -213,12 +223,31 @@ export async function createConsensusNetwork(t, { indexerCount = 5, prepareConne
         node.promoted = true;
     }
 
+    async function removeIndexer(node) {
+        await appendAdmin((factory, validity) => factory.buildCompleteRemoveIndexerMessage(
+            proposer.wallet.address, node.wallet.address, validity
+        ));
+        const expectedKeys = nodes.filter(peer => peer.promoted && peer !== node)
+            .map(peer => peer.state.writingKey.toString('hex')).sort();
+        await waitForReplication(`indexer ${node.id} removal signed on all nodes`, async () => {
+            for (const peer of nodes) {
+                const actual = (await peer.state.getIndexersEntry()).map(entry => entry.key.toString('hex')).sort();
+                if (actual.join(',') !== expectedKeys.join(',')) return false;
+                if ((await peer.state.getNodeEntry(node.wallet.address))?.isIndexer) return false;
+            }
+            return !node.state.isIndexer();
+        });
+        node.promoted = false;
+    }
+
     await appendAdmin((factory, validity) => factory.buildCompleteAddAdminMessage(
         proposer.wallet.address, proposer.state.writingKey, validity
     ));
     await waitForReplication('admin registration', async () =>
         (await Promise.all(nodes.map(node => node.state.getAdminEntry()))).every(Boolean)
     );
+
+    await beforeMembership?.({ nodes, proposer });
 
     for (const node of nodes.slice(1)) {
         await appendAdmin((factory, validity) => factory.buildCompleteBalanceInitializationMessage(
@@ -255,16 +284,30 @@ export async function createConsensusNetwork(t, { indexerCount = 5, prepareConne
 
     for (const node of nodes) {
         node.pending = new IndexerPendingRequestService(node.config);
+        if (coordination) {
+            node.appenderSelector = createEpochAppenderSelector(
+                node.state,
+                node.wallet,
+                node.config,
+                () => node.manager,
+                new Logger(node.config),
+                node.pending
+            );
+            await node.appenderSelector.open();
+        }
         function removeClosedSession(connection) {
             node.manager.remove(connection.remotePublicKey, connection);
         }
-        node.messages = new IndexerMessages(node.state, node.wallet, node.config, node.pending, removeClosedSession);
+        node.messages = new IndexerMessages(
+            node.state, node.wallet, node.config, node.pending, removeClosedSession, node.appenderSelector,
+        );
         const network = {
             isConnectionPending: () => false,
             async tryConnect(publicKey) {
                 const other = nodes.find(peer => peer.wallet.publicKey.toString('hex') === publicKey);
                 if (!other) throw new Error('Requested peer must exist in the test network');
-                await node.manager.add(other.wallet.publicKey, connectionFrom(node, other));
+                const connection = connectionFrom(node, other);
+                if (connection) await node.manager.add(other.wallet.publicKey, connection);
             },
         };
         node.manager = new IndexerConnectionManager(
@@ -304,6 +347,8 @@ export async function createConsensusNetwork(t, { indexerCount = 5, prepareConne
             logger: new Logger(config),
             operations: node.operations,
             intervalMs: config.epochInterval,
+            // Isolate proof-round regressions from elections with an explicit test double.
+            appenderSelector: node.appenderSelector ?? { enabledFor: () => false },
         });
         const execution = { round, completed: false };
         rounds.push(execution);
@@ -312,5 +357,5 @@ export async function createConsensusNetwork(t, { indexerCount = 5, prepareConne
         return execution;
     }
 
-    return { nodes, proposer, addIndexer, appendAdmin, connectionFrom, disconnect, reconnect, createProofProposal, startRound, openOperations, waitForReplication, deferred };
+    return { nodes, proposer, addIndexer, removeIndexer, appendAdmin, connectionFrom, disconnect, reconnect, createProofProposal, startRound, openOperations, waitForReplication, deferred };
 }

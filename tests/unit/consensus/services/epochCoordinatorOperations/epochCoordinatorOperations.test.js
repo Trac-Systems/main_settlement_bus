@@ -325,6 +325,26 @@ test('appendSetEpoch calls state.append with the given payload', async t => {
     t.ok(state.append.calledOnceWith(payload));
 });
 
+test('appendSetEpoch forwards selected-appender authorization to the guarded writer queue', async t => {
+    const failure = new Error('selection expired while queued');
+    const beforeAppend = sinon.stub().rejects(failure);
+    const location = { writerKey: '01'.repeat(32), from: 12 };
+    const state = makeState({
+        appendEpoch: sinon.stub().callsFake(async (_payload, authorize) => {
+            await authorize(location);
+            t.fail('a rejected authorization must stop the append');
+        }),
+    });
+    const payload = b4a.from('selected proof');
+
+    const result = await makeOps({ state }).appendSetEpoch(payload, beforeAppend).catch(error => error);
+
+    t.is(result, failure);
+    t.ok(state.appendEpoch.calledOnceWith(payload, beforeAppend));
+    t.ok(beforeAppend.calledOnceWith(location));
+    t.absent(state.append.called, 'selected appends cannot fall back to the unguarded path');
+});
+
 // --- approvers ---
 
 // approvers() only excludes self (writingKey) - it does not call getAdminEntry at all, so an
