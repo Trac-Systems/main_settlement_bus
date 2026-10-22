@@ -18,8 +18,8 @@ export function createSelectionContext(memberCount) {
 
 /** The caller owns the append; the selector authorizes it inside the writer queue. */
 export async function appendSelected(selector, requestId, append) {
-    const payload = await selector.getSelectedPayload(requestId);
-    return append(payload, location => selector.authorizeAppend(requestId, location));
+    const payload = await selector.getSelectedEpochPayload(requestId);
+    return append(payload, location => selector.authorizeEpochAppend(requestId, location));
 }
 
 /** Deterministic 32-byte keys for selector fixtures that do not exercise signatures. */

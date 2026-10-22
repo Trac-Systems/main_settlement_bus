@@ -29,11 +29,11 @@ export default class V1EpochAppendOperationHandler {
         if (session.closed) {
             return;
         }
-        await this.#selector.reconcile();
+        await this.#selector.refreshAppendOutcome();
         if (!await this.#canReply(request, session)) {
             return;
         }
-        await this.#selector.receiveRequest(request, response => {
+        await this.#selector.handleSelectionRequest(request, response => {
             return this.#sendReply(message.session_id, response, session);
         });
     }

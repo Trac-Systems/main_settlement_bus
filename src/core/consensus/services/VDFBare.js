@@ -2,25 +2,11 @@ import { VDFService } from './VDFService.js';
 
 let bareBinaryPathPromise = null;
 
-// Resolves the bare-runtime native binary bundled via the `bare-runtime` project dependency,
-// instead of using Bare.argv[0]. Under `pear run .`, Bare.argv[0] is Pear's own pear-runtime
-// binary, whose CLI expects `pear run <link>`-style arguments rather than a raw script path -
-// spawning it directly with the worker script path produces a "Unrecognized Argument" usage
-// error instead of running the worker (reproduced while diagnosing a crash surfaced in manual
-// QA). Resolving our own bundled bare-runtime-<platform>-<arch> binary works the same
-// regardless of what launched the current process.
-//
-// The path is built directly from Pear.config.dir/import.meta.url rather than through ES
-// module resolution (e.g. import.meta.resolve): Pear's `pear://dev/` module resolver doesn't
-// reliably see bare-runtime's platform-specific optional dependency, even by its literal
-// package name, and returns MODULE_NOT_FOUND for it despite npm installing it fine (also
-// reproduced in manual QA - worked outside Pear, failed under `pear run .`). Reading the
-// already-installed file straight off disk sidesteps that resolver entirely, the same way
-// #workerFileUrl() below already does for vdf-worker.js.
 /**
- * Finds and caches the Bare executable used to start VDF processes.
+ * Finds the bundled Bare executable and saves its path for later calls. Pear needs the actual file
+ * path to start this worker. Sets the executable permission before using it.
  *
- * @returns {Promise<string>}
+ * @returns {Promise<string>} Absolute executable path.
  */
 async function resolveBareBinaryPath() {
     if (!bareBinaryPathPromise) {
@@ -45,31 +31,33 @@ async function resolveBareBinaryPath() {
     return bareBinaryPathPromise;
 }
 
-// Each VDF computation runs in its own disposable OS subprocess instead of a Bare.Thread:
-// a real solveWesolowski() call leaves native/WASM state that crashes Bare.Thread's teardown
-// (V8's internal WASM compiler threads never rejoin cleanly - reproduced in isolation, with
-// no trac-vdf/Bare.Thread-specific code involved beyond calling the function once). A crash
-// in a short-lived, disposable subprocess after it has already reported its result is
-// harmless to the parent process, so shutdown is a plain SIGKILL instead of a graceful join.
+/**
+ * Runs each VDF calculation in a separate Bare process. This lets the parent stop the solver by
+ * closing the process. Requests and responses use one JSON object per line. The service uses the same
+ * write, read and close methods as the Node worker.
+ */
 class SubprocessPort {
-    #workerFileUrl;
-    #child = null;
-    #childExit = null;
-    #pendingResponse = null;
-    #finishPending = null;
+    #workerScriptUrl;
+    #workerProcess = null;
+    #workerExitPromise = null;
+    #workerResponsePromise = null;
+    #resolvePendingResponse = null;
     #closed = false;
 
     /** @param {string} workerFileUrl file URL of the VDF worker script */
     constructor(workerFileUrl) {
-        this.#workerFileUrl = workerFileUrl;
+        this.#workerScriptUrl = workerFileUrl;
     }
 
     /**
-     * Starts one Bare process and writes the VDF request to stdin.
-     * It checks close state again after async setup, so a process is not started after close().
+     * Starts a Bare process and sends the calculation to its standard input. Checks whether the port
+     * was closed during setup before starting the process.
      *
-     * @param {object} request
-     * @returns {Promise<void>}
+     * @param {object} calculationRequest Worker calculation data.
+     * @param {Buffer} calculationRequest.challenge Encoded epoch challenge.
+     * @param {number} calculationRequest.difficulty VDF iteration count.
+     * @param {number} calculationRequest.discriminantSizeBits Discriminant size in bits.
+     * @returns {Promise<void>} Resolves after sending the request. Call read() for the result.
      */
     async write({ challenge, difficulty, discriminantSizeBits }) {
         if (this.#closed) throw new Error('VDF subprocess is closed');
@@ -80,101 +68,102 @@ class SubprocessPort {
         const bareBinaryPath = await resolveBareBinaryPath();
         if (this.#closed) throw new Error('VDF subprocess is closed');
 
-        const child = spawn(
+        const workerProcess = spawn(
             bareBinaryPath,
-            [fileURLToPath(new URL(this.#workerFileUrl))],
+            [fileURLToPath(new URL(this.#workerScriptUrl))],
             { stdio: ['pipe', 'pipe', 'pipe'] }
         );
-        this.#child = child;
+        this.#workerProcess = workerProcess;
 
         let resolveChildExit;
-        this.#childExit = new Promise(resolve => {
+        this.#workerExitPromise = new Promise(resolve => {
             resolveChildExit = resolve;
         });
 
         // Attached synchronously, right after spawn, in the same tick as the write below -
         // no await/gap in between where a fast response or an unexpected early exit could
         // fire before a listener exists to catch it.
-        this.#pendingResponse = new Promise(resolve => {
-            let buffer = '';
+        this.#workerResponsePromise = new Promise(resolve => {
+            let responseBuffer = '';
             let settled = false;
 
-            const finish = (response) => {
+            const resolveWorkerResponse = (workerResponse) => {
                 if (settled) return;
                 settled = true;
-                resolve(response);
+                resolve(workerResponse);
                 // Deferred to the next tick: killing the child synchronously here, in the
                 // same tick as resolve(), was empirically linked to a downstream deadlock
                 // elsewhere in the process (unrelated pending autobase/hyperbee work never
                 // resolving) - reproduced and fixed by decoupling the kill from the resolve.
-                setImmediate(() => child.kill('SIGKILL'));
+                setImmediate(() => workerProcess.kill('SIGKILL'));
             };
-            this.#finishPending = finish;
+            this.#resolvePendingResponse = resolveWorkerResponse;
 
-            child.stdout.on('data', (chunk) => {
-                buffer += chunk.toString();
-                const newlineIndex = buffer.indexOf('\n');
+            workerProcess.stdout.on('data', (chunk) => {
+                responseBuffer += chunk.toString();
+                const newlineIndex = responseBuffer.indexOf('\n');
                 if (newlineIndex === -1) return;
-                const line = buffer.slice(0, newlineIndex);
-                let message;
+                const responseLine = responseBuffer.slice(0, newlineIndex);
+                let encodedResponse;
                 try {
-                    message = JSON.parse(line);
+                    encodedResponse = JSON.parse(responseLine);
                 } catch {
                     // Not a Bare.Thread/bare-subprocess assumption - stdout is a boundary to an
                     // external process, so unexpected content there (e.g. a CLI usage error
                     // from spawning the wrong binary, as happened in manual QA) must fail the
                     // request instead of crashing the caller.
-                    finish({ error: `VDF worker returned an invalid response: ${line}` });
+                    resolveWorkerResponse({ error: `VDF worker returned an invalid response: ${responseLine}` });
                     return;
                 }
-                finish(decodeResponse(message));
+                resolveWorkerResponse(decodeWorkerResponse(encodedResponse));
             });
 
-            child.on('exit', () => {
-                finish({ error: 'VDF worker process exited unexpectedly' });
+            workerProcess.on('exit', () => {
+                resolveWorkerResponse({ error: 'VDF worker process exited unexpectedly' });
                 resolveChildExit();
             });
         });
 
         try {
-            child.stdin.write(JSON.stringify({
+            workerProcess.stdin.write(JSON.stringify({
                 challenge: challenge.toString('hex'),
                 difficulty,
                 discriminantSizeBits
             }) + '\n');
         } catch (error) {
-            this.#finishPending?.({ error });
-            child.kill('SIGKILL');
+            this.#resolvePendingResponse?.({ error });
+            workerProcess.kill('SIGKILL');
             throw error;
         }
     }
 
     /**
-     * Waits for the worker response and for the process to exit.
+     * Waits for the response and for the process to exit. Clears the references only if they still
+     * belong to this calculation.
      *
-     * @returns {Promise<{result?: object, error?: Error|string}>}
+     * @returns {Promise<import('./VDFService.js').VdfWorkerResponse>}
      */
     async read() {
-        const response = this.#pendingResponse;
-        const childExit = this.#childExit;
-        if (!response) return { error: 'No pending VDF request' };
+        const workerResponse = this.#workerResponsePromise;
+        const workerExitPromise = this.#workerExitPromise;
+        if (!workerResponse) return { error: 'No pending VDF request' };
 
         try {
-            const result = await response;
-            await childExit;
-            return result;
+            const calculationResponse = await workerResponse;
+            await workerExitPromise;
+            return calculationResponse;
         } finally {
-            if (this.#pendingResponse === response) {
-                this.#child = null;
-                this.#childExit = null;
-                this.#pendingResponse = null;
-                this.#finishPending = null;
+            if (this.#workerResponsePromise === workerResponse) {
+                this.#workerProcess = null;
+                this.#workerExitPromise = null;
+                this.#workerResponsePromise = null;
+                this.#resolvePendingResponse = null;
             }
         }
     }
 
     /**
-     * Finishes the pending calculation with an error, kills the process and waits for its exit.
+     * Returns an error to the pending calculation, stops the process and waits for it to exit.
      *
      * @param {Error} error cancellation reason returned to the waiting calculation
      * @returns {Promise<void>}
@@ -182,28 +171,33 @@ class SubprocessPort {
     async close(error = new Error('VDF subprocess closed')) {
         this.#closed = true;
 
-        const child = this.#child;
-        const childExit = this.#childExit;
-        const response = this.#pendingResponse;
+        const workerProcess = this.#workerProcess;
+        const workerExitPromise = this.#workerExitPromise;
+        const workerResponse = this.#workerResponsePromise;
 
-        this.#finishPending?.({ error });
-        child?.kill('SIGKILL');
+        this.#resolvePendingResponse?.({ error });
+        workerProcess?.kill('SIGKILL');
 
         try {
-            await Promise.all([response, childExit]);
+            await Promise.all([workerResponse, workerExitPromise]);
         } finally {
-            if (this.#child === child) this.#child = null;
-            if (this.#childExit === childExit) this.#childExit = null;
-            if (this.#pendingResponse === response) this.#pendingResponse = null;
-            this.#finishPending = null;
+            if (this.#workerProcess === workerProcess) this.#workerProcess = null;
+            if (this.#workerExitPromise === workerExitPromise) this.#workerExitPromise = null;
+            if (this.#workerResponsePromise === workerResponse) this.#workerResponsePromise = null;
+            this.#resolvePendingResponse = null;
         }
     }
 }
 
-/** Converts the JSON worker response to buffers used by consensus. */
-function decodeResponse(message) {
-    if (message.error) return { error: message.error };
-    const { challenge, difficulty, discriminantSizeBits, solution } = message.result;
+/**
+ * Converts the challenge and solution in the worker response from hex to buffers.
+ *
+ * @param {object} encodedResponse Parsed JSON worker response.
+ * @returns {import('./VDFService.js').VdfWorkerResponse}
+ */
+function decodeWorkerResponse(encodedResponse) {
+    if (encodedResponse.error) return { error: encodedResponse.error };
+    const { challenge, difficulty, discriminantSizeBits, solution } = encodedResponse.result;
     return {
         result: {
             challenge: Buffer.from(challenge, 'hex'),
@@ -214,30 +208,34 @@ function decodeResponse(message) {
     };
 }
 
+/**
+ * Runs VDF calculations in Bare and Pear using separate processes. Messages use JSON between processes
+ * and buffers inside the consensus module.
+ */
 export class VDFBare extends VDFService {
     #workerURL; // for test injection
 
     /**
-     * Creates the Bare VDF service. Tests can provide another worker URL.
+     * Creates the Bare VDF service. A different worker URL can be provided for tests.
      *
-     * @param {URL} workerURL
+     * @param {URL} workerURL Script to run in the worker process.
      */
     constructor(workerURL = new URL('./vdf-worker.js', import.meta.url)) {
         super();
         this.#workerURL = workerURL;
     }
 
-    /** Creates the process port used by VDFService. */
+    /** Creates the worker port used by VDFService. */
     async _open() {
-        this._setPort(new SubprocessPort(this.#workerFileUrl()));
+        this._setPort(new SubprocessPort(this.#resolveWorkerFileUrl()));
     }
 
     /**
-     * Returns the worker file URL which can be used by Bare and Pear.
+     * Returns the worker file URL that Bare or Pear can open.
      *
      * @returns {string}
      */
-    #workerFileUrl() {
+    #resolveWorkerFileUrl() {
         // Pear's `pear://dev/` module protocol isn't registered inside a freshly
         // spawned subprocess, so a pear:// reference (e.g. import.meta.url under
         // `pear run`) fails with UNKNOWN_PROTOCOL there. Pear.config.dir is the
@@ -246,8 +244,8 @@ export class VDFBare extends VDFService {
         // file:// URL from it instead. Outside Pear (plain `bare`), the injected/default
         // worker URL is already a file:// URL and works as-is.
         if (typeof globalThis.Pear !== 'undefined') {
-            const baseDir = globalThis.Pear.config.dir;
-            return new URL('./vdf-worker.js', `file://${baseDir}/src/core/consensus/services/`).href;
+            const applicationDirectory = globalThis.Pear.config.dir;
+            return new URL('./vdf-worker.js', `file://${applicationDirectory}/src/core/consensus/services/`).href;
         }
         return this.#workerURL.href;
     }

@@ -36,15 +36,15 @@ test('appender selection reads the migrated view when the previous view blocks a
     await previousView.ready();
     t.teardown(() => previousView.close());
     const selector = network.proposer.appenderSelector;
-    const request = await selector.createRequest(await state.getEpochAppenderSelectionContext(), b4a.from('old membership'));
-    await selector.waitForReplies(request);
+    const request = await selector.createSelectionRequest(await state.getEpochAppenderSelectionContext(), b4a.from('old membership'));
+    await selector.waitForAppenderSelection(request);
     await network.removeIndexer(network.nodes[1]);
     t.absent(previousView.key.equals(state.base.view.core.key), 'removal migrates the application view');
     await previousView.clear(0, previousView.length);
     t.is(await state.getCurrentEpoch(), 0n, 'the current signed view remains readable');
     const context = await state.getEpochAppenderSelectionContext();
     t.is(context.members.length, 1, 'the remaining signed indexer can elect itself');
-    const failure = await selector.authorizeAppend(request.requestId, {
+    const failure = await selector.authorizeEpochAppend(request.requestId, {
         writerKey: state.base.local.key.toString('hex'), from: state.base.local.length,
     }).catch(error => error);
     t.is(failure?.code, EpochAppenderSelectionErrorCode.CONTEXT_CHANGED, 'the old selection cannot authorize a queued append');

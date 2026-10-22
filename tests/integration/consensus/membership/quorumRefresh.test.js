@@ -15,10 +15,10 @@ test('consensus refreshes quorum when membership grows from two to five before a
     const resumePayload = deferred();
     const responses = [];
     const append = sinon.spy(operations, 'appendSetEpoch');
-    const approvers = sinon.spy(operations, 'approvers');
+    const approvers = sinon.spy(operations, 'getProofApprovers');
     const calculateVDF = sinon.spy(operations, 'calculateVDF');
     const buildPayload = operations.buildSetEpochPayload.bind(operations);
-    const collectSignature = operations.collectSignature.bind(operations);
+    const requestProofApproval = operations.requestProofApproval.bind(operations);
     let firstPayload;
     let holdResponses = true;
 
@@ -32,8 +32,8 @@ test('consensus refreshes quorum when membership grows from two to five before a
         return payload;
     });
     // Signatures travel through real Protomux channels and validators before being held.
-    operations.collectSignature = async (...args) => {
-        const result = await collectSignature(...args);
+    operations.requestProofApproval = async (...args) => {
+        const result = await requestProofApproval(...args);
         if (!holdResponses) return result;
         const release = deferred();
         responses.push({ release, collection: args[3] });

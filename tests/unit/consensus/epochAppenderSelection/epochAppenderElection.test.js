@@ -12,9 +12,9 @@ test('three indexers elect an appender with one indexer offline', async t => {
         save: async () => {},
     }));
     t.teardown(() => Promise.all(nodes.map(node => node.close())));
-    const request = await nodes[0].createRequest(context(3), b4a.from('proof'));
-    await nodes[1].receiveRequest(request, reply => nodes[0].receiveReply(reply ?? request, key(2)));
-    t.is(nodes[0].active.phase, 'HELD', 'own vote and one peer form a majority of three');
+    const request = await nodes[0].createSelectionRequest(context(3), b4a.from('proof'));
+    await nodes[1].handleSelectionRequest(request, reply => nodes[0].handleSelectionReply(reply ?? request, key(2)));
+    t.is(nodes[0].activeReservation.phase, 'HELD', 'own vote and one peer form a majority of three');
 });
 
 function cluster(t, count, { clock = false } = {}) {
@@ -32,7 +32,7 @@ function cluster(t, count, { clock = false } = {}) {
             const recipient = snapshot.members.findIndex(member => member.publicKey === peer);
             if (disconnected.has(recipient) || disconnected.has(index)) throw new Error('offline');
             let response;
-            await nodes[recipient].receiveRequest(request, reply => { response = reply; });
+            await nodes[recipient].handleSelectionRequest(request, reply => { response = reply; });
             return response;
         },
     });
@@ -45,12 +45,12 @@ function cluster(t, count, { clock = false } = {}) {
         timer?.restore();
     });
     async function request(index) {
-        return nodes[index].createRequest(snapshot, b4a.from(`proof-${index}`));
+        return nodes[index].createSelectionRequest(snapshot, b4a.from(`proof-${index}`));
     }
     async function deliver(request, recipient, owner) {
         let response;
-        await nodes[recipient].receiveRequest(request, reply => { response = reply; });
-        if (owner !== undefined) await nodes[owner].receiveReply(response, key(recipient + 1));
+        await nodes[recipient].handleSelectionRequest(request, reply => { response = reply; });
+        if (owner !== undefined) await nodes[owner].handleSelectionReply(response, key(recipient + 1));
         return response;
     }
     return { nodes, stored, disconnected, snapshot, timer, create, request, deliver };
@@ -61,10 +61,10 @@ for (const [count, votes] of [[1, 1], [2, 2], [3, 2], [4, 3], [5, 3], [6, 4], [7
         const f = cluster(t, count);
         const request = await f.request(0);
         for (let peer = 1; peer < votes; peer++) {
-            t.is(f.nodes[0].active.phase, 'REQUESTING', 'a minority cannot authorize an append');
+            t.is(f.nodes[0].activeReservation.phase, 'REQUESTING', 'a minority cannot authorize an append');
             await f.deliver(request, peer, 0);
         }
-        t.is(f.nodes[0].active.phase, 'HELD');
+        t.is(f.nodes[0].activeReservation.phase, 'HELD');
     });
 }
 
@@ -83,20 +83,20 @@ test('a durable vote survives restart and cannot change within the same term, ev
     const next = await f.request(1);
     t.ok(BigInt(next.logicalCounter) > BigInt(first.logicalCounter));
     t.is((await f.deliver(next, 2, 1)).voteStatus, EpochAppenderVoteStatus.GRANTED);
-    t.is(f.nodes[1].active.phase, 'HELD');
+    t.is(f.nodes[1].activeReservation.phase, 'HELD');
 });
 
 test('an expired selected appender cannot use a queued authorization after voting for its successor', async t => {
     const f = cluster(t, 3, { clock: true });
     const first = await f.request(0);
     await f.deliver(first, 1, 0);
-    await f.nodes[0].getSelectedPayload(first.requestId);
+    await f.nodes[0].getSelectedEpochPayload(first.requestId);
     await f.timer.tickAsync(1001);
     const successor = await f.request(1);
     await f.deliver(successor, 0, 1);
-    t.is(f.nodes[1].active.phase, 'HELD');
-    await t.exception(() => f.nodes[0].authorizeAppend(first.requestId, { writerKey: key(10), from: 0 }));
-    t.absent(f.nodes[0].active);
+    t.is(f.nodes[1].activeReservation.phase, 'HELD');
+    await t.exception(() => f.nodes[0].authorizeEpochAppend(first.requestId, { writerKey: key(10), from: 0 }));
+    t.absent(f.nodes[0].activeReservation);
     t.is(f.stored.get(0).vote.request.requestId, successor.requestId);
 });
 
@@ -104,14 +104,14 @@ test('an unresolved append allows a later election without claiming that the old
     const f = cluster(t, 3, { clock: true });
     const first = await f.request(0);
     await f.deliver(first, 1, 0);
-    await f.nodes[0].authorizeAppend(first.requestId, { writerKey: key(10), from: 0 });
-    t.alike(await f.nodes[0].reconcile(), { status: EpochAppendOutcome.UNKNOWN });
+    await f.nodes[0].authorizeEpochAppend(first.requestId, { writerKey: key(10), from: 0 });
+    t.alike(await f.nodes[0].refreshAppendOutcome(), { status: EpochAppendOutcome.UNKNOWN });
     await f.timer.tickAsync(1001);
     const successor = await f.request(1);
     await f.deliver(successor, 0, 1);
-    t.is(f.nodes[1].active.phase, 'HELD');
-    t.alike(await f.nodes[0].reconcile(), { status: EpochAppendOutcome.SELECTION_EXPIRED });
-    t.alike(f.nodes[0].outcomeFor(first.requestId), { status: EpochAppendOutcome.SELECTION_EXPIRED });
+    t.is(f.nodes[1].activeReservation.phase, 'HELD');
+    t.alike(await f.nodes[0].refreshAppendOutcome(), { status: EpochAppendOutcome.SELECTION_EXPIRED });
+    t.alike(f.nodes[0].getRecordedAppendOutcome(first.requestId), { status: EpochAppendOutcome.SELECTION_EXPIRED });
 });
 
 for (const count of [2, 3]) {
@@ -119,18 +119,18 @@ for (const count of [2, 3]) {
         const f = cluster(t, count, { clock: true });
         for (let index = 1; index < count; index++) f.disconnected.add(index);
         const request = await f.request(0);
-        const waiting = f.nodes[0].waitForReplies(request).catch(error => error);
+        const waiting = f.nodes[0].waitForAppenderSelection(request).catch(error => error);
         await f.timer.tickAsync(999);
-        t.is(f.nodes[0].active.phase, 'REQUESTING');
+        t.is(f.nodes[0].activeReservation.phase, 'REQUESTING');
         await f.timer.tickAsync(1);
         const result = await waiting;
         if (count === 2) {
             t.is(result, undefined);
-            t.is(f.nodes[0].active.phase, 'HELD');
-            t.is(f.nodes[0].active.solo, true);
+            t.is(f.nodes[0].activeReservation.phase, 'HELD');
+            t.is(f.nodes[0].activeReservation.solo, true);
         } else {
             t.is(result.code, EpochAppenderSelectionErrorCode.REPLY_TIMEOUT);
-            t.absent(f.nodes[0].active);
+            t.absent(f.nodes[0].activeReservation);
         }
     });
 }
@@ -139,33 +139,33 @@ test('a two-member partition may elect both sides only after the unanswered time
     const f = cluster(t, 2, { clock: true });
     f.disconnected.add(0);
     const requests = await Promise.all([f.request(0), f.request(1)]);
-    const waiting = f.nodes.map((node, index) => node.waitForReplies(requests[index]));
+    const waiting = f.nodes.map((node, index) => node.waitForAppenderSelection(requests[index]));
     await f.timer.tickAsync(999);
-    t.ok(f.nodes.every(node => node.active.phase === 'REQUESTING'));
+    t.ok(f.nodes.every(node => node.activeReservation.phase === 'REQUESTING'));
     await f.timer.tickAsync(1);
     await Promise.all(waiting);
-    t.ok(f.nodes.every(node => node.active.phase === 'HELD' && node.active.solo), 'the explicitly accepted two-member availability exception');
+    t.ok(f.nodes.every(node => node.activeReservation.phase === 'HELD' && node.activeReservation.solo), 'the explicitly accepted two-member availability exception');
 });
 
 test('a responsive peer denying a two-member election never triggers a solo fallback', async t => {
     const f = cluster(t, 2, { clock: true });
     const request = await f.request(0);
     await f.request(1);
-    const waiting = f.nodes[0].waitForReplies(request).catch(error => error);
+    const waiting = f.nodes[0].waitForAppenderSelection(request).catch(error => error);
     await f.timer.tickAsync(1000);
     t.is((await waiting).code, EpochAppenderSelectionErrorCode.REPLIES_INCOMPLETE);
-    t.absent(f.nodes[0].active);
+    t.absent(f.nodes[0].activeReservation);
 });
 
 test('a split election retries in a higher term and can then reach a majority', async t => {
     const f = cluster(t, 3, { clock: true });
     const requests = await Promise.all(f.nodes.map((_node, index) => f.request(index)));
-    const waiting = f.nodes.map((node, index) => node.waitForReplies(requests[index]).catch(error => error));
+    const waiting = f.nodes.map((node, index) => node.waitForAppenderSelection(requests[index]).catch(error => error));
     await f.timer.tickAsync(1000);
     t.ok((await Promise.all(waiting)).every(error => error.code === EpochAppenderSelectionErrorCode.REPLIES_INCOMPLETE));
     const retry = await f.request(1);
-    await f.nodes[1].waitForReplies(retry);
-    t.is(f.nodes[1].active.phase, 'HELD');
+    await f.nodes[1].waitForAppenderSelection(retry);
+    t.is(f.nodes[1].activeReservation.phase, 'HELD');
     t.ok(BigInt(retry.logicalCounter) > BigInt(requests[1].logicalCounter));
 });
 
@@ -175,15 +175,15 @@ test('duplicate and stale votes cannot satisfy a new five-member election', asyn
     const stale = await f.deliver(old, 1);
     await f.nodes[0].cancel(old.requestId);
     const current = await f.request(0);
-    await f.nodes[0].receiveReply(stale, key(2));
+    await f.nodes[0].handleSelectionReply(stale, key(2));
     const response = await f.deliver(current, 2, 0);
-    await f.nodes[0].receiveReply(response, key(3));
-    t.is(f.nodes[0].active.phase, 'REQUESTING');
-    await t.exception(() => f.nodes[0].receiveReply(response, key(99)));
-    await f.nodes[0].receiveReply({ ...response, payloadHash: key(999) }, key(4));
-    t.is(f.nodes[0].active.phase, 'REQUESTING');
+    await f.nodes[0].handleSelectionReply(response, key(3));
+    t.is(f.nodes[0].activeReservation.phase, 'REQUESTING');
+    await t.exception(() => f.nodes[0].handleSelectionReply(response, key(99)));
+    await f.nodes[0].handleSelectionReply({ ...response, payloadHash: key(999) }, key(4));
+    t.is(f.nodes[0].activeReservation.phase, 'REQUESTING');
     await f.deliver(current, 3, 0);
-    t.is(f.nodes[0].active.phase, 'HELD');
+    t.is(f.nodes[0].activeReservation.phase, 'HELD');
 });
 
 test('authorization checks its deadline again after a slow durable marker write', async t => {
@@ -200,8 +200,8 @@ test('authorization checks its deadline again after a slow durable marker write'
         },
     }, undefined, 1000);
     t.teardown(async () => { gate.resolve(); await node.close(); timer.restore(); });
-    const request = await node.createRequest(context(1), b4a.from('proof'));
-    const publication = node.authorizeAppend(request.requestId, { writerKey: key(10), from: 0 }).catch(error => error);
+    const request = await node.createSelectionRequest(context(1), b4a.from('proof'));
+    const publication = node.authorizeEpochAppend(request.requestId, { writerKey: key(10), from: 0 }).catch(error => error);
     await started.promise;
     await timer.tickAsync(1001);
     gate.resolve();
@@ -221,8 +221,8 @@ for (const count of [3, 4, 5, 6, 7]) {
                 for (let recipient = 0; recipient < count; recipient++) {
                     if (recipient === owner) continue;
                     messages.push(async () => {
-                        await f.nodes[recipient].receiveRequest(request, response => {
-                            messages.push(() => f.nodes[owner].receiveReply(response, key(recipient + 1)));
+                        await f.nodes[recipient].handleSelectionRequest(request, response => {
+                            messages.push(() => f.nodes[owner].handleSelectionReply(response, key(recipient + 1)));
                         });
                     });
                 }
@@ -239,19 +239,19 @@ for (const count of [3, 4, 5, 6, 7]) {
             while (messages.length) {
                 random = (Math.imul(random, 1664525) + 1013904223) >>> 0;
                 await messages.splice(random % messages.length, 1)[0]();
-                const elected = f.nodes.filter(node => node.active?.phase === 'HELD').length;
+                const elected = f.nodes.filter(node => node.activeReservation?.phase === 'HELD').length;
                 maximum = Math.max(maximum, elected);
             }
             t.ok(maximum <= 1, `seed ${seed}: quorum grants do not overlap before expiry`);
             if (!maximum) {
                 await timer.tickAsync(1001);
                 for (const node of f.nodes) {
-                    if (node.active) await node.cancel(node.active.request.requestId);
+                    if (node.activeReservation) await node.cancel(node.activeReservation.request.requestId);
                 }
                 const request = await f.request(seed % count);
-                await f.nodes[seed % count].waitForReplies(request);
+                await f.nodes[seed % count].waitForAppenderSelection(request);
             }
-            t.is(f.nodes.filter(node => node.active?.phase === 'HELD').length, 1, `seed ${seed}: a split campaign can recover`);
+            t.is(f.nodes.filter(node => node.activeReservation?.phase === 'HELD').length, 1, `seed ${seed}: a split campaign can recover`);
             await Promise.all(f.nodes.map(node => node.close()));
         }
     });
@@ -297,18 +297,18 @@ test('a delayed two-member timeout cannot authorize or cancel the next election'
         sendRequest: async () => { throw new Error('offline'); },
     }, 100, 1000);
     t.teardown(async () => { gate.resolve(); await node.close(); timer.restore(); });
-    const first = await node.createRequest(snapshot, b4a.from('first'));
-    const firstWait = node.waitForReplies(first).catch(error => error);
+    const first = await node.createSelectionRequest(snapshot, b4a.from('first'));
+    const firstWait = node.waitForAppenderSelection(first).catch(error => error);
     await timer.tickAsync(1000);
     await node.cancel(first.requestId);
     t.is((await firstWait).code, EpochAppenderSelectionErrorCode.REQUEST_CANCELLED);
-    const next = await node.createRequest(snapshot, b4a.from('next'));
+    const next = await node.createSelectionRequest(snapshot, b4a.from('next'));
     let finished = false;
-    const nextWait = node.waitForReplies(next).catch(error => error).then(() => { finished = true; });
+    const nextWait = node.waitForAppenderSelection(next).catch(error => error).then(() => { finished = true; });
     gate.resolve();
     await timer.tickAsync(0);
-    t.is(node.active.request.requestId, next.requestId);
-    t.is(node.active.phase, 'REQUESTING');
+    t.is(node.activeReservation.request.requestId, next.requestId);
+    t.is(node.activeReservation.phase, 'REQUESTING');
     t.is(finished, false, 'the old timeout cannot finish the replacement waiter');
     await node.cancel(next.requestId);
     await nextWait;

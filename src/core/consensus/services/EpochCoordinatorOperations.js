@@ -1,3 +1,19 @@
+/**
+ * @typedef {object} EpochVdfProof
+ * @property {Buffer} solution Encoded Wesolowski proof.
+ * @property {number} difficulty VDF iteration count from the signed consensus config.
+ * @property {number} discriminantSizeBits Discriminant size used for this calculation.
+ *
+ * @typedef {object} EpochProofApproval
+ * @property {Buffer} signature Verified proof signature from another indexer.
+ * @property {Buffer} approver Signer address stored as a buffer.
+ *
+ * @typedef {object} EpochApprovalCollection
+ * @property {Array<{key: Buffer}>} approvers Other indexers that can approve this proof.
+ * @property {EpochProofApproval[]} approvals Accepted proof signatures from this attempt.
+ * @property {Array<{member: {key: Buffer}, error: Error}>} rejections Failed requests from this attempt.
+ * @property {boolean} closed True when enough signatures are collected or this attempt ends.
+ */
 import tracCryptoApi from "trac-crypto-api";
 import { generateUUID } from '../../../utils/helpers.js';
 import { consensusMessageFactory } from '../../../messages/consensus/v1/consensusMessageFactory.js';
@@ -5,18 +21,28 @@ import addressUtils from '../../state/utils/address.js';
 import b4a from "b4a";
 import { encodeProofProposal, encodeProofProposalApproval } from '../../../codecs/consensus/v1/consensusV1OperationCodec.js';
 import { applyStateMessageFactory } from '../../../messages/state/applyStateMessageFactory.js';
-import { uint16ToBuffer, uint32ToBuffer } from '../../../utils/buffer.js';
+import { toHex, uint16ToBuffer, uint32ToBuffer } from '../../../utils/buffer.js';
 import { encodeApplyOperation } from '../../../codecs/apply/applyOperationCodec.js';
 import { ConsensusResultCode } from '../../../utils/constants.js';
 
-/** Contains operations used by the epoch coordinator. */
+/**
+ * Builds proof messages and SET_EPOCH payloads, requests signatures and starts appends. The round uses
+ * these methods and controls the FSM. The selector decides whether this node may append.
+ */
 export class EpochCoordinatorOperations {
     #state;
     #wallet;
     #vdfService;
     #config;
 
-    /** Creates operations which use the provided state, wallet and VDF service. */
+    /**
+     * Sets up ledger access, the signing wallet, the VDF worker and message config.
+     *
+     * @param {import('../../state/State.js').default} state Signed ledger reads and the write queue that checks append authorization.
+     * @param {import('./VDFService.js').VDFService} vdfService VDF service ready to calculate proofs.
+     * @param {object} wallet Local signing wallet.
+     * @param {object} config Network ID and address encoding config.
+     */
     constructor(state, vdfService, wallet, config) {
         this.#state = state;
         this.#vdfService = vdfService;
@@ -24,88 +50,121 @@ export class EpochCoordinatorOperations {
         this.#config = config;
     }
 
-    /** Calculates a VDF proof and returns data used by the round. */
+    /**
+     * Calculates a proof using the challenge and signed VDF parameters from the round.
+     *
+     * @param {Buffer} challenge Encoded network, parent, proposer and VDF parameters.
+     * @param {number} difficulty VDF iteration count.
+     * @param {number} discriminantSizeBits Discriminant size in bits.
+     * @returns {Promise<EpochVdfProof>} Calculated proof and the parameters used to create it.
+     * @throws {Error} When the worker fails or closes.
+     */
     async calculateVDF(challenge, difficulty, discriminantSizeBits) {
-        const { result, error } = await this.#vdfService.calculateVDF(
+        const { result: vdfProof, error } = await this.#vdfService.calculateVDF(
             challenge,
             difficulty,
             discriminantSizeBits,
         );
         if (error) throw new Error(error);
-        const vdf = result;
-        return { solution: vdf.solution, difficulty, discriminantSizeBits };
+        return { solution: vdfProof.solution, difficulty, discriminantSizeBits };
     }  
 
-    /** Builds and signs a proof proposal for the next epoch. */
-    async createProofProposal(prevEpochId, prevEpochHash, vdf) {
-        const epoch = prevEpochId + 1n;
-        const difficulty = uint32ToBuffer(vdf.difficulty)
-        const discriminantSizeBits = uint16ToBuffer(vdf.discriminantSizeBits)
+    /**
+     * Builds and signs a proposal for the epoch after parentEpoch. Each message gets a new session ID.
+     *
+     * @param {bigint} parentEpoch Signed parent epoch number.
+     * @param {Buffer} parentEpochHash Hash of the signed parent epoch.
+     * @param {EpochVdfProof} vdfProof Local calculation result.
+     * @returns {Promise<object>} Consensus message containing proof_proposal.
+     */
+    async createProofProposal(parentEpoch, parentEpochHash, vdfProof) {
+        const targetEpoch = parentEpoch + 1n;
+        const encodedDifficulty = uint32ToBuffer(vdfProof.difficulty);
+        const encodedDiscriminantSize = uint16ToBuffer(vdfProof.discriminantSizeBits);
         return consensusMessageFactory(this.#wallet, this.#config)
             .buildProofProposal(
                 generateUUID(),
                 this.#config.networkId,
-                epoch,
-                prevEpochHash,
+                targetEpoch,
+                parentEpochHash,
                 this.#wallet.address,
-                difficulty,
-                discriminantSizeBits,
-                vdf.solution
+                encodedDifficulty,
+                encodedDiscriminantSize,
+                vdfProof.solution
             );
     }
 
-    /** Sends one consensus request to a connected indexer. */
-    async sendToIndexer(publicKeyHex, request, connectionManager) {
-        if (!connectionManager.connected(publicKeyHex)) throw new Error('Indexer not in the manager');
+    /**
+     * Sends a proof approval request through an authenticated consensus connection.
+     *
+     * @param {string} approverPublicKeyHex Remote wallet public key, encoded as hex.
+     * @param {object} proofProposalMessage Signed proof proposal message.
+     * @param {import('../../network/services/IndexerConnectionManager.js').default} indexerConnectionManager Peer session manager.
+     * @returns {Promise<{resultCode: number|undefined, signature: Buffer|undefined}>} Result code and signature from the protocol reply.
+     */
+    async sendProofApprovalRequest(approverPublicKeyHex, proofProposalMessage, indexerConnectionManager) {
+        if (!indexerConnectionManager.connected(approverPublicKeyHex)) throw new Error('Indexer not in the manager');
 
-        const response = await connectionManager.send(publicKeyHex, request);
+        const approvalResponse = await indexerConnectionManager.send(approverPublicKeyHex, proofProposalMessage);
         return {
-            resultCode: response?.resultCode,
-            signature: response?.approval?.approval_sig,
+            resultCode: approvalResponse?.resultCode,
+            signature: approvalResponse?.approval?.approval_sig,
         };
     }
 
     /**
-     * Builds a proposal for one indexer and requests its signature.
-     * It checks approval collection before sending, because the round can be cancelled during
-     * async request preparation.
+     * Finds the wallet identity for an indexer and requests its proof signature. Checks whether the
+     * collection is closed before sending. The round checks the collection again when the reply
+     * arrives.
+     *
+     * @param {{key: Buffer}} approverIndexer External indexer from the attempt membership.
+     * @param {{currentEpoch: bigint, currentEpochHash: Buffer, vdf: EpochVdfProof}} proofContext Parent and local proof.
+     * @param {import('../../network/services/IndexerConnectionManager.js').default} indexerConnectionManager Authenticated consensus sessions.
+     * @param {EpochApprovalCollection|null} [approvalCollection=null] Approval collection. A closed collection stops the request before sending.
+     * @returns {Promise<EpochProofApproval>} Approval data to be added by the round.
+     * @throws {Error} If identity lookup, request delivery or approval validation fails.
      */
-    async collectSignature(member, {currentEpoch, currentEpochHash, vdf}, connectionManager, approvalCollection = null) {
-        // Unfortunally we need to generate one payload per request because of the session id.
-        // But, we also need a general one (generated previously) because of the signature
-        const request = await this.createProofProposal(currentEpoch, currentEpochHash, vdf);
-        const key = b4a.toString(member.key, "hex");
-        const addressBuffer = await this.#state.getRegisteredWriterKey(key);
-        if (!addressBuffer) throw new Error('Registered writer key not found');
+    async requestProofApproval(approverIndexer, {currentEpoch, currentEpochHash, vdf: vdfProof}, indexerConnectionManager, approvalCollection = null) {
+        // Each peer request needs its own RPC session ID; the signed proposal content stays the same.
+        const proofProposalMessage = await this.createProofProposal(currentEpoch, currentEpochHash, vdfProof);
+        const writerKeyHex = toHex(approverIndexer.key);
+        const approverAddressBuffer = await this.#state.getRegisteredWriterKey(writerKeyHex);
+        if (!approverAddressBuffer) throw new Error('Registered writer key not found');
 
-        const address = addressUtils.bufferToAddress(addressBuffer, this.#config.addressPrefix);
-        if (!address) throw new Error('Writer address could not be decoded');
+        const approverAddress = addressUtils.bufferToAddress(approverAddressBuffer, this.#config.addressPrefix);
+        if (!approverAddress) throw new Error('Writer address could not be decoded');
 
-        const publicKey = tracCryptoApi.address.decode(address);
-        if (!publicKey) throw new Error('Writer public key could not be decoded');
+        const approverPublicKey = tracCryptoApi.address.decode(approverAddress);
+        if (!approverPublicKey) throw new Error('Writer public key could not be decoded');
 
-        const publicKeyHex = b4a.toString(publicKey, 'hex');
+        const approverPublicKeyHex = toHex(approverPublicKey);
         if (approvalCollection?.closed) throw new Error('Epoch approval request was cancelled');
 
-        const { resultCode, signature: memberSignature } = await this.sendToIndexer(publicKeyHex, request, connectionManager);
+        const { resultCode, signature: approvalSignature } = await this.sendProofApprovalRequest(approverPublicKeyHex, proofProposalMessage, indexerConnectionManager);
 
         if (resultCode !== ConsensusResultCode.OK) {
-            const err = new Error(`Approval rejected with result code ${resultCode}`);
-            err.resultCode = resultCode;
-            throw err;
+            const approvalError = new Error(`Approval rejected with result code ${resultCode}`);
+            approvalError.resultCode = resultCode;
+            throw approvalError;
         }
 
-        if (!memberSignature) throw new Error('Approval signature not received');
+        if (!approvalSignature) throw new Error('Approval signature not received');
 
         return {
-            signature: memberSignature,
-            approver: addressBuffer
+            signature: approvalSignature,
+            approver: approverAddressBuffer
         };
     }
 
-    /** Creates a SET_EPOCH payload from the proof and collected signatures. */
-    async buildSetEpochPayload(proofProposal, signatures) {
-        const proofData = encodeProofProposal({
+    /**
+     * Encodes a SET_EPOCH operation from the local proposal and external approvals.
+     *
+     * @param {object} proofProposal Signed protocol proof fields.
+     * @param {EpochProofApproval[]} proofApprovals Signatures from other indexers. proofProposal contains the proposer signature.
+     * @returns {Promise<Buffer>} Encoded SET_EPOCH operation ready for appender selection.
+     */
+    async buildSetEpochPayload(proofProposal, proofApprovals) {
+        const encodedProofProposal = encodeProofProposal({
             network_id: proofProposal.network_id,
             epoch: proofProposal.epoch,
             previous_epoch_record_hash: proofProposal.previous_epoch_record_hash,
@@ -115,25 +174,38 @@ export class EpochCoordinatorOperations {
             proof: proofProposal.proof,
             signature: proofProposal.signature,
         });
-        const approvals = signatures.map(({ signature, approver }) =>
+        const encodedApprovals = proofApprovals.map(({ signature, approver }) =>
             encodeProofProposalApproval({
                 approver,
                 approval_sig: signature,
             })
         );
         const message = await applyStateMessageFactory(this.#wallet, this.#config)
-            .buildCompleteSetEpochMessage(this.#wallet.address, proofData, approvals);
+            .buildCompleteSetEpochMessage(this.#wallet.address, encodedProofProposal, encodedApprovals);
         return encodeApplyOperation(message);
     }
 
-    /** Appends SET_EPOCH, authorizing a selected appender inside the writer queue. */
-    appendSetEpoch(payload, authorizeEpochAppend) {
-        return this.#state.appendEpoch(payload, authorizeEpochAppend);
+    /**
+     * Queues the epoch append. Calls authorizeEpochAppend just before Autobase.append. Completing the
+     * local write does not confirm the epoch. The round still checks its signed result.
+     *
+     * @param {Buffer} epochPayload Exact bytes reserved by the appender selection.
+     * @param {function({writerKey: string, from: number}): Promise<void>} authorizeEpochAppend Checks the selection and saves the append details locally.
+     * @returns {Promise<void>} Result returned by the write queue.
+     */
+    appendSetEpoch(epochPayload, authorizeEpochAppend) {
+        return this.#state.appendEpoch(epochPayload, authorizeEpochAppend);
     }
 
-    /** Filters the attempt's indexer snapshot; an admin/indexer still counts as an approver. */
-    approvers(indexers) {
+    /**
+     * Returns all indexers except the local writer. An admin who is also an indexer can approve the
+     * proof.
+     *
+     * @param {Array<{key: Buffer}>} indexers Indexer list read for this attempt.
+     * @returns {Array<{key: Buffer}>} Other indexers that can approve the proof.
+     */
+    getProofApprovers(indexers) {
         const writingKey = this.#state.writingKey;
-        return indexers.filter(({ key }) => !b4a.equals(key, writingKey));
+        return indexers.filter(({ key: writerKey }) => !b4a.equals(writerKey, writingKey));
     }
 }

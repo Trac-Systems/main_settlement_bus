@@ -92,24 +92,24 @@ test('signed writer clock proves a no-op was processed without advancing the vie
     };
     let selector = new EpochAppenderSelector(publicKey, operations);
     t.teardown(() => selector.close());
-    const request = await selector.createRequest(context, b4a.from('rejected-after-restart'));
+    const request = await selector.createSelectionRequest(context, b4a.from('rejected-after-restart'));
     await appendSelected(selector, request.requestId, append);
-    t.is(selector.active.phase, EpochAppenderSelectionPhase.PUBLISHING);
+    t.is(selector.activeReservation.phase, EpochAppenderSelectionPhase.PUBLISHING);
     await selector.close();
     await base.close();
     await store.close();
     await open();
     selector = new EpochAppenderSelector(publicKey, operations);
     await selector.open();
-    t.is(selector.active.request.requestId, request.requestId, 'real storage preserves the publication identity');
-    t.alike(await selector.reconcile(), { status: EpochAppendOutcome.REJECTED });
-    t.absent(selector.active, 'restart releases only after verifying the signed writer clock');
+    t.is(selector.activeReservation.request.requestId, request.requestId, 'real storage preserves the publication identity');
+    t.alike(await selector.refreshAppendOutcome(), { status: EpochAppendOutcome.REJECTED });
+    t.absent(selector.activeReservation, 'restart releases only after verifying the signed writer clock');
 
     append = async (_value, authorizeEpochAppend) => {
         await authorizeEpochAppend({ writerKey: base.local.key.toString('hex'), from: base.local.length });
         throw new Error('process interrupted before local write');
     };
-    const interrupted = await selector.createRequest(context, b4a.from('unknown-after-restart'));
+    const interrupted = await selector.createSelectionRequest(context, b4a.from('unknown-after-restart'));
     await t.exception(() => appendSelected(selector, interrupted.requestId, append));
     await selector.close();
     await base.close();
@@ -117,6 +117,6 @@ test('signed writer clock proves a no-op was processed without advancing the vie
     await open();
     selector = new EpochAppenderSelector(publicKey, operations);
     await selector.open();
-    t.alike(await selector.reconcile(), { status: EpochAppendOutcome.UNKNOWN });
+    t.alike(await selector.refreshAppendOutcome(), { status: EpochAppendOutcome.UNKNOWN });
     t.is(await selector.cancel(interrupted.requestId), false, 'a missing publication is not inferred to be cancelled');
 });

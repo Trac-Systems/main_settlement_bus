@@ -11,7 +11,7 @@ import { ConsensusOperationType } from '../../../../src/utils/constants.js';
 for (const indexerCount of [1, 2]) {
     test(`coordinated append with ${indexerCount} indexers keeps the existing proof quorum`, async t => {
         const network = await createConsensusNetwork(t, { indexerCount });
-        const selection = sinon.spy(network.proposer.appenderSelector, 'createRequest');
+        const selection = sinon.spy(network.proposer.appenderSelector, 'createSelectionRequest');
         const sends = sinon.spy(network.proposer.manager, 'send');
         const append = sinon.spy(network.proposer.state, 'appendEpoch');
         const round = network.startRound();
@@ -69,7 +69,7 @@ test('three real concurrent epoch rounds agree on one append over Protomux', asy
     await assertSignedEpoch(t, network);
     await waitFor('all competing rounds to finish', () => rounds.every(round => round.completed));
     t.is(appends.reduce((total, append) => total + append.callCount, 0), 1, 'only one actual publication');
-    t.ok(contenders.every(node => !node.appenderSelector.active), 'all reservations resolve or withdraw');
+    t.ok(contenders.every(node => !node.appenderSelector.activeReservation), 'all reservations resolve or withdraw');
 });
 
 test('a rejected publication hands off after the election deadline without closing replication', async t => {
@@ -102,19 +102,19 @@ test('a rejected publication hands off after the election deadline without closi
     const firstRound = network.startRound(first);
     await entered.promise;
     const followers = contenders.slice(1).map(node => network.startRound(node));
-    t.alike(await first.appenderSelector.reconcile(), { status: EpochAppendOutcome.UNKNOWN });
+    t.alike(await first.appenderSelector.refreshAppendOutcome(), { status: EpochAppendOutcome.UNKNOWN });
     t.is(appends.reduce((total, append) => total + append.callCount, 0), 1);
     const connection = network.connectionFrom(first, contenders[1]);
     connection.protocolSessions.indexer.close();
     t.absent(connection.destroyed, 'closing consensus keeps the shared replication stream');
     await firstRound.round.cancel();
-    t.is(first.appenderSelector.active.phase, 'PUBLISHING', 'cancelling the FSM preserves publication intent');
+    t.is(first.appenderSelector.activeReservation.phase, 'PUBLISHING', 'cancelling the FSM preserves publication intent');
     gate.resolve();
     await assertSignedEpoch(t, network);
     await waitFor('followers finish after handoff', () => followers.every(round => round.completed));
     t.is(appends.reduce((total, append) => total + append.callCount, 0), 2,
         'one rejected operation followed by exactly one successful operation');
-    t.absent(first.appenderSelector.active, 'finalized rejection is observed outside the cancelled round');
+    t.absent(first.appenderSelector.activeReservation, 'finalized rejection is observed outside the cancelled round');
     t.absent(connection.destroyed, 'replication survives the handoff');
 });
 
@@ -139,11 +139,11 @@ test('a locally appended epoch stays reserved until other indexers finalize its 
     for (const node of nodes.slice(1)) await network.disconnect(proposer, node);
     gate.resolve();
     await waitFor('local append Promise resolution', () => localWriteDone);
-    t.alike(await proposer.appenderSelector.reconcile(), { status: EpochAppendOutcome.UNKNOWN }, 'local append is insufficient without signed processing');
-    t.is(proposer.appenderSelector.active.phase, 'PUBLISHING');
+    t.alike(await proposer.appenderSelector.refreshAppendOutcome(), { status: EpochAppendOutcome.UNKNOWN }, 'local append is insufficient without signed processing');
+    t.is(proposer.appenderSelector.activeReservation.phase, 'PUBLISHING');
     t.is(await proposer.state.getCurrentEpoch(), 0n);
     for (const node of nodes.slice(1)) await network.reconnect(proposer, node);
     await assertSignedEpoch(t, network);
     await waitFor('round completes after replication', () => round.completed);
-    t.absent(proposer.appenderSelector.active);
+    t.absent(proposer.appenderSelector.activeReservation);
 });

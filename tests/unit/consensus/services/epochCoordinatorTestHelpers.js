@@ -124,8 +124,8 @@ export function makeOperations(overrides = {}) {
         createProofProposal: sinon.stub().resolves({
             proof_proposal: { epoch: b4a.alloc(8) },
         }),
-        approvers: sinon.stub().callsFake(indexers => indexers.filter(({ key }) => !b4a.equals(key, b4a.alloc(32, 1)))),
-        collectSignature: sinon.stub().resolves(makeConfirmation()),
+        getProofApprovers: sinon.stub().callsFake(indexers => indexers.filter(({ key }) => !b4a.equals(key, b4a.alloc(32, 1)))),
+        requestProofApproval: sinon.stub().resolves(makeConfirmation()),
         buildSetEpochPayload: sinon.stub().resolves(b4a.alloc(64, 0xdd)),
         ...overrides,
         appendSetEpoch: sinon.stub().callsFake(async (payload, authorizeEpochAppend) => {

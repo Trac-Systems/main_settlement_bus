@@ -175,15 +175,15 @@ test('append handler rechecks signed context after asynchronous validation and b
     let received = 0;
     let reply;
     const coordinator = {
-        async reconcile() { f.context.targetEpoch = '8'; },
-        async receiveRequest(_request, callback) { received++; reply = () => callback(f.decision); },
+        async refreshAppendOutcome() { f.context.targetEpoch = '8'; },
+        async handleSelectionRequest(_request, callback) { received++; reply = () => callback(f.decision); },
     };
     const handler = new V1EpochAppendOperationHandler(f.state, f.other, config, coordinator);
     const session = { closed: false, sendAndForget() { t.fail('stale request must not receive permission'); } };
     await handler.handleRequest(f.message, f.connection, session);
     t.is(received, 0);
     f.context.targetEpoch = '7';
-    coordinator.reconcile = async () => {};
+    coordinator.refreshAppendOutcome = async () => {};
     await handler.handleRequest(f.message, f.connection, session);
     t.is(received, 1);
     f.context.targetEpoch = '8';
@@ -255,7 +255,7 @@ for (const type of ['REQUEST', 'REPLY']) {
         const f = await fixture(t);
         f.state.emit = sinon.spy();
         const policy = new ConsensusV1ConnectionPolicy(f.state, { error: sinon.spy() }, config);
-        const selector = { receiveRequest: sinon.spy(), reconcile: sinon.spy() };
+        const selector = { handleSelectionRequest: sinon.spy(), refreshAppendOutcome: sinon.spy() };
         const router = new ConsensusV1MessageRouter(f.state, f.wallet, config, f.pending, policy, selector);
         const session = { closed: false, sendAndForget: sinon.spy() };
         // The transport belongs to wallet 2, but the message claims wallet 1.
@@ -273,8 +273,8 @@ for (const type of ['REQUEST', 'REPLY']) {
         t.is(ban?.connection, f.peer, 'the ban targets the authenticated transport, not the claimed author');
         t.is(ban?.error.resultCode, ConsensusResultCode.PUBLIC_KEY_MISMATCH);
         t.is(f.reads(), 0, 'impersonation is rejected before reading election state');
-        t.absent(selector.reconcile.called);
-        t.absent(selector.receiveRequest.called);
+        t.absent(selector.refreshAppendOutcome.called);
+        t.absent(selector.handleSelectionRequest.called);
         t.absent(session.sendAndForget.called, 'an impersonating REQUEST receives no reply');
         if (waiting) {
             t.is((await waiting).resultCode, ConsensusResultCode.PUBLIC_KEY_MISMATCH);
@@ -287,7 +287,7 @@ for (const type of ['REQUEST', 'REPLY']) {
             const f = await fixture(t);
             f.state.emit = sinon.spy();
             const policy = new ConsensusV1ConnectionPolicy(f.state, { error: sinon.spy() }, config);
-            const selector = { receiveRequest: sinon.spy(), reconcile: sinon.spy() };
+            const selector = { handleSelectionRequest: sinon.spy(), refreshAppendOutcome: sinon.spy() };
             const router = new ConsensusV1MessageRouter(f.state, f.wallet, config, f.pending, policy, selector);
             const session = { closed: false, sendAndForget: sinon.spy(), close: sinon.spy() };
             const message = type === 'REQUEST' ? f.message : f.response;
@@ -312,8 +312,8 @@ for (const type of ['REQUEST', 'REPLY']) {
             await router.route(encodeConsensusMessage(message), connection, session);
 
             t.absent(f.state.emit.calledWith(CustomEventType.CONSENSUS_PEER_BAN_REQUESTED));
-            t.absent(selector.reconcile.called);
-            t.absent(selector.receiveRequest.called);
+            t.absent(selector.refreshAppendOutcome.called);
+            t.absent(selector.handleSelectionRequest.called);
             t.absent(session.sendAndForget.called);
             t.absent(session.close.called, 'ordinary failures keep the consensus channel open');
             if (waiting) {

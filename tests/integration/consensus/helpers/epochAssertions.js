@@ -6,7 +6,7 @@ import {
 } from '../../../../src/codecs/consensus/v1/consensusV1OperationCodec.js';
 import { bufferToAddress } from '../../../../src/core/state/utils/address.js';
 import { VDF_DIFFICULTY, VDF_DISCRIMINANT_BITS } from './consensusNetwork.js';
-import { calculateQuorum } from '../../../../src/core/consensus/quorum.js';
+import { calculateProofSignatureQuorum } from '../../../../src/core/consensus/quorum.js';
 
 export async function assertSignedEpoch(t, network, { epoch = 1n, proposer = network.proposer } = {}) {
     const { nodes } = network;
@@ -24,7 +24,7 @@ export async function assertSignedEpoch(t, network, { epoch = 1n, proposer = net
     t.is(proposal.epoch.readBigUInt64BE(), epoch);
     t.is(proposal.difficulty.readUInt32BE(), VDF_DIFFICULTY);
     t.is(proposal.discriminant_bit_size.readUInt16BE(), VDF_DISCRIMINANT_BITS);
-    const expectedApprovals = calculateQuorum(nodes.filter(node => node.promoted).length) - 1;
+    const expectedApprovals = calculateProofSignatureQuorum(nodes.filter(node => node.promoted).length) - 1;
     t.is(proof.app.length, expectedApprovals, 'proof has the required external approvals');
     const approvers = proof.app.map(encoded => bufferToAddress(
         decodeProofProposalApproval(encoded).approver, proposer.config.addressPrefix

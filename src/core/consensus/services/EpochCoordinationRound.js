@@ -1,14 +1,14 @@
-import b4a from 'b4a';
 import { EPOCH_EVENTS, EPOCH_STATES, EpochStateMachine } from './EpochStateMachine.js';
 import {
     createMessage,
+    toHex,
     uint16ToBuffer,
     uint32ToBuffer,
     uint64ToBuffer,
 } from '../../../utils/buffer.js';
 import { addressToBuffer } from '../../state/utils/address.js';
 import { EpochRoundListeners } from './EpochRoundListeners.js';
-import { calculateQuorum } from '../quorum.js';
+import { calculateProofSignatureQuorum } from '../quorum.js';
 import {
     sameSelectionContext,
     EpochAppenderSelectionPhase,
@@ -19,71 +19,90 @@ import {
     EpochAppenderSelectionErrorCode,
 } from '../epochAppenderSelection/EpochAppenderSelectionError.js';
 
+/**
+ * @typedef {import('./EpochStateMachine.js').EpochRoundContext} EpochRoundContext
+ * @typedef {import('./EpochCoordinatorOperations.js').EpochApprovalCollection} EpochApprovalCollection
+ * @typedef {import('./EpochCoordinatorOperations.js').EpochProofApproval} EpochProofApproval
+ */
+
 const INACTIVE_ROUND_ERROR = new Error('Epoch coordination round is no longer active');
 
-/** Owns one execution of the epoch state machine. */
+/**
+ * Runs one epoch round through the FSM. Calculates the proof, collects approvals, selects an appender
+ * and checks the signed append result. A retry can reuse the proof, but starts a new approval
+ * collection and election. Cancelling the round stops its timers and callbacks. It cannot undo an
+ * append that has already started.
+ */
 export class EpochCoordinationRound {
     #state;
     #wallet;
     #config;
-    #manager;
+    #indexerConnectionManager;
     #logger;
-    #operations;
-    #intervalMs;
-    #machine;
-    #listeners;
+    #epochOperations;
+    #roundIntervalMs;
+    #epochStateMachine;
+    #roundListeners;
     #cancelled = false;
     #finished = false;
     #remoteProposalWait = null;
     #backoffWait = null;
     #appenderSelector;
-    #appendRequest = null;
-    #outcomeTimer = null;
-    #checkingOutcome = false;
+    #selectionRequest = null;
+    #appendOutcomeTimer = null;
+    #checkingAppendOutcome = false;
 
     /**
-     * Creates one state machine round.
-     * The same operations object is used during the whole round.
+     * Sets up a round with the shared node services. This round manages its own FSM, approval
+     * collection, retry delays and append outcome timer.
      *
-     * @param {object} dependencies round dependencies supplied by EpochCoordinatorService
+     * @param {object} dependencies Services used by this round.
+     * @param {import('../../state/State.js').default} dependencies.state Access to signed ledger data and epoch events.
+     * @param {object} dependencies.wallet Local proposer identity.
+     * @param {object} dependencies.config Network and timeout configuration.
+     * @param {import('../../network/services/IndexerConnectionManager.js').default} dependencies.manager Consensus peer sessions.
+     * @param {object} dependencies.logger Round diagnostic logger.
+     * @param {import('./EpochCoordinatorOperations.js').EpochCoordinatorOperations} dependencies.operations Methods for proofs, signatures and appends.
+     * @param {number} dependencies.intervalMs Delay before the next round.
+     * @param {import('../epochAppenderSelection/EpochAppenderSelector.js').EpochAppenderSelector|null} [dependencies.appenderSelector=null] Shared selector that saves votes locally.
      */
-    constructor({ state, wallet, config, manager, logger, operations, intervalMs, appenderSelector = null }) {
+    constructor({ state, wallet, config, manager: indexerConnectionManager, logger, operations: epochOperations, intervalMs: roundIntervalMs, appenderSelector = null }) {
         this.#state = state;
         this.#wallet = wallet;
         this.#config = config;
-        this.#manager = manager;
+        this.#indexerConnectionManager = indexerConnectionManager;
         this.#logger = logger;
-        this.#operations = operations;
-        this.#intervalMs = intervalMs;
+        this.#epochOperations = epochOperations;
+        this.#roundIntervalMs = roundIntervalMs;
         this.#appenderSelector = appenderSelector;
-        this.#machine = new EpochStateMachine(this.#buildHandlers());
-        this.#machine.on(EPOCH_EVENTS.APPROVAL_COLLECTION_FAILED, ({ context }) => {
+        this.#epochStateMachine = new EpochStateMachine(this.#buildHandlers());
+        this.#epochStateMachine.on(EPOCH_EVENTS.APPROVAL_COLLECTION_FAILED, ({ context: roundContext }) => {
             this.#closeApprovalCollection();
-            this.#logApprovalBackoff(context);
+            this.#logApprovalBackoff(roundContext);
         });
-        this.#listeners = new EpochRoundListeners({
+        this.#roundListeners = new EpochRoundListeners({
             state,
             config,
-            machine: this.#machine,
-            isRoundActive: () => this.#isActive(),
-            onEpochProgress: () => this.#checkCoordinatedProgress(),
+            machine: this.#epochStateMachine,
+            isRoundActive: () => this.#isRoundActive(),
+            onEpochProgress: () => this.#checkSignedEpochProgress(),
         });
     }
 
     /**
-     * Starts the state machine for this round.
-     * The method can finish while the round is still waiting for an approval, timeout or event.
+     * Starts this round. The method may return while the FSM is still waiting for an approval, timeout
+     * or ledger event.
      *
-     * @param {(delay: number) => void} next schedules the next coordinator round
+     * @param {(delay: number) => void} scheduleNextRound Schedules the next round after the given delay in milliseconds.
      * @returns {Promise<void>}
      */
-    async run(next) {
-        if (!this.#isActive()) return;
+    async run(scheduleNextRound) {
+        if (!this.#isRoundActive()) return;
 
         const currentEpoch = await this.#state.getCurrentEpoch();
-        if (!this.#isActive()) return;
+        if (!this.#isRoundActive()) return;
         if (currentEpoch === null || currentEpoch < 0n) {
-            await this.#finish(next, this.#intervalMs);
+            await this.#finishRound(scheduleNextRound, this.#roundIntervalMs);
             return;
         }
 
@@ -93,83 +112,86 @@ export class EpochCoordinationRound {
                 'Epoch appender selection is required but its selector is unavailable'
             );
         }
-        await this.#appenderSelector.reconcile();
-        if (!this.#isActive()) return;
-        if (this.#appenderSelector.active) {
-            await this.#finish(next, this.#intervalMs);
+        await this.#appenderSelector.refreshAppendOutcome();
+        if (!this.#isRoundActive()) return;
+        if (this.#appenderSelector.activeReservation) {
+            await this.#finishRound(scheduleNextRound, this.#roundIntervalMs);
             return;
         }
-        this.#listeners.start();
-        await this.#machine.enter({
-            next: (delay) => this.#finish(next, delay),
+        this.#roundListeners.start();
+        await this.#epochStateMachine.enter({
+            finishAndScheduleNextRound: (delayMs) => this.#finishRound(scheduleNextRound, delayMs),
         });
     }
 
     /**
-     * Cancels the round and closes its state machine.
-     * Async operations which already started check {@link #assertActive} and ignore late results.
+     * Cancels the round and closes its FSM. Operations that are already running check whether the
+     * round is still active before using their results.
      *
      * @returns {Promise<void>}
      */
     async cancel() {
-        if (this.#cancelled) return this.#machine.close();
+        if (this.#cancelled) return this.#epochStateMachine.close();
 
         this.#cancelled = true;
         this.#closeApprovalCollection();
         this.#cancelRemoteProposalWait();
         this.#cancelBackoffWait();
-        clearTimeout(this.#outcomeTimer);
-        await this.#machine.close();
-        await this.#withdrawAppendRequest();
+        clearTimeout(this.#appendOutcomeTimer);
+        await this.#epochStateMachine.close();
+        await this.#cancelSelectionRequest();
     }
 
     /**
-     * Finishes this round once and schedules the next round after the machine is closed.
-     * A cancelled round does not schedule another run.
+     * Closes this round and schedules the next one. A round finishes only once. A cancelled round does
+     * not schedule another run.
      *
-     * @param {(delay: number) => void} next
-     * @param {number} delay
+     * @param {(delay: number) => void} scheduleNextRound Schedules the next round after this one closes.
+     * @param {number} delayMs Delay before the next round, in milliseconds.
      * @returns {Promise<boolean>}
      */
-    async #finish(next, delay) {
+    async #finishRound(scheduleNextRound, delayMs) {
         if (this.#cancelled || this.#finished) return false;
 
         this.#finished = true;
         this.#closeApprovalCollection();
         this.#cancelRemoteProposalWait();
         this.#cancelBackoffWait();
-        clearTimeout(this.#outcomeTimer);
-        await this.#machine.close();
-        await this.#withdrawAppendRequest();
+        clearTimeout(this.#appendOutcomeTimer);
+        await this.#epochStateMachine.close();
+        await this.#cancelSelectionRequest();
 
         if (this.#cancelled) return false;
-        next(delay);
+        scheduleNextRound(delayMs);
         return true;
     }
 
     /**
-     * Checks if this round can still process events and async results.
-     * Listeners use it to ignore results from an old round.
+     * Checks whether the round can still handle events and operation results.
      *
      * @returns {boolean}
      */
-    #isActive() {
-        return !this.#cancelled && !this.#finished && this.#machine.shouldRun();
+    #isRoundActive() {
+        return !this.#cancelled && !this.#finished && this.#epochStateMachine.shouldRun();
     }
 
     /**
-     * Stops a handler when the round became inactive during an async operation.
-     * The private error is handled by {@link #wrapHandler} and is not returned to callers.
+     * Stops a handler if the round ended during an async operation. The handler wrapper catches this
+     * error and ignores the late result.
      */
-    #assertActive() {
-        if (!this.#isActive()) throw INACTIVE_ROUND_ERROR;
+    #assertRoundActive() {
+        if (!this.#isRoundActive()) throw INACTIVE_ROUND_ERROR;
     }
 
-    /** Logs approval collection diagnostics before the round enters backoff. */
-    #logApprovalBackoff(context) {
-        const receivedApprovals = context.proposals?.approvals.length ?? 0;
-        const requiredApprovals = Math.max(context.quorum - 1, 0);
-        const targetEpoch = context.currentEpoch + 1n;
+    /**
+     * Logs how many external approvals were received when collection fails.
+     *
+     * @param {EpochRoundContext} roundContext Failed collection and required signature count.
+     */
+    #logApprovalBackoff(roundContext) {
+        const receivedApprovals = roundContext.approvalCollection?.approvals.length ?? 0;
+        const requiredApprovals = Math.max(roundContext.requiredProofSignatures - 1, 0);
+        const targetEpoch = roundContext.currentEpoch + 1n;
 
         this.#logger.warn(
             `[EpochCoordinationRound] approval collection failed for epoch ${targetEpoch}; ` +
@@ -177,22 +199,27 @@ export class EpochCoordinationRound {
         );
     }
 
-    /** Closes approval collection, so late request callbacks are ignored. */
+    /** Closes the current approval collection so late replies are ignored. */
     #closeApprovalCollection() {
-        if (this.#machine.context.proposals) {
-            this.#machine.context.proposals.closed = true;
+        if (this.#epochStateMachine.context.approvalCollection) {
+            this.#epochStateMachine.context.approvalCollection.closed = true;
         }
     }
 
-    /** Only the current, open collection can accept responses while the round is active. */
-    #isApprovalCollectionActive(proposals) {
-        return this.#isActive() && !proposals.closed && proposals === this.#machine.context.proposals;
+    /**
+     * Checks that the round and this approval collection are still active.
+     *
+     * @param {EpochApprovalCollection} approvalCollection Collection that received a reply.
+     * @returns {boolean} True if this collection still belongs to the active attempt.
+     */
+    #isApprovalCollectionActive(approvalCollection) {
+        return this.#isRoundActive() && !approvalCollection.closed && approvalCollection === this.#epochStateMachine.context.approvalCollection;
     }
 
 
     /**
-     * Waits for the remote proposal timeout.
-     * cancel() finishes this wait without waiting for the timer.
+     * Waits for a matching remote proposal to reach the ledger. Cancelling the round ends this wait
+     * early.
      *
      * @returns {Promise<void>}
      */
@@ -206,7 +233,7 @@ export class EpochCoordinationRound {
         });
     }
 
-    /** Finishes and clears the remote proposal wait. */
+    /** Clears the remote proposal timer and finishes the wait. */
     #cancelRemoteProposalWait() {
         const remoteProposalWait = this.#remoteProposalWait;
         if (!remoteProposalWait) return;
@@ -216,7 +243,12 @@ export class EpochCoordinationRound {
         remoteProposalWait.resolve();
     }
 
-    /** Waits before retrying consensus work after a failed attempt. */
+    /**
+     * Waits before starting another attempt after a failure.
+     *
+     * @param {number} [delayMs] Delay in milliseconds. Defaults to epochBackoffDelay.
+     * @returns {Promise<void>} Resolves when the timer ends or the wait is cancelled.
+     */
     #waitForBackoff(delayMs = this.#config.epochBackoffDelay) {
         return new Promise((resolve) => {
             const complete = () => {
@@ -231,7 +263,7 @@ export class EpochCoordinationRound {
         });
     }
 
-    /** Finishes and clears the current backoff wait. */
+    /** Clears the retry timer and finishes the wait. */
     #cancelBackoffWait() {
         const backoffWait = this.#backoffWait;
         if (!backoffWait) return;
@@ -240,8 +272,14 @@ export class EpochCoordinationRound {
         backoffWait.complete();
     }
 
-    /** Loads the signed epoch and config used by this round. */
-    async #handleLoadEpochContext(_context, machine) {
+    /**
+     * Loads the signed parent epoch and VDF config for this round.
+     *
+     * @param {EpochRoundContext} _context Unused because this handler loads the round context.
+     * @param {EpochStateMachine} epochStateMachine FSM that receives the next event.
+     * @returns {Promise<void>}
+     */
+    async #handleLoadEpochContext(_context, epochStateMachine) {
         const currentEpoch = await this.#state.requireCurrentEpoch();
         const currentEpochHash = await this.#state.requireEpoch(currentEpoch);
         const {
@@ -250,14 +288,20 @@ export class EpochCoordinationRound {
                 discriminantBitSize: vdfDiscriminantSize,
             },
         } = await this.#state.requireSignedConsensusConfig();
-        this.#assertActive();
-        machine.appendContext({ currentEpoch, currentEpochHash, vdfDifficulty, vdfDiscriminantSize });
-        await machine.send(EPOCH_EVENTS.START);
+        this.#assertRoundActive();
+        epochStateMachine.appendContext({ currentEpoch, currentEpochHash, vdfDifficulty, vdfDiscriminantSize });
+        await epochStateMachine.send(EPOCH_EVENTS.START);
     }
 
-    /** Calculates the local VDF proof and sends the result to the state machine. */
-    async #handleInitializeVdf(context, machine) {
-        const { currentEpochHash, vdfDifficulty, vdfDiscriminantSize, currentEpoch } = context;
+    /**
+     * Calculates the local VDF proof and sends the result to the FSM.
+     *
+     * @param {EpochRoundContext} roundContext Data for this round and attempt.
+     * @param {EpochStateMachine} epochStateMachine FSM that receives the next event.
+     * @returns {Promise<void>}
+     */
+    async #handleInitializeVdf(roundContext, epochStateMachine) {
+        const { currentEpochHash, vdfDifficulty, vdfDiscriminantSize, currentEpoch } = roundContext;
 
         const challenge = createMessage(
             uint16ToBuffer(this.#config.networkId),
@@ -269,227 +313,294 @@ export class EpochCoordinationRound {
         );
 
         try {
-            const vdf = await this.#operations.calculateVDF(challenge, vdfDifficulty, vdfDiscriminantSize);
-            this.#assertActive();
-            machine.appendContext({ vdf });
-            await machine.send(EPOCH_EVENTS.LOCAL_PROOF_READY);
+            const vdf = await this.#epochOperations.calculateVDF(challenge, vdfDifficulty, vdfDiscriminantSize);
+            this.#assertRoundActive();
+            epochStateMachine.appendContext({ vdf });
+            await epochStateMachine.send(EPOCH_EVENTS.LOCAL_PROOF_READY);
         } catch (error) {
-            this.#assertActive();
+            this.#assertRoundActive();
             this.#logger.error(error);
-            await machine.send(EPOCH_EVENTS.SOLVER_FAILURE);
+            await epochStateMachine.send(EPOCH_EVENTS.SOLVER_FAILURE);
         }
     }
 
-    /** Builds and signs the local proof proposal after VDF completion. */
-    async #handleBuildAndSignProofProposal(context, machine) {
-        const { currentEpoch, currentEpochHash, vdf } = context;
-        const proofProposalMessage = await this.#operations.createProofProposal(currentEpoch, currentEpochHash, vdf);
-        this.#assertActive();
-        machine.appendContext({ proofProposalMessage, proofProposal: proofProposalMessage.proof_proposal });
-        await machine.send(EPOCH_EVENTS.PROPOSAL_BUILT);
+    /**
+     * Builds and signs the local proposal after the VDF proof is ready.
+     *
+     * @param {EpochRoundContext} roundContext Data for this round and attempt.
+     * @param {EpochStateMachine} epochStateMachine FSM that receives the next event.
+     * @returns {Promise<void>}
+     */
+    async #handleBuildAndSignProofProposal(roundContext, epochStateMachine) {
+        const { currentEpoch, currentEpochHash, vdf } = roundContext;
+        const proofProposalMessage = await this.#epochOperations.createProofProposal(currentEpoch, currentEpochHash, vdf);
+        this.#assertRoundActive();
+        epochStateMachine.appendContext({ proofProposalMessage, proofProposal: proofProposalMessage.proof_proposal });
+        await epochStateMachine.send(EPOCH_EVENTS.PROPOSAL_BUILT);
     }
 
-    /** Decides if external approvals are required before building SET_EPOCH. */
-    async #handleQuorumDecision(context, machine) {
-        if (context.remoteProposalReceived) {
+    /**
+     * Reads the current indexers and decides whether the proof needs external approvals.
+     *
+     * @param {EpochRoundContext} roundContext Data for this round and attempt.
+     * @param {EpochStateMachine} epochStateMachine FSM that receives the next event.
+     * @returns {Promise<void>}
+     */
+    async #handleQuorumDecision(roundContext, epochStateMachine) {
+        if (roundContext.remoteProposalReceived) {
             await this.#waitForRemoteProposal();
-            this.#assertActive();
+            this.#assertRoundActive();
             const latestEpoch = await this.#state.getCurrentEpoch();
-            this.#assertActive();
-            if (latestEpoch > context.currentEpoch) {
-                await machine.send(EPOCH_EVENTS.TARGET_EPOCH_ALREADY_SIGNED);
+            this.#assertRoundActive();
+            if (latestEpoch > roundContext.currentEpoch) {
+                await epochStateMachine.send(EPOCH_EVENTS.TARGET_EPOCH_ALREADY_SIGNED);
                 return;
             }
         }
 
         // Each attempt uses one authoritative membership snapshot, regardless of peer connectivity.
         const indexers = await this.#state.getIndexersEntry();
-        this.#assertActive();
-        const indexerKeys = new Set(indexers.map(({ key }) => b4a.toString(key, 'hex')));
-        if (!indexerKeys.has(b4a.toString(this.#state.writingKey, 'hex'))) {
-            await context.next(this.#intervalMs);
+        this.#assertRoundActive();
+        const indexerKeys = new Set(indexers.map(({ key }) => toHex(key)));
+        if (!indexerKeys.has(toHex(this.#state.writingKey))) {
+            await roundContext.finishAndScheduleNextRound(this.#roundIntervalMs);
             return;
         }
 
-        const quorum = calculateQuorum(indexers.length);
-        const approvers = this.#operations.approvers(indexers);
-        machine.appendContext({ indexerKeys, quorum, approvers, proposals: null });
+        const requiredProofSignatures = calculateProofSignatureQuorum(indexers.length);
+        const approvers = this.#epochOperations.getProofApprovers(indexers);
+        epochStateMachine.appendContext({ indexerKeys, requiredProofSignatures, approvers, approvalCollection: null });
 
-        await machine.send(
-            quorum <= 1
+        await epochStateMachine.send(
+            requiredProofSignatures <= 1
                 ? EPOCH_EVENTS.EXTERNAL_APPROVALS_NOT_REQUIRED
                 : EPOCH_EVENTS.EXTERNAL_APPROVALS_REQUIRED,
         );
     }
 
-    /** Connects to eligible indexers and starts one approval request per approver. */
-    async #handleSendProposalToIndexers(context, machine) {
-        const { approvers } = context;
-        await this.#manager.connect();
-        this.#assertActive();
+    /**
+     * Connects to the other indexers and starts one proof approval request per signer.
+     *
+     * @param {EpochRoundContext} roundContext Data for this round and attempt.
+     * @param {EpochStateMachine} epochStateMachine FSM that receives the next event.
+     * @returns {Promise<void>}
+     */
+    async #handleSendProposalToIndexers(roundContext, epochStateMachine) {
+        const { approvers } = roundContext;
+        await this.#indexerConnectionManager.connect();
+        this.#assertRoundActive();
 
-        const proposals = {
+        const approvalCollection = {
             approvers,
             approvals: [],
             rejections: [],
             closed: false,
         };
 
-        machine.appendContext({ proposals });
-        this.#dispatchApprovalRequests(approvers, machine, proposals);
-        await machine.send(EPOCH_EVENTS.PROPOSAL_BROADCAST);
+        epochStateMachine.appendContext({ approvalCollection });
+        this.#dispatchApprovalRequests(approvers, epochStateMachine, approvalCollection);
+        await epochStateMachine.send(EPOCH_EVENTS.PROPOSAL_BROADCAST);
     }
 
     /**
-     * Starts approval requests.
-     * Each callback checks if the round and approval collection are still active.
+     * Sends proof approval requests. Each reply is checked against the active round and approval
+     * collection.
+     *
+     * @param {Array<{key: Buffer}>} approvers Indexers that can approve this proof.
+     * @param {EpochStateMachine} epochStateMachine FSM for this round.
+     * @param {EpochApprovalCollection} approvalCollection Collection that owns these requests.
      */
-    #dispatchApprovalRequests(approvers, machine, proposals) {
+    #dispatchApprovalRequests(approvers, epochStateMachine, approvalCollection) {
         for (const member of approvers) {
-            const { currentEpoch, currentEpochHash, vdf } = machine.context;
-            this.#operations.collectSignature(
+            const { currentEpoch, currentEpochHash, vdf } = epochStateMachine.context;
+            this.#epochOperations.requestProofApproval(
                 member,
                 { currentEpoch, currentEpochHash, vdf },
-                this.#manager,
-                proposals,
+                this.#indexerConnectionManager,
+                approvalCollection,
             )
-                .then((confirmation) => this.#handleApproval(confirmation, proposals, machine))
-                .catch((error) => this.#handleApprovalFailure(error, member, proposals, machine));
+                .then((proofApproval) => this.#handleApproval(proofApproval, approvalCollection, epochStateMachine))
+                .catch((error) => this.#handleApprovalFailure(error, member, approvalCollection, epochStateMachine));
         }
     }
 
-    /** Records a valid approval and advances the state machine after reaching quorum. */
-    async #handleApproval(confirmation, proposals, machine) {
-        if (!this.#isApprovalCollectionActive(proposals)) return;
+    /**
+     * Adds a valid approval and advances the FSM when enough proof signatures are collected.
+     *
+     * @param {EpochProofApproval} proofApproval Verified signature and signer address.
+     * @param {EpochApprovalCollection} approvalCollection Collection that sent the request.
+     * @param {EpochStateMachine} epochStateMachine FSM that receives QUORUM_REACHED.
+     * @returns {Promise<void>}
+     */
+    async #handleApproval(proofApproval, approvalCollection, epochStateMachine) {
+        if (!this.#isApprovalCollectionActive(approvalCollection)) return;
 
-        proposals.approvals.push(confirmation);
-        if (proposals.approvals.length + 1 >= machine.context.quorum) {
-            proposals.closed = true;
-            await machine.send(EPOCH_EVENTS.QUORUM_REACHED);
+        approvalCollection.approvals.push(proofApproval);
+        if (approvalCollection.approvals.length + 1 >= epochStateMachine.context.requiredProofSignatures) {
+            approvalCollection.closed = true;
+            await epochStateMachine.send(EPOCH_EVENTS.QUORUM_REACHED);
         }
     }
 
-    /** Records a rejected approval and stops collection when quorum is no longer possible. */
-    async #handleApprovalFailure(error, member, proposals, machine) {
-        if (!this.#isApprovalCollectionActive(proposals)) return;
+    /**
+     * Records a failed approval request. Stops collection when the remaining signers cannot provide
+     * enough signatures.
+     *
+     * @param {Error} error Reason the approval request failed.
+     * @param {{key: Buffer}} member Indexer that was asked to approve the proof.
+     * @param {EpochApprovalCollection} approvalCollection Collection that sent the request.
+     * @param {EpochStateMachine} epochStateMachine FSM that receives APPROVAL_COLLECTION_FAILED.
+     * @returns {Promise<void>}
+     */
+    async #handleApprovalFailure(error, member, approvalCollection, epochStateMachine) {
+        if (!this.#isApprovalCollectionActive(approvalCollection)) return;
 
-        proposals.rejections.push({ member, error });
-        if (proposals.rejections.length > proposals.approvers.length - machine.context.quorum + 1) {
-            proposals.closed = true;
-            await machine.send(EPOCH_EVENTS.APPROVAL_COLLECTION_FAILED);
+        approvalCollection.rejections.push({ member, error });
+        if (approvalCollection.rejections.length > approvalCollection.approvers.length - epochStateMachine.context.requiredProofSignatures + 1) {
+            approvalCollection.closed = true;
+            await epochStateMachine.send(EPOCH_EVENTS.APPROVAL_COLLECTION_FAILED);
         }
     }
 
-    /** Builds the SET_EPOCH payload from the local proposal and collected approvals. */
-    async #handleBuildSetEpoch(context, machine) {
-        const setEpochPayload = await this.#operations.buildSetEpochPayload(
-            context.proofProposal,
-            context.proposals?.approvals ?? [],
+    /**
+     * Builds the SET_EPOCH payload from the local proposal and collected approvals.
+     *
+     * @param {EpochRoundContext} roundContext Data for this round and attempt.
+     * @param {EpochStateMachine} epochStateMachine FSM that receives the next event.
+     * @returns {Promise<void>}
+     */
+    async #handleBuildSetEpoch(roundContext, epochStateMachine) {
+        const setEpochPayload = await this.#epochOperations.buildSetEpochPayload(
+            roundContext.proofProposal,
+            roundContext.approvalCollection?.approvals ?? [],
         );
-        this.#assertActive();
-        machine.appendContext({ setEpochPayload });
-        await machine.send(EPOCH_EVENTS.SET_EPOCH_BUILT);
+        this.#assertRoundActive();
+        epochStateMachine.appendContext({ setEpochPayload });
+        await epochStateMachine.send(EPOCH_EVENTS.SET_EPOCH_BUILT);
     }
 
-    /** Checks the epoch and membership before appending a payload built by this attempt. */
-    async #handleRefreshSignedStateBeforeAppend(context, machine) {
+    /**
+     * Checks the signed epoch, consensus config and indexers before appending this payload.
+     *
+     * @param {EpochRoundContext} roundContext Data for this round and attempt.
+     * @param {EpochStateMachine} epochStateMachine FSM that receives the next event.
+     * @returns {Promise<void>}
+     */
+    async #handleRefreshSignedStateBeforeAppend(roundContext, epochStateMachine) {
         const latestEpochBeforeAppend = await this.#state.getCurrentEpoch();
-        this.#assertActive();
-        if (latestEpochBeforeAppend !== context.currentEpoch) {
-            await this.#withdrawAppendRequest();
-            this.#assertActive();
-            await machine.send(EPOCH_EVENTS.TARGET_EPOCH_ALREADY_SIGNED);
+        this.#assertRoundActive();
+        if (latestEpochBeforeAppend !== roundContext.currentEpoch) {
+            await this.#cancelSelectionRequest();
+            this.#assertRoundActive();
+            await epochStateMachine.send(EPOCH_EVENTS.TARGET_EPOCH_ALREADY_SIGNED);
             return;
         }
 
-        const snapshot = await this.#state.getEpochAppenderSelectionContext();
-        this.#assertActive();
+        const signedSelectionContext = await this.#state.getEpochAppenderSelectionContext();
+        this.#assertRoundActive();
 
         const { configData } = await this.#state.requireSignedConsensusConfig();
-        this.#assertActive();
+        this.#assertRoundActive();
 
         if (
-            !sameSelectionContext(snapshot, this.#appendRequest) ||
-            configData.difficulty !== context.vdfDifficulty ||
-            configData.discriminantBitSize !== context.vdfDiscriminantSize
+            !sameSelectionContext(signedSelectionContext, this.#selectionRequest) ||
+            configData.difficulty !== roundContext.vdfDifficulty ||
+            configData.discriminantBitSize !== roundContext.vdfDiscriminantSize
         ) {
-            await this.#withdrawAppendRequest();
-            this.#assertActive();
-            await machine.send(EPOCH_EVENTS.TARGET_EPOCH_ALREADY_SIGNED);
+            await this.#cancelSelectionRequest();
+            this.#assertRoundActive();
+            await epochStateMachine.send(EPOCH_EVENTS.TARGET_EPOCH_ALREADY_SIGNED);
             return;
         }
 
-        const currentWriterKeys = snapshot.currentWriterKeys;
+        const currentWriterKeys = signedSelectionContext.currentWriterKeys;
         const membershipChanged =
-            currentWriterKeys.length !== context.indexerKeys.size ||
-            currentWriterKeys.some(key => !context.indexerKeys.has(key));
+            currentWriterKeys.length !== roundContext.indexerKeys.size ||
+            currentWriterKeys.some(key => !roundContext.indexerKeys.has(key));
 
         if (membershipChanged) {
-            await this.#withdrawAppendRequest();
-            this.#assertActive();
+            await this.#cancelSelectionRequest();
+            this.#assertRoundActive();
         }
 
-        await machine.send(
+        await epochStateMachine.send(
             membershipChanged
                 ? EPOCH_EVENTS.INDEXERS_CHANGED
                 : EPOCH_EVENTS.TARGET_EPOCH_ABSENT
         );
     }
 
-    /** Refreshes signed state and decides if the existing proof can be used again. */
-    async #handleRefreshSignedState(context, machine) {
+    /**
+     * Refreshes signed state and checks whether the local proof can be reused.
+     *
+     * @param {EpochRoundContext} roundContext Data for this round and attempt.
+     * @param {EpochStateMachine} epochStateMachine FSM that receives the next event.
+     * @returns {Promise<void>}
+     */
+    async #handleRefreshSignedState(roundContext, epochStateMachine) {
         await this.#state.refresh();
-        this.#assertActive();
+        this.#assertRoundActive();
         const latestEpoch = await this.#state.getCurrentEpoch();
-        this.#assertActive();
+        this.#assertRoundActive();
 
-        if (latestEpoch > context.currentEpoch) {
-            await machine.send(EPOCH_EVENTS.NEW_EPOCH_DISCOVERED);
-        } else if (context.vdf) {
-            await machine.send(EPOCH_EVENTS.EPOCH_UNCHANGED_WITH_LOCAL_PROOF);
+        if (latestEpoch > roundContext.currentEpoch) {
+            await epochStateMachine.send(EPOCH_EVENTS.NEW_EPOCH_DISCOVERED);
+        } else if (roundContext.vdf) {
+            await epochStateMachine.send(EPOCH_EVENTS.EPOCH_UNCHANGED_WITH_LOCAL_PROOF);
         } else {
-            await machine.send(EPOCH_EVENTS.EPOCH_UNCHANGED_WITHOUT_LOCAL_PROOF);
+            await epochStateMachine.send(EPOCH_EVENTS.EPOCH_UNCHANGED_WITHOUT_LOCAL_PROOF);
         }
     }
 
-    /** Continues epoch processing after backoff. */
-    async #handleBackoff(context, machine) {
-        const delay = context.appendElectionRetry
+    /**
+     * Waits before retrying. Election failures use a shorter delay.
+     *
+     * @param {EpochRoundContext} roundContext Data for this round and attempt.
+     * @param {EpochStateMachine} epochStateMachine FSM that receives the next event.
+     * @returns {Promise<void>}
+     */
+    async #handleBackoff(roundContext, epochStateMachine) {
+        const delayMs = roundContext.appendElectionRetry
             ? Math.max(100, Math.min(this.#config.epochBackoffDelay, 1000))
             : this.#config.epochBackoffDelay;
-        machine.appendContext({ appendElectionRetry: false });
-        await this.#waitForBackoff(delay);
-        this.#assertActive();
-        await machine.send(EPOCH_EVENTS.BACKOFF_ELAPSED);
-    }
-
-    /** Finishes the round and schedules a fresh round which reloads signed context. */
-    async #handleReloadSignedContext(context) {
-        await context.next(this.#intervalMs);
+        epochStateMachine.appendContext({ appendElectionRetry: false });
+        await this.#waitForBackoff(delayMs);
+        this.#assertRoundActive();
+        await epochStateMachine.send(EPOCH_EVENTS.BACKOFF_ELAPSED);
     }
 
     /**
-     * Checks if the round is active before running a handler.
-     * Normal handler errors schedule a retry. Cancellation errors are ignored.
+     * Ends this round and schedules a new one that loads fresh signed context.
      *
-     * @param {Function} handler state-specific handler
-     * @returns {Function} guarded state-machine handler
+     * @param {EpochRoundContext} roundContext Provides the callback that closes this round and schedules the next.
+     * @returns {Promise<void>}
+     */
+    async #handleRoundCompletion(roundContext) {
+        await roundContext.finishAndScheduleNextRound(this.#roundIntervalMs);
+    }
+
+    /**
+     * Checks that the round is active before running a handler. A handler error ends the round and
+     * schedules another attempt. Late results from an inactive round are ignored.
+     *
+     * @param {Function} handler Handler for one FSM state.
+     * @returns {Function} Handler that checks whether the round is active.
      */
     #wrapHandler(handler) {
-        return async (context, machine) => {
+        return async (roundContext, epochStateMachine) => {
             try {
-                this.#assertActive();
-                await handler(context, machine);
+                this.#assertRoundActive();
+                await handler(roundContext, epochStateMachine);
             } catch (error) {
-                if (error === INACTIVE_ROUND_ERROR || !this.#isActive()) return;
+                if (error === INACTIVE_ROUND_ERROR || !this.#isRoundActive()) return;
 
                 this.#logger.error(`[EpochCoordinationRound] handler failed: ${error.message}`);
-                await context.next(this.#intervalMs);
+                await roundContext.finishAndScheduleNextRound(this.#roundIntervalMs);
             }
         };
     }
 
-    /** @returns {object} state machine handlers with the active round check */
+    /** @returns {object} FSM handlers that check whether the round is active. */
     #buildHandlers() {
         const handlers = {
             [EPOCH_STATES.LOAD_EPOCH_CONTEXT]: this.#handleLoadEpochContext.bind(this),
@@ -504,7 +615,7 @@ export class EpochCoordinationRound {
             [EPOCH_STATES.WAIT_FOR_APPEND_OUTCOME]: this.#handleWaitForAppendOutcome.bind(this),
             [EPOCH_STATES.REFRESH_SIGNED_STATE]: this.#handleRefreshSignedState.bind(this),
             [EPOCH_STATES.BACKOFF]: this.#handleBackoff.bind(this),
-            [EPOCH_STATES.RELOAD_SIGNED_CONTEXT]: this.#handleReloadSignedContext.bind(this),
+            [EPOCH_STATES.RELOAD_SIGNED_CONTEXT]: this.#handleRoundCompletion.bind(this),
         };
 
         return Object.fromEntries(
@@ -512,44 +623,58 @@ export class EpochCoordinationRound {
         );
     }
 
-    async #withdrawAppendRequest() {
-        const request = this.#appendRequest;
-        this.#appendRequest = null;
-        if (request) {
-            await this.#appenderSelector.cancel(request.requestId);
+    /**
+     * Clears this round's selection request. Cancels the reservation if no append has started. A
+     * PUBLISHING reservation stays with the selector until its result is known or it expires.
+     *
+     * @returns {Promise<void>}
+     */
+    async #cancelSelectionRequest() {
+        const selectionRequest = this.#selectionRequest;
+        this.#selectionRequest = null;
+        if (selectionRequest) {
+            await this.#appenderSelector.cancel(selectionRequest.requestId);
         }
     }
 
-    async #handleWaitForAppendReplies(context, machine) {
+    /**
+     * Reserves this attempt's payload and waits for appender votes. A changed signed context ends the
+     * round. A failed election starts another attempt after a delay.
+     *
+     * @param {EpochRoundContext} roundContext Current proof and SET_EPOCH bytes.
+     * @param {EpochStateMachine} epochStateMachine FSM receiving the selection outcome.
+     * @returns {Promise<void>}
+     */
+    async #handleWaitForAppendReplies(roundContext, epochStateMachine) {
         try {
-            const snapshot = await this.#state.getEpochAppenderSelectionContext();
-            this.#assertActive();
+            const signedSelectionContext = await this.#state.getEpochAppenderSelectionContext();
+            this.#assertRoundActive();
             if (
-                BigInt(snapshot.targetEpoch) !== context.currentEpoch + 1n ||
-                snapshot.parentHash !== context.currentEpochHash.toString('hex')
+                BigInt(signedSelectionContext.targetEpoch) !== roundContext.currentEpoch + 1n ||
+                signedSelectionContext.parentHash !== toHex(roundContext.currentEpochHash)
             ) {
-                await machine.send(EPOCH_EVENTS.TARGET_EPOCH_ALREADY_SIGNED);
+                await epochStateMachine.send(EPOCH_EVENTS.TARGET_EPOCH_ALREADY_SIGNED);
                 return;
             }
-            const request = await this.#appenderSelector.createRequest(snapshot, context.setEpochPayload);
-            if (!this.#isActive()) {
-                await this.#appenderSelector.cancel(request.requestId);
+            const selectionRequest = await this.#appenderSelector.createSelectionRequest(signedSelectionContext, roundContext.setEpochPayload);
+            if (!this.#isRoundActive()) {
+                await this.#appenderSelector.cancel(selectionRequest.requestId);
                 return;
             }
-            this.#appendRequest = request;
-            await this.#appenderSelector.waitForReplies(request);
-            this.#assertActive();
-            if (this.#appendRequest !== request || machine.state !== EPOCH_STATES.WAIT_FOR_APPEND_REPLIES) {
+            this.#selectionRequest = selectionRequest;
+            await this.#appenderSelector.waitForAppenderSelection(selectionRequest);
+            this.#assertRoundActive();
+            if (this.#selectionRequest !== selectionRequest || epochStateMachine.state !== EPOCH_STATES.WAIT_FOR_APPEND_REPLIES) {
                 return;
             }
-            await machine.send(EPOCH_EVENTS.APPEND_REPLIES_COLLECTED);
+            await epochStateMachine.send(EPOCH_EVENTS.APPEND_REPLIES_COLLECTED);
         } catch (error) {
-            this.#assertActive();
-            await this.#withdrawAppendRequest();
+            this.#assertRoundActive();
+            await this.#cancelSelectionRequest();
             const latestEpoch = await this.#state.getCurrentEpoch();
-            this.#assertActive();
-            if (latestEpoch > context.currentEpoch) {
-                await machine.send(EPOCH_EVENTS.TARGET_EPOCH_ALREADY_SIGNED);
+            this.#assertRoundActive();
+            if (latestEpoch > roundContext.currentEpoch) {
+                await epochStateMachine.send(EPOCH_EVENTS.TARGET_EPOCH_ALREADY_SIGNED);
                 return;
             }
             const message = `[EpochCoordinationRound] append replies unavailable: ${error.message}`;
@@ -560,81 +685,123 @@ export class EpochCoordinationRound {
             } else {
                 this.#logger.warn(message);
             }
-            machine.appendContext({ appendElectionRetry: true });
-            await machine.send(EPOCH_EVENTS.APPEND_REPLY_COLLECTION_FAILED);
+            epochStateMachine.appendContext({ appendElectionRetry: true });
+            await epochStateMachine.send(EPOCH_EVENTS.APPEND_REPLY_COLLECTION_FAILED);
         }
     }
 
-    /** Starts the selected append; signed progress or selection expiry ends the attempt. */
-    async #handleAppendSetEpoch(_context, machine) {
-        if (machine.state !== EPOCH_STATES.APPEND_SET_EPOCH || !this.#appendRequest) {
+    /**
+     * Starts the append and moves the FSM to waiting for its result. The write runs in the background
+     * because a timeout or a new election cannot cancel it.
+     *
+     * @param {EpochRoundContext} _context Unused here because the selector stores the selected payload.
+     * @param {EpochStateMachine} epochStateMachine FSM receiving APPEND_STARTED.
+     * @returns {Promise<void>}
+     */
+    async #handleAppendSetEpoch(_context, epochStateMachine) {
+        if (epochStateMachine.state !== EPOCH_STATES.APPEND_SET_EPOCH || !this.#selectionRequest) {
             return;
         }
-        const request = this.#appendRequest;
+        const selectionRequest = this.#selectionRequest;
         // Observe without awaiting the local write. Signed completion or election expiry
         // ends this attempt; neither a timeout nor a newer term cancels the pending append.
-        this.#appendSelectedPayload(request)
-            .catch(error => this.#handlePublicationFailure(request, machine, error))
+        this.#appendSelectedEpochPayload(selectionRequest)
+            .catch(error => this.#handleAppendFailure(selectionRequest, epochStateMachine, error))
             .catch(error => this.#logger.error(error));
-        await machine.send(EPOCH_EVENTS.APPEND_STARTED);
+        await epochStateMachine.send(EPOCH_EVENTS.APPEND_STARTED);
     }
 
-    async #appendSelectedPayload(request) {
-        const payload = await this.#appenderSelector.getSelectedPayload(request.requestId);
-        this.#assertActive();
-        if (this.#appendRequest !== request) {
+    /**
+     * Reads the selected payload and queues its append. The selector checks authorization inside the
+     * write queue before the payload is written.
+     *
+     * @param {import('../epochAppenderSelection/epochAppenderSelectionState.js').EpochAppendRequest} selectionRequest Selection request for this attempt.
+     * @returns {Promise<void>} Completes after the local append. The signed result still needs checking.
+     */
+    async #appendSelectedEpochPayload(selectionRequest) {
+        const epochPayload = await this.#appenderSelector.getSelectedEpochPayload(selectionRequest.requestId);
+        this.#assertRoundActive();
+        if (this.#selectionRequest !== selectionRequest) {
             return;
         }
-        return this.#operations.appendSetEpoch(payload, location => {
-            return this.#appenderSelector.authorizeAppend(request.requestId, location);
+        return this.#epochOperations.appendSetEpoch(epochPayload, appendLocation => {
+            return this.#appenderSelector.authorizeEpochAppend(selectionRequest.requestId, appendLocation);
         });
     }
 
-    async #handlePublicationFailure(request, machine, error) {
-        if (!this.#isActive() || this.#appendRequest !== request) {
+    /**
+     * Handles an append error only if it belongs to this attempt. Releases the selection when the
+     * append never started. Otherwise, the selector keeps checking its signed result until the result
+     * is known or the selection expires.
+     *
+     * @param {import('../epochAppenderSelection/epochAppenderSelectionState.js').EpochAppendRequest} selectionRequest Request saved before starting the append.
+     * @param {EpochStateMachine} epochStateMachine Current round FSM.
+     * @param {Error} error Error from the write queue, authorization or append.
+     * @returns {Promise<void>}
+     */
+    async #handleAppendFailure(selectionRequest, epochStateMachine, error) {
+        if (!this.#isRoundActive() || this.#selectionRequest !== selectionRequest) {
             return;
         }
         this.#logger.error(`[EpochCoordinationRound] append outcome unresolved: ${error.message}`);
-        const active = this.#appenderSelector.active;
-        if (active?.phase === EpochAppenderSelectionPhase.HELD) {
+        const activeReservation = this.#appenderSelector.activeReservation;
+        if (activeReservation?.phase === EpochAppenderSelectionPhase.HELD) {
             // Without the durable marker no append could have started, so cancellation is safe.
-            const released = await this.#appenderSelector.cancel(request.requestId);
-            if (released && this.#isActive() && this.#appendRequest === request) {
-                this.#appendRequest = null;
-                await machine.send(EPOCH_EVENTS.APPEND_REJECTED);
+            const released = await this.#appenderSelector.cancel(selectionRequest.requestId);
+            if (released && this.#isRoundActive() && this.#selectionRequest === selectionRequest) {
+                this.#selectionRequest = null;
+                await epochStateMachine.send(EPOCH_EVENTS.APPEND_REJECTED);
             }
             return;
         }
-        if (!active && !this.#appenderSelector.outcomeFor(request.requestId)) {
-            this.#appendRequest = null;
-            await machine.send(EPOCH_EVENTS.APPEND_REJECTED);
+        if (!activeReservation && !this.#appenderSelector.getRecordedAppendOutcome(selectionRequest.requestId)) {
+            this.#selectionRequest = null;
+            await epochStateMachine.send(EPOCH_EVENTS.APPEND_REJECTED);
         }
     }
 
+    /**
+     * Checks signed progress now, then schedules further checks while this attempt is active.
+     *
+     * @returns {Promise<void>}
+     */
     async #handleWaitForAppendOutcome() {
-        await this.#checkCoordinatedProgress();
-        this.#scheduleOutcomeCheck();
+        await this.#checkSignedEpochProgress();
+        this.#scheduleAppendOutcomeCheck();
     }
 
-    #scheduleOutcomeCheck() {
-        clearTimeout(this.#outcomeTimer);
-        if (!this.#isActive() || this.#machine.state !== EPOCH_STATES.WAIT_FOR_APPEND_OUTCOME) return;
-        this.#outcomeTimer = setTimeout(async () => {
-            await this.#checkCoordinatedProgress();
-            this.#scheduleOutcomeCheck();
+    /**
+     * Schedules another result check while the FSM waits for the append. The selector also checks
+     * appends that continue after the round has ended.
+     *
+     * @returns {void}
+     */
+    #scheduleAppendOutcomeCheck() {
+        clearTimeout(this.#appendOutcomeTimer);
+        if (!this.#isRoundActive() || this.#epochStateMachine.state !== EPOCH_STATES.WAIT_FOR_APPEND_OUTCOME) return;
+        this.#appendOutcomeTimer = setTimeout(async () => {
+            await this.#checkSignedEpochProgress();
+            this.#scheduleAppendOutcomeCheck();
         }, Math.max(100, Math.min(this.#config.epochAppendTimeout, 1000)));
     }
 
-    async #checkCoordinatedProgress() {
-        if (!this.#isActive() || this.#checkingOutcome) return;
-        this.#checkingOutcome = true;
-        const request = this.#appendRequest;
+    /**
+     * Sends an FSM event for the signed append result or selection expiry. EPOCH_CREATED can arrive
+     * before the epoch is signed, so the event starts a check. A result is used only if it still
+     * belongs to this round's current request.
+     *
+     * @returns {Promise<void>}
+     */
+    async #checkSignedEpochProgress() {
+        if (!this.#isRoundActive() || this.#checkingAppendOutcome) return;
+        this.#checkingAppendOutcome = true;
+        const selectionRequest = this.#selectionRequest;
         try {
-            await this.#appenderSelector.reconcile();
-            if (!this.#isActive() || this.#appendRequest !== request) return;
-            const observing = this.#machine.state === EPOCH_STATES.WAIT_FOR_APPEND_OUTCOME;
-            const outcome = request && this.#appenderSelector.outcomeFor(request.requestId);
-            if (observing && outcome) {
+            await this.#appenderSelector.refreshAppendOutcome();
+            if (!this.#isRoundActive() || this.#selectionRequest !== selectionRequest) return;
+            const waitingForAppendOutcome = this.#epochStateMachine.state === EPOCH_STATES.WAIT_FOR_APPEND_OUTCOME;
+            const outcome = selectionRequest && this.#appenderSelector.getRecordedAppendOutcome(selectionRequest.requestId);
+            if (waitingForAppendOutcome && outcome) {
                 let event;
                 switch (outcome.status) {
                     case EpochAppendOutcome.REJECTED:
@@ -644,29 +811,29 @@ export class EpochCoordinationRound {
                         event = EPOCH_EVENTS.TARGET_EPOCH_CONFIRMED;
                         break;
                     case EpochAppendOutcome.SELECTION_EXPIRED:
-                        this.#machine.appendContext({ appendElectionRetry: true });
+                        this.#epochStateMachine.appendContext({ appendElectionRetry: true });
                         event = EPOCH_EVENTS.APPENDER_SELECTION_EXPIRED;
                         break;
                     default:
                         return;
                 }
-                clearTimeout(this.#outcomeTimer);
-                this.#appendRequest = null;
-                await this.#machine.send(event);
+                clearTimeout(this.#appendOutcomeTimer);
+                this.#selectionRequest = null;
+                await this.#epochStateMachine.send(event);
                 return;
             }
             // The event itself may come from speculative apply. Read signed state.
-            if (!observing && this.#machine.state !== EPOCH_STATES.APPEND_SET_EPOCH) {
+            if (!waitingForAppendOutcome && this.#epochStateMachine.state !== EPOCH_STATES.APPEND_SET_EPOCH) {
                 const epoch = await this.#state.getCurrentEpoch();
-                if (!this.#isActive() || this.#appendRequest !== request) return;
-                if (epoch > this.#machine.context.currentEpoch) {
-                    await this.#machine.context.next(this.#intervalMs);
+                if (!this.#isRoundActive() || this.#selectionRequest !== selectionRequest) return;
+                if (epoch > this.#epochStateMachine.context.currentEpoch) {
+                    await this.#epochStateMachine.context.finishAndScheduleNextRound(this.#roundIntervalMs);
                 }
             }
         } catch (error) {
             this.#logger.error(`[EpochCoordinationRound] cannot confirm append outcome: ${error.message}`);
         } finally {
-            this.#checkingOutcome = false;
+            this.#checkingAppendOutcome = false;
         }
     }
 }

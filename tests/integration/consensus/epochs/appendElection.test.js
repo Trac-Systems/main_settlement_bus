@@ -89,7 +89,7 @@ test('two-member fallback submits locally after silence and finalizes when Autob
     };
     const round = network.startRound();
     await waitFor('solo local append after the unanswered election', () => submitted);
-    t.is(network.proposer.appenderSelector.active.solo, true);
+    t.is(network.proposer.appenderSelector.activeReservation.solo, true);
     t.is(await network.proposer.state.getCurrentEpoch(), 0n, 'the election fallback does not bypass Autobase signed finality');
     for (const node of online) await network.reconnect(offline, node);
     await assertSignedEpoch(t, network);

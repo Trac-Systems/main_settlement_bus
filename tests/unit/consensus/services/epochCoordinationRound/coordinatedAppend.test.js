@@ -80,10 +80,10 @@ test('coordinated FSM retries after election expiry and ignores a late append fa
     await f.clock.tickAsync(CONFIG.epochSignatureTimeout);
     await f.clock.tickAsync(CONFIG.epochBackoffDelay);
     t.is(f.writes.length, 2, 'an expired selection permits a higher-term attempt without declaring the old append rejected');
-    const current = f.selector.active.request.requestId;
+    const current = f.selector.activeReservation.request.requestId;
     f.writes[0].reject(new Error('late failure from A'));
     await f.clock.tickAsync(1000);
-    t.is(f.selector.active.request.requestId, current);
+    t.is(f.selector.activeReservation.request.requestId, current);
     t.is(f.writes.length, 2);
     t.is(f.next.callCount, 0);
 });
@@ -96,7 +96,7 @@ test('coordinated FSM cancellation cannot let the next round bypass a pending pu
     await first.cancel();
     await f.createRound().run(f.next);
     t.is(f.writes.length, 1);
-    t.is(f.selector.active.phase, EpochAppenderSelectionPhase.PUBLISHING);
+    t.is(f.selector.activeReservation.phase, EpochAppenderSelectionPhase.PUBLISHING);
     t.is(f.next.callCount, 1, 'new round reschedules while the node retains the reservation');
 });
 
@@ -113,18 +113,18 @@ test('FSM cancellation while queued prevents a stale append from using the next 
     await round.run(f.next);
     await f.clock.tickAsync(0);
     t.ok(f.operations.appendSetEpoch.calledOnce, 'the FSM owns the pending append operation');
-    t.is(f.selector.active.phase, EpochAppenderSelectionPhase.HELD, 'selection is checked when the writer queue opens');
+    t.is(f.selector.activeReservation.phase, EpochAppenderSelectionPhase.HELD, 'selection is checked when the writer queue opens');
 
     await round.cancel();
-    const nextRequest = await f.selector.createRequest(
+    const nextRequest = await f.selector.createSelectionRequest(
         await f.state.getEpochAppenderSelectionContext(), b4a.from('next attempt')
     );
     queue.resolve();
     await f.clock.tickAsync(0);
 
     t.is(writes, 0, 'the old request cannot reach the writer');
-    t.is(f.selector.active.request.requestId, nextRequest.requestId);
-    t.is(f.selector.active.phase, EpochAppenderSelectionPhase.HELD, 'the new selection is untouched');
+    t.is(f.selector.activeReservation.request.requestId, nextRequest.requestId);
+    t.is(f.selector.activeReservation.phase, EpochAppenderSelectionPhase.HELD, 'the new selection is untouched');
 });
 
 test('coordinated FSM does not accept speculative epoch events as finality', async t => {
@@ -133,12 +133,12 @@ test('coordinated FSM does not accept speculative epoch events as finality', asy
     await f.clock.tickAsync(0);
     await f.state.emit(CustomEventType.EPOCH_CREATED, { epoch: uint64ToBuffer(6n), proposerAddress: 'peer' });
     t.is(f.next.callCount, 0);
-    t.is(f.selector.active.phase, EpochAppenderSelectionPhase.PUBLISHING);
+    t.is(f.selector.activeReservation.phase, EpochAppenderSelectionPhase.PUBLISHING);
     f.state.getCurrentEpoch.resolves(6n);
     f.setOutcome(EpochAppendOutcome.EPOCH_ADVANCED);
     await f.clock.tickAsync(1000);
     t.is(f.next.callCount, 1);
-    t.absent(f.selector.active);
+    t.absent(f.selector.activeReservation);
 });
 
 test('coordinated FSM permits the explicitly agreed two-member solo fallback after silence', async t => {
@@ -147,7 +147,7 @@ test('coordinated FSM permits the explicitly agreed two-member solo fallback aft
     const running = round.run(f.next);
     await f.clock.tickAsync(CONFIG.epochSignatureTimeout);
     t.is(f.writes.length, 1);
-    t.is(f.selector.active.solo, true);
+    t.is(f.selector.activeReservation.solo, true);
     await round.cancel();
     await running;
 });
@@ -183,7 +183,7 @@ test('the selector monitor confirms a publication after its FSM round is cancell
     const round = f.createRound();
     await round.run(f.next);
     await f.clock.tickAsync(0);
-    const requestId = f.selector.active.request.requestId;
+    const requestId = f.selector.activeReservation.request.requestId;
     await round.cancel();
     f.readOutcome.resetHistory();
 
@@ -191,8 +191,8 @@ test('the selector monitor confirms a publication after its FSM round is cancell
     await f.clock.tickAsync(100);
 
     t.is(f.readOutcome.callCount, 1, 'the selector observes completion without the round timer');
-    t.alike(f.selector.outcomeFor(requestId), { status: EpochAppendOutcome.EPOCH_ADVANCED });
-    t.absent(f.selector.active);
+    t.alike(f.selector.getRecordedAppendOutcome(requestId), { status: EpochAppendOutcome.EPOCH_ADVANCED });
+    t.absent(f.selector.activeReservation);
     t.is(f.operations.appendSetEpoch.callCount, 1);
     t.is(f.next.callCount, 0, 'a cancelled round does not schedule another round');
 });
@@ -238,13 +238,13 @@ test('a confirmed epoch finishes once and the next round loads fresh signed cont
     t.alike(f.operations.calculateVDF.secondCall.args.slice(1), [200, 1024]);
     t.is(f.operations.createProofProposal.secondCall.args[0], 6n);
     t.alike(f.operations.createProofProposal.secondCall.args[1], parentHash);
-    const request = f.selector.active.request;
+    const request = f.selector.activeReservation.request;
     t.is(request.targetEpoch, '7');
     t.is(request.parentHash, parentHash.toString('hex'));
 
     f.writes[0].reject(new Error('late failure from the finished round'));
     await f.clock.tickAsync(0);
-    t.is(f.selector.active.request.requestId, request.requestId);
+    t.is(f.selector.activeReservation.request.requestId, request.requestId);
     t.is(f.writes.length, 2);
     t.is(f.next.callCount, 1);
     t.is(f.logger.error.callCount, 0);
@@ -254,21 +254,21 @@ test('coordinated FSM retries after selection expiry despite repeated ledger rea
     const f = await setup(t);
     await f.createRound().run(f.next);
     await f.clock.tickAsync(0);
-    const previous = f.selector.active.request;
+    const previous = f.selector.activeReservation.request;
     f.readOutcome.rejects(new Error('BLOCK_NOT_AVAILABLE'));
 
     await f.clock.tickAsync(CONFIG.epochSignatureTimeout - 1);
     t.is(f.writes.length, 1, 'read failures alone do not permit another append');
-    t.is(f.selector.active.request.requestId, previous.requestId);
+    t.is(f.selector.activeReservation.request.requestId, previous.requestId);
     await f.clock.tickAsync(1 + CONFIG.epochBackoffDelay);
 
     t.is(f.writes.length, 2, 'the real FSM starts a new attempt after expiry and backoff');
-    t.alike(f.selector.outcomeFor(previous.requestId), { status: EpochAppendOutcome.SELECTION_EXPIRED });
-    const current = f.selector.active.request;
+    t.alike(f.selector.getRecordedAppendOutcome(previous.requestId), { status: EpochAppendOutcome.SELECTION_EXPIRED });
+    const current = f.selector.activeReservation.request;
     t.is(BigInt(current.logicalCounter), BigInt(previous.logicalCounter) + 1n);
     f.writes[0].reject(new Error('late append failure'));
     await f.clock.tickAsync(0);
-    t.is(f.selector.active.request.requestId, current.requestId);
+    t.is(f.selector.activeReservation.request.requestId, current.requestId);
     t.is(f.writes.length, 2, 'the old append callback cannot interrupt the new attempt');
     t.is(f.next.callCount, 0);
 });
@@ -278,14 +278,14 @@ test('the selector monitor expires an unreadable publication after its FSM round
     const round = f.createRound();
     await round.run(f.next);
     await f.clock.tickAsync(0);
-    const request = f.selector.active.request;
+    const request = f.selector.activeReservation.request;
     await round.cancel();
     f.readOutcome.rejects(new Error('BLOCK_NOT_AVAILABLE'));
 
     await f.clock.tickAsync(CONFIG.epochSignatureTimeout);
 
-    t.absent(f.selector.active);
-    t.alike(f.selector.outcomeFor(request.requestId), { status: EpochAppendOutcome.SELECTION_EXPIRED });
+    t.absent(f.selector.activeReservation);
+    t.alike(f.selector.getRecordedAppendOutcome(request.requestId), { status: EpochAppendOutcome.SELECTION_EXPIRED });
     t.is(f.writes.length, 1, 'the monitor never submits another append');
     t.is(f.next.callCount, 0, 'the cancelled round stays cancelled');
 });

@@ -1,3 +1,4 @@
+/** Error codes used when handling election failures and building protocol replies. */
 export const EpochAppenderSelectionErrorCode = Object.freeze({
     SELECTION_STATE_INVALID: 'SELECTION_STATE_INVALID',
     RESERVATION_INVALID: 'RESERVATION_INVALID',
@@ -27,14 +28,18 @@ export const EpochAppenderSelectionErrorCode = Object.freeze({
     CONFIG_MISSING: 'CONFIG_MISSING',
 });
 
-/** Local coordination errors are mapped to protocol result codes at the network boundary. */
+/**
+ * Describes an appender selection error. Callers use the code to decide what to do next. The message
+ * and details help explain the failure in logs. Protocol handlers convert these errors to protocol
+ * result codes.
+ */
 export class EpochAppenderSelectionError extends Error {
     /**
      * @param {string} code One of EpochAppenderSelectionErrorCode.
-     * @param {string} message Human-readable diagnostic; never used for control flow.
-     * @param {object} [options]
-     * @param {object} [options.details] Request identity and other diagnostic context.
-     * @param {Error} [options.cause] Original storage, network or crypto failure.
+     * @param {string} message Message shown in logs. Callers use the code to handle the error.
+     * @param {object} [options] Extra details and the original error.
+     * @param {object} [options.details] Request ID and other details about the failure.
+     * @param {Error} [options.cause] Original error that caused this failure.
      */
     constructor(code, message, { details, cause } = {}) {
         super(message);

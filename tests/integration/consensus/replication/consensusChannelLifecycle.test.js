@@ -61,9 +61,9 @@ test('closing a consensus channel preserves replication and the next round reope
 
         // Quorum must include the peer whose channel was closed, not just unaffected peers.
         const otherResponses = network.deferred();
-        const collectSignature = proposer.operations.collectSignature.bind(proposer.operations);
-        proposer.operations.collectSignature = async (...args) => {
-            const result = await collectSignature(...args);
+        const requestProofApproval = proposer.operations.requestProofApproval.bind(proposer.operations);
+        proposer.operations.requestProofApproval = async (...args) => {
+            const result = await requestProofApproval(...args);
             const key = args[0].key;
             if (!key.equals(peer.state.writingKey) && !key.equals(nodes[2].state.writingKey)) {
                 await otherResponses.promise;

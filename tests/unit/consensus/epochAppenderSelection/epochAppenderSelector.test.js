@@ -42,8 +42,8 @@ function cluster(count) {
     async function broadcast(request, owner) {
         for (let recipient = 0; recipient < count; recipient++) {
             if (recipient === owner) continue;
-            messages.push(() => nodes[recipient].receiveRequest(request, async reply => {
-                messages.push(() => nodes[owner].receiveReply(reply, key(recipient + 1)));
+            messages.push(() => nodes[recipient].handleSelectionRequest(request, async reply => {
+                messages.push(() => nodes[owner].handleSelectionReply(reply, key(recipient + 1)));
             }));
         }
     }
@@ -58,12 +58,12 @@ test('epoch append: coordination state persistence failure prevents permission a
         save: async () => { throw diskFailure; }
     });
     const { nodes } = cluster(2);
-    const request = await nodes[1].createRequest(context(2), b4a.from('proof'));
-    const failure = await node.receiveRequest(request, () => { replies++; }).catch(error => error);
+    const request = await nodes[1].createSelectionRequest(context(2), b4a.from('proof'));
+    const failure = await node.handleSelectionRequest(request, () => { replies++; }).catch(error => error);
     t.ok(failure instanceof EpochAppenderSelectionError);
     t.is(failure.code, EpochAppenderSelectionErrorCode.PERSISTENCE_FAILED);
     t.is(failure.cause, diskFailure);
-    await t.exception(() => node.createRequest(context(2), b4a.from('local')));
+    await t.exception(() => node.createSelectionRequest(context(2), b4a.from('local')));
     t.is(replies, 0);
     await node.close();
     await Promise.all(nodes.map(item => item.close()));
@@ -72,17 +72,17 @@ test('epoch append: coordination state persistence failure prevents permission a
 test('epoch append: payload bytes and request metadata stay immutable after permission acquisition', async t => {
     const { nodes, appends, publish } = cluster(1);
     const payload = b4a.from('original bytes');
-    const request = await nodes[0].createRequest(context(1), payload);
+    const request = await nodes[0].createSelectionRequest(context(1), payload);
     payload.fill(0);
     request.payloadHash = key(999);
-    const exposed = nodes[0].active;
+    const exposed = nodes[0].activeReservation;
     exposed.payload = '00';
     exposed.request.members.length = 0;
-    const selectedPayload = await nodes[0].getSelectedPayload(request.requestId);
+    const selectedPayload = await nodes[0].getSelectedEpochPayload(request.requestId);
     selectedPayload.fill(0);
     await publish(0, request.requestId);
     t.is(appends[0].payload.toString(), 'original bytes');
-    t.is(nodes[0].active.request.members.length, 1);
+    t.is(nodes[0].activeReservation.request.members.length, 1);
     await nodes[0].close();
 });
 
@@ -96,7 +96,7 @@ test('epoch append: a signed-context change while queued prevents the actual app
         save: async () => {},
         readContext: async () => snapshot
     });
-    const request = await node.createRequest(snapshot, b4a.from('proof'));
+    const request = await node.createSelectionRequest(snapshot, b4a.from('proof'));
     const publication = appendSelected(node, request.requestId, async (_payload, authorizeEpochAppend) => {
         await queue;
         await authorizeEpochAppend({ writerKey: key(10), from: 0 });
@@ -116,17 +116,17 @@ test('epoch append: persisted logical clocks retain precision and refuse overflo
         load: async () => stored, save: async value => { stored = clone(value); },
     };
     let node = new EpochAppenderSelector(key(1), operations);
-    const request = await node.createRequest(context(1), b4a.from('proof'));
+    const request = await node.createSelectionRequest(context(1), b4a.from('proof'));
     t.is(request.logicalCounter, '9007199254740994');
     await node.close();
     node = new EpochAppenderSelector(key(1), operations);
-    await t.exception(() => node.createRequest(context(1), b4a.from('too soon')), 'the durable vote survives restart');
-    const next = await node.createRequest({ ...context(1), targetEpoch: '8' }, b4a.from('next'));
+    await t.exception(() => node.createSelectionRequest(context(1), b4a.from('too soon')), 'the durable vote survives restart');
+    const next = await node.createSelectionRequest({ ...context(1), targetEpoch: '8' }, b4a.from('next'));
     t.is(next.logicalCounter, '9007199254740995', 'restart does not reuse a ticket');
     await node.close();
     stored = { version: 1, clock: ((1n << 64n) - 1n).toString(), active: null };
     node = new EpochAppenderSelector(key(1), operations);
-    await t.exception(() => node.createRequest(context(1), b4a.from('overflow')));
+    await t.exception(() => node.createSelectionRequest(context(1), b4a.from('overflow')));
     await node.close();
 });
 
@@ -148,7 +148,7 @@ for (const failSave of [false, true]) {
             }
         });
         t.teardown(() => selector.close());
-        const request = await selector.createRequest(context(1), b4a.from('proof'));
+        const request = await selector.createSelectionRequest(context(1), b4a.from('proof'));
         const execution = appendSelected(selector, request.requestId, async (_payload, authorizeEpochAppend) => {
             await authorizeEpochAppend({ writerKey: key(10), from: 5 });
             writes++;
@@ -170,7 +170,7 @@ for (const failSave of [false, true]) {
             t.is(stored.active.phase, EpochAppenderSelectionPhase.PUBLISHING);
             t.is(stored.active.publication.from, 5);
         }
-        await t.exception(() => selector.authorizeAppend(request.requestId, { writerKey: key(10), from: 6 }));
+        await t.exception(() => selector.authorizeEpochAppend(request.requestId, { writerKey: key(10), from: 6 }));
         t.is(writes, failSave ? 0 : 1, 'authorization cannot be reused');
     });
 }
@@ -190,8 +190,8 @@ test('epoch append: legacy activation metadata does not disable selection or dis
     const node = createEpochAppenderSelector(state, wallet, config, () => null);
     t.teardown(() => node.close());
     await node.open();
-    t.is(node.active.request.requestId, compatibility.request.requestId);
-    t.alike(node.active.publication, compatibility.journal.active.publication);
+    t.is(node.activeReservation.request.requestId, compatibility.request.requestId);
+    t.alike(node.activeReservation.publication, compatibility.journal.active.publication);
     t.is(stored.journal.clock, compatibility.journal.clock);
     t.is(stored.journal.vote.request.requestId, compatibility.request.requestId);
 });
@@ -209,8 +209,8 @@ test('epoch append: permission timeout identifies the missing peer and its last 
         }
     }, 100, 1000);
     t.teardown(async () => { await node.close(); clock.restore(); });
-    const request = await node.createRequest(snapshot, b4a.from('proof'));
-    const waiting = node.waitForReplies(request).catch(error => error);
+    const request = await node.createSelectionRequest(snapshot, b4a.from('proof'));
+    const waiting = node.waitForAppenderSelection(request).catch(error => error);
     await clock.tickAsync(1000);
     const error = await waiting;
     t.is(error.code, EpochAppenderSelectionErrorCode.REPLY_TIMEOUT);
@@ -223,7 +223,7 @@ test('epoch append: permission timeout identifies the missing peer and its last 
     t.ok(error.message.includes('epoch=7; replies=1/2'));
     t.ok(error.message.includes(`${key(3)} (PeerConnectionManager: no session)`));
     t.absent(error.message.includes(key(2)), 'the peer that granted permission is not reported missing');
-    t.absent(node.active, 'a timed out request is withdrawn before retry');
+    t.absent(node.activeReservation, 'a timed out request is withdrawn before retry');
 });
 
 test('epoch append: a three-member timeout without replies cancels pending RPCs', async t => {
@@ -240,14 +240,14 @@ test('epoch append: a three-member timeout without replies cancels pending RPCs'
         }
     }, 100, 1000);
     t.teardown(async () => { await node.close(); clock.restore(); });
-    const request = await node.createRequest(snapshot, b4a.from('proof'));
-    const waiting = node.waitForReplies(request).catch(error => error);
+    const request = await node.createSelectionRequest(snapshot, b4a.from('proof'));
+    const waiting = node.waitForAppenderSelection(request).catch(error => error);
     await clock.tickAsync(1000);
     const error = await waiting;
     t.ok(error.message.includes('replies=0/1'));
     t.ok(error.message.includes(`${key(2)} (no reply received)`));
     t.is(cancel.callCount, 2);
-    t.absent(node.active);
+    t.absent(node.activeReservation);
 });
 
 test('epoch append: a changed signed context is distinguished from a permission timeout', async t => {
@@ -259,11 +259,11 @@ test('epoch append: a changed signed context is distinguished from a permission 
         readContext: async () => current
     });
     t.teardown(() => node.close());
-    const request = await node.createRequest(snapshot, b4a.from('proof'));
+    const request = await node.createSelectionRequest(snapshot, b4a.from('proof'));
     current = { ...snapshot, targetEpoch: '8' };
-    const failure = await node.waitForReplies(request).catch(error => error);
+    const failure = await node.waitForAppenderSelection(request).catch(error => error);
     t.is(failure.code, EpochAppenderSelectionErrorCode.CONTEXT_CHANGED);
-    t.absent(node.active);
+    t.absent(node.activeReservation);
 });
 
 
@@ -281,16 +281,16 @@ test('epoch append: pre-refactor coordination state recovers without changing pu
     });
     t.teardown(() => node.close());
     await node.open();
-    const recovered = node.active;
+    const recovered = node.activeReservation;
     t.alike(recovered.publication, compatibility.journal.active.publication);
     t.is(recovered.payload, compatibility.journal.active.payload);
     t.is(recovered.request.requestId, compatibility.journal.active.request.requestId);
     t.is(recovered.request.selectionVersion, 2);
-    const exposed = node.active;
+    const exposed = node.activeReservation;
     exposed.request.currentWriterKeys.length = 0;
     exposed.publication.from = 999;
-    t.alike(node.active, recovered, 'nested snapshots do not expose the durable reservation');
-    t.alike(await node.reconcile(), { status: EpochAppendOutcome.UNKNOWN });
+    t.alike(node.activeReservation, recovered, 'nested snapshots do not expose the durable reservation');
+    t.alike(await node.refreshAppendOutcome(), { status: EpochAppendOutcome.UNKNOWN });
     t.is(migrations.length, 1, 'the upgrade is durable and UNKNOWN does not rewrite the marker');
     t.is(migrations[0].version, 2);
     t.alike(migrations[0].active.publication, compatibility.journal.active.publication);
@@ -336,7 +336,7 @@ for (const monitorFirst of [false, true]) {
         if (monitorFirst) {
             await clock.tickAsync(100);
         }
-        const checking = [selector.reconcile(), selector.reconcile()];
+        const checking = [selector.refreshAppendOutcome(), selector.refreshAppendOutcome()];
         await clock.tickAsync(300);
         t.is(readOutcome.callCount, 1, 'all callers share the in-flight ledger read');
 
@@ -345,13 +345,13 @@ for (const monitorFirst of [false, true]) {
             { status: EpochAppendOutcome.UNKNOWN },
             { status: EpochAppendOutcome.UNKNOWN },
         ]);
-        t.is(selector.active.request.requestId, request.requestId);
+        t.is(selector.activeReservation.request.requestId, request.requestId);
 
         readOutcome.resolves({ status: EpochAppendOutcome.EPOCH_ADVANCED });
         await clock.tickAsync(100);
         t.is(readOutcome.callCount, 2, 'UNKNOWN is not cached after the check completes');
-        t.alike(selector.outcomeFor(request.requestId), { status: EpochAppendOutcome.EPOCH_ADVANCED });
-        t.absent(selector.active);
+        t.alike(selector.getRecordedAppendOutcome(request.requestId), { status: EpochAppendOutcome.EPOCH_ADVANCED });
+        t.absent(selector.activeReservation);
         t.is(save.callCount, 3, 'create, authorize and complete each persist once');
     });
 }
@@ -368,20 +368,20 @@ test('epoch append: a shared outcome read failure reaches every caller and permi
         clock.restore();
     });
 
-    const checking = [selector.reconcile(), selector.reconcile()].map(check => check.catch(error => error));
+    const checking = [selector.refreshAppendOutcome(), selector.refreshAppendOutcome()].map(check => check.catch(error => error));
     await clock.tickAsync(0);
     t.is(readOutcome.callCount, 1);
     pending.reject(failure);
     const errors = await Promise.all(checking);
     t.is(errors[0], failure);
     t.is(errors[1], failure);
-    t.is(selector.active.request.requestId, request.requestId, 'a read error does not prove rejection');
-    t.is(selector.outcomeFor(request.requestId), null);
+    t.is(selector.activeReservation.request.requestId, request.requestId, 'a read error does not prove rejection');
+    t.is(selector.getRecordedAppendOutcome(request.requestId), null);
 
     readOutcome.resolves({ status: EpochAppendOutcome.REJECTED });
-    t.alike(await selector.reconcile(), { status: EpochAppendOutcome.REJECTED });
+    t.alike(await selector.refreshAppendOutcome(), { status: EpochAppendOutcome.REJECTED });
     t.is(readOutcome.callCount, 2, 'a rejected Promise does not block future checks');
-    t.absent(selector.active);
+    t.absent(selector.activeReservation);
 });
 
 test('epoch append: each publication gets its own outcome check', async t => {
@@ -389,21 +389,21 @@ test('epoch append: each publication gets its own outcome check', async t => {
     const { selector, request } = await setupPublication(readOutcome);
     t.teardown(() => selector.close());
 
-    await Promise.all([selector.reconcile(), selector.reconcile()]);
+    await Promise.all([selector.refreshAppendOutcome(), selector.refreshAppendOutcome()]);
     t.is(readOutcome.callCount, 1);
-    t.alike(selector.outcomeFor(request.requestId), { status: EpochAppendOutcome.REJECTED });
+    t.alike(selector.getRecordedAppendOutcome(request.requestId), { status: EpochAppendOutcome.REJECTED });
 
-    const nextRequest = await selector.createRequest(context(1), b4a.from('next proof'));
-    await selector.authorizeAppend(nextRequest.requestId, { writerKey: key(10), from: 1 });
+    const nextRequest = await selector.createSelectionRequest(context(1), b4a.from('next proof'));
+    await selector.authorizeEpochAppend(nextRequest.requestId, { writerKey: key(10), from: 1 });
     readOutcome.resolves({ status: EpochAppendOutcome.EPOCH_ADVANCED });
-    t.alike(await Promise.all([selector.reconcile(), selector.reconcile()]), [
+    t.alike(await Promise.all([selector.refreshAppendOutcome(), selector.refreshAppendOutcome()]), [
         { status: EpochAppendOutcome.EPOCH_ADVANCED },
         { status: EpochAppendOutcome.EPOCH_ADVANCED },
     ]);
     t.is(readOutcome.callCount, 2);
     t.is(readOutcome.secondCall.args[0].from, 1);
     t.is(readOutcome.secondCall.args[0].payloadHash, nextRequest.payloadHash);
-    t.alike(selector.outcomeFor(nextRequest.requestId), { status: EpochAppendOutcome.EPOCH_ADVANCED });
+    t.alike(selector.getRecordedAppendOutcome(nextRequest.requestId), { status: EpochAppendOutcome.EPOCH_ADVANCED });
 });
 
 test('epoch append: closing waits for an outcome check started outside the monitor', async t => {
@@ -418,12 +418,12 @@ test('epoch append: closing waits for an outcome check started outside the monit
         pending.resolve({ status: EpochAppendOutcome.UNKNOWN });
         await selector.close();
     });
-    const checking = selector.reconcile();
+    const checking = selector.refreshAppendOutcome();
     await started.promise;
     let closed = false;
     const closing = selector.close().then(() => { closed = true; });
 
-    const error = await selector.reconcile().catch(error => error);
+    const error = await selector.refreshAppendOutcome().catch(error => error);
     t.is(error.code, EpochAppenderSelectionErrorCode.SELECTOR_CLOSED);
     t.is(readOutcome.callCount, 1, 'closing does not start another ledger read');
     t.is(closed, false, 'the existing read is still owned by the selector');
@@ -445,26 +445,26 @@ test('epoch append: repeated outcome read errors do not prevent selection expiry
 
     for (const time of [0, 10_000, 19_999]) {
         await clock.tickAsync(time - Date.now());
-        t.is(await selector.reconcile().catch(error => error), failure);
-        t.is(selector.active.request.requestId, request.requestId, 'the reservation is retained before expiry');
-        t.is(selector.outcomeFor(request.requestId), null, 'read errors do not prove a ledger outcome');
+        t.is(await selector.refreshAppendOutcome().catch(error => error), failure);
+        t.is(selector.activeReservation.request.requestId, request.requestId, 'the reservation is retained before expiry');
+        t.is(selector.getRecordedAppendOutcome(request.requestId), null, 'read errors do not prove a ledger outcome');
     }
     t.is(save.callCount, 2, 'failed reads do not rewrite the publication marker');
 
     await clock.tickAsync(1);
     readOutcome.resetHistory();
-    const results = await Promise.all([selector.reconcile(), selector.reconcile()].map(check => check.catch(error => error)));
+    const results = await Promise.all([selector.refreshAppendOutcome(), selector.refreshAppendOutcome()].map(check => check.catch(error => error)));
     t.alike(results, [
         { status: EpochAppendOutcome.SELECTION_EXPIRED },
         { status: EpochAppendOutcome.SELECTION_EXPIRED },
     ]);
     t.is(readOutcome.callCount, 1, 'concurrent expiry checks still share one read');
     t.is(save.callCount, 3, 'expiry is persisted once');
-    t.absent(selector.active);
-    t.alike(selector.outcomeFor(request.requestId), { status: EpochAppendOutcome.SELECTION_EXPIRED });
+    t.absent(selector.activeReservation);
+    t.alike(selector.getRecordedAppendOutcome(request.requestId), { status: EpochAppendOutcome.SELECTION_EXPIRED });
     t.alike(save.lastCall.args[0].vote.request, request, 'the durable vote identity is preserved');
 
-    const next = await selector.createRequest(context(1), b4a.from('next proof')).catch(error => error);
+    const next = await selector.createSelectionRequest(context(1), b4a.from('next proof')).catch(error => error);
     t.is(next.logicalCounter, (BigInt(request.logicalCounter) + 1n).toString());
     t.is(typeof next.requestId, 'string');
     t.absent(next.requestId === request.requestId);
@@ -481,7 +481,7 @@ for (const outcome of ['read error', EpochAppendOutcome.EPOCH_ADVANCED, EpochApp
             clock.restore();
         });
 
-        const checking = selector.reconcile().catch(error => error);
+        const checking = selector.refreshAppendOutcome().catch(error => error);
         await clock.tickAsync(20_000);
         if (outcome === 'read error') {
             pending.reject(new Error('BLOCK_NOT_AVAILABLE'));
@@ -490,8 +490,8 @@ for (const outcome of ['read error', EpochAppendOutcome.EPOCH_ADVANCED, EpochApp
         }
         const expected = outcome === 'read error' ? EpochAppendOutcome.SELECTION_EXPIRED : outcome;
         t.alike(await checking, { status: expected }, 'a signed outcome takes precedence over expiry');
-        t.alike(selector.outcomeFor(request.requestId), { status: expected });
-        t.absent(selector.active);
+        t.alike(selector.getRecordedAppendOutcome(request.requestId), { status: expected });
+        t.absent(selector.activeReservation);
     });
 }
 
@@ -508,7 +508,7 @@ async function setupPublication(readOutcome, monitor = false) {
         readContext: async () => snapshot,
         readOutcome,
     }, 100, 20_000, monitor);
-    const request = await selector.createRequest(snapshot, b4a.from('proof'));
-    await selector.authorizeAppend(request.requestId, { writerKey: key(10), from: 0 });
+    const request = await selector.createSelectionRequest(snapshot, b4a.from('proof'));
+    await selector.authorizeEpochAppend(request.requestId, { writerKey: key(10), from: 0 });
     return { selector, request, save };
 }
