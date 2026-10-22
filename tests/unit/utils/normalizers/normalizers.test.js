@@ -10,6 +10,7 @@ import {
     normalizeDecodedPayloadForJson,
     normalizeHtlcClaimOperation,
     normalizeHtlcLockOperation,
+    normalizeHtlcRefundOperation,
     normalizeMessageByOperationType,
     normalizeRoleAccessOperation,
     normalizeTransactionOperation,
@@ -508,6 +509,37 @@ test('normalizeHtlcClaimOperation prepares a signed claim for V1 broadcast', t =
     t.exception(
         () => normalizeHtlcClaimOperation({...payload, hco: {...payload.hco, pi: undefined}}, config),
         errorMessageIncludes('Missing required fields')
+    );
+});
+
+test('normalizeHtlcRefundOperation prepares a signed refund for V1 broadcast', t => {
+    const submitter = randomAddress(config.addressPrefix);
+    const payload = {
+        type: OperationType.HTLC_REFUND,
+        address: submitter,
+        hro: {
+            tx: hex('11', 32),
+            txv: hex('22', 32),
+            li: hex('33', 32),
+            in: hex('44', 32),
+            is: hex('55', 64)
+        }
+    };
+
+    const normalized = normalizeMessageByOperationType(payload, config);
+    t.alike(normalized, normalizeHtlcRefundOperation(payload, config));
+    t.ok(b4a.equals(normalized.address, addressToBuffer(submitter, config.addressPrefix)));
+    for (const [field, value] of Object.entries(payload.hro)) {
+        t.ok(b4a.equals(normalized.hro[field], toBuffer(value)), `${field} is preserved`);
+    }
+
+    t.exception(
+        () => normalizeHtlcRefundOperation({...payload, hro: {...payload.hro, li: undefined}}, config),
+        errorMessageIncludes('Missing required fields')
+    );
+    t.exception(
+        () => normalizeHtlcRefundOperation({...payload, hro: {...payload.hro, is: 'zz'}}, config),
+        errorMessageIncludes('Invalid hex string')
     );
 });
 
