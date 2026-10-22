@@ -33,7 +33,7 @@ async function setup(t, members = 1, monitor = false) {
         })),
         currentWriterKeys: [state.writingKey.toString('hex')],
     };
-    state.getEpochAppenderSelectionContext = async () => ({ ...snapshot });
+    state.getEpochAppenderSelectionContext = sinon.stub().callsFake(async () => ({ ...snapshot }));
     const readOutcome = sinon.stub().callsFake(async () => ({ status: outcome }));
     const selector = new EpochAppenderSelector(publicKey, {
         load: async () => selectionState, save: async value => { selectionState = value; },
@@ -195,4 +195,57 @@ test('the selector monitor confirms a publication after its FSM round is cancell
     t.absent(f.selector.active);
     t.is(f.operations.appendSetEpoch.callCount, 1);
     t.is(f.next.callCount, 0, 'a cancelled round does not schedule another round');
+});
+
+test('a confirmed epoch finishes once and the next round loads fresh signed context', async t => {
+    const f = await setup(t);
+    await f.createRound().run(f.next);
+    await f.clock.tickAsync(0);
+    t.is(f.writes.length, 1);
+    t.is(f.next.callCount, 0, 'local submission does not finish the round');
+
+    f.state.getCurrentEpoch.resolves(6n);
+    f.setOutcome(EpochAppendOutcome.EPOCH_ADVANCED);
+    await f.clock.tickAsync(1000);
+    t.ok(f.next.calledOnceWithExactly(CONFIG.epochInterval));
+    t.is(f.state.listenerCount(CustomEventType.EPOCH_CREATED), 0);
+    t.is(f.state.listenerCount(CustomEventType.EPOCH_PROPOSAL_VALIDATION_SUCCESS), 0);
+
+    f.readOutcome.resetHistory();
+    await f.state.emit(CustomEventType.EPOCH_CREATED, { epoch: uint64ToBuffer(6n) });
+    await f.clock.tickAsync(CONFIG.epochAppendTimeout + CONFIG.epochBackoffDelay);
+    t.is(f.readOutcome.callCount, 0, 'the finished round no longer polls the publication');
+    t.is(f.writes.length, 1, 'the finished round does not retry');
+    t.is(f.next.callCount, 1, 'repeated progress does not schedule another round');
+
+    const parentHash = b4a.alloc(32, 0xbb);
+    const snapshot = await f.state.getEpochAppenderSelectionContext();
+    f.state.getEpochAppenderSelectionContext.resolves({
+        ...snapshot, targetEpoch: '7', parentHash: parentHash.toString('hex'), configHash: '0e'.repeat(32),
+    });
+    f.state.getEpoch.resolves(parentHash);
+    f.state.getSignedConsensusConfig.resolves({
+        schemaVersion: 1, configData: { difficulty: 200, discriminantBitSize: 1024 },
+    });
+    f.operations.calculateVDF.resolves({
+        solution: b4a.alloc(516, 0xff), difficulty: 200, discriminantSizeBits: 1024,
+    });
+    f.setOutcome(EpochAppendOutcome.UNKNOWN);
+    await f.createRound().run(f.next);
+    await f.clock.tickAsync(0);
+
+    t.is(f.writes.length, 2);
+    t.alike(f.operations.calculateVDF.secondCall.args.slice(1), [200, 1024]);
+    t.is(f.operations.createProofProposal.secondCall.args[0], 6n);
+    t.alike(f.operations.createProofProposal.secondCall.args[1], parentHash);
+    const request = f.selector.active.request;
+    t.is(request.targetEpoch, '7');
+    t.is(request.parentHash, parentHash.toString('hex'));
+
+    f.writes[0].reject(new Error('late failure from the finished round'));
+    await f.clock.tickAsync(0);
+    t.is(f.selector.active.request.requestId, request.requestId);
+    t.is(f.writes.length, 2);
+    t.is(f.next.callCount, 1);
+    t.is(f.logger.error.callCount, 0);
 });

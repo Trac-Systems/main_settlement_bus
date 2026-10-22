@@ -54,7 +54,7 @@ function makeMachine() {
         },
         [EPOCH_STATES.APPEND_SET_EPOCH]: {
             [EPOCH_EVENTS.APPEND_FAILED]: EPOCH_STATES.BACKOFF,
-            [EPOCH_EVENTS.APPEND_ACCEPTED]: EPOCH_STATES.SEND_APPEND_SIGNAL,
+            [EPOCH_EVENTS.TARGET_EPOCH_CONFIRMED]: EPOCH_STATES.RELOAD_SIGNED_CONTEXT,
             [EPOCH_EVENTS.TARGET_EPOCH_ALREADY_SIGNED]: EPOCH_STATES.RELOAD_SIGNED_CONTEXT,
         },
     };
@@ -236,7 +236,7 @@ test('target EPOCH_CREATED from self is handled by the append listener without g
         proposerAddress: wallet.address,
     });
 
-    t.alike(machine.sentEvents, [EPOCH_EVENTS.APPEND_ACCEPTED]);
+    t.alike(machine.sentEvents, [EPOCH_EVENTS.TARGET_EPOCH_CONFIRMED]);
     t.absent(machine.close.called);
     t.absent(machine.context.next.called);
     await machine.close();

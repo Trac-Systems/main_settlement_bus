@@ -137,7 +137,7 @@ export class EpochRoundListeners {
                         if (eventEpoch !== targetEpoch) return;
                         this.#machine.send(
                             proposerAddress === this.#wallet.address
-                                ? EPOCH_EVENTS.APPEND_ACCEPTED
+                                ? EPOCH_EVENTS.TARGET_EPOCH_CONFIRMED
                                 : EPOCH_EVENTS.TARGET_EPOCH_ALREADY_SIGNED,
                         );
                     },

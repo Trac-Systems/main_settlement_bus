@@ -460,11 +460,6 @@ export class EpochCoordinationRound {
         }
     }
 
-    /** Ends the round after the append result has already been broadcast. */
-    async #handleSendAppendSignal(context) {
-        await context.next(this.#intervalMs);
-    }
-
     /** Refreshes signed state and decides if the existing proof can be used again. */
     async #handleRefreshSignedState(context, machine) {
         await this.#state.refresh();
@@ -492,9 +487,8 @@ export class EpochCoordinationRound {
         await machine.send(EPOCH_EVENTS.BACKOFF_ELAPSED);
     }
 
-    /** Closes the current machine and schedules a fresh round which reloads signed context. */
-    async #handleReloadSignedContext(context, machine) {
-        await machine.close();
+    /** Finishes the round and schedules a fresh round which reloads signed context. */
+    async #handleReloadSignedContext(context) {
         await context.next(this.#intervalMs);
     }
 
@@ -532,7 +526,6 @@ export class EpochCoordinationRound {
             [EPOCH_STATES.REFRESH_SIGNED_STATE_BEFORE_APPEND]: this.#handleRefreshSignedStateBeforeAppend.bind(this),
             [EPOCH_STATES.APPEND_SET_EPOCH]: this.#handleAppendSetEpoch.bind(this),
             [EPOCH_STATES.WAIT_FOR_APPEND_OUTCOME]: this.#handleWaitForAppendOutcome.bind(this),
-            [EPOCH_STATES.SEND_APPEND_SIGNAL]: this.#handleSendAppendSignal.bind(this),
             [EPOCH_STATES.REFRESH_SIGNED_STATE]: this.#handleRefreshSignedState.bind(this),
             [EPOCH_STATES.BACKOFF]: this.#handleBackoff.bind(this),
             [EPOCH_STATES.RELOAD_SIGNED_CONTEXT]: this.#handleReloadSignedContext.bind(this),
@@ -675,7 +668,7 @@ export class EpochCoordinationRound {
                         event = EPOCH_EVENTS.APPEND_REJECTED;
                         break;
                     case EpochAppendOutcome.EPOCH_ADVANCED:
-                        event = EPOCH_EVENTS.APPEND_ACCEPTED;
+                        event = EPOCH_EVENTS.TARGET_EPOCH_CONFIRMED;
                         break;
                     case EpochAppendOutcome.SELECTION_EXPIRED:
                         this.#machine.appendContext({ appendElectionRetry: true });
