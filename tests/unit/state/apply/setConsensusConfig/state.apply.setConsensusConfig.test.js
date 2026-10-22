@@ -2,7 +2,7 @@ import { test } from 'brittle';
 import b4a from 'b4a';
 import InvalidPayloadValidationScenario from '../common/payload-structure/invalidPayloadValidationScenario.js';
 import RequesterAddressValidationScenario from '../common/requesterAddressValidationScenario.js';
-import createRequesterPublicKeyValidationScenario from '../common/requesterPublicKeyValidationScenario.js';
+import createRequesterInvalidChecksumScenario from '../common/requesterInvalidChecksumScenario.js';
 import AdminEntryMissingScenario from '../common/access-control/adminEntryMissingScenario.js';
 import AdminEntryDecodeFailureScenario from '../common/access-control/adminEntryDecodeFailureScenario.js';
 import AdminOnlyGuardScenario from '../common/access-control/adminOnlyGuardScenario.js';
@@ -87,12 +87,12 @@ new RequesterAddressValidationScenario({
     expectedLogs: ['Requester address is invalid.']
 }).performScenario();
 
-createRequesterPublicKeyValidationScenario({
-    title: 'State.apply SET_CONSENSUS_CONFIG rejects an undecodable requester public key',
+createRequesterInvalidChecksumScenario({
+    title: 'State.apply SET_CONSENSUS_CONFIG rejects an invalid requester address checksum',
     setupScenario: setupSetConsensusConfigScenario,
     buildValidPayload: buildSetConsensusConfigPayload,
     assertStateUnchanged: assertRejected,
-    expectedLogs: ['Failed to decode requester public key.']
+    expectedLogs: ['Requester address is invalid.']
 }).performScenario();
 
 new AdminEntryMissingScenario({

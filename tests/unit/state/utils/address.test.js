@@ -84,7 +84,7 @@ test('address buffer rejects high-bit ASCII aliases', t => {
     );
 });
 
-test('new address inputs require a valid checksum and canonical bytes', t => {
+test('isAddressValid requires a valid checksum and canonical bytes', t => {
     const hrp = 'trac';
     const valid = randomAddress(hrp);
     const invalidChecksum = 'trac1wyu9uw02wmefzt63c36wa0fgc2xn99x5hw46w4frl7jd6mqw2f5q57tt90';
@@ -92,12 +92,13 @@ test('new address inputs require a valid checksum and canonical bytes', t => {
     const aliased = b4a.from(canonical);
     aliased[0] |= 0x80;
 
-    t.ok(addressUtils.isAddressDecodable(valid, hrp));
-    t.ok(addressUtils.isAddressDecodable(canonical, hrp));
-    t.ok(b4a.equals(addressUtils.addressToBufferIfDecodable(valid, hrp), canonical));
-    t.ok(addressUtils.isAddressValid(invalidChecksum, hrp), 'historical shape-only check is unchanged');
-    t.absent(addressUtils.isAddressDecodable(invalidChecksum, hrp));
-    t.is(addressUtils.addressToBufferIfDecodable(invalidChecksum, hrp).length, 0);
-    t.absent(addressUtils.isAddressDecodable(aliased, hrp));
-    t.is(addressUtils.addressToBufferIfDecodable(aliased, hrp).length, 0);
+    t.ok(addressUtils.isAddressValid(valid, hrp));
+    t.ok(addressUtils.isAddressValid(canonical, hrp));
+    t.ok(b4a.equals(addressUtils.addressToBuffer(valid, hrp), canonical));
+    t.absent(addressUtils.isAddressValid(invalidChecksum, hrp), 'invalid checksum is rejected');
+    t.absent(addressUtils.isAddressValid(b4a.from(invalidChecksum, 'ascii'), hrp));
+    t.is(addressUtils.addressToBuffer(invalidChecksum, hrp).length, 0);
+    t.is(addressUtils.bufferToAddress(b4a.from(invalidChecksum, 'ascii'), hrp), null);
+    t.absent(addressUtils.isAddressValid(aliased, hrp));
+    t.is(addressUtils.addressToBuffer(aliased, hrp).length, 0);
 });

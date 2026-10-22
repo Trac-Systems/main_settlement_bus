@@ -136,7 +136,7 @@ test('PartialTransferValidator rejects checksum-invalid recipient addresses', as
         await expectSharedValidatorError(
             t,
             () => transferValidator.validate(payload),
-            ResultCode.TRANSFER_RECIPIENT_PUBLIC_KEY_INVALID
+            ResultCode.TRANSFER_RECIPIENT_ADDRESS_INVALID
         );
     }
 });

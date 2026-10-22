@@ -28,9 +28,9 @@ import {
 } from './addWriterScenarioHelpers.js';
 import PartialOperationValidationScenario, { PartialOperationMutationStrategy } from '../common/payload-structure/partialOperationValidationScenario.js';
 import RequesterAddressValidationScenario from '../common/requesterAddressValidationScenario.js';
-import createRequesterPublicKeyValidationScenario from '../common/requesterPublicKeyValidationScenario.js';
+import createRequesterInvalidChecksumScenario from '../common/requesterInvalidChecksumScenario.js';
 import InvalidAddressValidationScenario from '../common/payload-structure/invalidAddressValidationScenario.js';
-import createAddressWithInvalidPublicKeyScenario from '../common/payload-structure/addressWithInvalidPublicKeyScenario.js';
+import createAddressWithInvalidChecksumScenario from '../common/payload-structure/addressWithInvalidChecksumScenario.js';
 import InvalidHashValidationScenario from '../common/payload-structure/invalidHashValidationScenario.js';
 import InvalidSignatureValidationScenario, { SignatureMutationStrategy } from '../common/payload-structure/invalidSignatureValidationScenario.js';
 import TransactionValidityMismatchScenario from '../common/transactionValidityMismatchScenario.js';
@@ -104,12 +104,12 @@ new RequesterAddressValidationScenario({
     expectedLogs: ['Requester address is invalid.']
 }).performScenario();
 
-createRequesterPublicKeyValidationScenario({
-    title: 'State.apply addWriter requester public key is invalid',
+createRequesterInvalidChecksumScenario({
+    title: 'State.apply addWriter rejects an invalid requester address checksum',
     setupScenario: setupAddWriterScenario,
     buildValidPayload: buildAddWriterPayload,
     assertStateUnchanged: assertAddWriterFailureState,
-    expectedLogs: ['Error while decoding requester public key.']
+    expectedLogs: ['Requester address is invalid.']
 }).performScenario();
 
 addWriterZeroWriterKeyScenario();
@@ -159,13 +159,13 @@ new InvalidAddressValidationScenario({
 }).performScenario();
 
 // validator public key validation scenario
-createAddressWithInvalidPublicKeyScenario({
-    title: 'State.apply addWriter validator public key is invalid',
+createAddressWithInvalidChecksumScenario({
+    title: 'State.apply addWriter rejects an invalid validator address checksum',
     setupScenario: setupAddWriterScenario,
     buildValidPayload: buildAddWriterPayload,
     assertStateUnchanged: assertAddWriterFailureState,
     addressPath: ['rao', 'va'],
-    expectedLogs: ['Failed to decode validator public key.']
+    expectedLogs: ['Failed to validate validator address.']
 }).performScenario();
 
 addWriterInvalidValidatorSignatureScenario();

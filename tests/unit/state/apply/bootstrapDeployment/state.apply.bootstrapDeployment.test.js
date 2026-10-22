@@ -7,11 +7,11 @@ import PartialOperationValidationScenario, {
 } from '../common/payload-structure/partialOperationValidationScenario.js';
 import OperationValidationScenarioBase from '../common/base/OperationValidationScenarioBase.js';
 import RequesterAddressValidationScenario from '../common/requesterAddressValidationScenario.js';
-import createRequesterPublicKeyValidationScenario from '../common/requesterPublicKeyValidationScenario.js';
+import createRequesterInvalidChecksumScenario from '../common/requesterInvalidChecksumScenario.js';
 import InvalidHashValidationScenario from '../common/payload-structure/invalidHashValidationScenario.js';
 import InvalidPayloadValidationScenario from '../common/payload-structure/invalidPayloadValidationScenario.js';
 import InvalidAddressValidationScenario from '../common/payload-structure/invalidAddressValidationScenario.js';
-import createAddressWithInvalidPublicKeyScenario from '../common/payload-structure/addressWithInvalidPublicKeyScenario.js';
+import createAddressWithInvalidChecksumScenario from '../common/payload-structure/addressWithInvalidChecksumScenario.js';
 import TransactionValidityMismatchScenario from '../common/transactionValidityMismatchScenario.js';
 import IndexerSequenceStateInvalidScenario from '../common/indexer/indexerSequenceStateInvalidScenario.js';
 import InvalidSignatureValidationScenario, {
@@ -126,13 +126,13 @@ new RequesterAddressValidationScenario({
     expectedLogs: ['Requester address is invalid.']
 }).performScenario();
 
-createRequesterPublicKeyValidationScenario({
-    title: 'State.apply bootstrapDeployment rejects requester public key decode failures',
+createRequesterInvalidChecksumScenario({
+    title: 'State.apply bootstrapDeployment rejects an invalid requester address checksum',
     setupScenario: setupBootstrapDeploymentScenario,
     buildValidPayload: buildBootstrapDeploymentPayload,
     assertStateUnchanged: (t, context, _valid, invalid) =>
         assertBootstrapDeploymentFailureState(t, context, { payload: invalid }),
-    expectedLogs: ['Failed to decode requester public key.']
+    expectedLogs: ['Requester address is invalid.']
 }).performScenario();
 
 new InvalidHashValidationScenario({
@@ -183,14 +183,14 @@ new InvalidAddressValidationScenario({
     expectedLogs: ['Invalid validator address.']
 }).performScenario();
 
-createAddressWithInvalidPublicKeyScenario({
-    title: 'State.apply bootstrapDeployment validator public key is invalid',
+createAddressWithInvalidChecksumScenario({
+    title: 'State.apply bootstrapDeployment rejects an invalid validator address checksum',
     setupScenario: setupBootstrapDeploymentScenario,
     buildValidPayload: buildBootstrapDeploymentPayload,
     assertStateUnchanged: (t, context, _valid, invalid) =>
         assertBootstrapDeploymentFailureState(t, context, { payload: invalid }),
     addressPath: ['bdo', 'va'],
-    expectedLogs: ['Failed to decode validator public key.']
+    expectedLogs: ['Invalid validator address.']
 }).performScenario();
 
 function mutateValidatorSignature(t, validPayload) {

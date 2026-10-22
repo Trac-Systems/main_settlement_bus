@@ -1,6 +1,6 @@
 import { OperationType } from './constants.js';
 import { normalizeHex } from './helpers.js';
-import { addressToBufferIfDecodable, bufferToAddress } from '../core/state/utils/address.js';
+import { addressToBuffer, bufferToAddress } from '../core/state/utils/address.js';
 import b4a from 'b4a';
 import { bufferToBigInt } from './amountSerialization.js'
 import {isBootstrapDeployment, isRoleAccess, isTransaction, isTransfer} from './applyOperations.js';
@@ -33,14 +33,14 @@ export function normalizeTransferOperation(payload, config) {
         tx: normalizeHex(tro.tx),     // Transaction hash
         txv: normalizeHex(tro.txv),   // Transaction validity
         in: normalizeHex(tro.in),     // Nonce
-        to: addressToBufferIfDecodable(tro.to, config.addressPrefix),   // Recipient address
+        to: addressToBuffer(tro.to, config.addressPrefix),   // Recipient address
         am: normalizeHex(tro.am),     // Amount
         is: normalizeHex(tro.is)      // Signature
     };
 
     return {
         type,
-        address: addressToBufferIfDecodable(address, config.addressPrefix),
+        address: addressToBuffer(address, config.addressPrefix),
         tro: normalizedTro
     };
 }
@@ -80,7 +80,7 @@ export function normalizeTransactionOperation(payload, config) {
 
     return {
         type,
-        address: addressToBufferIfDecodable(address, config.addressPrefix),
+        address: addressToBuffer(address, config.addressPrefix),
         txo: normalizedTxo
     };
 }
@@ -159,7 +159,7 @@ export function normalizeRoleAccessOperation(payload, config) {
 
     return {
         type,
-        address: addressToBufferIfDecodable(address, config.addressPrefix),
+        address: addressToBuffer(address, config.addressPrefix),
         rao: normalizedRao
     };
 }
@@ -196,7 +196,7 @@ export function normalizeBootstrapDeploymentOperation(payload, config) {
 
     return {
         type,
-        address: addressToBufferIfDecodable(address, config.addressPrefix),
+        address: addressToBuffer(address, config.addressPrefix),
         bdo: normalizedBdo
     };
 }
@@ -227,8 +227,8 @@ export function normalizeHtlcLockOperation(payload, config) {
     const normalizedHlo = {
         tx: normalizeHex(hlo.tx),
         txv: normalizeHex(hlo.txv),
-        ca: addressToBufferIfDecodable(hlo.ca, config.addressPrefix),
-        ra: addressToBufferIfDecodable(hlo.ra, config.addressPrefix),
+        ca: addressToBuffer(hlo.ca, config.addressPrefix),
+        ra: addressToBuffer(hlo.ra, config.addressPrefix),
         am: normalizeHex(hlo.am),
         fa: normalizeHex(hlo.fa),
         hl: normalizeHex(hlo.hl),
@@ -239,12 +239,12 @@ export function normalizeHtlcLockOperation(payload, config) {
         in: normalizeHex(hlo.in),
         is: normalizeHex(hlo.is)
     };
-    if (hlo.fr !== undefined) normalizedHlo.fr = addressToBufferIfDecodable(hlo.fr, config.addressPrefix);
+    if (hlo.fr !== undefined) normalizedHlo.fr = addressToBuffer(hlo.fr, config.addressPrefix);
     if (hlo.ph !== undefined) normalizedHlo.ph = normalizeHex(hlo.ph);
 
     return {
         type,
-        address: addressToBufferIfDecodable(address, config.addressPrefix),
+        address: addressToBuffer(address, config.addressPrefix),
         hlo: normalizedHlo
     };
 }
@@ -264,7 +264,7 @@ export function normalizeHtlcClaimOperation(payload, config) {
 
     return {
         type,
-        address: addressToBufferIfDecodable(address, config.addressPrefix),
+        address: addressToBuffer(address, config.addressPrefix),
         hco: {
             tx: normalizeHex(hco.tx),
             txv: normalizeHex(hco.txv),

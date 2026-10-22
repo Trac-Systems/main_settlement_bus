@@ -5,7 +5,7 @@ import b4a from "b4a";
 import _ from "lodash";
 import { sleep, isHexString } from "./utils/helpers.js";
 import { applyStateMessageFactory } from "./messages/state/applyStateMessageFactory.js";
-import { isAddressDecodable } from "./core/state/utils/address.js";
+import { isAddressValid } from "./core/state/utils/address.js";
 import Network from "./core/network/Network.js";
 import State from "./core/state/State.js";
 import {
@@ -647,7 +647,7 @@ export class MainSettlementBus extends ReadyResource {
             );
         }
 
-        if (!isAddressDecodable(addressToUpdate, this.#config.addressPrefix)) {
+        if (!isAddressValid(addressToUpdate, this.#config.addressPrefix)) {
             throw new Error(
                 `Can not request indexer role for: ${addressToUpdate} - invalid address.`
             );
@@ -736,7 +736,7 @@ export class MainSettlementBus extends ReadyResource {
             );
         }
 
-        if (!isAddressDecodable(addressToBan, this.#config.addressPrefix)) {
+        if (!isAddressValid(addressToBan, this.#config.addressPrefix)) {
             throw new Error(
                 `Can not ban writer with address:  ${addressToBan} - invalid address.`
             );
@@ -874,7 +874,7 @@ export class MainSettlementBus extends ReadyResource {
             );
         }
 
-        if (!isAddressDecodable(recipientAddress, this.#config.addressPrefix)) {
+        if (!isAddressValid(recipientAddress, this.#config.addressPrefix)) {
             throw new Error("Invalid recipient address");
         }
 
