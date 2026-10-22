@@ -249,3 +249,43 @@ test('a confirmed epoch finishes once and the next round loads fresh signed cont
     t.is(f.next.callCount, 1);
     t.is(f.logger.error.callCount, 0);
 });
+
+test('coordinated FSM retries after selection expiry despite repeated ledger read failures', async t => {
+    const f = await setup(t);
+    await f.createRound().run(f.next);
+    await f.clock.tickAsync(0);
+    const previous = f.selector.active.request;
+    f.readOutcome.rejects(new Error('BLOCK_NOT_AVAILABLE'));
+
+    await f.clock.tickAsync(CONFIG.epochSignatureTimeout - 1);
+    t.is(f.writes.length, 1, 'read failures alone do not permit another append');
+    t.is(f.selector.active.request.requestId, previous.requestId);
+    await f.clock.tickAsync(1 + CONFIG.epochBackoffDelay);
+
+    t.is(f.writes.length, 2, 'the real FSM starts a new attempt after expiry and backoff');
+    t.alike(f.selector.outcomeFor(previous.requestId), { status: EpochAppendOutcome.SELECTION_EXPIRED });
+    const current = f.selector.active.request;
+    t.is(BigInt(current.logicalCounter), BigInt(previous.logicalCounter) + 1n);
+    f.writes[0].reject(new Error('late append failure'));
+    await f.clock.tickAsync(0);
+    t.is(f.selector.active.request.requestId, current.requestId);
+    t.is(f.writes.length, 2, 'the old append callback cannot interrupt the new attempt');
+    t.is(f.next.callCount, 0);
+});
+
+test('the selector monitor expires an unreadable publication after its FSM round is cancelled', async t => {
+    const f = await setup(t, 1, true);
+    const round = f.createRound();
+    await round.run(f.next);
+    await f.clock.tickAsync(0);
+    const request = f.selector.active.request;
+    await round.cancel();
+    f.readOutcome.rejects(new Error('BLOCK_NOT_AVAILABLE'));
+
+    await f.clock.tickAsync(CONFIG.epochSignatureTimeout);
+
+    t.absent(f.selector.active);
+    t.alike(f.selector.outcomeFor(request.requestId), { status: EpochAppendOutcome.SELECTION_EXPIRED });
+    t.is(f.writes.length, 1, 'the monitor never submits another append');
+    t.is(f.next.callCount, 0, 'the cancelled round stays cancelled');
+});

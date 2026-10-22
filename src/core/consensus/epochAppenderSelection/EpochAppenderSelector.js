@@ -729,7 +729,13 @@ export class EpochAppenderSelector {
     }
 
     async #reconcilePublication(active) {
-        const result = await this.#operations.readOutcome(copyAppendPublication(active.publication));
+        let result = { status: EpochAppendOutcome.UNKNOWN };
+        let readError;
+        try {
+            result = await this.#operations.readOutcome(copyAppendPublication(active.publication));
+        } catch (error) {
+            readError = error;
+        }
         if (this.#selectionState.active !== active) {
             return null;
         }
@@ -737,6 +743,10 @@ export class EpochAppenderSelector {
             result.status === EpochAppendOutcome.EPOCH_ADVANCED;
         const selectionExpired = active.expiresAt <= Date.now() ||
             !sameSelectionRequest(this.#selectionState.vote?.request, active.request);
+        // A failed ledger read cannot extend the election deadline or prove rejection.
+        if (readError && !selectionExpired) {
+            throw readError;
+        }
         if (!finalOutcome && !selectionExpired) {
             return { status: EpochAppendOutcome.UNKNOWN };
         }
@@ -751,6 +761,9 @@ export class EpochAppenderSelector {
         });
         if (!released) {
             return null;
+        }
+        if (readError) {
+            this.#operations.onError?.(readError);
         }
         return { status: outcome.status };
     }

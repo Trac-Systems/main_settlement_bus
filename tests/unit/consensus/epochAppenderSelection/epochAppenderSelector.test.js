@@ -445,6 +445,68 @@ test('epoch append: closing waits for an outcome check started outside the monit
     t.is(closed, true);
 });
 
+test('epoch append: repeated outcome read errors do not prevent selection expiry or a higher-term retry', async t => {
+    const clock = sinon.useFakeTimers();
+    const failure = new Error('BLOCK_NOT_AVAILABLE');
+    const readOutcome = sinon.stub().rejects(failure);
+    const { selector, request, save } = await setupPublication(readOutcome);
+    t.teardown(async () => {
+        await selector.close();
+        clock.restore();
+    });
+
+    for (const time of [0, 10_000, 19_999]) {
+        await clock.tickAsync(time - Date.now());
+        t.is(await selector.reconcile().catch(error => error), failure);
+        t.is(selector.active.request.requestId, request.requestId, 'the reservation is retained before expiry');
+        t.is(selector.outcomeFor(request.requestId), null, 'read errors do not prove a ledger outcome');
+    }
+    t.is(save.callCount, 2, 'failed reads do not rewrite the publication marker');
+
+    await clock.tickAsync(1);
+    readOutcome.resetHistory();
+    const results = await Promise.all([selector.reconcile(), selector.reconcile()].map(check => check.catch(error => error)));
+    t.alike(results, [
+        { status: EpochAppendOutcome.SELECTION_EXPIRED },
+        { status: EpochAppendOutcome.SELECTION_EXPIRED },
+    ]);
+    t.is(readOutcome.callCount, 1, 'concurrent expiry checks still share one read');
+    t.is(save.callCount, 3, 'expiry is persisted once');
+    t.absent(selector.active);
+    t.alike(selector.outcomeFor(request.requestId), { status: EpochAppendOutcome.SELECTION_EXPIRED });
+    t.alike(save.lastCall.args[0].vote.request, request, 'the durable vote identity is preserved');
+
+    const next = await selector.createRequest(context(1), b4a.from('next proof')).catch(error => error);
+    t.is(next.logicalCounter, (BigInt(request.logicalCounter) + 1n).toString());
+    t.is(typeof next.requestId, 'string');
+    t.absent(next.requestId === request.requestId);
+});
+
+for (const outcome of ['read error', EpochAppendOutcome.EPOCH_ADVANCED, EpochAppendOutcome.REJECTED]) {
+    test(`epoch append: a pending ${outcome} is handled after the selection deadline`, async t => {
+        const clock = sinon.useFakeTimers();
+        const pending = Promise.withResolvers();
+        const { selector, request } = await setupPublication(() => pending.promise);
+        t.teardown(async () => {
+            pending.resolve({ status: EpochAppendOutcome.UNKNOWN });
+            await selector.close();
+            clock.restore();
+        });
+
+        const checking = selector.reconcile().catch(error => error);
+        await clock.tickAsync(20_000);
+        if (outcome === 'read error') {
+            pending.reject(new Error('BLOCK_NOT_AVAILABLE'));
+        } else {
+            pending.resolve({ status: outcome });
+        }
+        const expected = outcome === 'read error' ? EpochAppendOutcome.SELECTION_EXPIRED : outcome;
+        t.alike(await checking, { status: expected }, 'a signed outcome takes precedence over expiry');
+        t.alike(selector.outcomeFor(request.requestId), { status: expected });
+        t.absent(selector.active);
+    });
+}
+
 function granted(request) {
     return { ...request, voteStatus: 1, observedCounter: request.logicalCounter, vote: request };
 }
