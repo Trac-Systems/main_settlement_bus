@@ -24,8 +24,8 @@ export async function assertEpochWithPeer(t, network, peer) {
     const { proposer, nodes } = network;
     const second = nodes.find(node => node.promoted && node !== proposer && node !== peer);
     const releaseOthers = network.deferred();
-    const collect = proposer.operations.collectSignature.bind(proposer.operations);
-    proposer.operations.collectSignature = async (...args) => {
+    const collect = proposer.operations.requestProofApproval.bind(proposer.operations);
+    proposer.operations.requestProofApproval = async (...args) => {
         const result = await collect(...args);
         if (!args[0].key.equals(peer.state.writingKey) && !args[0].key.equals(second.state.writingKey)) {
             await releaseOthers.promise;

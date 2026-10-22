@@ -7,13 +7,16 @@ import { WalletProvider } from 'trac-wallet';
 import { CONNECTION_STATUS, CustomEventType, ConsensusResultCode, ConsensusVersion } from '../../../src/utils/constants.js';
 import { V1ConsensusProtocolError } from '../../../src/core/network/protocols/consensus/v1/V1ConsensusProtocolError.js';
 import ConsensusV1ConnectionPolicy from '../../../src/core/network/protocols/consensus/v1/ConsensusV1ConnectionPolicy.js';
+import ConsensusV1MessageRouter from '../../../src/core/network/protocols/consensus/v1/ConsensusV1MessageRouter.js';
 import V1EpochProofProposalOperationHandler from '../../../src/core/network/protocols/consensus/v1/handlers/V1EpochProofProposalOperationHandler.js';
-import { encodeProofProposalApproval } from '../../../src/codecs/consensus/v1/consensusV1OperationCodec.js';
+import { encodeConsensusMessage, encodeProofProposalApproval } from '../../../src/codecs/consensus/v1/consensusV1OperationCodec.js';
+import { consensusMessageFactory } from '../../../src/messages/consensus/v1/consensusMessageFactory.js';
 import { createMessage, uint16ToBuffer, uint32ToBuffer } from '../../../src/utils/buffer.js';
 import { bufferToAddress } from '../../../src/core/state/utils/address.js';
 import consensusFixtures from '../../fixtures/consensusV1Operation.fixtures.js';
 import { config as consensusConfig } from '../../helpers/config.js';
 import { testKeyPair2 } from '../../fixtures/apply.fixtures.js';
+import { createSelectionContext } from '../../helpers/epochAppenderSelection.js';
 
 const isBareRuntime = typeof globalThis.Bare !== 'undefined';
 
@@ -61,6 +64,7 @@ async function loadNetwork({ isIndexer = false, currentEpoch = null, indexerCoun
     let validatorConnectionManagerInstance = null;
     let indexerConnectionManagerInstance = null;
     let epochCoordinatorServiceInstance = null;
+    const epochAppenderSelector = { open: sinon.stub().resolves(), close: sinon.stub().resolves() };
     let validatorPendingRequestServiceInstance = null;
     let indexerPendingRequestServiceInstance = null;
     let consensusMessagesInstance = null;
@@ -259,6 +263,9 @@ async function loadNetwork({ isIndexer = false, currentEpoch = null, indexerCoun
         '../../../src/core/network/services/TransactionCommitService.js': { default: TransactionCommitServiceMock },
         '../../../src/core/network/services/ValidatorHealthCheckService.js': { default: ValidatorHealthCheckServiceMock },
         '../../../src/core/consensus/services/EpochCoordinatorService.js': { default: EpochCoordinatorServiceMock },
+        '../../../src/core/consensus/epochAppenderSelection/createEpochAppenderSelector.js': {
+            createEpochAppenderSelector: () => epochAppenderSelector,
+        },
         '../../../src/core/network/services/IndexerConnectionManager.js': { default: IndexerConnectionManagerMock },
         '../../../src/core/network/protocols/validators/ValidatorMessages.js': { default: ValidatorMessagesMock },
         '../../../src/core/network/protocols/consensus/IndexerMessages.js': { default: IndexerMessagesMock },
@@ -307,6 +314,7 @@ async function loadNetwork({ isIndexer = false, currentEpoch = null, indexerCoun
         validatorConnectionManagerInstance,
         indexerConnectionManagerInstance,
         epochCoordinatorServiceInstance,
+        epochAppenderSelector,
         validatorPendingRequestServiceInstance,
         indexerPendingRequestServiceInstance,
         consensusMessagesInstance,
@@ -321,13 +329,15 @@ if (isBareRuntime) {
     });
 } else {
     test('Network does not start the epoch coordinator before genesis initialization', async t => {
-        const { network, epochCoordinatorServiceInstance } = await loadNetwork({
+        const { network, epochCoordinatorServiceInstance, epochAppenderSelector } = await loadNetwork({
             isIndexer: true,
             currentEpoch: null
         });
 
         t.absent(epochCoordinatorServiceInstance.start.called);
+        t.is(epochAppenderSelector.open.callCount, 1, 'the shared append coordinator is opened with the network');
         await network.close();
+        t.is(epochAppenderSelector.close.callCount, 1, 'the shared append coordinator closes with the network');
     });
 
     test('Network starts the epoch coordinator for an initialized indexer', async t => {
@@ -657,7 +667,7 @@ if (isBareRuntime) {
         t.teardown(async () => await network.close());
     });
 
-    for (const kind of ['proposal', 'approval']) {
+    for (const kind of ['proposal', 'approval', 'REQUEST', 'REPLY']) {
         test(`Network bans the transport peer after a real ${kind} identity mismatch`, async t => {
             const context = await loadNetwork();
             const {
@@ -678,15 +688,34 @@ if (isBareRuntime) {
             const claimedKey = tracCryptoApi.address.decode(bufferToAddress(claimedAddress, consensusConfig.addressPrefix));
             const innocentPeer = createPeerInfo(claimedKey);
             swarmInstance.peers.set(claimedKey.toString('hex'), innocentPeer);
+            const innocentConnection = createMockConnection(claimedKey.toString('hex'));
+            swarmInstance.connections.add(innocentConnection);
 
-            const request = { ...consensusFixtures.proofProposalHeader, session_id: 'banned-peer-request' };
-            const pendingResult = indexerPendingRequestServiceInstance.registerPendingRequest(publicKey, request)
+            let request = { ...consensusFixtures.proofProposalHeader, session_id: 'banned-peer-request' };
+            let forgedMessage;
+            if (kind === 'REQUEST' || kind === 'REPLY') {
+                const intent = {
+                    ...createSelectionContext(3), networkId: consensusConfig.networkId,
+                    requester: claimedKey.toString('hex'), requestId: 'impersonating-request',
+                    logicalCounter: 1n, payloadHash: '07'.repeat(32), selectionVersion: 2,
+                };
+                const factory = consensusMessageFactory(wallet, consensusConfig);
+                request = await factory.buildRequest(request.session_id, intent);
+                forgedMessage = request;
+                if (kind === 'REPLY') {
+                    forgedMessage = await factory.buildReply(request.session_id, {
+                        ...intent, voteStatus: 1, observedCounter: intent.logicalCounter, vote: intent,
+                    });
+                    forgedMessage.reply.responder = claimedKey;
+                }
+            }
+            const session = { closed: false, sendAndForget: sinon.stub() };
+            const pendingResult = indexerPendingRequestServiceInstance.registerPendingRequest(publicKey, request, session)
                 .catch(error => error);
             const otherRequest = { ...request, session_id: 'other-peer-request' };
             indexerPendingRequestServiceInstance.registerPendingRequest(claimedKey.toString('hex'), otherRequest)
                 .catch(() => {});
             const handler = new V1EpochProofProposalOperationHandler(state, {}, consensusConfig, connectionPolicy);
-            const session = { sendAndForget: sinon.stub() };
 
             if (kind === 'proposal') {
                 await handler.handleRequest({
@@ -696,7 +725,7 @@ if (isBareRuntime) {
                         network_id: uint16ToBuffer(consensusConfig.networkId),
                     },
                 }, connection, session);
-            } else {
+            } else if (kind === 'approval') {
                 state.requireSignedConsensusConfig = async () => ({
                     schemaVersion: ConsensusVersion.VDF_V1,
                     configData: {
@@ -710,11 +739,18 @@ if (isBareRuntime) {
                 });
                 const result = await handler.handleApproval(response, connection, session, request.proof_proposal);
                 t.is(result.resultCode, ConsensusResultCode.PUBLIC_KEY_MISMATCH);
+            } else {
+                const router = new ConsensusV1MessageRouter(
+                    state, wallet, consensusConfig, indexerPendingRequestServiceInstance,
+                    connectionPolicy, context.epochAppenderSelector
+                );
+                await router.route(encodeConsensusMessage(forgedMessage), connection, session);
             }
 
             t.ok(peerInfo.ban.calledOnceWithExactly(true), 'Hyperswarm receives an explicit ban');
             t.ok(connection.destroy.calledOnce, 'active transport is destroyed');
             t.absent(innocentPeer.ban.called, 'the identity claimed in the payload is not banned');
+            t.absent(innocentConnection.destroy.called, 'the other peer keeps its transport for replication');
             t.absent(session.sendAndForget.called, 'no response is written after the ban');
             t.absent(network.isConnectionPending(publicKey), 'pending connection attempt is cleared');
             const error = await pendingResult;

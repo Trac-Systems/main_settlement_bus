@@ -1,17 +1,24 @@
 import Validator from 'fastest-validator';
-import b4a from 'b4a';
 import {
     HASH_BYTE_LENGTH,
+    PUBLIC_KEY_LENGTH,
+    CONSENSUS_REQUEST_ID_MAX_LENGTH,
+    CONSENSUS_SESSION_ID_MAX_LENGTH,
     ConsensusOperationType,
     SIGNATURE_BYTE_LENGTH,
     ConsensusResultCode,
-    VDF_PROOF_BYTE_LENGTHS,
     NETWORK_ID_BYTE_LENGTH,
     EPOCH_BYTE_LENGTH,
     VDF_DIFFICULTY_SIZE,
     VDF_DISCRIMINANT_SIZE
 } from '../../../../../../utils/constants.js';
-import { V1ConsensusProtocolError } from '../V1ConsensusProtocolError.js';
+import { EPOCH_APPENDER_SELECTION_VERSION, EpochAppenderVoteStatus } from '../../../../../consensus/epochAppenderSelection/epochAppenderSelectionState.js';
+import {
+    compileBufferRule,
+    validateSelectionCounter,
+    validateProofProposalLength,
+    validateProofProposalApprovalPresence,
+} from './consensusValidationSchemaHelpers.js';
 
 const ALLOWED_RESULT_CODES = Object.values(ConsensusResultCode);
 
@@ -19,7 +26,10 @@ class ConsensusValidationSchema {
     #config;
     #validator;
     #validateConsensusV1ProofProposalSchema;
-    #validateConsensusV1ProposalApproval;
+    #validateConsensusV1ProposalApprovalSchema;
+    #validateEpochAppendRequestSchema;
+    #validateEpochAppendReplySchema;
+    #epochAppendIntentSchema;
 
     constructor(config) {
         this.#config = config;
@@ -35,52 +45,28 @@ class ConsensusValidationSchema {
                 uint64: "The '{field}' field must be an unsigned 64-bit integer! Actual: {actual}",
             },
         });
-        const isBuffer = b4a.isBuffer;
-        this.#validator.add("buffer", function ({ schema, messages }, _path, _context) {
-            const allowEmpty = schema.allowEmpty === true;
-            const exactLength = Number.isInteger(schema.length) ? schema.length : null;
-            const minLength = Number.isInteger(schema.min) ? schema.min : null;
-            const maxLength = Number.isInteger(schema.max) ? schema.max : null;
-            return {
-                source:
-                    `
-                        if (!${isBuffer}(value)) {
-                            ${this.makeError({ type: "buffer", actual: "value", messages })}
-                            return value;
-                        }
-                        const len = value.length;
-                        ${exactLength === null ? '' : `
-                        if (len !== ${exactLength}) {
-                            ${this.makeError({ type: "bufferLength", expected: exactLength, actual: "len", messages })}
-                        }`}
-                        ${minLength === null ? '' : `
-                        if (len < ${minLength}) {
-                            ${this.makeError({ type: "bufferMinLength", expected: minLength, actual: "len", messages })}
-                        }`}
-                        ${maxLength === null ? '' : `
-                        if (len > ${maxLength}) {
-                            ${this.makeError({ type: "bufferMaxLength", expected: maxLength, actual: "len", messages })}
-                        }`}
-                        if (len === 0 && !${allowEmpty}) {
-                            ${this.makeError({ type: "emptyBuffer", actual: "len", messages })}
-                            return value;
-                        }
-                        let isZeroFilled = true;
-                        for (let i = 0; i < len; i++) {
-                            if (value[i] !== 0) {
-                                isZeroFilled = false;
-                                break;
-                            }
-                        }
-                        if (isZeroFilled) {
-                            ${this.makeError({ type: "nonZeroBuffer", actual: "value", messages })}
-                        }
-                            return value;
-                    `
-            };
-        });
+        this.#validator.add('buffer', compileBufferRule);
+        this.#epochAppendIntentSchema = {
+            type: 'object',
+            strict: true,
+            props: {
+                network_id: { type: 'buffer', length: NETWORK_ID_BYTE_LENGTH, required: true },
+                bootstrap: { type: 'buffer', length: HASH_BYTE_LENGTH, required: true },
+                epoch: { type: 'buffer', length: EPOCH_BYTE_LENGTH, required: true },
+                parent_hash: { type: 'buffer', length: HASH_BYTE_LENGTH, required: true },
+                membership_context: { type: 'buffer', length: HASH_BYTE_LENGTH, required: true },
+                config_hash: { type: 'buffer', length: HASH_BYTE_LENGTH, required: true },
+                request_id: { type: 'string', min: 1, max: CONSENSUS_REQUEST_ID_MAX_LENGTH, required: true },
+                payload_hash: { type: 'buffer', length: HASH_BYTE_LENGTH, required: true },
+                logical_counter: { type: 'buffer', length: EPOCH_BYTE_LENGTH, required: true, custom: validateSelectionCounter },
+                requester: { type: 'buffer', length: PUBLIC_KEY_LENGTH, required: true },
+                selection_version: { type: 'equal', value: EPOCH_APPENDER_SELECTION_VERSION, required: true },
+            },
+        };
         this.#validateConsensusV1ProofProposalSchema = this.#compileV1EpochProofProposalRequestSchema();
-        this.#validateConsensusV1ProposalApproval = this.#compileConsensusV1ProposalApprovalSchema();
+        this.#validateConsensusV1ProposalApprovalSchema = this.#compileConsensusV1ProposalApprovalSchema();
+        this.#validateEpochAppendRequestSchema = this.#compileEpochAppendRequestSchema();
+        this.#validateEpochAppendReplySchema = this.#compileEpochAppendReplySchema();
     }
 
     #compileV1EpochProofProposalRequestSchema() {
@@ -92,7 +78,7 @@ class ConsensusValidationSchema {
                 equal: ConsensusOperationType.PROOF_PROPOSAL,
                 required: true
             },
-            session_id: { type: 'string', min: 1, max: 64, required: true },
+            session_id: { type: 'string', min: 1, max: CONSENSUS_SESSION_ID_MAX_LENGTH, required: true },
             timestamp: { type: 'number', integer: true, min: 1, max: Number.MAX_SAFE_INTEGER, required: true },
             proof_proposal: {
                 strict: true,
@@ -107,43 +93,7 @@ class ConsensusValidationSchema {
                     proof: { type: 'buffer', required: true },
                     signature: { type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true },
                 },
-                custom: (proofProposal, errors) => {
-                    const discriminant = proofProposal?.discriminant_bit_size;
-                    const proof = proofProposal?.proof;
-
-                    if (
-                        !b4a.isBuffer(discriminant) ||
-                        discriminant.length !== VDF_DISCRIMINANT_SIZE
-                    ) {
-                        return proofProposal;
-                    }
-
-                    const discriminantBitSize = discriminant.readUInt16BE(0);
-                    const expectedProofLength = VDF_PROOF_BYTE_LENGTHS[discriminantBitSize];
-
-                    if (!Number.isInteger(expectedProofLength)) {
-                        errors.push({
-                            type: 'unsupportedDiscriminantBitSize',
-                            field: 'proof_proposal.discriminant_bit_size',
-                            actual: discriminantBitSize,
-                            expected: Object.keys(VDF_PROOF_BYTE_LENGTHS).map(Number),
-                            message: 'Discriminant bit size must be one of: 1024, 2048, 4096.'
-                        });
-                        return proofProposal;
-                    }
-
-                    if (b4a.isBuffer(proof) && proof.length !== expectedProofLength) {
-                        errors.push({
-                            type: 'bufferLength',
-                            field: 'proof_proposal.proof',
-                            actual: proof.length,
-                            expected: expectedProofLength,
-                            message: `Proof must be a Buffer with length ${expectedProofLength}.`
-                        });
-                    }
-
-                    return proofProposal;
-                }
+                custom: validateProofProposalLength,
             },
         };
         return this.#validator.compile(schema);
@@ -162,7 +112,7 @@ class ConsensusValidationSchema {
                 equal: ConsensusOperationType.PROOF_PROPOSAL_APPROVAL,
                 required: true
             },
-            session_id: { type: 'string', min: 1, max: 64, required: true },
+            session_id: { type: 'string', min: 1, max: CONSENSUS_SESSION_ID_MAX_LENGTH, required: true },
             timestamp: { type: 'number', integer: true, min: 1, max: Number.MAX_SAFE_INTEGER, required: true },
             proof_proposal_response: {
                 strict: true,
@@ -179,37 +129,63 @@ class ConsensusValidationSchema {
                         }
                     },
                     response_sig: { type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true },
-                }
+                },
+                custom: validateProofProposalApprovalPresence,
             },
         };
         return this.#validator.compile(schema);
     }
 
     validateV1EpochProofProposalResponse(operation) {
-        const isSchemaValid = this.#validateConsensusV1ProposalApproval(operation);
-        if (isSchemaValid !== true) {
-            throw new V1ConsensusProtocolError(
-                ConsensusResultCode.SCHEMA_VALIDATION_FAILED,
-                'Proof proposal response schema validation failed.'
-            );
-        }
+        return this.#validateConsensusV1ProposalApprovalSchema(operation) === true;
+    }
 
-        const response = operation.proof_proposal_response;
-        if (response.result === ConsensusResultCode.OK && !response.approval) {
-            throw new V1ConsensusProtocolError(
-                ConsensusResultCode.RESPONSE_APPROVAL_INVALID,
-                'Proof proposal response approval is required when result code is OK.'
-            );
-        }
+    #compileEpochAppendRequestSchema() {
+        const schema = {
+            $$strict: true,
+            type: { type: 'number', integer: true, equal: ConsensusOperationType.REQUEST, required: true },
+            session_id: { type: 'string', min: 1, max: CONSENSUS_SESSION_ID_MAX_LENGTH, required: true },
+            timestamp: { type: 'number', integer: true, min: 1, max: Number.MAX_SAFE_INTEGER, required: true },
+            request: {
+                type: 'object',
+                strict: true,
+                props: {
+                    intent: this.#epochAppendIntentSchema,
+                    signature: { type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true },
+                },
+            },
+        };
+        return this.#validator.compile(schema);
+    }
 
-        if (response.result !== ConsensusResultCode.OK && response.approval) {
-            throw new V1ConsensusProtocolError(
-                ConsensusResultCode.RESPONSE_APPROVAL_INVALID,
-                'Proof proposal response approval is only allowed when result code is OK.'
-            );
-        }
+    validateEpochAppendRequest(operation) {
+        return this.#validateEpochAppendRequestSchema(operation) === true;
+    }
 
-        return true;
+    #compileEpochAppendReplySchema() {
+        const schema = {
+            $$strict: true,
+            type: { type: 'number', integer: true, equal: ConsensusOperationType.REPLY, required: true },
+            session_id: { type: 'string', min: 1, max: CONSENSUS_SESSION_ID_MAX_LENGTH, required: true },
+            timestamp: { type: 'number', integer: true, min: 1, max: Number.MAX_SAFE_INTEGER, required: true },
+            reply: {
+                type: 'object',
+                strict: true,
+                props: {
+                    intent: this.#epochAppendIntentSchema,
+                    signature: { type: 'buffer', length: SIGNATURE_BYTE_LENGTH, required: true },
+                    responder: { type: 'buffer', length: PUBLIC_KEY_LENGTH, required: true },
+                    vote_status: { type: 'enum', values: Object.values(EpochAppenderVoteStatus), required: true },
+                    observed_counter: { type: 'buffer', length: EPOCH_BYTE_LENGTH, required: true, custom: validateSelectionCounter },
+                    vote: this.#epochAppendIntentSchema,
+                },
+            },
+        };
+        return this.#validator.compile(schema);
+    }
+
+    validateEpochAppendReply(operation) {
+        return this.#validateEpochAppendReplySchema(operation) === true;
     }
 }
 

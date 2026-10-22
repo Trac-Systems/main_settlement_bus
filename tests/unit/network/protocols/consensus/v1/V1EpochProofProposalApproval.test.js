@@ -421,3 +421,28 @@ test('V1EpochProofProposalApproval fails closed when signed config is unavailabl
         'Signed config is unavailable.'
     );
 });
+
+test('V1EpochProofProposalApproval reports invalid approval presence as a schema failure', async t => {
+    const validator = new V1EpochProofProposalApproval(config, {
+        requireSignedConsensusConfig: () => t.fail('schema failures must stop before reading signed state'),
+        isIndexerAddress: () => t.fail('schema failures must stop before checking membership'),
+    });
+    const approval = {
+        approver: b4a.alloc(config.addressLength, 2),
+        approval_sig: b4a.alloc(64, 3),
+    };
+    for (const response of [
+        { result: ConsensusResultCode.OK },
+        { result: ConsensusResultCode.OK, approval: null },
+        { result: ConsensusResultCode.INVALID_PAYLOAD, approval },
+    ]) {
+        const payload = {
+            type: ConsensusOperationType.PROOF_PROPOSAL_APPROVAL,
+            session_id: 'session',
+            timestamp: 1,
+            proof_proposal_response: { ...response, response_sig: b4a.alloc(64, 1) },
+        };
+        await assertProtocolError(t, () => validator.validate(payload, {}, {}),
+            ConsensusResultCode.SCHEMA_VALIDATION_FAILED, 'Payload is invalid.');
+    }
+});

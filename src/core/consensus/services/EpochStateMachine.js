@@ -1,3 +1,24 @@
+/**
+ * Stores the data used by one epoch round. Each approval attempt gets a new collection. Late callbacks
+ * must check that their collection is still current and open.
+ *
+ * @typedef {object} EpochRoundContext
+ * @property {function(number): Promise<boolean>} finishAndScheduleNextRound Closes this round and schedules the next one.
+ * @property {bigint} [currentEpoch] Signed parent epoch used to build the proof.
+ * @property {Buffer} [currentEpochHash] Hash of that parent record.
+ * @property {number} [vdfDifficulty] Signed VDF iteration count.
+ * @property {number} [vdfDiscriminantSize] Signed discriminant size in bits.
+ * @property {import('./EpochCoordinatorOperations.js').EpochVdfProof} [vdf] Local proof that can be reused while the parent epoch stays the same.
+ * @property {object} [proofProposalMessage] Signed message containing the local proof.
+ * @property {object} [proofProposal] Proof proposal fields from the signed message.
+ * @property {Set<string>} [indexerKeys] Writer keys captured for this attempt, encoded as hex.
+ * @property {number} [requiredProofSignatures] Proof quorum including the proposer's signature.
+ * @property {Array<{key: Buffer}>} [approvers] Other indexers that can sign this proof.
+ * @property {import('./EpochCoordinatorOperations.js').EpochApprovalCollection|null} [approvalCollection] This attempt's proof approvals.
+ * @property {Buffer} [setEpochPayload] Complete SET_EPOCH operation bytes.
+ * @property {boolean} [remoteProposalReceived] A validated proposal matches this epoch and parent.
+ * @property {boolean} [appendElectionRetry] Use the shorter election backoff for the next retry.
+ */
 import { StateMachine } from "../../../utils/StateMachine.js";
 
 export const EPOCH_STATES = Object.freeze({
@@ -8,9 +29,10 @@ export const EPOCH_STATES = Object.freeze({
     COLLECT_APPROVALS: "COLLECT_APPROVALS",
     QUORUM_DECISION: "QUORUM_DECISION",
     BUILD_SET_EPOCH: "BUILD_SET_EPOCH",
+    WAIT_FOR_APPEND_REPLIES: "WAIT_FOR_APPEND_REPLIES",
     REFRESH_SIGNED_STATE_BEFORE_APPEND: "REFRESH_SIGNED_STATE_BEFORE_APPEND",
     APPEND_SET_EPOCH: "APPEND_SET_EPOCH",
-    SEND_APPEND_SIGNAL: "SEND_APPEND_SIGNAL", // Terminal on purpose: no state is preserved across cycles, so there is nothing to hand off to BACKOFF.
+    WAIT_FOR_APPEND_OUTCOME: "WAIT_FOR_APPEND_OUTCOME",
     REFRESH_SIGNED_STATE: "REFRESH_SIGNED_STATE",
     BACKOFF: "BACKOFF",
     RELOAD_SIGNED_CONTEXT: "RELOAD_SIGNED_CONTEXT",
@@ -23,20 +45,21 @@ export const EPOCH_EVENTS = Object.freeze({
     EXTERNAL_APPROVALS_REQUIRED: "EXTERNAL_APPROVALS_REQUIRED",
     EXTERNAL_APPROVALS_NOT_REQUIRED: "EXTERNAL_APPROVALS_NOT_REQUIRED",
     PROPOSAL_BROADCAST: "PROPOSAL_BROADCAST",
-    APPROVAL_COLLECTED: "APPROVAL_COLLECTED",
     QUORUM_REACHED: "QUORUM_REACHED",
-    PEER_EPOCH_MISMATCH: "PEER_EPOCH_MISMATCH",
     APPROVAL_COLLECTION_FAILED: "APPROVAL_COLLECTION_FAILED",
     SET_EPOCH_BUILT: "SET_EPOCH_BUILT",
+    APPEND_REPLIES_COLLECTED: "APPEND_REPLIES_COLLECTED",
+    APPEND_REPLY_COLLECTION_FAILED: "APPEND_REPLY_COLLECTION_FAILED",
+    APPEND_STARTED: "APPEND_STARTED",
+    APPEND_REJECTED: "APPEND_REJECTED",
+    APPENDER_SELECTION_EXPIRED: "APPENDER_SELECTION_EXPIRED",
     TARGET_EPOCH_ABSENT: "TARGET_EPOCH_ABSENT",
     TARGET_EPOCH_ALREADY_SIGNED: "TARGET_EPOCH_ALREADY_SIGNED",
-    APPEND_ACCEPTED: "APPEND_ACCEPTED",
-    APPEND_FAILED: "APPEND_FAILED",
+    TARGET_EPOCH_CONFIRMED: "TARGET_EPOCH_CONFIRMED",
     BACKOFF_ELAPSED: "BACKOFF_ELAPSED",
     EPOCH_UNCHANGED_WITHOUT_LOCAL_PROOF: "EPOCH_UNCHANGED_WITHOUT_LOCAL_PROOF",
     EPOCH_UNCHANGED_WITH_LOCAL_PROOF: "EPOCH_UNCHANGED_WITH_LOCAL_PROOF",
     NEW_EPOCH_DISCOVERED: "NEW_EPOCH_DISCOVERED",
-    CONTEXT_RELOADED: "CONTEXT_RELOADED",
     SOLVER_FAILURE: "SOLVER FAILURE",
     INDEXERS_CHANGED: "INDEXERS_CHANGED",
 });
@@ -62,13 +85,16 @@ const TRANSITIONS = {
         [EPOCH_EVENTS.APPROVAL_COLLECTION_FAILED]: EPOCH_STATES.BACKOFF,
     }),
     [EPOCH_STATES.COLLECT_APPROVALS]: Object.freeze({
-        [EPOCH_EVENTS.APPROVAL_COLLECTED]: EPOCH_STATES.COLLECT_APPROVALS,
         [EPOCH_EVENTS.QUORUM_REACHED]: EPOCH_STATES.BUILD_SET_EPOCH,
-        [EPOCH_EVENTS.PEER_EPOCH_MISMATCH]: EPOCH_STATES.REFRESH_SIGNED_STATE,
         [EPOCH_EVENTS.APPROVAL_COLLECTION_FAILED]: EPOCH_STATES.BACKOFF,
     }),
     [EPOCH_STATES.BUILD_SET_EPOCH]: Object.freeze({
-        [EPOCH_EVENTS.SET_EPOCH_BUILT]: EPOCH_STATES.REFRESH_SIGNED_STATE_BEFORE_APPEND,
+        [EPOCH_EVENTS.SET_EPOCH_BUILT]: EPOCH_STATES.WAIT_FOR_APPEND_REPLIES,
+    }),
+    [EPOCH_STATES.WAIT_FOR_APPEND_REPLIES]: Object.freeze({
+        [EPOCH_EVENTS.APPEND_REPLIES_COLLECTED]: EPOCH_STATES.REFRESH_SIGNED_STATE_BEFORE_APPEND,
+        [EPOCH_EVENTS.APPEND_REPLY_COLLECTION_FAILED]: EPOCH_STATES.BACKOFF,
+        [EPOCH_EVENTS.TARGET_EPOCH_ALREADY_SIGNED]: EPOCH_STATES.RELOAD_SIGNED_CONTEXT,
     }),
     [EPOCH_STATES.REFRESH_SIGNED_STATE_BEFORE_APPEND]: Object.freeze({
         [EPOCH_EVENTS.TARGET_EPOCH_ABSENT]: EPOCH_STATES.APPEND_SET_EPOCH,
@@ -76,8 +102,15 @@ const TRANSITIONS = {
         [EPOCH_EVENTS.INDEXERS_CHANGED]: EPOCH_STATES.QUORUM_DECISION,
     }),
     [EPOCH_STATES.APPEND_SET_EPOCH]: Object.freeze({
-        [EPOCH_EVENTS.APPEND_ACCEPTED]: EPOCH_STATES.SEND_APPEND_SIGNAL,
-        [EPOCH_EVENTS.APPEND_FAILED]: EPOCH_STATES.BACKOFF,
+        [EPOCH_EVENTS.APPEND_STARTED]: EPOCH_STATES.WAIT_FOR_APPEND_OUTCOME,
+        [EPOCH_EVENTS.APPEND_REJECTED]: EPOCH_STATES.BACKOFF,
+        [EPOCH_EVENTS.TARGET_EPOCH_CONFIRMED]: EPOCH_STATES.RELOAD_SIGNED_CONTEXT,
+        [EPOCH_EVENTS.TARGET_EPOCH_ALREADY_SIGNED]: EPOCH_STATES.RELOAD_SIGNED_CONTEXT,
+    }),
+    [EPOCH_STATES.WAIT_FOR_APPEND_OUTCOME]: Object.freeze({
+        [EPOCH_EVENTS.TARGET_EPOCH_CONFIRMED]: EPOCH_STATES.RELOAD_SIGNED_CONTEXT,
+        [EPOCH_EVENTS.APPEND_REJECTED]: EPOCH_STATES.BACKOFF,
+        [EPOCH_EVENTS.APPENDER_SELECTION_EXPIRED]: EPOCH_STATES.BACKOFF,
         [EPOCH_EVENTS.TARGET_EPOCH_ALREADY_SIGNED]: EPOCH_STATES.RELOAD_SIGNED_CONTEXT,
     }),
     [EPOCH_STATES.REFRESH_SIGNED_STATE]: Object.freeze({
@@ -90,7 +123,18 @@ const TRANSITIONS = {
     }),
 };
 
+/**
+ * Defines the states and transitions for one epoch round. EpochCoordinationRound supplies the
+ * handlers. Proof approvals, appender selection and append confirmation are separate steps.
+ * WAIT_FOR_APPEND_OUTCOME waits for a signed result or selection expiry after the local append starts.
+ */
 export class EpochStateMachine extends StateMachine {
+    /**
+     * Connects the round handlers to the transition table. Entering LOAD_EPOCH_CONTEXT clears the
+     * previous context.
+     *
+     * @param {Object<string, function(EpochRoundContext, EpochStateMachine): Promise<void>>} [handlers={}] Handlers indexed by EPOCH_STATES.
+     */
     constructor(handlers = {}) {
         super(TRANSITIONS, EPOCH_STATES.LOAD_EPOCH_CONTEXT, EPOCH_STATES.LOAD_EPOCH_CONTEXT, handlers);
     }

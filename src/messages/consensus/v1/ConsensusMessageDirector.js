@@ -14,6 +14,7 @@ class ConsensusMessageDirector {
         this.#builder = builderInstance;
     }
 
+
     /**
      * Build a proof proposal message.
      * @param {string} sessionId
@@ -113,6 +114,27 @@ class ConsensusMessageDirector {
             .setResultCode(consensusResultCode)
             .buildPayload();
 
+        return this.#builder.getResult();
+    }
+
+
+    /** Build a signed arbitration REQUEST for the exact publication intent. */
+    async buildRequest(sessionId, request) {
+        return this.#buildAppendMessage(ConsensusOperationType.REQUEST, sessionId, request);
+    }
+
+    /** Build a signed REPLY bound to the original request and RPC session. */
+    async buildReply(sessionId, request) {
+        return this.#buildAppendMessage(ConsensusOperationType.REPLY, sessionId, request);
+    }
+
+    async #buildAppendMessage(type, sessionId, request) {
+        await this.#builder
+            .setType(type)
+            .setSessionId(sessionId)
+            .setTimestamp()
+            .setAppendIntent(request)
+            .buildPayload();
         return this.#builder.getResult();
     }
 }

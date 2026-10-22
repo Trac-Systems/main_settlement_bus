@@ -78,6 +78,7 @@ import PQueue from 'p-queue';
 import {createGenesisEpochProof} from './utils/epochProof.js';
 import {decodeVersionedConsensusConfig} from '../../utils/consensusConfig.js';
 import {safeDecodeVdfConfig} from '../../codecs/consensus/v1/vdfConfigCodec.js';
+import { readEpochAppenderSelectionContext, readEpochAppendOutcome } from '../consensus/epochAppenderSelection/epochAppenderSelectionLedgerReader.js';
 import _ from 'lodash';
 import {StateEventQueue} from './StateEventQueue.js';
 import {
@@ -671,16 +672,9 @@ class State extends ReadyResource {
             lte: endSeq
         });
 
-        const filters = (entry) => {
-            const isPut = entry.type === "put";
-            const isHex = isHexString(entry.key);
-            const is64 = entry.key.length === 64;
-            return isPut && isHex && is64;
-        }
-
         let hashes = [];
         for await (const entry of historyStream) {
-            if (filters(entry)) {
+            if (isTransactionRecordPut(entry)) {
                 hashes.push({ hash: entry.key, confirmed_length: entry.seq });
             }
         }
@@ -726,6 +720,30 @@ class State extends ReadyResource {
             throw new Error('Consensus config is not initialized.');
         }
         return consensusConfig;
+    }
+
+    /** @returns {Promise<import('../consensus/epochAppenderSelection/epochAppenderSelectionState.js').EpochAppenderSelectionContext>} Signed arbitration context. */
+    getEpochAppenderSelectionContext() {
+        return readEpochAppenderSelectionContext(this.#base, this.#config);
+    }
+
+    /**
+     * @param {import('../consensus/epochAppenderSelection/epochAppenderSelectionState.js').EpochAppendPublication} publication
+     * @returns {Promise<import('../consensus/epochAppenderSelection/epochAppenderSelectionState.js').EpochAppendOutcomeResult>}
+     */
+    getEpochAppendOutcome(publication) {
+        return readEpochAppendOutcome(this.#base, publication);
+    }
+
+    /** Authorizes the epoch append inside the writer queue before writing to Autobase. */
+    appendEpoch(payload, authorizeEpochAppend) {
+        return this.#writeQueue.add(async () => {
+            await authorizeEpochAppend({
+                writerKey: this.#base.local.key.toString('hex'),
+                from: this.#base.local.length,
+            });
+            return this.#base.append(payload);
+        });
     }
 
     // ATTENTION: DO NOT USE METHODS ABOVE IN APPLY PART!

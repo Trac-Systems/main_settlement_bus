@@ -61,7 +61,9 @@ export const NetworkOperationType = Object.freeze({
 export const ConsensusOperationType = Object.freeze({
     UNSPECIFIED: ConsensusMessageType.MESSAGE_TYPE_UNSPECIFIED,
     PROOF_PROPOSAL: ConsensusMessageType.MESSAGE_TYPE_PROOF_PROPOSAL,
-    PROOF_PROPOSAL_APPROVAL: ConsensusMessageType.MESSAGE_TYPE_PROOF_PROPOSAL_APPROVAL
+    PROOF_PROPOSAL_APPROVAL: ConsensusMessageType.MESSAGE_TYPE_PROOF_PROPOSAL_APPROVAL,
+    REQUEST: ConsensusMessageType.MESSAGE_TYPE_REQUEST,
+    REPLY: ConsensusMessageType.MESSAGE_TYPE_REPLY,
 });
 
 export const ConsensusResultCode = Object.freeze({
@@ -227,6 +229,7 @@ export const UINT32_MAX = 0xFFFFFFFF;
 // consensus
 export const NETWORK_ID_BYTE_LENGTH = 2; // 2 BYTES - UINT16
 export const EPOCH_BYTE_LENGTH = 8; // 8 BYTES - UINT64
+// Peer hints advance the election clock by at most one step per message.
 export const VDF_DIFFICULTY_SIZE = 4; // 4 BYTES - UINT32
 export const VDF_DISCRIMINANT_SIZE = 2; // 2 BYTES - UINT16
 export const MAX_VDF_DIFFICULTY = UINT32_MAX;
@@ -239,6 +242,12 @@ export const VDF_PROOF_BYTE_LENGTHS = Object.freeze({
     2048: 516,
     4096: 1028
 });
+export const EPOCH_APPENDER_SELECTION_MAX_COUNTER = (1n << 64n) - 1n;
+export const CONSENSUS_REQUEST_ID_MAX_LENGTH = 64;
+export const CONSENSUS_SESSION_ID_MAX_LENGTH = 64;
+export const HASH_HEX_LENGTH = HASH_BYTE_LENGTH * 2;
+export const EPOCH_APPENDER_SELECTION_COUNTER_STEP = 1024n;
+export const EPOCH_APPENDER_SELECTION_COUNTER_LIMIT = EPOCH_APPENDER_SELECTION_MAX_COUNTER - EPOCH_APPENDER_SELECTION_COUNTER_STEP;
 
 // These permanent consensus IDs select the config, SET_EPOCH and genesis formats.
 // Assign higher IDs to new versions; parameter updates retain the current ID.

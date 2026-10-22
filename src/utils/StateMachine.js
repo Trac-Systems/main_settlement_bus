@@ -9,6 +9,7 @@ export class StateMachine extends ReadyResource {
     #listeners = new Map();
     #transitions;
     #handlers;
+    #transition = null;
 
     constructor(transitions, initialState, discardState, handlers = {}) {
         super();
@@ -52,12 +53,14 @@ export class StateMachine extends ReadyResource {
         this.appendContext(payload);
 
         const prev = this.#state;
-        this.#state = next;
-        await this.#emit(event, { machine: this, prev, next, context: this.#context });
-
-        if (!this.shouldRun()) return false;
-
         const transition = { machine: this, prev, next, context: this.#context };
+        this.#transition = transition;
+        this.#state = next;
+        await this.#emit(event, transition);
+
+        // Another transition may have run while an event listener was awaited.
+        if (!this.shouldRun() || this.#transition !== transition) return false;
+
         if (this.#discardState !== null && next === this.#discardState) {
             this.#context = {};
         }
@@ -77,11 +80,12 @@ export class StateMachine extends ReadyResource {
         this.appendContext(payload);
 
         const transition = { machine: this, prev: null, next: this.#state, context: this.#context };
+        this.#transition = transition;
         await this.#emit('ENTER', transition);
 
-        if (!this.shouldRun()) return false;
+        if (!this.shouldRun() || this.#transition !== transition) return false;
 
-        await this.#dispatch(this.#state);
+        await this.#dispatch(transition.next);
 
         return transition;
     }
@@ -109,7 +113,13 @@ export class StateMachine extends ReadyResource {
     }
 
     async #emit(event, data) {
-        for (const fn of this.#listeners.get(event) ?? []) await fn(data);
-        for (const fn of this.#listeners.get('*') ?? []) await fn({ event, ...data });
+        for (const fn of this.#listeners.get(event) ?? []) {
+            if (!this.shouldRun() || this.#transition !== data) return;
+            await fn(data);
+        }
+        for (const fn of this.#listeners.get('*') ?? []) {
+            if (!this.shouldRun() || this.#transition !== data) return;
+            await fn({ event, ...data });
+        }
     }
 }

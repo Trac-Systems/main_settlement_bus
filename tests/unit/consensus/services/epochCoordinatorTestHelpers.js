@@ -1,5 +1,8 @@
 import sinon from 'sinon';
 import b4a from 'b4a';
+import { createSelectionContext } from '../../../helpers/epochAppenderSelection.js';
+import { EpochAppenderSelector } from '../../../../src/core/consensus/epochAppenderSelection/EpochAppenderSelector.js';
+import { EpochAppendOutcome, EpochAppenderVoteStatus } from '../../../../src/core/consensus/epochAppenderSelection/epochAppenderSelectionState.js';
 
 export const CONFIG = Object.freeze({
     epochInterval: 1000,
@@ -111,6 +114,7 @@ export function makeState(overrides = {}) {
 }
 
 export function makeOperations(overrides = {}) {
+    const appendSetEpoch = overrides.appendSetEpoch ?? sinon.stub().resolves();
     return {
         calculateVDF: sinon.stub().resolves({
             solution: b4a.alloc(516, 0xff),
@@ -120,10 +124,46 @@ export function makeOperations(overrides = {}) {
         createProofProposal: sinon.stub().resolves({
             proof_proposal: { epoch: b4a.alloc(8) },
         }),
-        approvers: sinon.stub().callsFake(indexers => indexers.filter(({ key }) => !b4a.equals(key, b4a.alloc(32, 1)))),
-        collectSignature: sinon.stub().resolves(makeConfirmation()),
+        getProofApprovers: sinon.stub().callsFake(indexers => indexers.filter(({ key }) => !b4a.equals(key, b4a.alloc(32, 1)))),
+        requestProofApproval: sinon.stub().resolves(makeConfirmation()),
         buildSetEpochPayload: sinon.stub().resolves(b4a.alloc(64, 0xdd)),
-        appendSetEpoch: sinon.stub().resolves(),
         ...overrides,
+        appendSetEpoch: sinon.stub().callsFake(async (payload, authorizeEpochAppend) => {
+            await authorizeEpochAppend({ writerKey: b4a.alloc(32, 1).toString('hex'), from: 0 });
+            return appendSetEpoch(payload);
+        }),
     };
+}
+
+/** Real selection lifecycle; storage, ledger reads and consenting peers are test doubles. */
+export function makeAppenderSelector(state, config = CONFIG) {
+    let stored;
+    state.getEpochAppenderSelectionContext ??= sinon.stub().callsFake(async () => {
+        const currentEpoch = await state.getCurrentEpoch();
+        const parentHash = await state.getEpoch(currentEpoch);
+        const indexers = await state.getIndexersEntry();
+        const members = indexers.map(({ key }) => ({ writerKey: key.toString('hex'), publicKey: key.toString('hex') }));
+        return {
+            ...createSelectionContext(0),
+            networkId: config.networkId,
+            targetEpoch: (currentEpoch + 1n).toString(),
+            parentHash: parentHash.toString('hex'),
+            members,
+            currentWriterKeys: members.map(member => member.writerKey).sort(),
+        };
+    });
+    state.getEpochAppendOutcome ??= sinon.stub().callsFake(async publication => ({
+        status: await state.getCurrentEpoch() >= BigInt(publication.targetEpoch)
+            ? EpochAppendOutcome.EPOCH_ADVANCED : EpochAppendOutcome.UNKNOWN,
+    }));
+    return new EpochAppenderSelector(state.writingKey.toString('hex'), {
+        load: async () => stored,
+        save: async value => { stored = value; },
+        readContext: () => state.getEpochAppenderSelectionContext(),
+        readOutcome: publication => state.getEpochAppendOutcome(publication),
+        sendRequest: async (_peer, request) => ({
+            ...request, voteStatus: EpochAppenderVoteStatus.GRANTED,
+            observedCounter: request.logicalCounter, vote: request,
+        }),
+    }, 100, config.epochSignatureTimeout);
 }
