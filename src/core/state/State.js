@@ -723,10 +723,10 @@ class State extends ReadyResource {
         return readEpochAppendOutcome(this.#base, publication);
     }
 
-    /** Persist publication intent inside the writer queue, before invoking Autobase. */
-    appendEpoch(payload, beforeAppend) {
+    /** Authorizes the epoch append inside the writer queue before writing to Autobase. */
+    appendEpoch(payload, authorizeEpochAppend) {
         return this.#writeQueue.add(async () => {
-            await beforeAppend({
+            await authorizeEpochAppend({
                 writerKey: this.#base.local.key.toString('hex'),
                 from: this.#base.local.length,
             });

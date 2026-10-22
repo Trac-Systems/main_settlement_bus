@@ -5,7 +5,10 @@ import { createConsensusNetwork, waitFor } from '../helpers/consensusNetwork.js'
 import { assertSignedEpoch } from '../helpers/epochAssertions.js';
 
 test('consensus refreshes quorum when membership grows from two to five before append', async t => {
-    const network = await createConsensusNetwork(t, { indexerCount: 2 });
+    const network = await createConsensusNetwork(t, {
+        indexerCount: 2,
+        timings: { epochSignatureTimeout: 5000, epochBackoffDelay: 100, indexerPendingRequestTimeout: 1000 },
+    });
     const { proposer, nodes, deferred } = network;
     const operations = proposer.operations;
     const firstPayloadReady = deferred();
@@ -17,6 +20,7 @@ test('consensus refreshes quorum when membership grows from two to five before a
     const buildPayload = operations.buildSetEpochPayload.bind(operations);
     const collectSignature = operations.collectSignature.bind(operations);
     let firstPayload;
+    let holdResponses = true;
 
     const build = sinon.stub(operations, 'buildSetEpochPayload').callsFake(async (...args) => {
         const payload = await buildPayload(...args);
@@ -30,6 +34,7 @@ test('consensus refreshes quorum when membership grows from two to five before a
     // Signatures travel through real Protomux channels and validators before being held.
     operations.collectSignature = async (...args) => {
         const result = await collectSignature(...args);
+        if (!holdResponses) return result;
         const release = deferred();
         responses.push({ release, collection: args[3] });
         await release.promise;
@@ -58,12 +63,17 @@ test('consensus refreshes quorum when membership grows from two to five before a
     t.is(append.callCount, 0, 'one external approval cannot trigger append');
 
     responses[1].release.resolve();
+    await waitFor('payload rebuilt with the new quorum', () => build.callCount === 2);
+    t.is(build.callCount, 2, 'the old payload is rebuilt with new approvals');
+    // A withdrawn election can retain remote votes until their deadline. Let later
+    // attempts collect fresh approvals while the real selector waits for that expiry.
+    holdResponses = false;
+    for (const response of responses) response.release.resolve();
     await assertSignedEpoch(t, network);
     await waitFor('round completion after membership growth', () => round.completed);
 
     t.is(append.callCount, 1, 'only the payload meeting the new quorum is appended');
     const appendedProof = decodeEpochProofV1(safeDecodeApplyOperation(append.firstCall.args[0]).seo.data);
     t.is(appendedProof.app.length, 2, 'the appended payload already satisfies the new quorum');
-    t.is(build.callCount, 2, 'the old payload is rebuilt with new approvals');
     t.is(calculateVDF.callCount, 1, 'membership refresh reuses the existing VDF proof');
 });

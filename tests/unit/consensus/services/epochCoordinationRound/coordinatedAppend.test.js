@@ -40,8 +40,8 @@ async function setup(t, members = 1, monitor = false) {
         readContext: state.getEpochAppenderSelectionContext, readOutcome,
         sendRequest: () => new Promise(() => {}),
     }, 100, CONFIG.epochSignatureTimeout, monitor);
-    operations.appendSetEpoch.callsFake(async (payload, beforeAppend) => {
-        await beforeAppend({ writerKey: state.writingKey.toString('hex'), from: writes.length });
+    operations.appendSetEpoch.callsFake(async (payload, authorizeEpochAppend) => {
+        await authorizeEpochAppend({ writerKey: state.writingKey.toString('hex'), from: writes.length });
         payloads.push(payload);
         return new Promise((resolve, reject) => writes.push({ resolve, reject }));
     });
@@ -104,9 +104,9 @@ test('FSM cancellation while queued prevents a stale append from using the next 
     const f = await setup(t);
     const queue = Promise.withResolvers();
     let writes = 0;
-    f.operations.appendSetEpoch.callsFake(async (_payload, beforeAppend) => {
+    f.operations.appendSetEpoch.callsFake(async (_payload, authorizeEpochAppend) => {
         await queue.promise;
-        await beforeAppend({ writerKey: f.state.writingKey.toString('hex'), from: 0 });
+        await authorizeEpochAppend({ writerKey: f.state.writingKey.toString('hex'), from: 0 });
         writes++;
     });
     const round = f.createRound();

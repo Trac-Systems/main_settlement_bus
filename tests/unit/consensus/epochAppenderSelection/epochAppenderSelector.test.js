@@ -34,8 +34,8 @@ function cluster(count) {
         save: async selectionState => { selectionStates.set(index, clone(selectionState)); },
         readOutcome: async () => ({ status: outcomes.get(index) ?? EpochAppendOutcome.UNKNOWN }),
     });
-    const publish = (index, requestId) => appendSelected(nodes[index], requestId, async (payload, before) => {
-        await before({ writerKey: key(index + 10), from: 0 });
+    const publish = (index, requestId) => appendSelected(nodes[index], requestId, async (payload, authorizeEpochAppend) => {
+        await authorizeEpochAppend({ writerKey: key(index + 10), from: 0 });
         appends.push({ index, payload });
     });
     for (let i = 0; i < count; i++) nodes.push(new EpochAppenderSelector(key(i + 1), operations(i)));
@@ -97,9 +97,9 @@ test('epoch append: a signed-context change while queued prevents the actual app
         readContext: async () => snapshot
     });
     const request = await node.createRequest(snapshot, b4a.from('proof'));
-    const publication = appendSelected(node, request.requestId, async (_payload, before) => {
+    const publication = appendSelected(node, request.requestId, async (_payload, authorizeEpochAppend) => {
         await queue;
-        await before({ writerKey: key(10), from: 0 });
+        await authorizeEpochAppend({ writerKey: key(10), from: 0 });
         writes++;
     });
     snapshot = { ...snapshot, configHash: key(999) };
@@ -149,8 +149,8 @@ for (const failSave of [false, true]) {
         });
         t.teardown(() => selector.close());
         const request = await selector.createRequest(context(1), b4a.from('proof'));
-        const execution = appendSelected(selector, request.requestId, async (_payload, beforeAppend) => {
-            await beforeAppend({ writerKey: key(10), from: 5 });
+        const execution = appendSelected(selector, request.requestId, async (_payload, authorizeEpochAppend) => {
+            await authorizeEpochAppend({ writerKey: key(10), from: 5 });
             writes++;
         }).catch(error => error);
 
@@ -175,17 +175,6 @@ for (const failSave of [false, true]) {
     });
 }
 
-test('epoch append: appender selection is always active from the first epoch', async t => {
-    const state = { base: { getUserData: async () => null } };
-    const wallet = { address: tracCryptoApi.address.encode('trac', b4a.from(key(1), 'hex')) };
-    const node = createEpochAppenderSelector(state, wallet, { epochBackoffDelay: 1000 }, () => null);
-    t.teardown(() => node.close());
-    await node.open();
-    t.is(node.enabledFor('0'), false);
-    t.is(node.enabledFor('1'), true);
-    t.is(node.enabledFor('9007199254740993'), true);
-});
-
 test('epoch append: legacy activation metadata does not disable selection or discard durable votes', async t => {
     let stored = { activationEpoch: '7', journal: clone(compatibility.journal) };
     const state = {
@@ -201,7 +190,6 @@ test('epoch append: legacy activation metadata does not disable selection or dis
     const node = createEpochAppenderSelector(state, wallet, config, () => null);
     t.teardown(() => node.close());
     await node.open();
-    t.ok(node.enabledFor('1'));
     t.is(node.active.request.requestId, compatibility.request.requestId);
     t.alike(node.active.publication, compatibility.journal.active.publication);
     t.is(stored.journal.clock, compatibility.journal.clock);

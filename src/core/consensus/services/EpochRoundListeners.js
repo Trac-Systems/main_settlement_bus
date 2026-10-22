@@ -16,23 +16,17 @@ const listenTo = (eventEmitter, event, handler) => {
 export class EpochRoundListeners {
     #state;
     #machine;
-    #wallet;
     #config;
-    #intervalMs;
     #isRoundActive;
     #cleanups = [];
-    #isAppendCoordinated;
     #onEpochProgress;
 
     /** Creates listeners for one state machine round. */
-    constructor({ state, machine, wallet, config, intervalMs, isRoundActive, isAppendCoordinated = () => false, onEpochProgress }) {
+    constructor({ state, machine, config, isRoundActive, onEpochProgress }) {
         this.#state = state;
         this.#machine = machine;
-        this.#wallet = wallet;
         this.#config = config;
-        this.#intervalMs = intervalMs;
         this.#isRoundActive = isRoundActive;
-        this.#isAppendCoordinated = isAppendCoordinated;
         this.#onEpochProgress = onEpochProgress;
     }
 
@@ -73,31 +67,19 @@ export class EpochRoundListeners {
         );
     }
 
-    /** Restarts coordination when a new epoch is created outside the append state. */
+    /** Asks the round to verify signed progress when an epoch event arrives. */
     #listenForEpochCreated() {
         this.#cleanups.push(
             listenTo(this.#state, CustomEventType.EPOCH_CREATED, async () => {
                 if (!this.#isRoundActive()) return;
-                if (this.#isAppendCoordinated()) {
-                    await this.#onEpochProgress();
-                    return;
-                }
-                if (this.#machine.state !== EPOCH_STATES.APPEND_SET_EPOCH) {
-                    await this.#machine.close();
-                    await this.#machine.context.next(this.#intervalMs);
-                }
+                await this.#onEpochProgress();
             }),
         );
     }
 
-    /**
-     * Starts and clears approval and append timers.
-     * The EPOCH_CREATED listener exists only in APPEND_SET_EPOCH state.
-     */
+    /** Starts and clears the proof approval timer. */
     #listenForStateTransitions() {
         let signatureTimer = null;
-        let appendTimer = null;
-        let stopAppendListener = null;
 
         this.#machine.on('*', ({ next, prev }) => {
             if (!this.#isRoundActive()) return;
@@ -114,43 +96,8 @@ export class EpochRoundListeners {
             } else if (prev === EPOCH_STATES.COLLECT_APPROVALS && next !== EPOCH_STATES.COLLECT_APPROVALS) {
                 clearTimeout(signatureTimer);
             }
-
-            if (next === EPOCH_STATES.APPEND_SET_EPOCH && !this.#isAppendCoordinated()) {
-                appendTimer = setTimeout(
-                    () => {
-                        if (this.#isRoundActive()) this.#machine.send(EPOCH_EVENTS.APPEND_FAILED);
-                    },
-                    this.#config.epochAppendTimeout,
-                );
-
-                const targetEpoch = this.#machine.context.currentEpoch + 1n;
-                stopAppendListener = listenTo(
-                    this.#state,
-                    CustomEventType.EPOCH_CREATED,
-                    (event) => {
-                        if (!this.#isRoundActive()) return;
-
-                        const { epoch, proposerAddress } = event ?? {};
-                        if (!b4a.isBuffer(epoch) || epoch.length !== EPOCH_BYTE_LENGTH) return;
-
-                        const eventEpoch = epoch.readBigUInt64BE(0);
-                        if (eventEpoch !== targetEpoch) return;
-                        this.#machine.send(
-                            proposerAddress === this.#wallet.address
-                                ? EPOCH_EVENTS.TARGET_EPOCH_CONFIRMED
-                                : EPOCH_EVENTS.TARGET_EPOCH_ALREADY_SIGNED,
-                        );
-                    },
-                );
-            } else if (prev === EPOCH_STATES.APPEND_SET_EPOCH) {
-                clearTimeout(appendTimer);
-                stopAppendListener?.();
-                stopAppendListener = null;
-            }
         });
 
         this.#cleanups.push(() => clearTimeout(signatureTimer));
-        this.#cleanups.push(() => clearTimeout(appendTimer));
-        this.#cleanups.push(() => stopAppendListener?.());
     }
 }

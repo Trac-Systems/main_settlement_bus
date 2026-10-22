@@ -175,7 +175,6 @@ test('append handler rechecks signed context after asynchronous validation and b
     let received = 0;
     let reply;
     const coordinator = {
-        enabledFor: () => true,
         async reconcile() { f.context.targetEpoch = '8'; },
         async receiveRequest(_request, callback) { received++; reply = () => callback(f.decision); },
     };
@@ -256,7 +255,7 @@ for (const type of ['REQUEST', 'REPLY']) {
         const f = await fixture(t);
         f.state.emit = sinon.spy();
         const policy = new ConsensusV1ConnectionPolicy(f.state, { error: sinon.spy() }, config);
-        const selector = { receiveRequest: sinon.spy(), reconcile: sinon.spy(), enabledFor: () => true };
+        const selector = { receiveRequest: sinon.spy(), reconcile: sinon.spy() };
         const router = new ConsensusV1MessageRouter(f.state, f.wallet, config, f.pending, policy, selector);
         const session = { closed: false, sendAndForget: sinon.spy() };
         // The transport belongs to wallet 2, but the message claims wallet 1.
@@ -288,7 +287,7 @@ for (const type of ['REQUEST', 'REPLY']) {
             const f = await fixture(t);
             f.state.emit = sinon.spy();
             const policy = new ConsensusV1ConnectionPolicy(f.state, { error: sinon.spy() }, config);
-            const selector = { receiveRequest: sinon.spy(), reconcile: sinon.spy(), enabledFor: () => true };
+            const selector = { receiveRequest: sinon.spy(), reconcile: sinon.spy() };
             const router = new ConsensusV1MessageRouter(f.state, f.wallet, config, f.pending, policy, selector);
             const session = { closed: false, sendAndForget: sinon.spy(), close: sinon.spy() };
             const message = type === 'REQUEST' ? f.message : f.response;

@@ -11,6 +11,7 @@ import {
     uint32ToBuffer,
     uint64ToBuffer,
 } from '../../../../../src/utils/buffer.js';
+import { EpochAppendOutcome } from '../../../../../src/core/consensus/epochAppenderSelection/epochAppenderSelectionState.js';
 import { EpochCoordinationRound } from '../../../../../src/core/consensus/services/EpochCoordinationRound.js';
 import { addressToBuffer } from '../../../../../src/core/state/utils/address.js';
 import {
@@ -21,6 +22,7 @@ import {
     makeIndexers,
     makeOperations,
     makeState,
+    makeAppenderSelector,
 } from '../epochCoordinatorTestHelpers.js';
 
 const deferred = () => {
@@ -49,6 +51,7 @@ function setupRound(overrides = {}) {
         info: sinon.stub(),
     };
     const rounds = [];
+    const appenderSelector = makeAppenderSelector(state, config);
 
     const createRound = () => {
         const round = new EpochCoordinationRound({
@@ -59,7 +62,7 @@ function setupRound(overrides = {}) {
             logger,
             operations,
             intervalMs: config.epochInterval,
-            appenderSelector: { enabledFor: () => false },
+            appenderSelector,
         });
         rounds.push(round);
         return round;
@@ -80,7 +83,10 @@ function setupRound(overrides = {}) {
         logger,
         createRound,
         runRound,
-        closeRounds: () => Promise.all(rounds.map(round => round.cancel())),
+        closeRounds: async () => {
+            await Promise.all(rounds.map(round => round.cancel()));
+            await appenderSelector.close();
+        },
     };
 }
 
@@ -460,7 +466,7 @@ test('an already-signed target ends the round without appending', async t => {
     t.ok(next.calledOnceWith(CONFIG.epochInterval));
 });
 
-test('append failure retries within the same round using the local VDF', async t => {
+test('append failure waits for signed rejection before retrying with the local VDF', async t => {
     const clock = sinon.useFakeTimers();
     let context;
     try {
@@ -476,6 +482,10 @@ test('append failure retries within the same round using the local VDF', async t
         t.is(context.operations.appendSetEpoch.callCount, 1);
 
         await clock.tickAsync(CONFIG.epochBackoffDelay);
+        t.is(context.operations.appendSetEpoch.callCount, 1, 'a rejected Promise alone does not release the selection');
+        context.state.getEpochAppendOutcome.onCall(context.state.getEpochAppendOutcome.callCount)
+            .resolves({ status: EpochAppendOutcome.REJECTED });
+        await clock.tickAsync(1000 + CONFIG.epochBackoffDelay);
         await running;
 
         t.is(context.operations.calculateVDF.callCount, 1);
@@ -500,7 +510,7 @@ test('a late append failure cannot interrupt the next attempt or change its time
         await clock.tickAsync(0);
         t.is(appendSetEpoch.callCount, 1);
 
-        await clock.tickAsync(CONFIG.epochAppendTimeout + CONFIG.epochBackoffDelay);
+        await clock.tickAsync(CONFIG.epochSignatureTimeout + CONFIG.epochBackoffDelay);
         t.is(appendSetEpoch.callCount, 2, 'the second attempt starts after timeout and backoff');
 
         firstAppend.reject(new Error('late append failure'));
@@ -512,8 +522,8 @@ test('a late append failure cannot interrupt the next attempt or change its time
         t.absent(context.logger.error.called, 'the old failure is ignored');
         t.absent(next.called, 'the current round remains active');
 
-        await clock.tickAsync(CONFIG.epochAppendTimeout - CONFIG.epochBackoffDelay - 1);
-        t.is(context.state.refresh.callCount, 1, 'the second attempt keeps its full append timeout');
+        await clock.tickAsync(CONFIG.epochSignatureTimeout - CONFIG.epochBackoffDelay - 1);
+        t.is(context.state.refresh.callCount, 1, 'the second attempt keeps its full selection timeout');
         await clock.tickAsync(1);
         await clock.tickAsync(CONFIG.epochBackoffDelay - 1);
         t.is(appendSetEpoch.callCount, 2, 'the second timeout still observes the backoff delay');
@@ -534,7 +544,7 @@ test('a late append failure during backoff is ignored before the next append sta
     try {
         const running = context.runRound();
         await clock.tickAsync(0);
-        await clock.tickAsync(CONFIG.epochAppendTimeout);
+        await clock.tickAsync(CONFIG.epochSignatureTimeout);
 
         firstAppend.reject(new Error('late append failure during backoff'));
         await clock.tickAsync(0);
@@ -563,13 +573,14 @@ for (const localProposer of [true, false]) {
         try {
             const running = context.runRound(next);
             await clock.tickAsync(0);
-            await clock.tickAsync(CONFIG.epochAppendTimeout + CONFIG.epochBackoffDelay);
+            await clock.tickAsync(CONFIG.epochSignatureTimeout + CONFIG.epochBackoffDelay);
             t.is(appendSetEpoch.callCount, 2);
 
             firstAppend.resolve();
             await running;
             t.absent(next.called, 'a completed local append still waits for ledger progress');
 
+            context.state.getCurrentEpoch.resolves(6n);
             await context.state.emit(CustomEventType.EPOCH_CREATED, {
                 epoch: uint64ToBuffer(6n),
                 proposerAddress: localProposer ? context.wallet.address : 'trac1peer',
@@ -577,7 +588,7 @@ for (const localProposer of [true, false]) {
             await clock.tickAsync(0);
             t.ok(next.calledOnceWithExactly(CONFIG.epochInterval), 'ledger progress ends the round while the second append is pending');
 
-            await clock.tickAsync(CONFIG.epochAppendTimeout + CONFIG.epochBackoffDelay);
+            await clock.tickAsync(CONFIG.epochSignatureTimeout + CONFIG.epochBackoffDelay);
             t.is(appendSetEpoch.callCount, 2, 'ledger progress clears the retry timer');
             t.ok(next.calledOnce);
         } finally {
@@ -587,7 +598,7 @@ for (const localProposer of [true, false]) {
     });
 }
 
-test('append completion waits for the target EPOCH_CREATED event', async t => {
+test('append completion waits for signed target progress', async t => {
     const context = setupRound();
     t.teardown(context.closeRounds);
     const next = sinon.stub();
@@ -598,6 +609,7 @@ test('append completion waits for the target EPOCH_CREATED event', async t => {
     t.ok(context.operations.appendSetEpoch.calledOnce);
     t.absent(next.called);
 
+    context.state.getCurrentEpoch.resolves(6n);
     await context.state.emit(CustomEventType.EPOCH_CREATED, {
         epoch: uint64ToBuffer(6n),
         proposerAddress: context.wallet.address,
@@ -616,6 +628,7 @@ test('peer EPOCH_CREATED in append state reloads without repeating work', async 
     await drainMicrotasks();
     t.ok(context.operations.appendSetEpoch.calledOnce);
 
+    context.state.getCurrentEpoch.resolves(6n);
     await context.state.emit(CustomEventType.EPOCH_CREATED, {
         epoch: uint64ToBuffer(6n),
         proposerAddress: 'trac1peer',
@@ -640,6 +653,7 @@ test('global EPOCH_CREATED outside append state closes and schedules the round',
     await context.runRound(next);
     t.absent(next.called);
 
+    context.state.getCurrentEpoch.resolves(6n);
     await context.state.emit(CustomEventType.EPOCH_CREATED);
 
     t.ok(next.calledOnceWith(CONFIG.epochInterval));
@@ -764,7 +778,8 @@ test('cancel interrupts the remote-proposal delay', async t => {
     });
     const round = context.createRound();
     const running = round.run();
-    await drainMicrotasks();
+    await flush();
+    t.ok(context.operations.createProofProposal.calledOnce);
 
     await context.state.emit(CustomEventType.EPOCH_PROPOSAL_VALIDATION_SUCCESS, {
         proofProposal: { epoch: uint64ToBuffer(6n), previous_epoch_record_hash: b4a.alloc(32, 0xaa) },
@@ -862,7 +877,7 @@ test('retry after growing from two to five indexers requires two new external ap
         t.absent(collectSignature.called);
 
         context.state.getIndexersEntry.resolves(makeIndexers(5));
-        await clock.tickAsync(CONFIG.epochBackoffDelay);
+        await clock.tickAsync(CONFIG.epochSignatureTimeout + CONFIG.epochBackoffDelay);
         await running;
         t.is(collectSignature.callCount, 4);
 

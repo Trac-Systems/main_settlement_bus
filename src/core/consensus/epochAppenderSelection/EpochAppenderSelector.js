@@ -99,11 +99,6 @@ export class EpochAppenderSelector {
         return copySelectionReservation(this.#selectionState.active);
     }
 
-    /** @param {string|bigint} epoch @returns {boolean} */
-    enabledFor(epoch) {
-        return BigInt(epoch) >= 1n;
-    }
-
     /** @returns {EpochAppendOutcomeResult|null} Null means no recorded completion for this request. */
     outcomeFor(requestId) {
         if (this.#completedRequest?.requestId !== requestId) {

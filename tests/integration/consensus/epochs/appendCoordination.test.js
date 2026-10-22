@@ -10,14 +10,15 @@ import { ConsensusOperationType } from '../../../../src/utils/constants.js';
 
 for (const indexerCount of [1, 2]) {
     test(`coordinated append with ${indexerCount} indexers keeps the existing proof quorum`, async t => {
-        const network = await createConsensusNetwork(t, { indexerCount, coordination: true });
-        t.ok(network.proposer.appenderSelector.enabledFor(1n),
-            'appender selection is active from the first epoch');
+        const network = await createConsensusNetwork(t, { indexerCount });
+        const selection = sinon.spy(network.proposer.appenderSelector, 'createRequest');
         const sends = sinon.spy(network.proposer.manager, 'send');
         const append = sinon.spy(network.proposer.state, 'appendEpoch');
         const round = network.startRound();
         await assertSignedEpoch(t, network);
         await waitFor('coordinated round completion', () => round.completed);
+        t.is(selection.callCount, 1, 'the first epoch goes through appender selection');
+        t.is(selection.firstCall.args[0].targetEpoch, '1');
         t.is(append.callCount, 1);
         const requests = sends.args.filter(([, message]) => message.type === ConsensusOperationType.REQUEST);
         t.ok(requests.length >= indexerCount - 1);
@@ -28,7 +29,7 @@ for (const indexerCount of [1, 2]) {
 }
 
 test('epoch append context is stable across heads and adopts signed membership changes before the next epoch', async t => {
-    const network = await createConsensusNetwork(t, { indexerCount: 2, coordination: true });
+    const network = await createConsensusNetwork(t, { indexerCount: 2 });
     const initial = await network.proposer.state.getEpochAppenderSelectionContext();
     t.is(initial.members.length, 2);
     t.is(initial.targetEpoch, '1');
@@ -49,7 +50,7 @@ test('epoch append context is stable across heads and adopts signed membership c
 });
 
 test('three real concurrent epoch rounds agree on one append over Protomux', async t => {
-    const network = await createConsensusNetwork(t, { indexerCount: 3, coordination: true });
+    const network = await createConsensusNetwork(t, { indexerCount: 3 });
     const contenders = network.nodes.slice(0, 3);
     await Promise.all(contenders.slice(1).map(node => network.openOperations(node)));
     const payloadsReady = network.deferred();
@@ -73,7 +74,7 @@ test('three real concurrent epoch rounds agree on one append over Protomux', asy
 
 test('a rejected publication hands off after the election deadline without closing replication', async t => {
     const network = await createConsensusNetwork(t, {
-        indexerCount: 3, coordination: true,
+        indexerCount: 3,
         timings: { epochSignatureTimeout: 5000, epochBackoffDelay: 100, indexerPendingRequestTimeout: 5000 },
     });
     const contenders = network.nodes.slice(0, 3);
@@ -88,8 +89,8 @@ test('a rejected publication hands off after the election deadline without closi
     const originalAppend = first.state.appendEpoch.bind(first.state);
     const appends = contenders.map(node => node === first ? null : sinon.spy(node.state, 'appendEpoch'));
     let gated = true;
-    first.state.appendEpoch = (payload, before) => originalAppend(payload, async location => {
-        await before(location);
+    first.state.appendEpoch = (payload, authorizeEpochAppend) => originalAppend(payload, async location => {
+        await authorizeEpochAppend(location);
         if (gated) {
             gated = false;
             entered.resolve();
@@ -118,15 +119,15 @@ test('a rejected publication hands off after the election deadline without closi
 });
 
 test('a locally appended epoch stays reserved until other indexers finalize its writer position', async t => {
-    const network = await createConsensusNetwork(t, { indexerCount: 2, coordination: true });
+    const network = await createConsensusNetwork(t, { indexerCount: 2 });
     const { proposer, nodes } = network;
     const gate = network.deferred();
     const entered = network.deferred();
     const original = proposer.state.appendEpoch.bind(proposer.state);
     let localWriteDone = false;
-    proposer.state.appendEpoch = async (payload, before) => {
+    proposer.state.appendEpoch = async (payload, authorizeEpochAppend) => {
         const result = await original(payload, async location => {
-            await before(location);
+            await authorizeEpochAppend(location);
             entered.resolve();
             await gate.promise;
         });

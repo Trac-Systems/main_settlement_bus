@@ -127,11 +127,8 @@ export class EpochCoordinatorOperations {
     }
 
     /** Appends SET_EPOCH, authorizing a selected appender inside the writer queue. */
-    appendSetEpoch(payload, beforeAppend) {
-        if (beforeAppend) {
-            return this.#state.appendEpoch(payload, beforeAppend);
-        }
-        return this.#state.append(payload);
+    appendSetEpoch(payload, authorizeEpochAppend) {
+        return this.#state.appendEpoch(payload, authorizeEpochAppend);
     }
 
     /** Filters the attempt's indexer snapshot; an admin/indexer still counts as an approver. */

@@ -36,10 +36,8 @@ export class EpochCoordinationRound {
     #finished = false;
     #remoteProposalWait = null;
     #backoffWait = null;
-    #appendAttempt = null;
     #appenderSelector;
     #appendRequest = null;
-    #coordinated = false;
     #outcomeTimer = null;
     #checkingOutcome = false;
 
@@ -63,18 +61,11 @@ export class EpochCoordinationRound {
             this.#closeApprovalCollection();
             this.#logApprovalBackoff(context);
         });
-        this.#machine.on('*', ({ prev }) => {
-            // Invalidate the callback as soon as its append state is left, before a retry can enter it.
-            if (prev === EPOCH_STATES.APPEND_SET_EPOCH) this.#appendAttempt = null;
-        });
         this.#listeners = new EpochRoundListeners({
             state,
-            wallet,
             config,
-            intervalMs,
             machine: this.#machine,
             isRoundActive: () => this.#isActive(),
-            isAppendCoordinated: () => this.#coordinated,
             onEpochProgress: () => this.#checkCoordinatedProgress(),
         });
     }
@@ -102,14 +93,11 @@ export class EpochCoordinationRound {
                 'Epoch appender selection is required but its selector is unavailable'
             );
         }
-        this.#coordinated = this.#appenderSelector.enabledFor(currentEpoch + 1n);
-        if (this.#coordinated) {
-            await this.#appenderSelector.reconcile();
-            if (!this.#isActive()) return;
-            if (this.#appenderSelector.active) {
-                await this.#finish(next, this.#intervalMs);
-                return;
-            }
+        await this.#appenderSelector.reconcile();
+        if (!this.#isActive()) return;
+        if (this.#appenderSelector.active) {
+            await this.#finish(next, this.#intervalMs);
+            return;
         }
         this.#listeners.start();
         await this.#machine.enter({
@@ -414,34 +402,24 @@ export class EpochCoordinationRound {
             return;
         }
 
-        let currentWriterKeys;
+        const snapshot = await this.#state.getEpochAppenderSelectionContext();
+        this.#assertActive();
 
-        if (this.#coordinated) {
-            const snapshot = await this.#state.getEpochAppenderSelectionContext();
+        const { configData } = await this.#state.requireSignedConsensusConfig();
+        this.#assertActive();
+
+        if (
+            !sameSelectionContext(snapshot, this.#appendRequest) ||
+            configData.difficulty !== context.vdfDifficulty ||
+            configData.discriminantBitSize !== context.vdfDiscriminantSize
+        ) {
+            await this.#withdrawAppendRequest();
             this.#assertActive();
-
-            const { configData } = await this.#state.requireSignedConsensusConfig();
-            this.#assertActive();
-
-            if (
-                !sameSelectionContext(snapshot, this.#appendRequest) ||
-                configData.difficulty !== context.vdfDifficulty ||
-                configData.discriminantBitSize !== context.vdfDiscriminantSize
-            ) {
-                await this.#withdrawAppendRequest();
-                this.#assertActive();
-                await machine.send(EPOCH_EVENTS.TARGET_EPOCH_ALREADY_SIGNED);
-                return;
-            }
-
-            currentWriterKeys = snapshot.currentWriterKeys;
-        } else {
-            const indexers = await this.#state.getIndexersEntry();
-            this.#assertActive();
-
-            currentWriterKeys = indexers.map(({ key }) => b4a.toString(key, 'hex'));
+            await machine.send(EPOCH_EVENTS.TARGET_EPOCH_ALREADY_SIGNED);
+            return;
         }
 
+        const currentWriterKeys = snapshot.currentWriterKeys;
         const membershipChanged =
             currentWriterKeys.length !== context.indexerKeys.size ||
             currentWriterKeys.some(key => !context.indexerKeys.has(key));
@@ -456,26 +434,6 @@ export class EpochCoordinationRound {
                 ? EPOCH_EVENTS.INDEXERS_CHANGED
                 : EPOCH_EVENTS.TARGET_EPOCH_ABSENT
         );
-    }
-
-    /** Appends SET_EPOCH locally. The event or timeout decides the final result. */
-    async #handleAppendSetEpoch(context, machine) {
-        if (this.#coordinated) {
-            await this.#startSelectedAppend(machine);
-            return;
-        }
-        const appendAttempt = {};
-        this.#appendAttempt = appendAttempt;
-        try {
-            await this.#operations.appendSetEpoch(context.setEpochPayload);
-            this.#assertActive();
-            // append() stores the operation locally. The event or timeout decides if it succeeded.
-        } catch (error) {
-            this.#assertActive();
-            if (this.#appendAttempt !== appendAttempt) return;
-            this.#logger.error(error);
-            await machine.send(EPOCH_EVENTS.APPEND_FAILED);
-        }
     }
 
     /** Refreshes signed state and decides if the existing proof can be used again. */
@@ -563,10 +521,6 @@ export class EpochCoordinationRound {
     }
 
     async #handleWaitForAppendReplies(context, machine) {
-        if (!this.#coordinated) {
-            await machine.send(EPOCH_EVENTS.APPEND_REPLIES_COLLECTED);
-            return;
-        }
         try {
             const snapshot = await this.#state.getEpochAppenderSelectionContext();
             this.#assertActive();
@@ -611,7 +565,8 @@ export class EpochCoordinationRound {
         }
     }
 
-    async #startSelectedAppend(machine) {
+    /** Starts the selected append; signed progress or selection expiry ends the attempt. */
+    async #handleAppendSetEpoch(_context, machine) {
         if (machine.state !== EPOCH_STATES.APPEND_SET_EPOCH || !this.#appendRequest) {
             return;
         }
@@ -671,7 +626,7 @@ export class EpochCoordinationRound {
     }
 
     async #checkCoordinatedProgress() {
-        if (!this.#coordinated || !this.#isActive() || this.#checkingOutcome) return;
+        if (!this.#isActive() || this.#checkingOutcome) return;
         this.#checkingOutcome = true;
         const request = this.#appendRequest;
         try {

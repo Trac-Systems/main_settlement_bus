@@ -26,7 +26,7 @@ export default class V1EpochAppendOperationHandler {
             return;
         }
         const request = await this.#requestValidator.validate(message, connection);
-        if (session.closed || !this.#selector.enabledFor(request.targetEpoch)) {
+        if (session.closed) {
             return;
         }
         await this.#selector.reconcile();

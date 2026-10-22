@@ -81,8 +81,8 @@ test('signed writer clock proves a no-op was processed without advancing the vie
         save: selectionState => base.setUserData('test/append-coordination-state', b4a.from(JSON.stringify(selectionState))),
         readOutcome: record => readEpochAppendOutcome(base, record),
     };
-    let append = async (value, beforeAppend) => {
-        await beforeAppend({ writerKey: base.local.key.toString('hex'), from: base.local.length });
+    let append = async (value, authorizeEpochAppend) => {
+        await authorizeEpochAppend({ writerKey: base.local.key.toString('hex'), from: base.local.length });
         await base.append(value);
     };
     const context = {
@@ -105,8 +105,8 @@ test('signed writer clock proves a no-op was processed without advancing the vie
     t.alike(await selector.reconcile(), { status: EpochAppendOutcome.REJECTED });
     t.absent(selector.active, 'restart releases only after verifying the signed writer clock');
 
-    append = async (_value, before) => {
-        await before({ writerKey: base.local.key.toString('hex'), from: base.local.length });
+    append = async (_value, authorizeEpochAppend) => {
+        await authorizeEpochAppend({ writerKey: base.local.key.toString('hex'), from: base.local.length });
         throw new Error('process interrupted before local write');
     };
     const interrupted = await selector.createRequest(context, b4a.from('unknown-after-restart'));

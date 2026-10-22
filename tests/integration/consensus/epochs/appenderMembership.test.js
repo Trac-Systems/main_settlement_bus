@@ -6,7 +6,7 @@ import { EpochAppenderSelectionErrorCode } from '../../../../src/core/consensus/
 
 test('epochs continue after signed indexer removals from three to two to one', async t => {
     const network = await createConsensusNetwork(t, {
-        indexerCount: 3, coordination: true,
+        indexerCount: 3,
         timings: { epochSignatureTimeout: 10000, epochBackoffDelay: 100, indexerPendingRequestTimeout: 5000 },
     });
     for (let epoch = 1n; epoch <= 3n; epoch++) {
@@ -30,7 +30,7 @@ test('epochs continue after signed indexer removals from three to two to one', a
 });
 
 test('appender selection reads the migrated view when the previous view blocks are unavailable', async t => {
-    const network = await createConsensusNetwork(t, { indexerCount: 2, coordination: true });
+    const network = await createConsensusNetwork(t, { indexerCount: 2 });
     const { state, store } = network.proposer;
     const previousView = store.get({ key: state.base.view.core.key });
     await previousView.ready();

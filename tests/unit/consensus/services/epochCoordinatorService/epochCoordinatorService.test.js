@@ -2,7 +2,7 @@ import test from 'brittle';
 import sinon from 'sinon';
 import { CustomEventType } from '../../../../../src/utils/constants.js';
 import { SCHEDULABLE_SERVICE_EVENTS } from '../../../../../src/utils/scheduler/SchedulableService.js';
-import { CONFIG, drainMicrotasks, makeIndexers, makeOperations, makeState } from '../epochCoordinatorTestHelpers.js';
+import { CONFIG, drainMicrotasks, makeIndexers, makeOperations, makeState, makeAppenderSelector } from '../epochCoordinatorTestHelpers.js';
 
 const isBareRuntime = typeof globalThis.Bare !== 'undefined';
 
@@ -79,7 +79,13 @@ async function setup(overrides = {}) {
     const { default: esmock } = await import('esmock');
     const { default: Service } = await esmock(SVC_PATH, mocks);
 
-    const service = new Service(state, wallet, config, manager, { enabledFor: () => false });
+    const appenderSelector = makeAppenderSelector(state, config);
+    const service = new Service(state, wallet, config, manager, appenderSelector);
+    const close = service.close.bind(service);
+    service.close = async () => {
+        await close();
+        await appenderSelector.close();
+    };
     await service.ready();
 
     return {

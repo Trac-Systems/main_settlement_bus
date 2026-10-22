@@ -36,7 +36,7 @@ export async function waitFor(description, predicate) {
 
 /** Real State/Autobase nodes over local Noise streams; only peer discovery is replaced. */
 export async function createConsensusNetwork(t, {
-    indexerCount = 5, prepareConnections = true, coordination = false, beforeMembership, timings = {},
+    indexerCount = 5, prepareConnections = true, beforeMembership, timings = {},
 } = {}) {
     const nodes = [];
     const links = [];
@@ -284,17 +284,15 @@ export async function createConsensusNetwork(t, {
 
     for (const node of nodes) {
         node.pending = new IndexerPendingRequestService(node.config);
-        if (coordination) {
-            node.appenderSelector = createEpochAppenderSelector(
-                node.state,
-                node.wallet,
-                node.config,
-                () => node.manager,
-                new Logger(node.config),
-                node.pending
-            );
-            await node.appenderSelector.open();
-        }
+        node.appenderSelector = createEpochAppenderSelector(
+            node.state,
+            node.wallet,
+            node.config,
+            () => node.manager,
+            new Logger(node.config),
+            node.pending
+        );
+        await node.appenderSelector.open();
         function removeClosedSession(connection) {
             node.manager.remove(connection.remotePublicKey, connection);
         }
@@ -347,8 +345,7 @@ export async function createConsensusNetwork(t, {
             logger: new Logger(config),
             operations: node.operations,
             intervalMs: config.epochInterval,
-            // Isolate proof-round regressions from elections with an explicit test double.
-            appenderSelector: node.appenderSelector ?? { enabledFor: () => false },
+            appenderSelector: node.appenderSelector,
         });
         const execution = { round, completed: false };
         rounds.push(execution);

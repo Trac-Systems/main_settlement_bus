@@ -5,7 +5,7 @@ import { assertSignedEpoch } from '../helpers/epochAssertions.js';
 
 test('two of three indexers keep committing epochs while the third is offline and then reconnects', async t => {
     const network = await createConsensusNetwork(t, {
-        indexerCount: 3, coordination: true,
+        indexerCount: 3,
         timings: { epochSignatureTimeout: 3000, epochBackoffDelay: 100, indexerPendingRequestTimeout: 500 },
     });
     const offline = network.nodes[2];
@@ -27,7 +27,7 @@ test('two of three indexers keep committing epochs while the third is offline an
 
 test('a disconnected elected appender is replaced and its late write cannot replace the committed epoch', async t => {
     const network = await createConsensusNetwork(t, {
-        indexerCount: 3, coordination: true,
+        indexerCount: 3,
         timings: {
             epochSignatureTimeout: 2000, epochBackoffDelay: 100,
             indexerPendingRequestTimeout: 500, epochRemoteProposalTimeout: 100,
@@ -74,7 +74,7 @@ test('a disconnected elected appender is replaced and its late write cannot repl
 
 test('two-member fallback submits locally after silence and finalizes when Autobase regains its quorum', async t => {
     const network = await createConsensusNetwork(t, {
-        indexerCount: 2, coordination: true,
+        indexerCount: 2,
         timings: { epochSignatureTimeout: 2000, epochBackoffDelay: 100, indexerPendingRequestTimeout: 500 },
     });
     const offline = network.nodes[1];

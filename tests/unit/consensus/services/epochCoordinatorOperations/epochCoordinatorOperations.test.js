@@ -29,6 +29,7 @@ const makeState = (overrides = {}) => ({
     getRegisteredWriterKey: sinon.stub().resolves(b4a.alloc(32, 0xaa)),
     writingKey: b4a.alloc(32, 1),
     append: sinon.stub().resolves(),
+    appendEpoch: sinon.stub().resolves(),
     ...overrides,
 });
 
@@ -316,32 +317,34 @@ nodeOnlyTest('buildSetEpochPayload does not append to state', async t => {
 
 // --- appendSetEpoch ---
 
-test('appendSetEpoch calls state.append with the given payload', async t => {
+test('appendSetEpoch forwards payload and authorization to state.appendEpoch', async t => {
     const state = makeState();
     const payload = b4a.alloc(64, 0xcc);
+    const authorizeEpochAppend = sinon.stub().resolves();
 
-    await makeOps({ state }).appendSetEpoch(payload);
+    await makeOps({ state }).appendSetEpoch(payload, authorizeEpochAppend);
 
-    t.ok(state.append.calledOnceWith(payload));
+    t.ok(state.appendEpoch.calledOnceWithExactly(payload, authorizeEpochAppend));
+    t.absent(state.append.called);
 });
 
 test('appendSetEpoch forwards selected-appender authorization to the guarded writer queue', async t => {
     const failure = new Error('selection expired while queued');
-    const beforeAppend = sinon.stub().rejects(failure);
+    const authorizeEpochAppend = sinon.stub().rejects(failure);
     const location = { writerKey: '01'.repeat(32), from: 12 };
     const state = makeState({
-        appendEpoch: sinon.stub().callsFake(async (_payload, authorize) => {
-            await authorize(location);
+        appendEpoch: sinon.stub().callsFake(async (_payload, authorizeEpochAppend) => {
+            await authorizeEpochAppend(location);
             t.fail('a rejected authorization must stop the append');
         }),
     });
     const payload = b4a.from('selected proof');
 
-    const result = await makeOps({ state }).appendSetEpoch(payload, beforeAppend).catch(error => error);
+    const result = await makeOps({ state }).appendSetEpoch(payload, authorizeEpochAppend).catch(error => error);
 
     t.is(result, failure);
-    t.ok(state.appendEpoch.calledOnceWith(payload, beforeAppend));
-    t.ok(beforeAppend.calledOnceWith(location));
+    t.ok(state.appendEpoch.calledOnceWith(payload, authorizeEpochAppend));
+    t.ok(authorizeEpochAppend.calledOnceWith(location));
     t.absent(state.append.called, 'selected appends cannot fall back to the unguarded path');
 });
 
