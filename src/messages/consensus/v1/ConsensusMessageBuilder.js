@@ -344,7 +344,7 @@ class ConsensusMessageBuilder {
         this.#appendIntent = toAppendIntent(request);
         this.#appendVote = request.vote ? {
             vote_status: request.voteStatus,
-            observed_counter: uint64ToBuffer(BigInt(request.observedCounter)),
+            observed_counter: uint64ToBuffer(request.observedCounter),
             vote: toAppendIntent(request.vote),
         } : null;
         return this;

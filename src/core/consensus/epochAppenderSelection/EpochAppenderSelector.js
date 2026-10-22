@@ -2,13 +2,14 @@ import b4a from 'b4a';
 import tracCryptoApi from 'trac-crypto-api';
 import { generateUUID } from '../../../utils/helpers.js';
 import { toHex } from '../../../utils/buffer.js';
+import { EPOCH_APPENDER_SELECTION_COUNTER_LIMIT, EPOCH_APPENDER_SELECTION_COUNTER_STEP } from '../../../utils/constants.js';
 import { EpochAppenderSelectionError, EpochAppenderSelectionErrorCode } from './EpochAppenderSelectionError.js';
 import {
     EpochAppenderSelectionPhase,
     EpochAppendOutcome,
     EpochAppenderVoteStatus,
     EPOCH_APPENDER_SELECTION_VERSION,
-    EPOCH_APPENDER_SELECTION_MAX_COUNTER,
+    TWO_INDEXER_COHORT_SIZE,
     copySelectionContext,
     copySelectionRequest,
     copyAppendPublication,
@@ -21,6 +22,7 @@ import {
     upgradeSelectionState,
     copySelectionState,
     validateSelectionState,
+    isValidPeerSelectionCounter,
 } from './epochAppenderSelectionState.js';
 
 /**
@@ -150,10 +152,13 @@ export class EpochAppenderSelector {
         if (signedSelectionContext.members.length > 1) {
             await this.#waitBeforeElection();
         }
-        if (this.#selectionOperations.readContext && !sameSelectionContext(signedSelectionContext, await this.#selectionOperations.readContext())) {
+        const currentSignedContext = await this.#selectionOperations.readContext?.();
+        if (this.#selectionOperations.readContext && !sameSelectionContext(signedSelectionContext, currentSignedContext)) {
             throw new EpochAppenderSelectionError(EpochAppenderSelectionErrorCode.CONTEXT_CHANGED, 'Epoch changed before starting the appender election');
         }
         return this.#persistStateChange(() => {
+            this.#recoverElectionClock(currentSignedContext);
+            this.#requireCurrentElectionEpoch(signedSelectionContext.targetEpoch);
             if (this.#selectionState.active) {
                 throw new EpochAppenderSelectionError(EpochAppenderSelectionErrorCode.PUBLICATION_UNRESOLVED, 'A previous epoch publication is unresolved');
             }
@@ -166,16 +171,17 @@ export class EpochAppenderSelector {
                     'Waiting for the current appender election to finish or expire',
                     { details: { requester: recordedVote.request.requester, term: recordedVote.request.logicalCounter } });
             }
-            const nextElectionCounter = BigInt(this.#selectionState.clock) + 1n;
-            if (nextElectionCounter > EPOCH_APPENDER_SELECTION_MAX_COUNTER) {
-                throw new EpochAppenderSelectionError(EpochAppenderSelectionErrorCode.LOGICAL_CLOCK_EXHAUSTED, 'Epoch append logical clock exhausted');
+            const nextElectionCounter = this.#selectionState.clock + 1n;
+            if (nextElectionCounter > EPOCH_APPENDER_SELECTION_COUNTER_LIMIT) {
+                throw new EpochAppenderSelectionError(EpochAppenderSelectionErrorCode.LOGICAL_CLOCK_EXHAUSTED,
+                    'Epoch append clock exhausted; recovery requires a newer signed epoch');
             }
-            this.#selectionState.clock = nextElectionCounter.toString();
+            this.#selectionState.clock = nextElectionCounter;
             const selectionRequest = {
                 ...copySelectionContext(signedSelectionContext),
                 requestId: generateUUID(),
                 payloadHash,
-                logicalCounter: nextElectionCounter.toString(),
+                logicalCounter: nextElectionCounter,
                 requester: this.#localPublicKey,
                 selectionVersion: EPOCH_APPENDER_SELECTION_VERSION,
             };
@@ -203,8 +209,19 @@ export class EpochAppenderSelector {
      * @returns {Promise<boolean>} True when this node granted its vote.
      */
     async handleSelectionRequest(selectionRequest, sendVoteReply) {
+        await this.open();
+        let currentSignedContext;
+        if (this.#selectionState.clock >= EPOCH_APPENDER_SELECTION_COUNTER_LIMIT) {
+            currentSignedContext = await this.#selectionOperations.readContext?.();
+            if (currentSignedContext && !sameSelectionContext(selectionRequest, currentSignedContext)) {
+                throw new EpochAppenderSelectionError(EpochAppenderSelectionErrorCode.CONTEXT_CHANGED, 'Epoch changed before recovering the election clock');
+            }
+        }
         const response = await this.#persistStateChange(() => {
-            this.#validateRequestAndAdvanceClock(selectionRequest);
+            this.#recoverElectionClock(currentSignedContext);
+            if (!this.#validateRequestAndAdvanceClock(selectionRequest)) {
+                return null;
+            }
             const voteStatus = this.#recordVote(selectionRequest);
             const activeReservation = this.#selectionState.active;
             if (voteStatus === EpochAppenderVoteStatus.GRANTED && activeReservation &&
@@ -219,6 +236,11 @@ export class EpochAppenderSelector {
                 vote: copySelectionRequest(this.#selectionState.vote.request),
             };
         });
+        // A peer far ahead retries while this node catches up in bounded steps.
+        // Never save a vote whose term is beyond the local clock.
+        if (!response) {
+            return false;
+        }
         if (this.#replyCollection && !this.#selectionState.active) {
             this.#finishReplyCollection(this.#createSupersededElectionError());
         }
@@ -246,18 +268,17 @@ export class EpochAppenderSelector {
             if (peerPublicKey === this.#localPublicKey || !isMember) {
                 throw new EpochAppenderSelectionError(EpochAppenderSelectionErrorCode.UNEXPECTED_PEER, 'Reply from an unexpected epoch member');
             }
-            if (!/^[1-9]\d*$/.test(selectionReply.observedCounter) ||
-                BigInt(selectionReply.observedCounter) > EPOCH_APPENDER_SELECTION_MAX_COUNTER ||
+            if (!isValidPeerSelectionCounter(selectionReply.observedCounter) ||
+                !isValidPeerSelectionCounter(selectionReply.vote?.logicalCounter) ||
                 !selectionReply.vote || selectionReply.vote.networkId !== activeReservation.request.networkId ||
-                selectionReply.vote.bootstrap !== activeReservation.request.bootstrap) {
+                selectionReply.vote.bootstrap !== activeReservation.request.bootstrap ||
+                selectionReply.observedCounter < selectionReply.logicalCounter ||
+                selectionReply.observedCounter < selectionReply.vote.logicalCounter) {
                 throw new EpochAppenderSelectionError(EpochAppenderSelectionErrorCode.REQUEST_STALE, 'Invalid appender vote response');
             }
             this.#replyCollection?.respondingPeers.add(peerPublicKey);
-            const observedCounter = BigInt(selectionReply.observedCounter);
-            if (observedCounter > BigInt(this.#selectionState.clock)) {
-                this.#selectionState.clock = observedCounter.toString();
-            }
-            if (BigInt(selectionReply.vote.logicalCounter) > BigInt(activeReservation.request.logicalCounter)) {
+            this.#observePeerCounter(selectionReply.observedCounter);
+            if (selectionReply.vote.logicalCounter > activeReservation.request.logicalCounter) {
                 failure = this.#createSupersededElectionError();
                 this.#releaseReservation(activeReservation.request);
                 return false;
@@ -473,6 +494,7 @@ export class EpochAppenderSelector {
             this.#selectionState.active = null;
             selectionStateChanged = true;
         }
+        selectionStateChanged = this.#recoverElectionClock(undefined, true) || selectionStateChanged;
         if (selectionStateChanged) {
             await this.#saveSelectionState();
         }
@@ -591,7 +613,7 @@ export class EpochAppenderSelector {
             if (sameSelectionRequest(recordedVote.request, selectionRequest)) {
                 return recordedVote.expiresAt > Date.now() ? EpochAppenderVoteStatus.GRANTED : EpochAppenderVoteStatus.STALE;
             }
-            if (BigInt(selectionRequest.logicalCounter) <= BigInt(recordedVote.request.logicalCounter)) {
+            if (selectionRequest.logicalCounter <= recordedVote.request.logicalCounter) {
                 return EpochAppenderVoteStatus.STALE;
             }
             if (sameSelectionContext(recordedVote.request, selectionRequest) && recordedVote.expiresAt > Date.now()) {
@@ -615,11 +637,12 @@ export class EpochAppenderSelector {
     }
 
     /**
-     * Checks the request version, members and counter. Updates the local clock when the request
-     * contains a higher election term.
+     * Checks the request version, members and counter. Moves the local clock towards the peer term
+     * by at most one step. A request further ahead must retry before this node can vote for it.
      *
      * @param {EpochAppendRequest} selectionRequest Validated network request.
      * @throws {EpochAppenderSelectionError} Invalid identity, membership or counter.
+     * @returns {boolean} True when the requested term is within the updated local clock.
      */
     #validateRequestAndAdvanceClock(selectionRequest) {
         if (selectionRequest.selectionVersion !== EPOCH_APPENDER_SELECTION_VERSION) {
@@ -633,15 +656,15 @@ export class EpochAppenderSelector {
         if (!includesLocal || !includesRequester) {
             throw new EpochAppenderSelectionError(EpochAppenderSelectionErrorCode.NOT_IN_COHORT, 'Append request does not include both participants');
         }
-        if (!/^[1-9]\d*$/.test(selectionRequest.logicalCounter)) {
+        this.#requireCurrentElectionEpoch(selectionRequest.targetEpoch);
+        if (!isValidPeerSelectionCounter(selectionRequest.logicalCounter)) {
             throw new EpochAppenderSelectionError(EpochAppenderSelectionErrorCode.LOGICAL_COUNTER_INVALID, 'Invalid append counter');
         }
-        const remoteCounter = BigInt(selectionRequest.logicalCounter);
-        if (remoteCounter > EPOCH_APPENDER_SELECTION_MAX_COUNTER) {
-            throw new EpochAppenderSelectionError(EpochAppenderSelectionErrorCode.LOGICAL_COUNTER_INVALID, 'Append counter exceeds uint64');
+        if (this.#selectionState.clock > EPOCH_APPENDER_SELECTION_COUNTER_LIMIT) {
+            throw new EpochAppenderSelectionError(EpochAppenderSelectionErrorCode.LOGICAL_CLOCK_EXHAUSTED,
+                'Epoch append clock exhausted; recovery requires a newer signed epoch');
         }
-        const localCounter = BigInt(this.#selectionState.clock);
-        this.#selectionState.clock = (remoteCounter > localCounter ? remoteCounter : localCounter).toString();
+        return this.#observePeerCounter(selectionRequest.logicalCounter);
     }
 
     /**
@@ -703,7 +726,7 @@ export class EpochAppenderSelector {
      */
     async #handleSelectionTimeout(replyCollection) {
         if (this.#replyCollection !== replyCollection) return;
-        if (replyCollection.request.members.length === 2 && replyCollection.respondingPeers.size === 0) {
+        if (replyCollection.request.members.length === TWO_INDEXER_COHORT_SIZE && replyCollection.respondingPeers.size === 0) {
             const signedSelectionContext = await this.#selectionOperations.readContext();
             const selectionGranted = await this.#persistStateChange(() => {
                 const activeReservation = this.#selectionState.active;
@@ -951,4 +974,69 @@ export class EpochAppenderSelector {
         return { status: outcome.status };
     }
 
+    /**
+     * Moves towards a peer counter by a bounded amount. Repeated valid requests can help a node
+     * catch up, but one message cannot set an arbitrary local clock.
+     *
+     * @param {bigint} peerCounter Validated counter from a REQUEST or REPLY.
+     * @returns {boolean} True if the local clock has reached this counter.
+     */
+    #observePeerCounter(peerCounter) {
+        const localCounter = this.#selectionState.clock;
+        if (peerCounter <= localCounter) {
+            return true;
+        }
+        const nextCounter = localCounter + EPOCH_APPENDER_SELECTION_COUNTER_STEP;
+        this.#selectionState.clock = peerCounter < nextCounter ? peerCounter : nextCounter;
+        return peerCounter <= nextCounter;
+    }
+
+    /**
+     * Recovers the clock without forgetting votes in the current epoch. On restart, a large gap
+     * between observed counters and saved votes can be removed. An exhausted saved vote needs a
+     * newer signed epoch and no pending append before it can be cleared. The epoch floor blocks
+     * requests from before that recovery.
+     *
+     * @param {EpochAppenderSelectionContext} [signedContext] Current context read from local signed state.
+     * @param {boolean} [recoverPeerHints=false] Check for inflated observations while opening saved state.
+     * @returns {boolean} True when the state needs saving.
+     */
+    #recoverElectionClock(signedContext, recoverPeerHints = false) {
+        const localCounter = this.#selectionState.clock;
+        const savedRequests = [this.#selectionState.vote?.request, this.#selectionState.active?.request].filter(Boolean);
+        const lastVotedCounter = savedRequests.reduce((highest, request) => {
+            const counter = request.logicalCounter;
+            return counter > highest ? counter : highest;
+        }, 0n);
+        if (localCounter < EPOCH_APPENDER_SELECTION_COUNTER_LIMIT &&
+            (!recoverPeerHints || localCounter - lastVotedCounter <= EPOCH_APPENDER_SELECTION_COUNTER_STEP)) {
+            return false;
+        }
+        if (lastVotedCounter < EPOCH_APPENDER_SELECTION_COUNTER_LIMIT) {
+            this.#selectionState.clock = lastVotedCounter;
+            return true;
+        }
+        if (!signedContext || this.#selectionState.active || !savedRequests.every(request =>
+            request.networkId === signedContext.networkId && request.bootstrap === signedContext.bootstrap &&
+            BigInt(request.targetEpoch) < BigInt(signedContext.targetEpoch)
+        )) {
+            return false;
+        }
+        this.#selectionState.minimumElectionEpoch = signedContext.targetEpoch;
+        this.#selectionState.clock = 0n;
+        this.#selectionState.vote = null;
+        return true;
+    }
+
+    /**
+     * Rejects requests from before a clock recovery, including delayed callbacks after restart.
+     *
+     * @param {string} targetEpoch Epoch requested by the caller or peer.
+     */
+    #requireCurrentElectionEpoch(targetEpoch) {
+        if (BigInt(targetEpoch) < BigInt(this.#selectionState.minimumElectionEpoch)) {
+            throw new EpochAppenderSelectionError(EpochAppenderSelectionErrorCode.REQUEST_STALE,
+                'Election request predates clock recovery');
+        }
+    }
 }

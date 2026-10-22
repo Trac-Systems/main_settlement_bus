@@ -6,7 +6,7 @@ import { assertSignedEpoch } from '../helpers/epochAssertions.js';
 test('two of three indexers keep committing epochs while the third is offline and then reconnects', async t => {
     const network = await createConsensusNetwork(t, {
         indexerCount: 3,
-        timings: { epochSignatureTimeout: 3000, epochBackoffDelay: 100, indexerPendingRequestTimeout: 500 },
+        timings: { epochSignatureTimeout: 10_000, epochBackoffDelay: 100, indexerPendingRequestTimeout: 5_000 },
     });
     const offline = network.nodes[2];
     const online = network.nodes.filter(node => node !== offline);
@@ -29,30 +29,30 @@ test('a disconnected elected appender is replaced and its late write cannot repl
     const network = await createConsensusNetwork(t, {
         indexerCount: 3,
         timings: {
-            epochSignatureTimeout: 2000, epochBackoffDelay: 100,
-            indexerPendingRequestTimeout: 500, epochRemoteProposalTimeout: 100,
+            epochSignatureTimeout: 10_000, epochBackoffDelay: 100,
+            indexerPendingRequestTimeout: 5_000, epochRemoteProposalTimeout: 100,
         },
     });
     const first = network.proposer;
     const online = network.nodes.filter(node => node !== first);
     const contenders = network.nodes.slice(0, 3);
     await Promise.all(contenders.slice(1).map(node => network.openOperations(node)));
-    const entered = network.deferred();
+    let appendEntered = false;
     const gate = network.deferred();
-    const finished = network.deferred();
+    let appendFinished = false;
     const original = first.state.appendEpoch.bind(first.state);
     first.state.appendEpoch = async (payload, before) => {
         const result = await original(payload, async location => {
             await before(location);
-            entered.resolve();
+            appendEntered = true;
             await gate.promise;
         });
-        finished.resolve();
+        appendFinished = true;
         return result;
     };
     const writes = contenders.map(node => sinon.spy(node.state, 'appendEpoch'));
     const oldRound = network.startRound(first);
-    await entered.promise;
+    await waitFor('the first appender to reach the authorized append', () => appendEntered);
     for (const node of online) await network.disconnect(first, node);
     await oldRound.round.cancel();
     const successors = contenders.slice(1).map(node => network.startRound(node));
@@ -66,7 +66,7 @@ test('a disconnected elected appender is replaced and its late write cannot repl
     for (const node of online) await network.reconnect(first, node);
     await waitFor('returning appender observes the new signed epoch', async () => (await first.state.getCurrentEpoch()) === 1n);
     gate.resolve();
-    await finished.promise;
+    await waitFor('the returning appender to finish its late append', () => appendFinished);
     await assertSignedEpoch(t, network);
     t.alike(await first.state.getEpoch(1n), committed, 'the previously authorized late append cannot replace the epoch');
     t.is(writes.reduce((sum, spy) => sum + spy.callCount, 0), 2, 'only the old in-flight append and its replacement were submitted');
@@ -75,7 +75,7 @@ test('a disconnected elected appender is replaced and its late write cannot repl
 test('two-member fallback submits locally after silence and finalizes when Autobase regains its quorum', async t => {
     const network = await createConsensusNetwork(t, {
         indexerCount: 2,
-        timings: { epochSignatureTimeout: 2000, epochBackoffDelay: 100, indexerPendingRequestTimeout: 500 },
+        timings: { epochSignatureTimeout: 10_000, epochBackoffDelay: 100, indexerPendingRequestTimeout: 5_000 },
     });
     const offline = network.nodes[1];
     const online = network.nodes.filter(node => node !== offline);

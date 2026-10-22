@@ -697,7 +697,7 @@ if (isBareRuntime) {
                 const intent = {
                     ...createSelectionContext(3), networkId: consensusConfig.networkId,
                     requester: claimedKey.toString('hex'), requestId: 'impersonating-request',
-                    logicalCounter: '1', payloadHash: '07'.repeat(32), selectionVersion: 2,
+                    logicalCounter: 1n, payloadHash: '07'.repeat(32), selectionVersion: 2,
                 };
                 const factory = consensusMessageFactory(wallet, consensusConfig);
                 request = await factory.buildRequest(request.session_id, intent);

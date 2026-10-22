@@ -3,7 +3,7 @@
  * storage format. Copy helpers keep changes to one record from affecting another.
  *
  * @typedef {EpochAppendRequest & {
- *   voteStatus: number, observedCounter: string, vote: EpochAppendRequest
+ *   voteStatus: number, observedCounter: bigint, vote: EpochAppendRequest
  * }} EpochAppendReply Validated REPLY containing the peer's saved vote.
  *
  * @typedef {object} EpochSelectionRequestLifecycle
@@ -11,9 +11,24 @@
  * @property {function(function(): void): void} onPending Registers a callback that cancels the pending request.
  */
 import { EpochAppenderSelectionError, EpochAppenderSelectionErrorCode } from './EpochAppenderSelectionError.js';
+import {
+    EPOCH_APPENDER_SELECTION_MAX_COUNTER,
+    EPOCH_APPENDER_SELECTION_COUNTER_LIMIT,
+    CONSENSUS_REQUEST_ID_MAX_LENGTH,
+    UINT16_MAX,
+    HASH_HEX_LENGTH,
+    PEER_PUBLIC_KEY_HEX_LENGTH,
+} from '../../../utils/constants.js';
+import { isHexString } from '../../../utils/helpers.js';
 
-const SELECTION_STATE_VERSION = 2;
+const SelectionStateVersion = Object.freeze({
+    LEGACY: 1,
+    DURABLE_VOTES: 2,
+    EPOCH_RECOVERY: 3,
+});
+const SELECTION_STATE_VERSION = SelectionStateVersion.EPOCH_RECOVERY;
 export const EPOCH_APPENDER_SELECTION_VERSION = 2;
+export const TWO_INDEXER_COHORT_SIZE = 2;
 
 /** Reply values for a granted vote, a busy voter or an old election term. */
 export const EpochAppenderVoteStatus = Object.freeze({
@@ -30,7 +45,7 @@ export const EpochAppenderVoteStatus = Object.freeze({
  * @returns {number} Number of votes before applying the fallback for two indexers.
  */
 export function calculateAppenderVoteQuorum(memberCount) {
-    return memberCount <= 2 ? memberCount : Math.floor(memberCount / 2) + 1;
+    return memberCount <= TWO_INDEXER_COHORT_SIZE ? memberCount : Math.floor(memberCount / 2) + 1;
 }
 
 /** Selection phases stored locally. These names also support reading older records. */
@@ -47,8 +62,6 @@ export const EpochAppendOutcome = Object.freeze({
     REJECTED: 'REJECTED',
     SELECTION_EXPIRED: 'SELECTION_EXPIRED',
 });
-
-export const EPOCH_APPENDER_SELECTION_MAX_COUNTER = (1n << 64n) - 1n;
 
 /**
  * @typedef {object} EpochAppenderSelectionMember
@@ -68,7 +81,7 @@ export const EPOCH_APPENDER_SELECTION_MAX_COUNTER = (1n << 64n) - 1n;
  * @typedef {object} EpochSelectionIdentity
  * @property {string} requestId ID shared by all retries of this election request.
  * @property {string} payloadHash Hash of the exact SET_EPOCH bytes reserved by the candidate.
- * @property {string} logicalCounter Election term stored as a decimal uint64 string. New terms follow the saved voting history.
+ * @property {bigint} logicalCounter Election term. New terms follow the saved voting history.
  * @property {string} requester Candidate's authenticated wallet public key, encoded as hex.
  * @property {number} selectionVersion Voting protocol version.
  *
@@ -224,7 +237,8 @@ export function copySelectionReservation(reservation) {
 /**
  * @typedef {object} EpochAppenderSelectionState
  * @property {number} version Local storage format version.
- * @property {string} clock Highest known logical counter, encoded as a decimal uint64.
+ * @property {bigint} clock Local election counter. Peer hints advance it in bounded steps.
+ * @property {string} minimumElectionEpoch Earliest epoch allowed after recovering an exhausted clock.
  * @property {EpochAppenderSelectionReservation|null} active Local selection request or append still waiting for a result.
  * @property {{request: EpochAppendRequest, expiresAt: number}|null} vote Last saved vote. After it expires, another candidate still needs a higher term.
  */
@@ -235,7 +249,7 @@ export function copySelectionReservation(reservation) {
  * @returns {EpochAppenderSelectionState}
  */
 export function createSelectionState() {
-    return { version: SELECTION_STATE_VERSION, clock: '0', active: null, vote: null };
+    return { version: SELECTION_STATE_VERSION, clock: 0n, minimumElectionEpoch: '0', active: null, vote: null };
 }
 
 /**
@@ -248,6 +262,7 @@ export function copySelectionState(selectionState) {
     return {
         version: selectionState.version,
         clock: selectionState.clock,
+        minimumElectionEpoch: selectionState.minimumElectionEpoch ?? '0',
         active: copySelectionReservation(selectionState.active),
         vote: selectionState.vote ? {
             request: copySelectionRequest(selectionState.vote.request),
@@ -271,7 +286,7 @@ export function upgradeSelectionState(selectionState, nowMs, selectionTimeoutMs)
         return upgradedState;
     }
     upgradedState.version = SELECTION_STATE_VERSION;
-    if (upgradedState.active) {
+    if (selectionState.version === SelectionStateVersion.LEGACY && upgradedState.active) {
         upgradedState.active.request.selectionVersion = EPOCH_APPENDER_SELECTION_VERSION;
         upgradedState.active.expiresAt = nowMs + selectionTimeoutMs;
         upgradedState.vote = {
@@ -293,35 +308,31 @@ export function upgradeSelectionState(selectionState, nowMs, selectionTimeoutMs)
 export function validateSelectionState(selectionState, localPublicKey) {
     if (
         !selectionState ||
-        ![1, SELECTION_STATE_VERSION].includes(selectionState.version) ||
-        !/^\d+$/.test(selectionState.clock)
+        !Object.values(SelectionStateVersion).includes(selectionState.version) ||
+        typeof selectionState.clock !== 'bigint' ||
+        selectionState.clock < 0n
     ) {
         throw new EpochAppenderSelectionError(EpochAppenderSelectionErrorCode.SELECTION_STATE_INVALID, 'Invalid epoch appender selection state');
     }
-    if (BigInt(selectionState.clock) > EPOCH_APPENDER_SELECTION_MAX_COUNTER) {
+    if (selectionState.clock > EPOCH_APPENDER_SELECTION_MAX_COUNTER) {
         throw new EpochAppenderSelectionError(EpochAppenderSelectionErrorCode.SELECTION_STATE_INVALID, 'Epoch append coordination counter exceeds uint64');
     }
-    if (selectionState.version === SELECTION_STATE_VERSION && !Object.hasOwn(selectionState, 'vote')) {
+    if (selectionState.version === SELECTION_STATE_VERSION &&
+        typeof selectionState.minimumElectionEpoch !== 'string') {
+        throw new EpochAppenderSelectionError(EpochAppenderSelectionErrorCode.SELECTION_STATE_INVALID, 'Invalid minimum election epoch');
+    }
+    if (selectionState.version >= SelectionStateVersion.DURABLE_VOTES && !Object.hasOwn(selectionState, 'vote')) {
         throw new EpochAppenderSelectionError(EpochAppenderSelectionErrorCode.SELECTION_STATE_INVALID, 'Durable appender vote field is missing');
     }
-    if (selectionState.version === SELECTION_STATE_VERSION && selectionState.vote) {
-        const { request, expiresAt } = selectionState.vote;
-        if (!isValidElectionRequest(request) || BigInt(request.logicalCounter) > BigInt(selectionState.clock) ||
-            !Number.isSafeInteger(expiresAt) || expiresAt < 0 ||
-            !request.members?.some(member => member.publicKey === request.requester) ||
-            !request.members.some(member => member.publicKey === localPublicKey)) {
-            throw new EpochAppenderSelectionError(EpochAppenderSelectionErrorCode.SELECTION_STATE_INVALID, 'Invalid durable appender vote');
-        }
+    if (selectionState.version >= SelectionStateVersion.DURABLE_VOTES && selectionState.vote) {
+        validateStoredVote(selectionState, localPublicKey);
     }
     if (!selectionState.active) {
         return;
     }
-    validateReservation(selectionState.active, localPublicKey, BigInt(selectionState.clock));
-    if (selectionState.version === SELECTION_STATE_VERSION &&
-        (!Number.isSafeInteger(selectionState.active.expiresAt) || selectionState.active.expiresAt < 0 ||
-        !isValidElectionRequest(selectionState.active.request) || typeof selectionState.active.solo !== 'boolean' ||
-        (selectionState.active.solo && selectionState.active.request.members.length !== 2))) {
-        throw new EpochAppenderSelectionError(EpochAppenderSelectionErrorCode.RESERVATION_INVALID, 'Invalid appender election deadline or version');
+    validateReservation(selectionState.active, localPublicKey, selectionState.clock);
+    if (selectionState.version >= SelectionStateVersion.DURABLE_VOTES) {
+        validateReservationVote(selectionState);
     }
     if (selectionState.active.phase === EpochAppenderSelectionPhase.PUBLISHING) {
         validatePublication(selectionState.active);
@@ -329,23 +340,37 @@ export function validateSelectionState(selectionState, localPublicKey) {
 }
 
 /**
- * Checks the request version, uint64 counters and member identities.
+ * Checks a decoded request and its member identities. Storage decoding has already checked epoch values.
  *
  * @param {EpochAppendRequest} request Candidate request read from local storage.
  * @returns {boolean}
  */
 function isValidElectionRequest(request) {
-    if (!request || request.selectionVersion !== EPOCH_APPENDER_SELECTION_VERSION ||
-        !Number.isInteger(request.networkId) || request.networkId < 1 || request.networkId > 65535 ||
-        typeof request.requestId !== 'string' || !request.requestId.length || request.requestId.length > 64 ||
-        !/^[1-9]\d*$/.test(request.logicalCounter) || BigInt(request.logicalCounter) > EPOCH_APPENDER_SELECTION_MAX_COUNTER ||
-        !/^\d+$/.test(request.targetEpoch) || BigInt(request.targetEpoch) > EPOCH_APPENDER_SELECTION_MAX_COUNTER) return false;
-    const hasValidIdentityFields = ['bootstrap', 'parentHash', 'membershipContext', 'configHash', 'payloadHash', 'requester']
-        .every(field => typeof request[field] === 'string' && /^[a-f0-9]{64}$/.test(request[field]));
+    if (!request || request.selectionVersion !== EPOCH_APPENDER_SELECTION_VERSION) {
+        return false;
+    }
+    if (!Number.isInteger(request.networkId) || request.networkId < 1 || request.networkId > UINT16_MAX) {
+        return false;
+    }
+    if (typeof request.requestId !== 'string' || !request.requestId.length ||
+        request.requestId.length > CONSENSUS_REQUEST_ID_MAX_LENGTH) {
+        return false;
+    }
+    if (!(request.logicalCounter > 0n && request.logicalCounter <= EPOCH_APPENDER_SELECTION_MAX_COUNTER) ||
+        typeof request.targetEpoch !== 'string') {
+        return false;
+    }
+    const hasValidIdentityFields = ['bootstrap', 'parentHash', 'membershipContext', 'configHash', 'payloadHash']
+        .every(field => isValidSelectionHex(request[field], HASH_HEX_LENGTH)) &&
+        isValidSelectionHex(request.requester, PEER_PUBLIC_KEY_HEX_LENGTH);
     const members = request.members;
-    return hasValidIdentityFields && Array.isArray(members) && members.length > 0 && members.every(member =>
-        member && /^[a-f0-9]{64}$/.test(member.publicKey) && /^[a-f0-9]{64}$/.test(member.writerKey)
-    ) && new Set(members.map(member => member.publicKey)).size === members.length;
+    if (!hasValidIdentityFields || !Array.isArray(members) || members.length === 0) {
+        return false;
+    }
+    const hasValidMembers = members.every(member => member &&
+        isValidSelectionHex(member.publicKey, PEER_PUBLIC_KEY_HEX_LENGTH) &&
+        isValidSelectionHex(member.writerKey, PEER_PUBLIC_KEY_HEX_LENGTH));
+    return hasValidMembers && new Set(members.map(member => member.publicKey)).size === members.length;
 }
 
 /**
@@ -360,11 +385,11 @@ function validateReservation(reservation, localPublicKey, highestKnownCounter) {
     const request = reservation.request;
     const hasValidPhase = Object.values(EpochAppenderSelectionPhase).includes(reservation.phase);
     const hasLocalOwner = request?.requester === localPublicKey;
-    const hasValidCounter = /^[1-9]\d*$/.test(request?.logicalCounter);
+    const hasValidCounter = request?.logicalCounter > 0n && request.logicalCounter <= EPOCH_APPENDER_SELECTION_MAX_COUNTER;
     if (!hasValidPhase || !hasLocalOwner || !hasValidCounter) {
         throw new EpochAppenderSelectionError(EpochAppenderSelectionErrorCode.RESERVATION_INVALID, 'Invalid epoch append reservation');
     }
-    if (BigInt(request.logicalCounter) > highestKnownCounter) {
+    if (request.logicalCounter > highestKnownCounter) {
         throw new EpochAppenderSelectionError(EpochAppenderSelectionErrorCode.RESERVATION_INVALID, 'Reservation counter exceeds coordination clock');
     }
     const hasValidMembers = Array.isArray(request.members) && request.members.every(member =>
@@ -385,7 +410,7 @@ function validateReservation(reservation, localPublicKey, highestKnownCounter) {
  */
 function validatePublication(reservation) {
     const { publication, request } = reservation;
-    if (!publication || !/^[a-f0-9]{64}$/.test(publication.writerKey)) {
+    if (!publication || !isValidSelectionHex(publication.writerKey, PEER_PUBLIC_KEY_HEX_LENGTH)) {
         throw new EpochAppenderSelectionError(EpochAppenderSelectionErrorCode.PUBLICATION_MARKER_INVALID, 'Invalid durable epoch publication writer');
     }
     if (!Number.isSafeInteger(publication.from) || publication.from < 0) {
@@ -396,3 +421,68 @@ function validatePublication(reservation) {
     }
 }
 
+/**
+ * Checks the election range of a decoded peer counter.
+ *
+ * @param {bigint} counter Election term or observed clock.
+ * @returns {boolean}
+ */
+export function isValidPeerSelectionCounter(counter) {
+    return counter > 0n && counter <= EPOCH_APPENDER_SELECTION_COUNTER_LIMIT;
+}
+
+/**
+ * Checks that a stored vote belongs to this cohort and follows the saved clock and epoch floor.
+ *
+ * @param {EpochAppenderSelectionState} selectionState Decoded local state.
+ * @param {string} localPublicKey Local wallet public key.
+ * @throws {EpochAppenderSelectionError}
+ */
+function validateStoredVote(selectionState, localPublicKey) {
+    const { request, expiresAt } = selectionState.vote;
+    if (!isValidElectionRequest(request) || !Number.isSafeInteger(expiresAt) || expiresAt < 0) {
+        throw new EpochAppenderSelectionError(EpochAppenderSelectionErrorCode.SELECTION_STATE_INVALID, 'Invalid durable appender vote');
+    }
+    const includesCandidate = request.members.some(member => member.publicKey === request.requester);
+    const includesLocalIndexer = request.members.some(member => member.publicKey === localPublicKey);
+    if (!includesCandidate || !includesLocalIndexer) {
+        throw new EpochAppenderSelectionError(EpochAppenderSelectionErrorCode.SELECTION_STATE_INVALID, 'Durable vote is missing a participant');
+    }
+    if (request.logicalCounter > selectionState.clock ||
+        BigInt(request.targetEpoch) < BigInt(selectionState.minimumElectionEpoch ?? '0')) {
+        throw new EpochAppenderSelectionError(EpochAppenderSelectionErrorCode.SELECTION_STATE_INVALID, 'Durable vote conflicts with the saved clock or epoch');
+    }
+}
+
+/**
+ * Checks that an active reservation has a saved vote and a valid election deadline.
+ *
+ * @param {EpochAppenderSelectionState} selectionState Decoded local state with an active reservation.
+ * @throws {EpochAppenderSelectionError}
+ */
+function validateReservationVote(selectionState) {
+    const { active, vote } = selectionState;
+    if (!vote || active.request.logicalCounter > vote.request.logicalCounter) {
+        throw new EpochAppenderSelectionError(EpochAppenderSelectionErrorCode.RESERVATION_INVALID, 'Reservation is missing its durable vote');
+    }
+    if (!Number.isSafeInteger(active.expiresAt) || active.expiresAt < 0 || !isValidElectionRequest(active.request)) {
+        throw new EpochAppenderSelectionError(EpochAppenderSelectionErrorCode.RESERVATION_INVALID, 'Invalid appender election deadline or request');
+    }
+    if (typeof active.solo !== 'boolean' || (active.solo && active.request.members.length !== TWO_INDEXER_COHORT_SIZE)) {
+        throw new EpochAppenderSelectionError(EpochAppenderSelectionErrorCode.RESERVATION_INVALID, 'Solo selection requires a two-indexer cohort');
+    }
+    if (BigInt(active.request.targetEpoch) < BigInt(selectionState.minimumElectionEpoch ?? '0')) {
+        throw new EpochAppenderSelectionError(EpochAppenderSelectionErrorCode.RESERVATION_INVALID, 'Reservation precedes the minimum election epoch');
+    }
+}
+
+/**
+ * Checks the expected length and lowercase form of a stored key or hash.
+ *
+ * @param {string} value Stored hexadecimal value.
+ * @param {number} expectedLength Expected number of hexadecimal characters.
+ * @returns {boolean}
+ */
+function isValidSelectionHex(value, expectedLength) {
+    return isHexString(value) && value.length === expectedLength && value === value.toLowerCase();
+}

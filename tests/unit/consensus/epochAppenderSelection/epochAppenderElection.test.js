@@ -25,7 +25,7 @@ function cluster(t, count, { clock = false } = {}) {
     const nodes = [];
     const operations = index => ({
         load: async () => stored.get(index),
-        save: async value => { stored.set(index, JSON.parse(JSON.stringify(value))); },
+        save: async value => { stored.set(index, structuredClone(value)); },
         readContext: async () => snapshot,
         readOutcome: async () => ({ status: EpochAppendOutcome.UNKNOWN }),
         sendRequest: async (peer, request) => {
@@ -81,7 +81,7 @@ test('a durable vote survives restart and cannot change within the same term, ev
     t.is((await f.deliver(first, 2)).voteStatus, EpochAppenderVoteStatus.STALE, 'an old grant is not renewed');
     await f.nodes[1].cancel(other.requestId);
     const next = await f.request(1);
-    t.ok(BigInt(next.logicalCounter) > BigInt(first.logicalCounter));
+    t.ok(next.logicalCounter > first.logicalCounter);
     t.is((await f.deliver(next, 2, 1)).voteStatus, EpochAppenderVoteStatus.GRANTED);
     t.is(f.nodes[1].activeReservation.phase, 'HELD');
 });
@@ -166,7 +166,7 @@ test('a split election retries in a higher term and can then reach a majority', 
     const retry = await f.request(1);
     await f.nodes[1].waitForAppenderSelection(retry);
     t.is(f.nodes[1].activeReservation.phase, 'HELD');
-    t.ok(BigInt(retry.logicalCounter) > BigInt(requests[1].logicalCounter));
+    t.ok(retry.logicalCounter > requests[1].logicalCounter);
 });
 
 test('duplicate and stale votes cannot satisfy a new five-member election', async t => {
@@ -264,11 +264,14 @@ test('missing or malformed durable votes fail recovery instead of allowing a sec
     for (const corrupt of [
         state => { delete state.vote; },
         state => { state.vote.request.payloadHash = 'invalid'; },
+        state => { state.vote.request.payloadHash = 'AB'.repeat(32); },
+        state => { state.vote.request.payloadHash = '0'.repeat(63); },
+        state => { state.vote.request.members[0].publicKey = 'gg'.repeat(32); },
         state => { state.vote.request.selectionVersion = 1; },
         state => { state.vote.expiresAt = -1; },
-        state => { state.vote.request.logicalCounter = (BigInt(state.clock) + 1n).toString(); },
+        state => { state.vote.request.logicalCounter = state.clock + 1n; },
     ]) {
-        const state = JSON.parse(JSON.stringify(f.stored.get(1)));
+        const state = structuredClone(f.stored.get(1));
         corrupt(state);
         const node = new EpochAppenderSelector(key(2), {
             load: async () => state, save: async () => { t.fail('corruption cannot reset the vote'); },

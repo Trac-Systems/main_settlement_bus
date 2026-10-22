@@ -6,6 +6,7 @@ async function runConsensusModuleTests() {
     await import('./services/epochCoordinatorService/epochCoordinatorService.test.js');
     await import('./epochAppenderSelection/epochAppenderSelector.test.js');
     await import('./epochAppenderSelection/epochAppenderElection.test.js');
+    await import('./epochAppenderSelection/epochAppenderCounter.test.js');
     // esmock requires Node; real ledger reads are covered by integration tests in Bare.
     if (typeof globalThis.Bare === 'undefined') {
         await import('./epochAppenderSelection/epochAppenderSelectionLedgerReader.test.js');

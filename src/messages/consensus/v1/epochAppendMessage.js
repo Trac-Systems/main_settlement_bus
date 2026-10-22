@@ -15,7 +15,7 @@ export function toAppendIntent(request) {
         config_hash: b4a.from(request.configHash, 'hex'),
         request_id: request.requestId,
         payload_hash: b4a.from(request.payloadHash, 'hex'),
-        logical_counter: uint64ToBuffer(BigInt(request.logicalCounter)),
+        logical_counter: uint64ToBuffer(request.logicalCounter),
         requester: b4a.from(request.requester, 'hex'),
         selection_version: request.selectionVersion ?? EPOCH_APPENDER_SELECTION_VERSION,
     };
@@ -32,7 +32,7 @@ export function fromAppendIntent(intent) {
         configHash: b4a.toString(intent.config_hash, 'hex'),
         requestId: intent.request_id,
         payloadHash: b4a.toString(intent.payload_hash, 'hex'),
-        logicalCounter: intent.logical_counter.readBigUInt64BE(0).toString(),
+        logicalCounter: intent.logical_counter.readBigUInt64BE(0),
         requester: b4a.toString(intent.requester, 'hex'),
         selectionVersion: intent.selection_version,
     };

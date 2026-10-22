@@ -12,10 +12,11 @@ import ConsensusV1MessageRouter from '../../../../../../src/core/network/protoco
 import ConsensusV1ConnectionPolicy from '../../../../../../src/core/network/protocols/consensus/v1/ConsensusV1ConnectionPolicy.js';
 import IndexerPendingRequestService from '../../../../../../src/core/network/protocols/consensus/v1/IndexerPendingRequestService.js';
 import V1EpochAppendOperationHandler from '../../../../../../src/core/network/protocols/consensus/v1/handlers/V1EpochAppendOperationHandler.js';
-import { ConsensusOperationType, ConsensusResultCode, CustomEventType } from '../../../../../../src/utils/constants.js';
+import { ConsensusOperationType, ConsensusResultCode, CustomEventType, EPOCH_APPENDER_SELECTION_MAX_COUNTER, EPOCH_APPENDER_SELECTION_COUNTER_LIMIT } from '../../../../../../src/utils/constants.js';
 import sinon from 'sinon';
 import compatibility from '../../../../../fixtures/epochAppendCompatibility.js';
 import { appendSignatureData } from '../../../../../../src/messages/consensus/v1/epochAppendMessage.js';
+import { uint64ToBuffer } from '../../../../../../src/utils/buffer.js';
 
 async function fixture(t) {
     const wallet = await new WalletProvider(config).fromSecretKey(testKeyPair1.secretKey);
@@ -30,7 +31,7 @@ async function fixture(t) {
     };
     const request = {
         ...context, requester: testKeyPair1.publicKey, requestId: 'publication-1',
-        logicalCounter: '9007199254740993', payloadHash: '07'.repeat(32),
+        logicalCounter: 9007199254740993n, payloadHash: '07'.repeat(32),
         selectionVersion: 2,
     };
     let reads = 0;
@@ -65,10 +66,12 @@ test('append protocol round trips signed requests and permissions without losing
     const request = await new V1EpochAppendRequest(config, f.state).validate(
         decodeConsensusMessage(encodeConsensusMessage(f.message)), f.connection,
     );
-    t.is(request.logicalCounter, '9007199254740993');
+    t.is(request.logicalCounter, 9007199254740993n);
     const permission = await new V1EpochAppendReply(config, f.state).validate(
         decodeConsensusMessage(encodeConsensusMessage(f.response)), f.peer, f.message,
     );
+    t.is(permission.observedCounter, request.logicalCounter);
+    t.is(permission.vote.logicalCounter, request.logicalCounter);
     t.is(permission.requestId, f.request.requestId);
     t.is(permission.payloadHash, f.request.payloadHash);
 });
@@ -82,7 +85,7 @@ test('append schemas reject malformed fields, oversized identifiers and mixed me
         for (const value of [undefined, b4a.alloc(1, 1), b4a.alloc(128, 1)]) {
             const malformed = fresh();
             malformed.request.intent[field] = value;
-            t.is(schema.validateEpochAppendMessage(malformed), false, field);
+            t.is(schema.validateEpochAppendRequest(malformed), false, field);
         }
     }
     for (const mutate of [
@@ -96,7 +99,7 @@ test('append schemas reject malformed fields, oversized identifiers and mixed me
     ]) {
         const malformed = fresh();
         mutate(malformed);
-        t.is(schema.validateEpochAppendMessage(malformed), false);
+        t.is(schema.validateEpochAppendRequest(malformed), false);
     }
 });
 
@@ -224,22 +227,22 @@ test('vote status, observed term and the persisted vote are authenticated and se
         await t.exception(() => validator.validate(tampered, f.peer, f.message));
     }
     for (const change of [
-        { observedCounter: '1' },
+        { observedCounter: 1n },
         { vote: { ...f.request, requester: testKeyPair2.publicKey } },
         { vote: { ...f.request, payloadHash: '11'.repeat(32) } },
         { vote: { ...f.request, targetEpoch: '8' } },
-        { voteStatus: 3, vote: { ...f.request, logicalCounter: '1' } },
+        { voteStatus: 3, vote: { ...f.request, logicalCounter: 1n } },
     ]) {
         const response = await consensusMessageFactory(f.other, config).buildReply('rpc-1', { ...f.decision, ...change });
         await t.exception(() => validator.validate(response, f.peer, f.message), 'a valid signature does not make an inconsistent vote valid');
     }
-    const busy = { ...f.decision, voteStatus: 2, vote: { ...f.request, requester: testKeyPair2.publicKey, logicalCounter: '1' } };
+    const busy = { ...f.decision, voteStatus: 2, vote: { ...f.request, requester: testKeyPair2.publicKey, logicalCounter: 1n } };
     const response = await consensusMessageFactory(f.other, config).buildReply('rpc-1', busy);
     const result = await validator.validate(decodeConsensusMessage(encodeConsensusMessage(response)), f.peer, f.message);
     t.is(result.voteStatus, 2);
     t.is(result.vote.requester, testKeyPair2.publicKey);
 
-    const laterTerm = (BigInt(f.request.logicalCounter) + 1n).toString();
+    const laterTerm = f.request.logicalCounter + 1n;
     const previousContext = {
         ...f.decision, voteStatus: 3, observedCounter: laterTerm,
         vote: { ...f.request, targetEpoch: '6', configHash: '11'.repeat(32), logicalCounter: laterTerm },
@@ -323,3 +326,81 @@ for (const type of ['REQUEST', 'REPLY']) {
         });
     }
 }
+
+
+for (const counter of [EPOCH_APPENDER_SELECTION_MAX_COUNTER, EPOCH_APPENDER_SELECTION_MAX_COUNTER - 1n,
+    EPOCH_APPENDER_SELECTION_COUNTER_LIMIT + 1n]) {
+    test(`signed REQUEST rejects a counter in the overflow range: ${counter}`, async t => {
+        const f = await fixture(t);
+        const message = await consensusMessageFactory(f.wallet, config).buildRequest('rpc-1', {
+            ...f.request, logicalCounter: counter,
+        });
+        const decoded = decodeConsensusMessage(encodeConsensusMessage(message));
+        t.is(new ConsensusValidationSchema(config).validateEpochAppendRequest(decoded), false);
+        const error = await new V1EpochAppendRequest(config, f.state).validate(decoded, f.connection).catch(error => error);
+        t.is(error.resultCode, ConsensusResultCode.SCHEMA_VALIDATION_FAILED);
+        t.is(f.reads(), 0, 'reject before reading context or reaching the selector');
+    });
+
+    test(`correlated GRANTED reply rejects an overflowing observed counter: ${counter}`, async t => {
+        const f = await fixture(t);
+        const message = await consensusMessageFactory(f.other, config).buildReply('rpc-1', {
+            ...f.decision, observedCounter: counter,
+        });
+        const decoded = decodeConsensusMessage(encodeConsensusMessage(message));
+        t.is(new ConsensusValidationSchema(config).validateEpochAppendReply(decoded), false);
+        const error = await new V1EpochAppendReply(config, f.state).validate(decoded, f.peer, f.message).catch(error => error);
+        t.is(error.resultCode, ConsensusResultCode.SCHEMA_VALIDATION_FAILED);
+        t.is(f.reads(), 0);
+    });
+
+    test(`REPLY rejects an overflowing counter in its saved vote: ${counter}`, async t => {
+        const f = await fixture(t);
+        const message = await consensusMessageFactory(f.other, config).buildReply('rpc-1', {
+            ...f.decision, voteStatus: 3,
+            vote: { ...f.request, logicalCounter: counter },
+        });
+        const decoded = decodeConsensusMessage(encodeConsensusMessage(message));
+        t.is(new ConsensusValidationSchema(config).validateEpochAppendReply(decoded), false,
+            'a valid observed counter does not hide an invalid nested vote');
+        const error = await new V1EpochAppendReply(config, f.state).validate(decoded, f.peer, f.message).catch(error => error);
+        t.is(error.resultCode, ConsensusResultCode.SCHEMA_VALIDATION_FAILED);
+    });
+}
+
+test('compiled append schemas validate the shape and range of every counter field', async t => {
+    const f = await fixture(t);
+    const schema = new ConsensusValidationSchema(config);
+    for (const fieldPath of [
+        ['request', 'intent', 'logical_counter'],
+        ['reply', 'intent', 'logical_counter'],
+        ['reply', 'observed_counter'],
+        ['reply', 'vote', 'logical_counter'],
+    ]) {
+        const original = fieldPath[0] === 'request' ? f.message : f.response;
+        const validateSchema = fieldPath[0] === 'request'
+            ? schema.validateEpochAppendRequest.bind(schema)
+            : schema.validateEpochAppendReply.bind(schema);
+        for (const value of [undefined, null, 'invalid', b4a.alloc(7, 1), b4a.alloc(9, 1), uint64ToBuffer(0n),
+            uint64ToBuffer(EPOCH_APPENDER_SELECTION_COUNTER_LIMIT + 1n)]) {
+            const message = decodeConsensusMessage(encodeConsensusMessage(original));
+            const parent = fieldPath.slice(0, -1).reduce((object, field) => object[field], message);
+            parent[fieldPath.at(-1)] = value;
+            t.is(validateSchema(message), false, fieldPath.join('.'));
+        }
+        for (const value of [1n, EPOCH_APPENDER_SELECTION_COUNTER_LIMIT]) {
+            const message = decodeConsensusMessage(encodeConsensusMessage(original));
+            const parent = fieldPath.slice(0, -1).reduce((object, field) => object[field], message);
+            parent[fieldPath.at(-1)] = uint64ToBuffer(value);
+            t.is(validateSchema(message), true, `${fieldPath.join('.')} accepts ${value}`);
+        }
+    }
+    for (const message of [undefined, null, {}, { type: ConsensusOperationType.PROOF_PROPOSAL }]) {
+        t.is(schema.validateEpochAppendRequest(message), false);
+        t.is(schema.validateEpochAppendReply(message), false);
+    }
+    t.is(schema.validateEpochAppendRequest(f.message), true);
+    t.is(schema.validateEpochAppendReply(f.response), true);
+    t.is(schema.validateEpochAppendRequest(f.response), false, 'the request schema rejects replies');
+    t.is(schema.validateEpochAppendReply(f.message), false, 'the reply schema rejects requests');
+});

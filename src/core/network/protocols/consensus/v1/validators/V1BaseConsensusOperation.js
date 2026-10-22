@@ -160,8 +160,9 @@ class V1BaseConsensusOperation {
 
         switch (type) {
             case ConsensusOperationType.REQUEST:
+                return this.#consensusValidationSchema.validateEpochAppendRequest.bind(this.#consensusValidationSchema);
             case ConsensusOperationType.REPLY:
-                return this.#consensusValidationSchema.validateEpochAppendMessage.bind(this.#consensusValidationSchema);
+                return this.#consensusValidationSchema.validateEpochAppendReply.bind(this.#consensusValidationSchema);
             case ConsensusOperationType.UNSPECIFIED:
                 throw new V1ConsensusProtocolError(
                     ConsensusResultCode.OPERATION_TYPE_INVALID,

@@ -265,7 +265,7 @@ test('coordinated FSM retries after selection expiry despite repeated ledger rea
     t.is(f.writes.length, 2, 'the real FSM starts a new attempt after expiry and backoff');
     t.alike(f.selector.getRecordedAppendOutcome(previous.requestId), { status: EpochAppendOutcome.SELECTION_EXPIRED });
     const current = f.selector.activeReservation.request;
-    t.is(BigInt(current.logicalCounter), BigInt(previous.logicalCounter) + 1n);
+    t.is(current.logicalCounter, previous.logicalCounter + 1n);
     f.writes[0].reject(new Error('late append failure'));
     await f.clock.tickAsync(0);
     t.is(f.selector.activeReservation.request.requestId, current.requestId);

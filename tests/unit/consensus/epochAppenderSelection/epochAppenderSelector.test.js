@@ -21,8 +21,6 @@ import {
 import compatibility from '../../../fixtures/epochAppendCompatibility.js';
 import { createSelectionContext as context, selectionKey as key, appendSelected } from '../../../helpers/epochAppenderSelection.js';
 
-const clone = value => JSON.parse(JSON.stringify(value));
-
 function cluster(count) {
     const messages = [];
     const selectionStates = new Map();
@@ -31,7 +29,7 @@ function cluster(count) {
     const appends = [];
     const operations = index => ({
         load: async () => selectionStates.get(index),
-        save: async selectionState => { selectionStates.set(index, clone(selectionState)); },
+        save: async selectionState => { selectionStates.set(index, structuredClone(selectionState)); },
         readOutcome: async () => ({ status: outcomes.get(index) ?? EpochAppendOutcome.UNKNOWN }),
     });
     const publish = (index, requestId) => appendSelected(nodes[index], requestId, async (payload, authorizeEpochAppend) => {
@@ -110,23 +108,33 @@ test('epoch append: a signed-context change while queued prevents the actual app
     await node.close();
 });
 
-test('epoch append: persisted logical clocks retain precision and refuse overflow', async t => {
-    let stored = { version: 1, clock: '9007199254740993', active: null };
+test('epoch append: persisted clocks retain precision and recover overflow without saved votes', async t => {
+    let stored = {
+        version: 2, clock: '9007199254740993', active: null,
+        vote: {
+            request: {
+                ...context(1), requester: key(1), requestId: 'previous-vote', payloadHash: key(200),
+                logicalCounter: '9007199254740993', selectionVersion: 2,
+            },
+            expiresAt: 0,
+        },
+    };
     const operations = {
-        load: async () => stored, save: async value => { stored = clone(value); },
+        load: async () => decodeSelectionState(encodeSelectionState(stored)), save: async value => { stored = structuredClone(value); },
     };
     let node = new EpochAppenderSelector(key(1), operations);
     const request = await node.createSelectionRequest(context(1), b4a.from('proof'));
-    t.is(request.logicalCounter, '9007199254740994');
+    t.is(request.logicalCounter, 9007199254740994n);
     await node.close();
     node = new EpochAppenderSelector(key(1), operations);
     await t.exception(() => node.createSelectionRequest(context(1), b4a.from('too soon')), 'the durable vote survives restart');
     const next = await node.createSelectionRequest({ ...context(1), targetEpoch: '8' }, b4a.from('next'));
-    t.is(next.logicalCounter, '9007199254740995', 'restart does not reuse a ticket');
+    t.is(next.logicalCounter, 9007199254740995n, 'restart does not reuse a ticket');
     await node.close();
     stored = { version: 1, clock: ((1n << 64n) - 1n).toString(), active: null };
     node = new EpochAppenderSelector(key(1), operations);
-    await t.exception(() => node.createSelectionRequest(context(1), b4a.from('overflow')));
+    const recovered = await node.createSelectionRequest(context(1), b4a.from('recovered'));
+    t.is(recovered.logicalCounter, 1n, 'an exhausted clock without any saved vote can recover');
     await node.close();
 });
 
@@ -144,7 +152,7 @@ for (const failSave of [false, true]) {
                     markerReached.resolve();
                     await markerWrite.promise;
                 }
-                stored = clone(value);
+                stored = structuredClone(value);
             }
         });
         t.teardown(() => selector.close());
@@ -176,7 +184,7 @@ for (const failSave of [false, true]) {
 }
 
 test('epoch append: legacy activation metadata does not disable selection or discard durable votes', async t => {
-    let stored = { activationEpoch: '7', journal: clone(compatibility.journal) };
+    let stored = { activationEpoch: '7', journal: structuredClone(compatibility.journal) };
     const state = {
         base: {
             getUserData: async () => b4a.from(JSON.stringify(stored)),
@@ -272,11 +280,11 @@ test('epoch append: pre-refactor coordination state recovers without changing pu
     const encoded = b4a.from(JSON.stringify({ activationEpoch: '1', journal: compatibility.journal }));
     const selectionState = decodeSelectionState(encoded);
     t.alike(encodeSelectionState(selectionState), encoded, 'the local v1 storage envelope stays byte-compatible');
-    t.alike(decodeSelectionState(encodeSelectionState(selectionState)), compatibility.journal);
+    t.alike(decodeSelectionState(encodeSelectionState(selectionState)), selectionState);
     const migrations = [];
     const node = new EpochAppenderSelector(compatibility.request.requester, {
         load: async () => selectionState,
-        save: async state => { migrations.push(clone(state)); },
+        save: async state => { migrations.push(structuredClone(state)); },
         readOutcome: async () => ({ status: EpochAppendOutcome.UNKNOWN }),
     });
     t.teardown(() => node.close());
@@ -292,7 +300,7 @@ test('epoch append: pre-refactor coordination state recovers without changing pu
     t.alike(node.activeReservation, recovered, 'nested snapshots do not expose the durable reservation');
     t.alike(await node.refreshAppendOutcome(), { status: EpochAppendOutcome.UNKNOWN });
     t.is(migrations.length, 1, 'the upgrade is durable and UNKNOWN does not rewrite the marker');
-    t.is(migrations[0].version, 2);
+    t.is(migrations[0].version, 3);
     t.alike(migrations[0].active.publication, compatibility.journal.active.publication);
 });
 
@@ -310,7 +318,7 @@ test('epoch append: corruption fails recovery with a stable code and original pa
     } catch (error) {
         t.is(error.code, EpochAppenderSelectionErrorCode.SELECTION_STATE_INVALID);
     }
-    const selectionState = clone(compatibility.journal);
+    const selectionState = decodeSelectionState(encodeSelectionState(compatibility.journal));
     selectionState.active.publication.from = -1;
     const node = new EpochAppenderSelector(compatibility.request.requester, {
         load: async () => selectionState,
@@ -465,7 +473,7 @@ test('epoch append: repeated outcome read errors do not prevent selection expiry
     t.alike(save.lastCall.args[0].vote.request, request, 'the durable vote identity is preserved');
 
     const next = await selector.createSelectionRequest(context(1), b4a.from('next proof')).catch(error => error);
-    t.is(next.logicalCounter, (BigInt(request.logicalCounter) + 1n).toString());
+    t.is(next.logicalCounter, request.logicalCounter + 1n);
     t.is(typeof next.requestId, 'string');
     t.absent(next.requestId === request.requestId);
 });

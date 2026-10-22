@@ -22,8 +22,8 @@ export default class V1EpochAppendReply extends V1BaseConsensusOperation {
             // It advances the local term only; it can never count as permission.
             const vote = fromAppendIntent(body.vote);
             const observedCounter = body.observed_counter.readBigUInt64BE(0);
-            const requestedTerm = BigInt(request.logicalCounter);
-            const votedTerm = BigInt(vote.logicalCounter);
+            const requestedTerm = request.logicalCounter;
+            const votedTerm = vote.logicalCounter;
             if (vote.networkId !== request.networkId || vote.bootstrap !== request.bootstrap ||
                 requestedTerm <= 0n || votedTerm <= 0n || observedCounter < requestedTerm || observedCounter < votedTerm ||
                 (body.vote_status === EpochAppenderVoteStatus.GRANTED && !sameSelectionRequest(request, vote)) ||
@@ -31,7 +31,7 @@ export default class V1EpochAppendReply extends V1BaseConsensusOperation {
                 (body.vote_status === EpochAppenderVoteStatus.STALE && votedTerm < requestedTerm)) {
                 throw new V1ConsensusProtocolError(ConsensusResultCode.INVALID_PAYLOAD, 'Inconsistent appender vote reply');
             }
-            return { ...request, voteStatus: body.vote_status, observedCounter: observedCounter.toString(), vote };
+            return { ...request, voteStatus: body.vote_status, observedCounter, vote };
         });
     }
 

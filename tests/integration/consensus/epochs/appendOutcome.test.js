@@ -12,6 +12,7 @@ import { readEpochAppendOutcome } from '../../../../src/core/consensus/epochAppe
 import { EntryType } from '../../../../src/utils/constants.js';
 import { uint64ToBuffer } from '../../../../src/utils/buffer.js';
 import { EpochAppenderSelector } from '../../../../src/core/consensus/epochAppenderSelection/EpochAppenderSelector.js';
+import { encodeSelectionState, decodeSelectionState } from '../../../../src/core/consensus/epochAppenderSelection/epochAppenderSelectionStorage.js';
 import { appendSelected } from '../../../helpers/epochAppenderSelection.js';
 
 test('signed writer clock proves a no-op was processed without advancing the view, including after restart', async t => {
@@ -76,9 +77,9 @@ test('signed writer clock proves a no-op was processed without advancing the vie
     const operations = {
         async load() {
             const value = await base.getUserData('test/append-coordination-state');
-            return value && JSON.parse(value.toString());
+            return value && decodeSelectionState(value);
         },
-        save: selectionState => base.setUserData('test/append-coordination-state', b4a.from(JSON.stringify(selectionState))),
+        save: selectionState => base.setUserData('test/append-coordination-state', encodeSelectionState(selectionState)),
         readOutcome: record => readEpochAppendOutcome(base, record),
     };
     let append = async (value, authorizeEpochAppend) => {
