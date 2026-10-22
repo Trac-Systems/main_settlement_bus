@@ -495,7 +495,7 @@ test('PartialHtlcValidator requires valid settlement addresses', async t => {
     );
 });
 
-test.skip('PartialHtlcValidator rejects signed high-bit settlement-address aliases', async t => {
+test('PartialHtlcValidator rejects signed high-bit settlement-address aliases', async t => {
     const {requester: maker, validator, recipient: claimant} = await getWalletSet();
     const validatorInstance = new PartialHtlcValidator(createValidState(maker), validator.address, config);
 
@@ -517,7 +517,7 @@ test.skip('PartialHtlcValidator rejects signed high-bit settlement-address alias
     }
 });
 
-test.skip('PartialHtlcValidator rejects a signed high-bit requester-address alias', async t => {
+test('PartialHtlcValidator rejects a signed high-bit requester-address alias', async t => {
     const {requester: maker, validator, recipient: claimant} = await getWalletSet();
     const payload = await buildHtlcLockPayload(maker, claimant.address);
     payload.address = b4a.from(payload.address);

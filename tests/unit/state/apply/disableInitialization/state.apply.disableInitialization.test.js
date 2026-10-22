@@ -8,7 +8,7 @@ import InvalidSignatureValidationScenario, { SignatureMutationStrategy } from '.
 import TransactionValidityMismatchScenario from '../common/transactionValidityMismatchScenario.js';
 import OperationAlreadyAppliedScenario from '../common/operationAlreadyAppliedScenario.js';
 import RequesterAddressValidationScenario from '../common/requesterAddressValidationScenario.js';
-import createRequesterPublicKeyValidationScenario from '../common/requesterPublicKeyValidationScenario.js';
+import createRequesterInvalidChecksumScenario from '../common/requesterInvalidChecksumScenario.js';
 import IndexerSequenceStateInvalidScenario from '../common/indexer/indexerSequenceStateInvalidScenario.js';
 import disableInitializationHappyPathScenario from './disableInitializationHappyPathScenario.js';
 import disableInitializationAlreadyDisabledScenario from './disableInitializationAlreadyDisabledScenario.js';
@@ -43,12 +43,12 @@ new RequesterAddressValidationScenario({
     expectedLogs: ['Failed to validate requester address.']
 }).performScenario();
 
-createRequesterPublicKeyValidationScenario({
-    title: 'State.apply disableInitialization requester public key is invalid',
+createRequesterInvalidChecksumScenario({
+    title: 'State.apply disableInitialization rejects an invalid requester address checksum',
     setupScenario: setupDisableInitializationScenario,
     buildValidPayload: buildDisableInitializationPayload,
     assertStateUnchanged: assertDisableInitializationFailureState,
-    expectedLogs: ['Failed to decode requester public key.']
+    expectedLogs: ['Failed to validate requester address.']
 }).performScenario();
 
 new AdminEntryDecodeFailureScenario({

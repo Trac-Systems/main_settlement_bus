@@ -1,6 +1,6 @@
 import InvalidPayloadValidationScenario from '../common/payload-structure/invalidPayloadValidationScenario.js';
 import InvalidAddressValidationScenario from '../common/payload-structure/invalidAddressValidationScenario.js';
-import createAddressWithInvalidPublicKeyScenario from '../common/payload-structure/addressWithInvalidPublicKeyScenario.js';
+import createAddressWithInvalidChecksumScenario from '../common/payload-structure/addressWithInvalidChecksumScenario.js';
 import AdminEntryMissingScenario from '../common/access-control/adminEntryMissingScenario.js';
 import AdminEntryDecodeFailureScenario from '../common/access-control/adminEntryDecodeFailureScenario.js';
 import AdminOnlyGuardScenario from '../common/access-control/adminOnlyGuardScenario.js';
@@ -53,13 +53,13 @@ new InvalidAddressValidationScenario({
     expectedLogs: ['Recipient address is invalid.']
 }).performScenario();
 
-createAddressWithInvalidPublicKeyScenario({
-    title: 'State.apply appendWhitelist recipient public key is invalid',
+createAddressWithInvalidChecksumScenario({
+    title: 'State.apply appendWhitelist rejects an invalid recipient address checksum',
     setupScenario: setupAppendWhitelistScenario,
     buildValidPayload: context => buildAppendWhitelistPayload(context),
     assertStateUnchanged: assertAppendWhitelistFailureState,
     addressPath: ['address'],
-    expectedLogs: ['Failed to decode recipient public key.']
+    expectedLogs: ['Recipient address is invalid.']
 }).performScenario();
 
 new AdminEntryMissingScenario({
@@ -116,13 +116,13 @@ new InvalidAddressValidationScenario({
     expectedLogs: ['Failed to verify node address.']
 }).performScenario();
 
-createAddressWithInvalidPublicKeyScenario({
-    title: 'State.apply appendWhitelist node public key is invalid',
+createAddressWithInvalidChecksumScenario({
+    title: 'State.apply appendWhitelist rejects an invalid node address checksum',
     setupScenario: setupAppendWhitelistScenario,
     buildValidPayload: context => buildAppendWhitelistPayload(context),
     assertStateUnchanged: assertAppendWhitelistFailureState,
     addressPath: ['aco', 'ia'],
-    expectedLogs: ['Failed to decode node public key.']
+    expectedLogs: ['Failed to verify node address.']
 }).performScenario();
 
 new InvalidHashValidationScenario({

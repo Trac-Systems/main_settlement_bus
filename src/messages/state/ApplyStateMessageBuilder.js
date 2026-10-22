@@ -15,8 +15,7 @@ import {
     PUBLIC_KEY_LENGTH,
     SIGNATURE_BYTE_LENGTH,
 } from '../../utils/constants.js';
-import { addressToBuffer, bufferToAddress } from '../../core/state/utils/address.js';
-import { isAddressValid } from "../../core/state/utils/address.js";
+import { addressToBuffer, bufferToAddress, isAddressValid } from '../../core/state/utils/address.js';
 import {
     isAdminControl,
     isBalanceInitialization,

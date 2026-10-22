@@ -6,7 +6,7 @@ import banValidatorBanAndReWhitelistScenario from './banValidatorBanAndReWhiteli
 import b4a from 'b4a';
 import AdminControlOperationValidationScenario from '../common/adminControlOperationValidationScenario.js';
 import RequesterAddressValidationScenario from '../common/requesterAddressValidationScenario.js';
-import createRequesterPublicKeyValidationScenario from '../common/requesterPublicKeyValidationScenario.js';
+import createRequesterInvalidChecksumScenario from '../common/requesterInvalidChecksumScenario.js';
 import AdminEntryMissingScenario from '../common/access-control/adminEntryMissingScenario.js';
 import AdminEntryDecodeFailureScenario from '../common/access-control/adminEntryDecodeFailureScenario.js';
 import AdminOnlyGuardScenario from '../common/access-control/adminOnlyGuardScenario.js';
@@ -61,12 +61,12 @@ new RequesterAddressValidationScenario({
     expectedLogs: ['Requester address is invalid.']
 }).performScenario();
 
-createRequesterPublicKeyValidationScenario({
-    title: 'State.apply banValidator rejects payloads when requester public key is invalid',
+createRequesterInvalidChecksumScenario({
+    title: 'State.apply banValidator rejects an invalid requester address checksum',
     setupScenario: setupBanValidatorScenario,
     buildValidPayload: context => buildBanValidatorPayload(context),
     assertStateUnchanged: assertBanValidatorFailureState,
-    expectedLogs: ['Error while decoding requester public key.']
+    expectedLogs: ['Requester address is invalid.']
 }).performScenario();
 
 new AdminEntryMissingScenario({

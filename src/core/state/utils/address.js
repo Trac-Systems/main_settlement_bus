@@ -4,9 +4,7 @@ import _ from 'lodash'
 
 /**
  * Checks if a given address is a valid TRAC bech32m address.
- * Note that we only check the format and length, not the checksum.
- * So, it is possible that even if an address is considered valid,
- * it may not be a real address on the network.
+ * Checks the format, length, and bech32m checksum.
  * @param {string | Buffer} address - The address to validate.
  * @param {string} hrp - The HRP of the bech32m address.
  * @returns {boolean} True if the address is valid, false otherwise.
@@ -21,12 +19,12 @@ export function isAddressValid(address, hrp) {
     }
 
     const res = _.attempt(() => 
-        addressApi.size(hrp) === address.length && address.startsWith(`${hrp}1`) && addressApi.isValid(address)
+        addressApi.size(hrp) === address.length && address.startsWith(`${hrp}1`) &&
+        addressApi.isValid(address) && addressApi.canDecode(address)
     );
 
     return !_.isError(res) && res
 }
-
 
 /**
  * Converts a valid bech32m address string to a buffer.

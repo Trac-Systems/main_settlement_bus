@@ -9,7 +9,7 @@ import {
 } from './addAdminScenarioHelpers.js';
 import addAdminHappyPathScenario from './addAdminHappyPathScenario.js';
 import RequesterAddressValidationScenario from '../common/requesterAddressValidationScenario.js';
-import createRequesterPublicKeyValidationScenario from '../common/requesterPublicKeyValidationScenario.js';
+import createRequesterInvalidChecksumScenario from '../common/requesterInvalidChecksumScenario.js';
 import InvalidHashValidationScenario from '../common/payload-structure/invalidHashValidationScenario.js';
 import InvalidSignatureValidationScenario, { SignatureMutationStrategy } from '../common/payload-structure/invalidSignatureValidationScenario.js';
 import InvalidMessageComponentValidationScenario, { MessageComponentStrategy } from '../common/invalidMessageComponentValidationScenario.js';
@@ -52,12 +52,12 @@ new RequesterAddressValidationScenario({
     expectedLogs: ['Requester address is invalid.']
 }).performScenario();
 
-createRequesterPublicKeyValidationScenario({
-    title: 'State.apply addAdmin requester public key is invalid',
+createRequesterInvalidChecksumScenario({
+    title: 'State.apply addAdmin rejects an invalid requester address checksum',
     setupScenario: setupAddAdminScenario,
     buildValidPayload: buildAddAdminRequesterPayload,
     assertStateUnchanged: assertAddAdminRequesterFailureState,
-    expectedLogs: ['Error while decoding requester public key.']
+    expectedLogs: ['Requester address is invalid.']
 }).performScenario();
 
 addAdminNonBootstrapNodeScenario();

@@ -11,9 +11,9 @@ import PartialOperationValidationScenario, {
 import OperationValidationScenarioBase from '../common/base/OperationValidationScenarioBase.js';
 import InvalidSignatureValidationScenario from '../common/payload-structure/invalidSignatureValidationScenario.js';
 import RequesterAddressValidationScenario from '../common/requesterAddressValidationScenario.js';
-import createRequesterPublicKeyValidationScenario from '../common/requesterPublicKeyValidationScenario.js';
+import createRequesterInvalidChecksumScenario from '../common/requesterInvalidChecksumScenario.js';
 import InvalidAddressValidationScenario from '../common/payload-structure/invalidAddressValidationScenario.js';
-import createAddressWithInvalidPublicKeyScenario from '../common/payload-structure/addressWithInvalidPublicKeyScenario.js';
+import createAddressWithInvalidChecksumScenario from '../common/payload-structure/addressWithInvalidChecksumScenario.js';
 import IndexerSequenceStateInvalidScenario from '../common/indexer/indexerSequenceStateInvalidScenario.js';
 import TransactionValidityMismatchScenario from '../common/transactionValidityMismatchScenario.js';
 import OperationAlreadyAppliedScenario from '../common/operationAlreadyAppliedScenario.js';
@@ -152,13 +152,13 @@ new RequesterAddressValidationScenario({
     expectedLogs: ['Invalid requester address.']
 }).performScenario();
 
-createRequesterPublicKeyValidationScenario({
-    title: 'State.apply txOperation rejects requester public key decode failures',
+createRequesterInvalidChecksumScenario({
+    title: 'State.apply txOperation rejects an invalid requester address checksum',
     setupScenario: setupTxOperationScenario,
     buildValidPayload: buildTxOperationPayload,
     assertStateUnchanged: (t, context, _valid, invalidPayload) =>
         assertTxOperationFailureState(t, context, { payload: invalidPayload }),
-    expectedLogs: ['Failed to decode requester public key.']
+    expectedLogs: ['Invalid requester address.']
 }).performScenario();
 
 new InvalidHashValidationScenario({
@@ -192,14 +192,14 @@ new InvalidAddressValidationScenario({
     expectedLogs: ['Invalid validator address.']
 }).performScenario();
 
-createAddressWithInvalidPublicKeyScenario({
-    title: 'State.apply txOperation rejects validator public key decode failures',
+createAddressWithInvalidChecksumScenario({
+    title: 'State.apply txOperation rejects an invalid validator address checksum',
     setupScenario: setupTxOperationScenario,
     buildValidPayload: buildTxOperationPayload,
     assertStateUnchanged: (t, context, _valid, invalidPayload) =>
         assertTxOperationFailureState(t, context, { payload: invalidPayload }),
     addressPath: ['txo', 'va'],
-    expectedLogs: ['Failed to decode validator public key.']
+    expectedLogs: ['Invalid validator address.']
 }).performScenario();
 
 new OperationValidationScenarioBase({

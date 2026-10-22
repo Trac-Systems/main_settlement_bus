@@ -31,12 +31,12 @@ import PartialOperationValidationScenario, {
     PartialOperationMutationStrategy
 } from '../common/payload-structure/partialOperationValidationScenario.js';
 import RequesterAddressValidationScenario from '../common/requesterAddressValidationScenario.js';
-import createRequesterPublicKeyValidationScenario from '../common/requesterPublicKeyValidationScenario.js';
+import createRequesterInvalidChecksumScenario from '../common/requesterInvalidChecksumScenario.js';
 import InvalidHashValidationScenario from '../common/payload-structure/invalidHashValidationScenario.js';
 import OperationValidationScenarioBase from '../common/base/OperationValidationScenarioBase.js';
 import { safeDecodeApplyOperation, safeEncodeApplyOperation } from '../../../../../src/codecs/apply/applyOperationCodec.js';
 import InvalidAddressValidationScenario from '../common/payload-structure/invalidAddressValidationScenario.js';
-import createAddressWithInvalidPublicKeyScenario from '../common/payload-structure/addressWithInvalidPublicKeyScenario.js';
+import createAddressWithInvalidChecksumScenario from '../common/payload-structure/addressWithInvalidChecksumScenario.js';
 import TransactionValidityMismatchScenario from '../common/transactionValidityMismatchScenario.js';
 import IndexerSequenceStateInvalidScenario from '../common/indexer/indexerSequenceStateInvalidScenario.js';
 import ValidatorInactiveScenario from '../common/validatorConsistency/validatorInactiveScenario.js';
@@ -113,13 +113,13 @@ new RequesterAddressValidationScenario({
     expectedLogs: ['Requester address is invalid.']
 }).performScenario();
 
-createRequesterPublicKeyValidationScenario({
-    title: 'State.apply adminRecovery rejects requester public key decode failures',
+createRequesterInvalidChecksumScenario({
+    title: 'State.apply adminRecovery rejects an invalid requester address checksum',
     setupScenario: setupAdminRecoveryScenario,
     buildValidPayload: buildAdminRecoveryPayload,
     assertStateUnchanged: assertAdminRecoveryFailureState,
     applyInvalidPayload: applyAdminRecoveryViaValidator,
-    expectedLogs: ['Error while decoding requester public key.']
+    expectedLogs: ['Requester address is invalid.']
 }).performScenario();
 
 new OperationValidationScenarioBase({
@@ -169,14 +169,14 @@ new InvalidAddressValidationScenario({
     expectedLogs: ['Failed to validate validator address.']
 }).performScenario();
 
-createAddressWithInvalidPublicKeyScenario({
-    title: 'State.apply adminRecovery rejects validator public key decode failures',
+createAddressWithInvalidChecksumScenario({
+    title: 'State.apply adminRecovery rejects an invalid validator address checksum',
     setupScenario: setupAdminRecoveryScenario,
     buildValidPayload: buildAdminRecoveryPayload,
     assertStateUnchanged: assertAdminRecoveryFailureState,
     addressPath: ['rao', 'va'],
     applyInvalidPayload: applyAdminRecoveryViaValidator,
-    expectedLogs: ['Failed to decode validator public key.']
+    expectedLogs: ['Failed to validate validator address.']
 }).performScenario();
 
 new OperationValidationScenarioBase({

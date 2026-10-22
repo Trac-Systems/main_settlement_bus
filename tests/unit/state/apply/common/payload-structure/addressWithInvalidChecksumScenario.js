@@ -5,7 +5,7 @@ import {
     safeEncodeApplyOperation
 } from '../../../../../../src/codecs/apply/applyOperationCodec.js';
 
-export default function createAddressWithInvalidPublicKeyScenario(config, pathOverride) {
+export default function createAddressWithInvalidChecksumScenario(config, pathOverride) {
     const { addressPath, ...rest } = config ?? {};
     const normalizedPath = normalizePath(pathOverride ?? addressPath);
 

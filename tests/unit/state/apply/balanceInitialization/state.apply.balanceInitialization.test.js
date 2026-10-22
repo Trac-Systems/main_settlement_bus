@@ -10,8 +10,8 @@ import balanceInitializationNodeEntryBalanceUpdateFailureScenario from './nodeEn
 import RequesterAddressValidationScenario from '../common/requesterAddressValidationScenario.js';
 import InvalidPayloadValidationScenario from '../common/payload-structure/invalidPayloadValidationScenario.js';
 import InvalidAddressValidationScenario from '../common/payload-structure/invalidAddressValidationScenario.js';
-import createAddressWithInvalidPublicKeyScenario from '../common/payload-structure/addressWithInvalidPublicKeyScenario.js';
-import createRequesterPublicKeyValidationScenario from '../common/requesterPublicKeyValidationScenario.js';
+import createAddressWithInvalidChecksumScenario from '../common/payload-structure/addressWithInvalidChecksumScenario.js';
+import createRequesterInvalidChecksumScenario from '../common/requesterInvalidChecksumScenario.js';
 import InvalidHashValidationScenario from '../common/payload-structure/invalidHashValidationScenario.js';
 import InvalidSignatureValidationScenario, { SignatureMutationStrategy } from '../common/payload-structure/invalidSignatureValidationScenario.js';
 import InvalidMessageComponentValidationScenario, { MessageComponentStrategy } from '../common/invalidMessageComponentValidationScenario.js';
@@ -41,12 +41,12 @@ new RequesterAddressValidationScenario({
     expectedLogs: ['Requester address is invalid.']
 }).performScenario();
 
-createRequesterPublicKeyValidationScenario({
-    title: 'State.apply balanceInitialization requester public key is invalid',
+createRequesterInvalidChecksumScenario({
+    title: 'State.apply balanceInitialization rejects an invalid requester address checksum',
     setupScenario: setupBalanceInitializationScenario,
     buildValidPayload: buildDefaultBalanceInitializationPayload,
     assertStateUnchanged: assertBalanceInitializationFailureState,
-    expectedLogs: ['Error while decoding requester public key.']
+    expectedLogs: ['Requester address is invalid.']
 }).performScenario();
 
 new InvalidAddressValidationScenario({
@@ -58,13 +58,13 @@ new InvalidAddressValidationScenario({
     expectedLogs: ['Recipient address is invalid.']
 }).performScenario();
 
-createAddressWithInvalidPublicKeyScenario({
-    title: 'State.apply balanceInitialization recipient public key is invalid',
+createAddressWithInvalidChecksumScenario({
+    title: 'State.apply balanceInitialization rejects an invalid recipient address checksum',
     setupScenario: setupBalanceInitializationScenario,
     buildValidPayload: buildDefaultBalanceInitializationPayload,
     assertStateUnchanged: assertBalanceInitializationFailureState,
     addressPath: ['bio', 'ia'],
-    expectedLogs: ['Failed to decode recipient public key.']
+    expectedLogs: ['Recipient address is invalid.']
 }).performScenario();
 
 balanceInitializationInvalidAmountScenario();

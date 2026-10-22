@@ -22,6 +22,36 @@ import { bigIntTo16ByteBuffer } from '../../../../src/utils/amountSerialization.
 const hex = (value, bytes) => value.repeat(bytes);
 const toBuffer = value => b4a.from(value, 'hex');
 
+test('operation normalization does not admit checksum-invalid address fields', t => {
+    const invalid = 'trac1wyu9uw02wmefzt63c36wa0fgc2xn99x5hw46w4frl7jd6mqw2f5q57tt90';
+    const valid = randomAddress(config.addressPrefix);
+    const transfer = normalizeTransferOperation({
+        type: OperationType.TRANSFER,
+        address: invalid,
+        tro: {
+            tx: hex('11', 32), txv: hex('22', 32), in: hex('33', 32),
+            to: invalid, am: hex('44', 16), is: hex('55', 64)
+        }
+    }, config);
+    t.is(transfer.address.length, 0);
+    t.is(transfer.tro.to.length, 0);
+
+    const lock = normalizeHtlcLockOperation({
+        type: OperationType.HTLC_LOCK,
+        address: valid,
+        hlo: {
+            tx: hex('11', 32), txv: hex('22', 32), ca: invalid, ra: invalid,
+            am: hex('33', 16), fa: hex('44', 16), hl: hex('55', 32),
+            re: hex('66', 8), ss: [hex('77', 32)], th: hex('01', 1),
+            cs: [], in: hex('88', 32), is: hex('99', 64), fr: invalid
+        }
+    }, config);
+    t.ok(b4a.equals(lock.address, b4a.from(valid, 'ascii')));
+    t.is(lock.hlo.ca.length, 0);
+    t.is(lock.hlo.ra.length, 0);
+    t.is(lock.hlo.fr.length, 0);
+});
+
 test('normalizeTransferOperation normalizes hex strings and addresses', t => {
     const sender = randomAddress(config.addressPrefix);
     const recipient = randomAddress(config.addressPrefix);
