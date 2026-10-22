@@ -119,6 +119,9 @@ class ConsensusV1MessageRouter {
             }
             const isArbitrationMessage = decodedMessage.type === ConsensusOperationType.REQUEST ||
                 decodedMessage.type === ConsensusOperationType.REPLY;
+            if (isArbitrationMessage && this.#connectionPolicy.requestPeerBan(connection, error)) {
+                return;
+            }
             if (isArbitrationMessage && error instanceof V1ConsensusProtocolError && error.resultCode === ConsensusResultCode.EPOCH_INVALID) {
                 return;
             }

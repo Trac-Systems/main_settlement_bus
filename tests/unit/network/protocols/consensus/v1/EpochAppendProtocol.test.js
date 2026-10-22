@@ -9,9 +9,10 @@ import V1EpochAppendRequest from '../../../../../../src/core/network/protocols/c
 import V1EpochAppendReply from '../../../../../../src/core/network/protocols/consensus/v1/validators/V1EpochAppendReply.js';
 import ConsensusValidationSchema from '../../../../../../src/core/network/protocols/consensus/v1/validators/ConsensusValidationSchema.js';
 import ConsensusV1MessageRouter from '../../../../../../src/core/network/protocols/consensus/v1/ConsensusV1MessageRouter.js';
+import ConsensusV1ConnectionPolicy from '../../../../../../src/core/network/protocols/consensus/v1/ConsensusV1ConnectionPolicy.js';
 import IndexerPendingRequestService from '../../../../../../src/core/network/protocols/consensus/v1/IndexerPendingRequestService.js';
 import V1EpochAppendOperationHandler from '../../../../../../src/core/network/protocols/consensus/v1/handlers/V1EpochAppendOperationHandler.js';
-import { ConsensusOperationType, ConsensusResultCode } from '../../../../../../src/utils/constants.js';
+import { ConsensusOperationType, ConsensusResultCode, CustomEventType } from '../../../../../../src/utils/constants.js';
 import sinon from 'sinon';
 import compatibility from '../../../../../fixtures/epochAppendCompatibility.js';
 import { appendSignatureData } from '../../../../../../src/messages/consensus/v1/epochAppendMessage.js';
@@ -139,6 +140,7 @@ test('append router ignores wrong peers, old sessions and replaced RPC entries w
     const policy = {
         handleLocalError() {},
         handleInvalidMessage() { t.fail('append response must not close consensus'); },
+        requestPeerBan() { t.fail('ignored or valid replies must not request a ban'); },
     };
     const router = new ConsensusV1MessageRouter(f.state, f.wallet, config, f.pending, policy);
     const promise = f.pending.registerPendingRequest(testKeyPair2.publicKey, f.message, session);
@@ -248,3 +250,77 @@ test('vote status, observed term and the persisted vote are authenticated and se
     t.is(validated.voteStatus, 3);
     t.is(validated.observedCounter, laterTerm, 'a lagging candidate learns the term even if the last vote was for an older context');
 });
+
+for (const type of ['REQUEST', 'REPLY']) {
+    test(`append ${type} identity mismatch requests a ban for the transport peer`, async t => {
+        const f = await fixture(t);
+        f.state.emit = sinon.spy();
+        const policy = new ConsensusV1ConnectionPolicy(f.state, { error: sinon.spy() }, config);
+        const selector = { receiveRequest: sinon.spy(), reconcile: sinon.spy(), enabledFor: () => true };
+        const router = new ConsensusV1MessageRouter(f.state, f.wallet, config, f.pending, policy, selector);
+        const session = { closed: false, sendAndForget: sinon.spy() };
+        // The transport belongs to wallet 2, but the message claims wallet 1.
+        const message = type === 'REQUEST' ? f.message
+            : await consensusMessageFactory(f.wallet, config).buildReply('rpc-1', f.decision);
+        const waiting = type === 'REPLY'
+            ? f.pending.registerPendingRequest(testKeyPair2.publicKey, f.message, session).catch(error => error)
+            : null;
+
+        await router.route(encodeConsensusMessage(message), f.peer, session);
+
+        const bans = f.state.emit.withArgs(CustomEventType.CONSENSUS_PEER_BAN_REQUESTED);
+        t.is(bans.callCount, 1, 'the existing connection policy receives the validation failure');
+        const ban = bans.firstCall?.args[1];
+        t.is(ban?.connection, f.peer, 'the ban targets the authenticated transport, not the claimed author');
+        t.is(ban?.error.resultCode, ConsensusResultCode.PUBLIC_KEY_MISMATCH);
+        t.is(f.reads(), 0, 'impersonation is rejected before reading election state');
+        t.absent(selector.reconcile.called);
+        t.absent(selector.receiveRequest.called);
+        t.absent(session.sendAndForget.called, 'an impersonating REQUEST receives no reply');
+        if (waiting) {
+            t.is((await waiting).resultCode, ConsensusResultCode.PUBLIC_KEY_MISMATCH);
+            t.absent(f.pending.getPendingRequest('rpc-1'), 'an impersonating REPLY rejects the pending request');
+        }
+    });
+
+    for (const failure of ['signature', 'context', 'local read']) {
+        test(`append ${type} ${failure} failure does not ban the peer`, async t => {
+            const f = await fixture(t);
+            f.state.emit = sinon.spy();
+            const policy = new ConsensusV1ConnectionPolicy(f.state, { error: sinon.spy() }, config);
+            const selector = { receiveRequest: sinon.spy(), reconcile: sinon.spy(), enabledFor: () => true };
+            const router = new ConsensusV1MessageRouter(f.state, f.wallet, config, f.pending, policy, selector);
+            const session = { closed: false, sendAndForget: sinon.spy(), close: sinon.spy() };
+            const message = type === 'REQUEST' ? f.message : f.response;
+            const connection = type === 'REQUEST' ? f.connection : f.peer;
+            let expectedCode;
+            if (failure === 'signature') {
+                message.timestamp++;
+                expectedCode = ConsensusResultCode.RESPONSE_SIGNATURE_INVALID;
+            } else if (failure === 'context') {
+                f.context.targetEpoch = '8';
+                expectedCode = ConsensusResultCode.EPOCH_INVALID;
+            } else {
+                f.state.getEpochAppenderSelectionContext = async () => {
+                    throw Object.assign(new Error('local read failed'), { resultCode: ConsensusResultCode.PUBLIC_KEY_MISMATCH });
+                };
+                expectedCode = ConsensusResultCode.UNEXPECTED_ERROR;
+            }
+            const waiting = type === 'REPLY'
+                ? f.pending.registerPendingRequest(testKeyPair2.publicKey, f.message, session).catch(error => error)
+                : null;
+
+            await router.route(encodeConsensusMessage(message), connection, session);
+
+            t.absent(f.state.emit.calledWith(CustomEventType.CONSENSUS_PEER_BAN_REQUESTED));
+            t.absent(selector.reconcile.called);
+            t.absent(selector.receiveRequest.called);
+            t.absent(session.sendAndForget.called);
+            t.absent(session.close.called, 'ordinary failures keep the consensus channel open');
+            if (waiting) {
+                t.is((await waiting).resultCode, expectedCode);
+                t.absent(f.pending.getPendingRequest('rpc-1'));
+            }
+        });
+    }
+}
