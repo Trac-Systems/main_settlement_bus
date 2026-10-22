@@ -68,7 +68,7 @@ export default class PendingRequestService {
     /*
     @returns {Promise}
     */
-    registerPendingRequest(peerPubKeyHex, message) {
+    registerPendingRequest(peerPubKeyHex, message, connection = null) {
         this.#validateRegisterInput(peerPubKeyHex, message);
         const id = message.id;
         const peerAddress = publicKeyToAddress(peerPubKeyHex, this.#config);
@@ -86,6 +86,7 @@ export default class PendingRequestService {
             requestType: message.type,
             requestTxData: this.#extractRequestTxData(message),
             requestedTo: peerPubKeyHex,
+            connection,
             timeoutId: null,
             resolve: null,
             reject: null,
@@ -159,6 +160,33 @@ export default class PendingRequestService {
         }
 
         return idsToReject.length;
+    }
+
+    // Socket cleanup must not reject requests sent on a replacement connection
+    // to the same peer. Requests registered without an owner are left untouched.
+    rejectPendingRequestsForConnection(connection, error) {
+        if (!connection) {
+            return 0;
+        }
+
+        const hasConnectionIdentity = typeof connection === 'object' || typeof connection === 'function';
+        if (!hasConnectionIdentity) {
+            return 0;
+        }
+
+        const requestIdsOwnedByConnection = [];
+        for (const [requestId, pendingRequest] of this.#pendingRequests) {
+            const requestBelongsToConnection = pendingRequest.connection === connection;
+            if (requestBelongsToConnection) {
+                requestIdsOwnedByConnection.push(requestId);
+            }
+        }
+
+        for (const requestId of requestIdsOwnedByConnection) {
+            this.rejectPendingRequest(requestId, error);
+        }
+
+        return requestIdsOwnedByConnection.length;
     }
 
     stopPendingRequestTimeout(id) {

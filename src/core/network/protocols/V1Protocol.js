@@ -8,12 +8,14 @@ class V1Protocol extends ProtocolInterface {
     #session;
     #router;
     #publicKeyHex;
+    #connection;
     #pendingRequestService;
 
     constructor(router, connection, pendingRequestService, config) {
         super(router, connection, pendingRequestService, config);
         this.#router = router;
         this.#publicKeyHex = connection.remotePublicKey.toString('hex');
+        this.#connection = connection;
         this.#pendingRequestService = pendingRequestService;
         this.init(connection);
     }
@@ -62,13 +64,19 @@ class V1Protocol extends ProtocolInterface {
 
     async send(message) {
         const encodedMessage = encodeV1networkOperation(message);
-        const msgReplyPromise = this.#pendingRequestService.registerPendingRequest(this.#publicKeyHex, message);
+        const pendingResponse = this.#pendingRequestService.registerPendingRequest(
+            this.#publicKeyHex,
+            message,
+            this.#connection
+        );
+
         try {
             this.#session.send(encodedMessage);
         } catch (error) {
             this.#pendingRequestService.rejectPendingRequest(message.id, error);
         }
-        return msgReplyPromise;
+
+        return pendingResponse;
     }
 
     sendAndForget(message) {

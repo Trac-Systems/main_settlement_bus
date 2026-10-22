@@ -7,6 +7,8 @@ import {getTelemetry} from "../../../utils/telemetry.js";
  * @typedef {import('hyperswarm').Connection} Connection
  */
 
+const DEFAULT_HEALTH_CHECK_FAILURE_THRESHOLD = 3;
+
 export class ConnectionManagerError extends Error {
     constructor(message) {
         super(message);
@@ -19,6 +21,8 @@ class ConnectionManager {
     #maxValidators
     #config
     #healthCheckService
+    #healthCheckFailures
+    #healthCheckFailureThreshold
     #boundedHealthCheckHandler
     #logger
     #telemetry
@@ -32,8 +36,11 @@ class ConnectionManager {
      **/
     constructor(config) {
         this.#validators = new Map();
+        // consecutive failed health checks per validator
+        this.#healthCheckFailures = new Map();
         this.#config = config
         this.#maxValidators = config.maxValidators
+        this.#healthCheckFailureThreshold = this.#resolveHealthCheckFailureThreshold(config);
         this.#boundedHealthCheckHandler = this.#healthCheckHandler.bind(this);
         this.#logger = new Logger(config)
         this.#telemetry = getTelemetry(config)
@@ -81,43 +88,93 @@ class ConnectionManager {
             return;
         }
 
-        const connection = this.getConnection(publicKey);
+        const checkedConnection = this.getConnection(publicKey);
+        const protocolSession = checkedConnection?.protocolSession;
+        const canSendHealthCheck = typeof protocolSession?.sendHealthCheck === 'function';
         const startedAt = Date.now();
-        const context = { validator: publicKey, validator_address: targetAddress, healthcheck_id: requestId, ...this.getConnectionDiagnostics(publicKey) };
-        if (!connection || !connection.protocolSession || typeof connection.protocolSession.sendHealthCheck !== 'function') {
+        const context = {
+            validator: publicKey,
+            validator_address: targetAddress,
+            healthcheck_id: requestId,
+            ...this.getConnectionDiagnostics(publicKey),
+        };
+
+        if (!canSendHealthCheck) {
             this.#logger.debug(`healthCheck: missing protocol session, removing validator. Address = ${targetAddress}; Request ID = ${requestId}`);
-            this.#stopHealthCheck(publicKey);
             this.#telemetry.emit('validator.healthcheck_failed', { ...context, reason: 'missing_protocol_session' }, 4);
-            this.remove(publicKey, { reason: 'missing_protocol_session', healthcheck_id: requestId, expectedConnection: connection });
+            this.remove(publicKey, {
+                reason: 'missing_protocol_session',
+                healthcheck_id: requestId,
+                expectedConnection: checkedConnection,
+            });
             return;
         }
 
-        let success = false;
+        let healthCheckSucceeded = false;
         let resultCode;
         let errorType;
         try {
             this.#logger.debug(`healthCheck: sending liveness request. Address = ${targetAddress}; Request ID = ${requestId}`);
 
-            connection.protocolSession.setTelemetryContext?.(context);
-            resultCode = await connection.protocolSession.sendHealthCheck();
-            success = resultCode === ResultCode.OK;
-            if (!success) {
+            protocolSession.setTelemetryContext?.(context);
+            resultCode = await protocolSession.sendHealthCheck();
+            healthCheckSucceeded = resultCode === ResultCode.OK;
+            if (!healthCheckSucceeded) {
                 this.#logger.debug(`healthCheck: non-OK result code. Address = ${targetAddress}; Request ID = ${requestId}`);
             }
         } catch (error) {
             errorType = error?.name ?? 'Error';
-            success = false;
+            healthCheckSucceeded = false;
         }
 
-        if (!success) {
-            this.#logger.debug(`healthCheck: liveness request failed, removing validator. Address = ${targetAddress}; Request ID = ${requestId}`);
-            const reason = resultCode === ResultCode.TIMEOUT || errorType === 'PendingRequestServiceTimeoutError'
-                ? 'healthcheck_timeout' : 'healthcheck_rejected';
-            const failure = { reason, healthcheck_id: requestId, result_code: resultCode, error_type: errorType, duration_ms: Date.now() - startedAt };
-            this.#telemetry.emit('validator.healthcheck_failed', { ...context, ...failure }, 4);
-            this.remove(publicKey, { ...failure, expectedConnection: connection });
-        } else {
+        // A check may finish after this socket was detached and replaced for the same key.
+        const checkedConnectionIsStillCurrent = this.isCurrent(publicKey, checkedConnection);
+        if (healthCheckSucceeded) {
+            if (!checkedConnectionIsStillCurrent) {
+                return;
+            }
+
+            this.#clearHealthCheckFailures(publicKey);
             this.#logger.debug(`healthCheck: success. Address = ${targetAddress}; Request ID = ${requestId}`);
+            return;
+        }
+
+        const healthCheckTimedOut = resultCode === ResultCode.TIMEOUT || errorType === 'PendingRequestServiceTimeoutError';
+        const failure = {
+            reason: healthCheckTimedOut ? 'healthcheck_timeout' : 'healthcheck_rejected',
+            healthcheck_id: requestId,
+            result_code: resultCode,
+            error_type: errorType,
+            duration_ms: Date.now() - startedAt,
+        };
+
+        if (!checkedConnectionIsStillCurrent) {
+            this.#telemetry.emit('validator.healthcheck_failed', {
+                ...context,
+                ...failure,
+                stale_connection: true,
+            }, 4);
+            return;
+        }
+
+        const consecutiveFailures = this.#countHealthCheckFailure(publicKey);
+        this.#logger.debug(`healthCheck: liveness request failed. Address = ${targetAddress}; Request ID = ${requestId}; Consecutive failures = ${consecutiveFailures}`);
+        this.#telemetry.emit('validator.healthcheck_failed', {
+            ...context,
+            ...failure,
+            consecutive_failures: consecutiveFailures,
+            failure_threshold: this.#healthCheckFailureThreshold,
+        }, 4);
+
+        const failureThresholdReached = consecutiveFailures >= this.#healthCheckFailureThreshold;
+        if (failureThresholdReached) {
+            this.#logger.debug(`healthCheck: failure threshold reached, removing validator. Address = ${targetAddress}; Request ID = ${requestId}`);
+            this.remove(publicKey, {
+                ...failure,
+                consecutive_failures: consecutiveFailures,
+                failure_threshold: this.#healthCheckFailureThreshold,
+                expectedConnection: checkedConnection,
+            });
         }
     };
 
@@ -138,6 +195,23 @@ class ConnectionManager {
         }
     }
 
+    #resolveHealthCheckFailureThreshold(config) {
+        const threshold = Number(config.validatorHealthCheckFailureThreshold);
+        if (!Number.isInteger(threshold) || threshold < 1) return DEFAULT_HEALTH_CHECK_FAILURE_THRESHOLD;
+        return threshold;
+    }
+
+    #countHealthCheckFailure(publicKey) {
+        const publicKeyHex = this.#toHexString(publicKey);
+        const failures = (this.#healthCheckFailures.get(publicKeyHex) || 0) + 1;
+        this.#healthCheckFailures.set(publicKeyHex, failures);
+        return failures;
+    }
+
+    #clearHealthCheckFailures(publicKey) {
+        this.#healthCheckFailures.delete(this.#toHexString(publicKey));
+    }
+
     /**
      * Retrieves the Hyperswarm connection object for a given validator public key.
      * @param {String | Buffer} publicKey - The public key (Buffer or hex string) of the validator.
@@ -147,6 +221,18 @@ class ConnectionManager {
         const publicKeyHex = this.#toHexString(publicKey);
         const entry = this.#validators.get(publicKeyHex);
         return entry ? entry.connection : undefined;
+    }
+
+    /**
+     * Checks whether a connection is the one currently tracked for a validator.
+     * @param {String | Buffer} publicKey - The public key (Buffer or hex string) of the validator.
+     * @param {Object} connection - The connection object to compare with the tracked one.
+     * @returns {Boolean} - Returns true if the tracked connection is the given connection, false otherwise.
+     */
+    isCurrent(publicKey, connection) {
+        const publicKeyHex = this.#toHexString(publicKey);
+        const entry = this.#validators.get(publicKeyHex);
+        return !!entry && entry.connection === connection;
     }
 
     /**
@@ -205,42 +291,77 @@ class ConnectionManager {
      * @param {object} [options]
      * @param {boolean} [options.endConnection=true] - Whether to close the underlying socket.
      * @param {string} [options.reason='unspecified'] - The initiating operation's removal reason.
-     * @param {Object} [options.expectedConnection] - Ignore a late callback from a replaced socket.
+     * @param {Object} [options.expectedConnection] - Only remove this socket if it is still tracked.
      */
-    remove(publicKey, { endConnection = true, reason = 'unspecified', expectedConnection, ...context } = {}) {
-        this.#logger.debug(`remove: removing validator ${publicKeyToAddress(publicKey, this.#config)}`);
+    remove(publicKey, options = {}) {
+        const {
+            endConnection = true,
+            reason = 'unspecified',
+            expectedConnection,
+            ...context
+        } = options;
         const publicKeyHex = this.#toHexString(publicKey);
-        const tracked = this.#validators.get(publicKeyHex);
-        if (expectedConnection && tracked?.connection !== expectedConnection) return;
-        this.#stopHealthCheck(publicKeyHex);
-        if (this.exists(publicKeyHex)) {
-            const entry = this.#validators.get(publicKeyHex);
-            const poolBefore = this.connectionCount();
-            const diagnostics = this.getConnectionDiagnostics(publicKeyHex);
-            // Remove before ending the socket: end() may synchronously emit close.
-            this.#validators.delete(publicKeyHex);
-            this.#poolVersion++;
-            const poolAfter = this.connectionCount();
-            this.#telemetry.emit('validator.removed', {
-                ...context, ...diagnostics, validator: publicKeyHex, reason,
-                end_connection: endConnection, pool_before: poolBefore, pool_after: poolAfter,
-                pool_version: this.#poolVersion
-            }, reason === 'message_threshold' || reason === 'shutdown' ? 6 : 4);
-            if (poolBefore > 0 && poolAfter === 0) {
-                this.#emptySince = Date.now();
-                this.#telemetry.emit('validator.pool_empty', { reason, pool_version: this.#poolVersion }, reason === 'shutdown' ? 6 : 4);
+        const removalRequiresMatchingConnection = expectedConnection !== undefined;
+
+        if (removalRequiresMatchingConnection) {
+            const expectedConnectionIsStillCurrent = this.isCurrent(publicKeyHex, expectedConnection);
+            if (!expectedConnectionIsStillCurrent) {
+                return;
             }
-            if (endConnection && entry && entry.connection && typeof entry.connection.end === 'function') {
-                try {
-                    entry.connection.end();
-                } catch (e) {
-                    // Ignore errors on connection end
-                    this.#logger.debug(`remove: failed to end connection: ${e.message}`);
-                    // TODO: Consider logging these errors here in verbose mode
-                }
-            }
-            this.#logger.debug(`remove: validator removed successfully. Map size is now ${this.#validators.size}.`);
         }
+
+        this.#logger.debug(`remove: removing validator ${publicKeyToAddress(publicKey, this.#config)}`);
+        this.#stopHealthCheck(publicKeyHex);
+        this.#clearHealthCheckFailures(publicKeyHex);
+
+        if (!this.exists(publicKeyHex)) {
+            return;
+        }
+
+        const validatorEntry = this.#validators.get(publicKeyHex);
+        const removedConnection = validatorEntry?.connection;
+        const poolBefore = this.connectionCount();
+        const diagnostics = this.getConnectionDiagnostics(publicKeyHex);
+        this.#logger.debug(`remove: removing validator from map: ${publicKeyToAddress(publicKeyHex, this.#config)}. Map size before removal: ${this.#validators.size}.`);
+
+        // Detach first: end() may synchronously emit close and attach a replacement socket.
+        this.#validators.delete(publicKeyHex);
+        this.#poolVersion++;
+
+        const poolAfter = this.connectionCount();
+        const removalIsPlanned = reason === 'message_threshold' || reason === 'shutdown';
+        this.#telemetry.emit('validator.removed', {
+            ...context,
+            ...diagnostics,
+            validator: publicKeyHex,
+            reason,
+            end_connection: endConnection,
+            pool_before: poolBefore,
+            pool_after: poolAfter,
+            pool_version: this.#poolVersion,
+        }, removalIsPlanned ? 6 : 4);
+
+        const poolBecameEmpty = poolBefore > 0 && poolAfter === 0;
+        if (poolBecameEmpty) {
+            this.#emptySince = Date.now();
+            this.#telemetry.emit('validator.pool_empty', {
+                reason,
+                pool_version: this.#poolVersion,
+            }, reason === 'shutdown' ? 6 : 4);
+        }
+
+        const shouldEndSocket = endConnection && removedConnection && typeof removedConnection.end === 'function';
+        if (shouldEndSocket) {
+            try {
+                removedConnection.end();
+            } catch (error) {
+                // Ignore errors on connection end
+                this.#logger.debug(`remove: failed to end connection: ${error.message}`);
+                // TODO: Consider logging these errors here in verbose mode
+            }
+        }
+
+        this.#logger.debug(`remove: validator removed successfully. Map size is now ${this.#validators.size}.`);
     }
 
     get poolVersion() {
@@ -393,6 +514,7 @@ class ConnectionManager {
         const poolBefore = this.connectionCount();
         const entry = { connection, sent: this.#validators.get(publicKeyHex)?.sent ?? 0, connectionId: generateUUID(), connectedAt: Date.now() };
         this.#validators.set(publicKeyHex, entry);
+        this.#clearHealthCheckFailures(publicKeyHex);
         this.#poolVersion++;
         this.#telemetry.emit('validator.connected', {
             ...context, validator: publicKeyHex, connection_id: entry.connectionId,

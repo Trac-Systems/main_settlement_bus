@@ -59,22 +59,26 @@ class MessageOrchestrator {
             return this.connectionManager.pickRandomConnectedValidator();
         }
 
-        const connected = this.connectionManager.connectedValidators();
-        if (!Array.isArray(connected) || connected.length === 0) {
+        const connectedValidatorKeys = this.connectionManager.connectedValidators();
+        if (!Array.isArray(connectedValidatorKeys) || connectedValidatorKeys.length === 0) {
             return null;
         }
 
-        const eligible = connected.filter((publicKey) => {
+        const eligibleValidatorKeys = connectedValidatorKeys.filter((publicKey) => {
             return publicKeyToAddress(publicKey, this.#config) !== requesterAddress;
         });
 
-        const pool = eligible.length > 0 ? eligible : connected;
-        if (typeof this.connectionManager.pickRandomValidator === 'function') {
-            return this.connectionManager.pickRandomValidator(pool);
+        let candidateValidatorKeys = connectedValidatorKeys;
+        if (eligibleValidatorKeys.length > 0) {
+            candidateValidatorKeys = eligibleValidatorKeys;
         }
 
-        const index = Math.floor(Math.random() * pool.length);
-        return pool[index] ?? null;
+        if (typeof this.connectionManager.pickRandomValidator === 'function') {
+            return this.connectionManager.pickRandomValidator(candidateValidatorKeys);
+        }
+
+        const randomIndex = Math.floor(Math.random() * candidateValidatorKeys.length);
+        return candidateValidatorKeys[randomIndex] ?? null;
     }
 
     /**
@@ -139,17 +143,6 @@ class MessageOrchestrator {
         return this.#send(message, retries + 1, context);
     }
 
-    #removeAfterThreshold(validatorPublicKey, fields) {
-        if (this.shouldRemove(validatorPublicKey)) {
-            this.connectionManager.remove(validatorPublicKey, {
-                ...fields,
-                reason: 'message_threshold',
-                sent_count: this.connectionManager.getSentCount(validatorPublicKey),
-                message_threshold: this.#config.messageThreshold,
-            });
-        }
-    }
-
     async #send(message, retries, context) {
         if (retries > this.#config.maxRetries) {
             this.#sendFailed(context, this.#broadcastFields(context), 'max_retries');
@@ -162,20 +155,19 @@ class MessageOrchestrator {
             this.#sendFailed(context, this.#broadcastFields(context), 'no_validators');
             return false;
         }
+
         console.log("Sending message to validator:", publicKeyToAddress(validatorPublicKey, this.#config));
 
-        /* NOTE: Since the retry logic for Legacy is handled here, and is very unique to the protocol,
-        * it was decided to not change MessageOrchestrator send method in the refactor to make protocols transparent.
-        * As the Legacy protocol is going to be deprecated soon, it was decided to keep the retry logic 
-        * here instead of abstracting it in the protocol implementation. 
-        * If we were to abstract it, we would need to add protocol-specific logic in the ProtocolSession
-        * or ProtocolInterface, which would make them less clean and more coupled with the specifics of the protocols.
-        * The parts to be refactored in the future are marked with TODO comments.
-        */
+        // Retain this connection throughout the attempt. The same public key can
+        // refer to a replacement connection after any of the awaits below.
+        const selectedConnection = this.connectionManager.getConnection(validatorPublicKey);
+        const protocolSession = selectedConnection.protocolSession;
+        const preferredProtocol = protocolSession.preferredProtocol;
+        let requestId;
+        if (preferredProtocol === protocolSession.supportedProtocols.V1) {
+            requestId = generateUUID();
+        }
 
-        // TODO: After Legacy is deprecated, we don't need to check preferred protocol here.
-        const validatorConnection = this.connectionManager.getConnection(validatorPublicKey);
-        const preferredProtocol = validatorConnection.protocolSession.preferredProtocol;
         const fields = {
             ...this.#broadcastFields(context),
             validator_address: publicKeyToAddress(validatorPublicKey, this.#config),
@@ -183,123 +175,157 @@ class MessageOrchestrator {
             pool_version: this.connectionManager.poolVersion,
             connected_validators: this.connectionManager.connectedValidators?.()?.length,
             protocol: preferredProtocol,
-            request_id: preferredProtocol === validatorConnection.protocolSession.supportedProtocols.V1 ? generateUUID() : undefined,
+            request_id: requestId,
             attempt: context.attempts + 1,
             retry_count: retries,
         };
         context.lastFields = fields;
         this.#telemetry.emit('validator.selected', fields);
-        let success = false;
-        if (preferredProtocol === validatorConnection.protocolSession.supportedProtocols.LEGACY) {
+
+        if (preferredProtocol === protocolSession.supportedProtocols.LEGACY) {
             const startedAt = Date.now();
-            context.attempts++;
-            this.#telemetry.emit('tx.send_started', fields);
+            let sendSucceeded = false;
             let failureReason = 'unsigned_timeout';
             try {
-                success = await this.#attemptSendMessageForLegacy(validatorPublicKey, message, fields);
+                sendSucceeded = await this.#sendLegacyMessageAndWaitForState(
+                    message,
+                    validatorPublicKey,
+                    selectedConnection,
+                    context,
+                    fields
+                );
                 this.#telemetry.emit('tx.response', {
                     ...fields,
-                    success,
+                    success: sendSucceeded,
                     response_source: 'local_unsigned_state',
                     duration_ms: Date.now() - startedAt,
-                }, success ? 6 : 4);
-                if (success) context.reason = 'unsigned_observed';
-                else this.#sendFailed(context, fields, failureReason);
+                }, sendSucceeded ? 6 : 4);
+
+                if (sendSucceeded) {
+                    context.reason = 'unsigned_observed';
+                } else {
+                    this.#sendFailed(context, fields, failureReason);
+                }
             } catch (error) {
                 failureReason = 'send_error';
                 this.#sendFailed(context, {
                     ...fields,
                     duration_ms: Date.now() - startedAt,
                 }, failureReason, error);
-                success = await this.#retry(message, retries, context, fields, failureReason);
+                sendSucceeded = await this.#retry(message, retries, context, fields, failureReason);
             }
-            if (!success) {
-                // Remove validator and retry
-                this.connectionManager.remove(validatorPublicKey, { ...fields, reason: failureReason });
-                success = await this.#retry(message, retries, context, fields, failureReason);
+
+            // Legacy also reaches this branch if the recursive attempt in the
+            // catch failed. It then removes the original connection and retries again.
+            if (!sendSucceeded) {
+                this.connectionManager.remove(validatorPublicKey, {
+                    ...fields,
+                    reason: failureReason,
+                    expectedConnection: selectedConnection,
+                });
+                sendSucceeded = await this.#retry(message, retries, context, fields, failureReason);
             }
-        } else if (preferredProtocol === validatorConnection.protocolSession.supportedProtocols.V1) {
-            // TODO: This is probably better placed inside the V1 protocol definition.
-            // Both protocols should receive a 'canonical' message and solve the encodings internally
-            // Refactor 
-            const normalizedMessage = normalizeMessageByOperationType(message, this.#config)
-            const encodedTransaction = unsafeEncodeApplyOperation(normalizedMessage)
-            const v1Message = await networkMessageFactory(this.#wallet, this.#config)
-                .buildBroadcastTransactionRequest(
-                    fields.request_id,
-                    encodedTransaction,
-                    NETWORK_CAPABILITIES
-                );
 
-            context.attempts++;
-            const startedAt = Date.now();
-            this.#telemetry.emit('tx.send_started', fields);
-            await this.connectionManager.sendSingleMessage(v1Message, validatorPublicKey)
-                .then(
-                    async (resultCode) => {
-                        const responseFields = {
-                            ...fields,
-                            result_code: resultCode,
-                            result_name: RESULT_NAMES.get(resultCode) ?? 'UNKNOWN',
-                            duration_ms: Date.now() - startedAt,
-                        };
-                        this.#telemetry.emit('tx.response', responseFields, resultCode === ResultCode.OK ? 6 : 4);
-                        if (await this.#isIdempotentSuccess(resultCode, message)) {
-                            success = true;
-                            context.reason = 'idempotent_success';
-                            this.#telemetry.emit('tx.idempotent_success', responseFields);
-                            return;
-                        }
-
-                        // TODO: When we will deprecate the legacy protocol, we should refactor this scope, to propagate domain-error with result code.
-                        const action = resultToValidatorAction(resultCode);
-                        switch (action) {
-                            case SENDER_ACTION.SUCCESS:
-                                success = true;
-                                context.reason = 'validator_accepted';
-                                //TODO: Create a function for action below, and replace it also in legacy flow.
-                                this.incrementSentCount(validatorPublicKey);
-                                this.#removeAfterThreshold(validatorPublicKey, responseFields);
-                                break;
-                            case SENDER_ACTION.ROTATE:
-                                this.#sendFailed(context, { ...responseFields, action }, 'response_policy');
-                                this.connectionManager.remove(validatorPublicKey, { ...responseFields, reason: 'response_policy' });
-                                break;
-                            case SENDER_ACTION.NO_ROTATE:
-                                this.#sendFailed(context, { ...responseFields, action }, 'response_policy');
-                                break;
-                            default:
-                                this.#sendFailed(context, { ...responseFields, action }, 'unknown_response_policy');
-                                this.connectionManager.remove(validatorPublicKey, { ...responseFields, reason: 'response_policy' });
-                                console.warn(
-                                    `MessageOrchestrator: Unrecognized action from connectionPolicies: ${action}.
-                                     ResultCode was: ${resultCode}. Removing validator ${publicKeyToAddress(validatorPublicKey, this.#config)}`
-                                );
-                                break;
-                        }
-                    }
-                )
-                .catch(
-                    async (err) => {
-                        const reason = err instanceof ConnectionManagerError ? 'connection_unavailable' : 'send_error';
-                        this.#sendFailed(context, {
-                            ...fields,
-                            duration_ms: Date.now() - startedAt,
-                        }, reason, err);
-                        if (err instanceof ConnectionManagerError) {
-                            success = await this.#retry(message, retries, context, fields, reason);
-                            console.warn(`MessageOrchestrator: Connection Error: ${err.message}`);
-                        } else {
-                            this.connectionManager.remove(validatorPublicKey, { ...fields, reason: 'send_error' });
-                            success = await this.#retry(message, retries, context, fields, reason);
-                        }
-                    }
-                )
-
-        } else {
-            this.#sendFailed(context, fields, 'unsupported_protocol');
+            return sendSucceeded;
         }
-        return success;
+
+        if (preferredProtocol !== protocolSession.supportedProtocols.V1) {
+            this.#sendFailed(context, fields, 'unsupported_protocol');
+            return false;
+        }
+
+        // Construction errors propagate to the caller. Only sending and response
+        // handling use the retry policy below.
+        const normalizedMessage = normalizeMessageByOperationType(message, this.#config);
+        const encodedTransaction = unsafeEncodeApplyOperation(normalizedMessage);
+        const v1Message = await networkMessageFactory(this.#wallet, this.#config)
+            .buildBroadcastTransactionRequest(
+                requestId,
+                encodedTransaction,
+                NETWORK_CAPABILITIES
+            );
+
+        const startedAt = Date.now();
+        try {
+            const resultCode = await this.#sendOnSelectedConnection(
+                v1Message,
+                validatorPublicKey,
+                selectedConnection,
+                context,
+                fields
+            );
+            const responseFields = {
+                ...fields,
+                result_code: resultCode,
+                result_name: RESULT_NAMES.get(resultCode) ?? 'UNKNOWN',
+                duration_ms: Date.now() - startedAt,
+            };
+            this.#telemetry.emit('tx.response', responseFields, resultCode === ResultCode.OK ? 6 : 4);
+
+            const alreadyCommitted = await this.#isIdempotentSuccess(resultCode, message);
+            if (alreadyCommitted) {
+                context.reason = 'idempotent_success';
+                this.#telemetry.emit('tx.idempotent_success', responseFields);
+                return true;
+            }
+
+            const senderAction = resultToValidatorAction(resultCode);
+            switch (senderAction) {
+                case SENDER_ACTION.SUCCESS: {
+                    context.reason = 'validator_accepted';
+                    this.#recordSuccessfulSend(validatorPublicKey, selectedConnection, responseFields);
+                    return true;
+                }
+                case SENDER_ACTION.ROTATE: {
+                    this.#sendFailed(context, { ...responseFields, action: senderAction }, 'response_policy');
+                    this.connectionManager.remove(validatorPublicKey, {
+                        ...responseFields,
+                        reason: 'response_policy',
+                        expectedConnection: selectedConnection,
+                    });
+                    return false;
+                }
+                case SENDER_ACTION.NO_ROTATE: {
+                    this.#sendFailed(context, { ...responseFields, action: senderAction }, 'response_policy');
+                    return false;
+                }
+                default: {
+                    this.#sendFailed(context, { ...responseFields, action: senderAction }, 'unknown_response_policy');
+                    this.connectionManager.remove(validatorPublicKey, {
+                        ...responseFields,
+                        reason: 'response_policy',
+                        expectedConnection: selectedConnection,
+                    });
+                    console.warn(
+                        `MessageOrchestrator: Unrecognized action from connectionPolicies: ${senderAction}. ` +
+                        `ResultCode was: ${resultCode}. Removing validator ${publicKeyToAddress(validatorPublicKey, this.#config)}`
+                    );
+                    return false;
+                }
+            }
+        } catch (error) {
+            let failureReason = 'send_error';
+            if (error instanceof ConnectionManagerError) {
+                failureReason = 'connection_unavailable';
+            }
+            this.#sendFailed(context, {
+                ...fields,
+                duration_ms: Date.now() - startedAt,
+            }, failureReason, error);
+
+            if (error instanceof ConnectionManagerError) {
+                const retrySucceeded = await this.#retry(message, retries, context, fields, failureReason);
+                console.warn(`MessageOrchestrator: Connection Error: ${error.message}`);
+                return retrySucceeded;
+            }
+
+            this.connectionManager.remove(validatorPublicKey, {
+                ...fields,
+                reason: failureReason,
+                expectedConnection: selectedConnection,
+            });
+            return await this.#retry(message, retries, context, fields, failureReason);
+        }
     }
 
     /**
@@ -315,10 +341,14 @@ class MessageOrchestrator {
      * change is actually observable locally, not just because the result code matched.
      */
     async #isIdempotentSuccess(resultCode, message) {
-        if (!this.#idempotentSuccessCodes.has(resultCode)) return false;
+        if (!this.#idempotentSuccessCodes.has(resultCode)) {
+            return false;
+        }
 
         const txHash = this.#extractTxHash(message);
-        if (!txHash) return false;
+        if (!txHash) {
+            return false;
+        }
 
         // A short wait covers the race where a first validator committed the tx
         // and a retried validator only observes it as "already exists/completed".
@@ -331,35 +361,78 @@ class MessageOrchestrator {
     }
 
     #extractTxHash(message) {
-        if (!message || !Number.isInteger(message.type)) return null;
+        if (!message || !Number.isInteger(message.type)) {
+            return null;
+        }
 
         const payloadKey = operationToPayload(message.type);
         const txHash = message?.[payloadKey]?.tx;
-        return typeof txHash === 'string' && txHash.length > 0 ? txHash : null;
+        if (typeof txHash !== 'string' || txHash.length === 0) {
+            return null;
+        }
+
+        return txHash;
     }
 
     // TODO: Delete this function after legacy protocol is deprecated
-    async #attemptSendMessageForLegacy(validatorPublicKey, message, fields) {
-        const deductedTxType = operationToPayload(message.type);
-        await this.connectionManager.sendSingleMessage(message, validatorPublicKey);
-        const appeared = await this.state.waitForUnsigned(
-            message[deductedTxType].tx,
+    async #sendLegacyMessageAndWaitForState(message, validatorPublicKey, selectedConnection, context, fields) {
+        const payloadKey = operationToPayload(message.type);
+        await this.#sendOnSelectedConnection(message, validatorPublicKey, selectedConnection, context, fields);
+
+        const transactionAppeared = await this.state.waitForUnsigned(
+            message[payloadKey].tx,
             this.#config.messageValidatorResponseTimeout
         );
-        if (appeared) {
-            this.incrementSentCount(validatorPublicKey);
-            this.#removeAfterThreshold(validatorPublicKey, fields);
-            return true;
+        if (!transactionAppeared) {
+            return false;
         }
-        return false;
+
+        this.#recordSuccessfulSend(validatorPublicKey, selectedConnection, fields);
+        return true;
     }
 
-    incrementSentCount(validatorPubKey) {
-        this.connectionManager.incrementSentCount(validatorPubKey);
+    async #sendOnSelectedConnection(message, validatorPublicKey, selectedConnection, context, fields) {
+        // Building a V1 request awaits hashing. The selected connection may have
+        // been replaced by the time the request is ready to send.
+        const currentConnection = this.connectionManager.getConnection(validatorPublicKey);
+        if (currentConnection !== selectedConnection) {
+            throw new ConnectionManagerError('Validator connection changed before sending the message.');
+        }
+
+        // Count attempts only when dispatch reaches the selected connection.
+        // A replacement during request construction triggers a retry without a send.
+        context.attempts++;
+        this.#telemetry.emit('tx.send_started', fields);
+        return this.connectionManager.sendSingleMessage(message, validatorPublicKey);
     }
 
-    shouldRemove(validatorPubKey) {
-        return this.connectionManager.getSentCount(validatorPubKey) >= this.#config.messageThreshold;
+    #recordSuccessfulSend(validatorPublicKey, selectedConnection, fields) {
+        // A late response from an old socket belongs to that socket's counter,
+        // not to a replacement connection registered under the same public key.
+        const currentConnection = this.connectionManager.getConnection(validatorPublicKey);
+        if (currentConnection !== selectedConnection) {
+            return;
+        }
+
+        this.incrementSentCount(validatorPublicKey);
+        if (this.shouldRemove(validatorPublicKey)) {
+            this.connectionManager.remove(validatorPublicKey, {
+                ...fields,
+                reason: 'message_threshold',
+                sent_count: this.connectionManager.getSentCount(validatorPublicKey),
+                message_threshold: this.#config.messageThreshold,
+                expectedConnection: selectedConnection,
+            });
+        }
+    }
+
+    incrementSentCount(validatorPublicKey) {
+        this.connectionManager.incrementSentCount(validatorPublicKey);
+    }
+
+    shouldRemove(validatorPublicKey) {
+        const sentCount = this.connectionManager.getSentCount(validatorPublicKey);
+        return sentCount >= this.#config.messageThreshold;
     }
 }
 
