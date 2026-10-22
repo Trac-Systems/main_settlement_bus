@@ -414,30 +414,48 @@ export class EpochCoordinationRound {
             return;
         }
 
-        let indexers = await this.#state.getIndexersEntry();
+        let currentWriterKeys;
+
         if (this.#coordinated) {
             const snapshot = await this.#state.getEpochAppenderSelectionContext();
             this.#assertActive();
+
             const { configData } = await this.#state.requireSignedConsensusConfig();
             this.#assertActive();
-            if (!sameSelectionContext(snapshot, this.#appendRequest) ||
+
+            if (
+                !sameSelectionContext(snapshot, this.#appendRequest) ||
                 configData.difficulty !== context.vdfDifficulty ||
-                configData.discriminantBitSize !== context.vdfDiscriminantSize) {
+                configData.discriminantBitSize !== context.vdfDiscriminantSize
+            ) {
                 await this.#withdrawAppendRequest();
                 this.#assertActive();
                 await machine.send(EPOCH_EVENTS.TARGET_EPOCH_ALREADY_SIGNED);
                 return;
             }
-            indexers = snapshot.currentWriterKeys.map(key => ({ key: b4a.from(key, 'hex') }));
+
+            currentWriterKeys = snapshot.currentWriterKeys;
+        } else {
+            const indexers = await this.#state.getIndexersEntry();
+            this.#assertActive();
+
+            currentWriterKeys = indexers.map(({ key }) => b4a.toString(key, 'hex'));
         }
-        this.#assertActive();
-        const membershipChanged = indexers.length !== context.indexerKeys.size ||
-            indexers.some(({ key }) => !context.indexerKeys.has(b4a.toString(key, 'hex')));
+
+        const membershipChanged =
+            currentWriterKeys.length !== context.indexerKeys.size ||
+            currentWriterKeys.some(key => !context.indexerKeys.has(key));
+
         if (membershipChanged) {
             await this.#withdrawAppendRequest();
             this.#assertActive();
         }
-        await machine.send(membershipChanged ? EPOCH_EVENTS.INDEXERS_CHANGED : EPOCH_EVENTS.TARGET_EPOCH_ABSENT);
+
+        await machine.send(
+            membershipChanged
+                ? EPOCH_EVENTS.INDEXERS_CHANGED
+                : EPOCH_EVENTS.TARGET_EPOCH_ABSENT
+        );
     }
 
     /** Appends SET_EPOCH locally. The event or timeout decides the final result. */
