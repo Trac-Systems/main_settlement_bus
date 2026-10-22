@@ -333,6 +333,132 @@ test('epoch append: corruption fails recovery with a stable code and original pa
     t.is(error.code, EpochAppenderSelectionErrorCode.PUBLICATION_MARKER_INVALID);
 });
 
+for (const monitorFirst of [false, true]) {
+    test(`epoch append: monitor and callers share an outcome read when ${monitorFirst ? 'the monitor' : 'a caller'} starts first`, async t => {
+        const clock = sinon.useFakeTimers();
+        const pending = Promise.withResolvers();
+        const readOutcome = sinon.stub().returns(pending.promise);
+        const { selector, request, save } = await setupPublication(readOutcome, true);
+        t.teardown(async () => {
+            pending.resolve({ status: EpochAppendOutcome.UNKNOWN });
+            await selector.close();
+            clock.restore();
+        });
+
+        if (monitorFirst) {
+            await clock.tickAsync(100);
+        }
+        const checking = [selector.reconcile(), selector.reconcile()];
+        await clock.tickAsync(300);
+        t.is(readOutcome.callCount, 1, 'all callers share the in-flight ledger read');
+
+        pending.resolve({ status: EpochAppendOutcome.UNKNOWN });
+        t.alike(await Promise.all(checking), [
+            { status: EpochAppendOutcome.UNKNOWN },
+            { status: EpochAppendOutcome.UNKNOWN },
+        ]);
+        t.is(selector.active.request.requestId, request.requestId);
+
+        readOutcome.resolves({ status: EpochAppendOutcome.EPOCH_ADVANCED });
+        await clock.tickAsync(100);
+        t.is(readOutcome.callCount, 2, 'UNKNOWN is not cached after the check completes');
+        t.alike(selector.outcomeFor(request.requestId), { status: EpochAppendOutcome.EPOCH_ADVANCED });
+        t.absent(selector.active);
+        t.is(save.callCount, 3, 'create, authorize and complete each persist once');
+    });
+}
+
+test('epoch append: a shared outcome read failure reaches every caller and permits a fresh read', async t => {
+    const clock = sinon.useFakeTimers();
+    const pending = Promise.withResolvers();
+    const failure = new Error('BLOCK_NOT_AVAILABLE');
+    const readOutcome = sinon.stub().returns(pending.promise);
+    const { selector, request } = await setupPublication(readOutcome);
+    t.teardown(async () => {
+        pending.resolve({ status: EpochAppendOutcome.UNKNOWN });
+        await selector.close();
+        clock.restore();
+    });
+
+    const checking = [selector.reconcile(), selector.reconcile()].map(check => check.catch(error => error));
+    await clock.tickAsync(0);
+    t.is(readOutcome.callCount, 1);
+    pending.reject(failure);
+    const errors = await Promise.all(checking);
+    t.is(errors[0], failure);
+    t.is(errors[1], failure);
+    t.is(selector.active.request.requestId, request.requestId, 'a read error does not prove rejection');
+    t.is(selector.outcomeFor(request.requestId), null);
+
+    readOutcome.resolves({ status: EpochAppendOutcome.REJECTED });
+    t.alike(await selector.reconcile(), { status: EpochAppendOutcome.REJECTED });
+    t.is(readOutcome.callCount, 2, 'a rejected Promise does not block future checks');
+    t.absent(selector.active);
+});
+
+test('epoch append: each publication gets its own outcome check', async t => {
+    const readOutcome = sinon.stub().resolves({ status: EpochAppendOutcome.REJECTED });
+    const { selector, request } = await setupPublication(readOutcome);
+    t.teardown(() => selector.close());
+
+    await Promise.all([selector.reconcile(), selector.reconcile()]);
+    t.is(readOutcome.callCount, 1);
+    t.alike(selector.outcomeFor(request.requestId), { status: EpochAppendOutcome.REJECTED });
+
+    const nextRequest = await selector.createRequest(context(1), b4a.from('next proof'));
+    await selector.authorizeAppend(nextRequest.requestId, { writerKey: key(10), from: 1 });
+    readOutcome.resolves({ status: EpochAppendOutcome.EPOCH_ADVANCED });
+    t.alike(await Promise.all([selector.reconcile(), selector.reconcile()]), [
+        { status: EpochAppendOutcome.EPOCH_ADVANCED },
+        { status: EpochAppendOutcome.EPOCH_ADVANCED },
+    ]);
+    t.is(readOutcome.callCount, 2);
+    t.is(readOutcome.secondCall.args[0].from, 1);
+    t.is(readOutcome.secondCall.args[0].payloadHash, nextRequest.payloadHash);
+    t.alike(selector.outcomeFor(nextRequest.requestId), { status: EpochAppendOutcome.EPOCH_ADVANCED });
+});
+
+test('epoch append: closing waits for an outcome check started outside the monitor', async t => {
+    const started = Promise.withResolvers();
+    const pending = Promise.withResolvers();
+    const readOutcome = sinon.stub().callsFake(() => {
+        started.resolve();
+        return pending.promise;
+    });
+    const { selector } = await setupPublication(readOutcome);
+    t.teardown(async () => {
+        pending.resolve({ status: EpochAppendOutcome.UNKNOWN });
+        await selector.close();
+    });
+    const checking = selector.reconcile();
+    await started.promise;
+    let closed = false;
+    const closing = selector.close().then(() => { closed = true; });
+
+    const error = await selector.reconcile().catch(error => error);
+    t.is(error.code, EpochAppenderSelectionErrorCode.SELECTOR_CLOSED);
+    t.is(readOutcome.callCount, 1, 'closing does not start another ledger read');
+    t.is(closed, false, 'the existing read is still owned by the selector');
+    pending.resolve({ status: EpochAppendOutcome.UNKNOWN });
+    await checking;
+    await closing;
+    t.is(closed, true);
+});
+
 function granted(request) {
     return { ...request, voteStatus: 1, observedCounter: request.logicalCounter, vote: request };
+}
+
+async function setupPublication(readOutcome, monitor = false) {
+    const save = sinon.stub().resolves();
+    const snapshot = context(1);
+    const selector = new EpochAppenderSelector(key(1), {
+        load: async () => null,
+        save,
+        readContext: async () => snapshot,
+        readOutcome,
+    }, 100, 20_000, monitor);
+    const request = await selector.createRequest(snapshot, b4a.from('proof'));
+    await selector.authorizeAppend(request.requestId, { writerKey: key(10), from: 0 });
+    return { selector, request, save };
 }

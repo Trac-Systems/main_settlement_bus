@@ -75,6 +75,7 @@ export class EpochAppenderSelector {
     #completedRequest = null;
     #monitorTimer = null;
     #monitorTask = null;
+    #reconcileTask = null;
 
     /**
      * @param {string} publicKey Local authenticated wallet public key, encoded as hex.
@@ -330,38 +331,27 @@ export class EpochAppenderSelector {
     /**
      * Observe signed completion or expire the local selection to allow a new term.
      * SELECTION_EXPIRED says nothing about whether the old append will still land.
+     * Concurrent callers share the current publication's check until it settles.
      * @returns {Promise<EpochAppendOutcomeResult|null>} Null if absent or superseded during the read.
      */
     async reconcile() {
         await this.open();
+        this.#assertAvailable();
         const active = this.#selectionState.active;
         if (!active || active.phase !== EpochAppenderSelectionPhase.PUBLISHING) {
             return null;
         }
-        const result = await this.#operations.readOutcome(copyAppendPublication(active.publication));
-        if (this.#selectionState.active !== active) {
-            return null;
+        if (this.#reconcileTask?.active === active) {
+            return this.#reconcileTask.promise;
         }
-        const finalOutcome = result.status === EpochAppendOutcome.REJECTED ||
-            result.status === EpochAppendOutcome.EPOCH_ADVANCED;
-        const selectionExpired = active.expiresAt <= Date.now() ||
-            !sameSelectionRequest(this.#selectionState.vote?.request, active.request);
-        if (!finalOutcome && !selectionExpired) {
-            return { status: EpochAppendOutcome.UNKNOWN };
-        }
-        const outcome = { status: finalOutcome ? result.status : EpochAppendOutcome.SELECTION_EXPIRED };
-        const released = await this.#updateSelectionState(() => {
-            if (this.#selectionState.active !== active) {
-                return false;
+        const task = { active, promise: null };
+        task.promise = this.#reconcilePublication(active).finally(() => {
+            if (this.#reconcileTask === task) {
+                this.#reconcileTask = null;
             }
-            this.#completedRequest = { requestId: active.request.requestId, outcome };
-            this.#releaseActiveRequest(active.request);
-            return true;
         });
-        if (!released) {
-            return null;
-        }
-        return { status: outcome.status };
+        this.#reconcileTask = task;
+        return task.promise;
     }
 
     /** @returns {Promise<void>} Resolves on quorum, or on the two-member unanswered timeout. */
@@ -402,7 +392,9 @@ export class EpochAppenderSelector {
         this.#campaignTimers.clear();
         clearInterval(this.#monitorTimer);
         this.#finishReplyWaiter(new EpochAppenderSelectionError(EpochAppenderSelectionErrorCode.SELECTOR_CLOSED, 'Epoch appender selector closed'));
-        await Promise.allSettled([this.#opening, this.#monitorTask, this.#selectionStateQueue]);
+        await Promise.allSettled([
+            this.#opening, this.#monitorTask, this.#reconcileTask?.promise, this.#selectionStateQueue,
+        ]);
     }
 
     async #open() {
@@ -734,6 +726,33 @@ export class EpochAppenderSelector {
         this.#selectionState.active = null;
         this.#expireOwnVote(request);
         this.#receivedReplies.clear();
+    }
+
+    async #reconcilePublication(active) {
+        const result = await this.#operations.readOutcome(copyAppendPublication(active.publication));
+        if (this.#selectionState.active !== active) {
+            return null;
+        }
+        const finalOutcome = result.status === EpochAppendOutcome.REJECTED ||
+            result.status === EpochAppendOutcome.EPOCH_ADVANCED;
+        const selectionExpired = active.expiresAt <= Date.now() ||
+            !sameSelectionRequest(this.#selectionState.vote?.request, active.request);
+        if (!finalOutcome && !selectionExpired) {
+            return { status: EpochAppendOutcome.UNKNOWN };
+        }
+        const outcome = { status: finalOutcome ? result.status : EpochAppendOutcome.SELECTION_EXPIRED };
+        const released = await this.#updateSelectionState(() => {
+            if (this.#selectionState.active !== active) {
+                return false;
+            }
+            this.#completedRequest = { requestId: active.request.requestId, outcome };
+            this.#releaseActiveRequest(active.request);
+            return true;
+        });
+        if (!released) {
+            return null;
+        }
+        return { status: outcome.status };
     }
 
 }

@@ -13,7 +13,7 @@ import { CustomEventType } from '../../../../../src/utils/constants.js';
 import { CONFIG, makeState, makeOperations } from '../epochCoordinatorTestHelpers.js';
 import { uint64ToBuffer } from '../../../../../src/utils/buffer.js';
 
-async function setup(t, members = 1) {
+async function setup(t, members = 1, monitor = false) {
     const clock = sinon.useFakeTimers();
     const state = makeState();
     const operations = makeOperations();
@@ -34,11 +34,12 @@ async function setup(t, members = 1) {
         currentWriterKeys: [state.writingKey.toString('hex')],
     };
     state.getEpochAppenderSelectionContext = async () => ({ ...snapshot });
+    const readOutcome = sinon.stub().callsFake(async () => ({ status: outcome }));
     const selector = new EpochAppenderSelector(publicKey, {
         load: async () => selectionState, save: async value => { selectionState = value; },
-        readContext: state.getEpochAppenderSelectionContext, readOutcome: async () => ({ status: outcome }),
+        readContext: state.getEpochAppenderSelectionContext, readOutcome,
         sendRequest: () => new Promise(() => {}),
-    }, 100, CONFIG.epochSignatureTimeout);
+    }, 100, CONFIG.epochSignatureTimeout, monitor);
     operations.appendSetEpoch.callsFake(async (payload, beforeAppend) => {
         await beforeAppend({ writerKey: state.writingKey.toString('hex'), from: writes.length });
         payloads.push(payload);
@@ -66,7 +67,7 @@ async function setup(t, members = 1) {
         return instance;
     }
     return {
-        clock, state, operations, selector, createRound, next, logger, payloads, writes,
+        clock, state, operations, selector, createRound, next, logger, payloads, writes, readOutcome,
         setOutcome: value => { outcome = value; },
     };
 }
@@ -175,4 +176,23 @@ test('an initialized round cannot append without its selector', async t => {
     t.teardown(() => round.cancel());
     await t.exception(() => round.run(() => {}));
     t.is(operations.appendSetEpoch.callCount, 0);
+});
+
+test('the selector monitor confirms a publication after its FSM round is cancelled', async t => {
+    const f = await setup(t, 1, true);
+    const round = f.createRound();
+    await round.run(f.next);
+    await f.clock.tickAsync(0);
+    const requestId = f.selector.active.request.requestId;
+    await round.cancel();
+    f.readOutcome.resetHistory();
+
+    f.setOutcome(EpochAppendOutcome.EPOCH_ADVANCED);
+    await f.clock.tickAsync(100);
+
+    t.is(f.readOutcome.callCount, 1, 'the selector observes completion without the round timer');
+    t.alike(f.selector.outcomeFor(requestId), { status: EpochAppendOutcome.EPOCH_ADVANCED });
+    t.absent(f.selector.active);
+    t.is(f.operations.appendSetEpoch.callCount, 1);
+    t.is(f.next.callCount, 0, 'a cancelled round does not schedule another round');
 });

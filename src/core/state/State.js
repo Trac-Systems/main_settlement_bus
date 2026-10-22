@@ -717,6 +717,30 @@ class State extends ReadyResource {
         return consensusConfig;
     }
 
+    /** @returns {Promise<import('../consensus/epochAppenderSelection/epochAppenderSelectionState.js').EpochAppenderSelectionContext>} Signed arbitration context. */
+    getEpochAppenderSelectionContext() {
+        return readEpochAppenderSelectionContext(this.#base, this.#config);
+    }
+
+    /**
+     * @param {import('../consensus/epochAppenderSelection/epochAppenderSelectionState.js').EpochAppendPublication} publication
+     * @returns {Promise<import('../consensus/epochAppenderSelection/epochAppenderSelectionState.js').EpochAppendOutcomeResult>}
+     */
+    getEpochAppendOutcome(publication) {
+        return readEpochAppendOutcome(this.#base, publication);
+    }
+
+    /** Persist publication intent inside the writer queue, before invoking Autobase. */
+    appendEpoch(payload, beforeAppend) {
+        return this.#writeQueue.add(async () => {
+            await beforeAppend({
+                writerKey: this.#base.local.key.toString('hex'),
+                from: this.#base.local.length,
+            });
+            return this.#base.append(payload);
+        });
+    }
+
     // ATTENTION: DO NOT USE METHODS ABOVE IN APPLY PART!
     ///////////////////////////////APPLY////////////////////////////////////
 
@@ -4903,29 +4927,6 @@ class State extends ReadyResource {
         return Status.SUCCESS;
     }
 
-    /** @returns {Promise<import('../consensus/epochAppenderSelection/epochAppenderSelectionState.js').EpochAppenderSelectionContext>} Signed arbitration context. */
-    getEpochAppenderSelectionContext() {
-        return readEpochAppenderSelectionContext(this.#base, this.#config);
-    }
-
-    /**
-     * @param {import('../consensus/epochAppenderSelection/epochAppenderSelectionState.js').EpochAppendPublication} publication
-     * @returns {Promise<import('../consensus/epochAppenderSelection/epochAppenderSelectionState.js').EpochAppendOutcomeResult>}
-     */
-    getEpochAppendOutcome(publication) {
-        return readEpochAppendOutcome(this.#base, publication);
-    }
-
-    /** Persist publication intent inside the writer queue, before invoking Autobase. */
-    appendEpoch(payload, beforeAppend) {
-        return this.#writeQueue.add(async () => {
-            await beforeAppend({
-                writerKey: this.#base.local.key.toString('hex'),
-                from: this.#base.local.length,
-            });
-            return this.#base.append(payload);
-        });
-    }
 }
 
 export default State;
