@@ -460,7 +460,7 @@ export class EpochCoordinationRound {
         }
     }
 
-    1    /** Ends the round after the append result has already been broadcast. */
+    /** Ends the round after the append result has already been broadcast. */
     async #handleSendAppendSignal(context) {
         await context.next(this.#intervalMs);
     }
