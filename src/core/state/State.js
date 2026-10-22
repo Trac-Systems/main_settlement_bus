@@ -660,16 +660,9 @@ class State extends ReadyResource {
             lte: endSeq
         });
 
-        const filters = (entry) => {
-            const isPut = entry.type === "put";
-            const isHex = isHexString(entry.key);
-            const is64 = entry.key.length === 64;
-            return isPut && isHex && is64;
-        }
-
         let hashes = [];
         for await (const entry of historyStream) {
-            if (filters(entry)) {
+            if (isTransactionRecordPut(entry)) {
                 hashes.push({ hash: entry.key, confirmed_length: entry.seq });
             }
         }
