@@ -75,9 +75,9 @@ import PQueue from 'p-queue';
 import {createGenesisEpochProof} from './utils/epochProof.js';
 import {decodeVersionedConsensusConfig} from '../../utils/consensusConfig.js';
 import {safeDecodeVdfConfig} from '../../codecs/consensus/v1/vdfConfigCodec.js';
+import { readEpochAppenderSelectionContext, readEpochAppendOutcome } from '../consensus/epochAppenderSelection/epochAppenderSelectionLedgerReader.js';
 import _ from 'lodash';
 import {StateEventQueue} from './StateEventQueue.js';
-import { readEpochAppenderSelectionContext, readEpochAppendOutcome } from '../consensus/epochAppenderSelection/epochAppenderSelectionLedgerReader.js';
 
 const OVERSIZED_BATCH_PENALTY_MULTIPLIER = BATCH_SIZE;
 
