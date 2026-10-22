@@ -130,8 +130,8 @@ const configData = {
         addressPrefix: TRAC_NETWORK_MSB_MAINNET_PREFIX,
         addressPrefixLength: TRAC_NETWORK_MSB_MAINNET_PREFIX.length,
         bech32mHrpLength: TRAC_NETWORK_MSB_MAINNET_PREFIX.length + 1, // len(addressPrefix + separator)
-        bootstrap: '059aefabf33419b85f650e0fd39cafa6efb06a8bd069fdbb419501eecf295399',
-        channel: '1231231312312323',
+        bootstrap: 'e81a23d67224e794a7df923843591880c24a4fd4de1795a80108035a7fcdfcbd',
+        channel: '123123131231233',
         dhtBootstrap: ['116.202.214.149:10001','157.180.12.214:10001','node1.hyperdht.org:49737','node2.hyperdht.org:49737','node3.hyperdht.org:49737'],
         derivationPath: address.MAINNET_DERIVATION_PATH,
         pollInterval: 500, // Validator observer poll interval
