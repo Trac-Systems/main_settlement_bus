@@ -215,8 +215,7 @@ export const HASH_BYTE_LENGTH = 32;
 export const HTLC_LOCK_ID_BYTE_LENGTH = 32;
 export const HTLC_PREIMAGE_BYTE_LENGTH = 32;
 export const HTLC_THRESHOLD_BYTE_LENGTH = 1;
-export const HTLC_MAX_SIGNERS = 8;
-export const HTLC_MIN_LOCK_DURATION_EPOCHS = 1n;
+export const HTLC_METADATA_BYTE_LENGTH = 1024;
 export const BALANCE_BYTE_LENGTH = 16;
 export const SIGNATURE_BYTE_LENGTH = 64;
 export const PEER_PUBLIC_KEY_HEX_LENGTH = 64;
@@ -245,6 +244,10 @@ export const VDF_PROOF_BYTE_LENGTHS = Object.freeze({
 export const ConsensusVersion = Object.freeze({
     VDF_V1: 1,
 });
+
+// HTLC constants
+export const HTLC_MAX_SIGNERS = 8;
+export const HTLC_MIN_LOCK_DURATION_EPOCHS = 1n;
 
 export const LICENSE_BYTE_LENGTH = 4;
 

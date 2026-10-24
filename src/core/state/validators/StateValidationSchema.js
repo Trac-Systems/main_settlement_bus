@@ -19,6 +19,7 @@ import {
     HTLC_PREIMAGE_BYTE_LENGTH,
     HTLC_THRESHOLD_BYTE_LENGTH,
     PUBLIC_KEY_LENGTH,
+    HTLC_METADATA_BYTE_LENGTH,
 } from '../../../utils/constants.js';
 import {
     boundedHtlcBufferArray,
@@ -583,7 +584,7 @@ class StateValidationSchema {
                     fr: {type: 'buffer', length: this.#config.addressLength, optional: true},
                     hl: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
                     re: {type: 'buffer', length: EPOCH_BYTE_LENGTH, required: true},
-                    ph: {type: 'buffer', length: HASH_BYTE_LENGTH, optional: true},
+                    md: {type: 'buffer', length: HTLC_METADATA_BYTE_LENGTH, optional: true},
                     ss: boundedHtlcBufferArray(1, HTLC_MAX_SIGNERS, PUBLIC_KEY_LENGTH),
                     th: {type: 'buffer', length: HTLC_THRESHOLD_BYTE_LENGTH, required: true},
                     cs: boundedHtlcBufferArray(0, HTLC_MAX_SIGNERS - 1, SIGNATURE_BYTE_LENGTH),
@@ -596,8 +597,8 @@ class StateValidationSchema {
                 custom: (value, errors) => {
                     if (!value || typeof value !== 'object') return value;
 
-                    const {fa, fr, ph, ss, th, cs, va, vn, vs} = value;
-                    if (fr === null || ph === null) {
+                    const {fa, fr, md, ss, th, cs, va, vn, vs} = value;
+                    if (fr === null || md === null) {
                         errors.push({
                             type: 'buffer',
                             field: 'hlo',
