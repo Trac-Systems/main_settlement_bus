@@ -5,7 +5,7 @@ import b4a from "b4a";
 import _ from "lodash";
 import { sleep, isHexString } from "./utils/helpers.js";
 import { applyStateMessageFactory } from "./messages/state/applyStateMessageFactory.js";
-import { isAddressValid } from "./core/state/utils/address.js";
+import { isAddressValid, bufferToAddress } from "./core/state/utils/address.js";
 import Network from "./core/network/Network.js";
 import State from "./core/state/State.js";
 import {
@@ -14,6 +14,8 @@ import {
     BALANCE_MIGRATION_SLEEP_INTERVAL,
     WHITELIST_MIGRATION_DIR,
     OperationType,
+    EntryType,
+    HTLC_LOCK_ID_BYTE_LENGTH,
     ConsensusVersion,
     MAX_VDF_DIFFICULTY,
     VDF_PROOF_BYTE_LENGTHS
@@ -22,8 +24,13 @@ import { decimalStringToBigInt, bigIntTo16ByteBuffer, bufferToBigInt, bigIntToDe
 import {
     normalizeDecodedPayloadForJson,
     normalizeTransactionOperation,
-    normalizeTransferOperation
+    normalizeTransferOperation,
+    normalizeMessageByOperationType
 } from "./utils/normalizers.js";
+import { operationToPayload } from "./utils/applyOperations.js";
+import PartialHtlcValidator from "./core/network/protocols/validators/shared/validators/PartialHtlcValidator.js";
+import { V1ProtocolError } from "./core/network/protocols/validators/v1/V1ProtocolError.js";
+import * as escrowEntryUtils from "./core/state/utils/escrowEntry.js";
 import fileUtils from './utils/fileUtils.js';
 import migrationUtils from './utils/migrationUtils.js';
 import {
@@ -125,13 +132,57 @@ export class MainSettlementBus extends ReadyResource {
         return await this.#network.validatorMessageOrchestrator.send(partialTransactionPayload);
     }
 
-    async htlcLock() {}
+    async htlcLock(payload) {
+        if (payload?.type !== OperationType.HTLC_LOCK) {
+            throw new ValidationError('HTLC lock payload is required.');
+        }
+        return this.broadcastTransaction(payload);
+    }
 
-    async htlcClaim() {}
+    async htlcClaim(payload) {
+        if (payload?.type !== OperationType.HTLC_CLAIM) {
+            throw new ValidationError('HTLC claim payload is required.');
+        }
+        return this.broadcastTransaction(payload);
+    }
 
-    async htlcRefund() {}
+    async htlcRefund(payload) {
+        if (payload?.type !== OperationType.HTLC_REFUND) {
+            throw new ValidationError('HTLC refund payload is required.');
+        }
+        return this.broadcastTransaction(payload);
+    }
 
-    async getHtlc() {}
+    async getHtlc(lockId, confirmed = true) {
+        if (typeof lockId !== 'string' || lockId.length !== HTLC_LOCK_ID_BYTE_LENGTH * 2 || !isHexString(lockId)) {
+            throw new ValidationError('Invalid HTLC lock ID.');
+        }
+        const normalizedId = lockId.toLowerCase();
+        const key = EntryType.HTLC_ESCROW + normalizedId;
+        const entry = confirmed ? await this.#state.getSigned(key) : await this.#state.get(key);
+        if (!entry) return null;
+
+        const escrow = escrowEntryUtils.decode(entry, this.#config.addressPrefix);
+        if (!escrow || b4a.toString(escrow.lockId, 'hex') !== normalizedId) {
+            throw new Error('Stored HTLC escrow is invalid.');
+        }
+        const address = value => value ? bufferToAddress(value, this.#config.addressPrefix) : null;
+        const hex = value => value ? b4a.toString(value, 'hex') : null;
+        return {
+            lockId: normalizedId,
+            status: Object.keys(escrowEntryUtils.Status).find(name => escrowEntryUtils.Status[name] === escrow.status),
+            lockerAddress: address(escrow.lockerAddress),
+            claimRecipientAddress: address(escrow.claimRecipientAddress),
+            refundRecipientAddress: address(escrow.refundRecipientAddress),
+            amount: bufferToBigInt(escrow.amount).toString(),
+            additionalFeeAmount: bufferToBigInt(escrow.additionalFeeAmount).toString(),
+            additionalFeeRecipientAddress: address(escrow.additionalFeeRecipientAddress),
+            hashLock: hex(escrow.hashLock),
+            refundEpoch: escrow.refundEpoch.readBigUInt64BE(0).toString(),
+            policyHash: hex(escrow.policyHash),
+            preimage: hex(escrow.preimage),
+        };
+    }
 
     async validateTransfer(payload) {
         const partialTransferValidator = new PartialTransferValidator(this.#state, null, this.#config);
@@ -142,6 +193,11 @@ export class MainSettlementBus extends ReadyResource {
     async validateTransaction(payload) {
         const partialTransactionValidator = new PartialTransactionValidator(this.#state, null, this.#config);
         return await partialTransactionValidator.validate(payload);
+    }
+
+    async validateHtlc(payload) {
+        const validator = new PartialHtlcValidator(this.#state, null, this.#config);
+        return validator.validate(payload);
     }
 
     async broadcastTransaction(payload) {
@@ -165,6 +221,21 @@ export class MainSettlementBus extends ReadyResource {
                 throw new ValidationError("Invalid transaction payload.");
             }
             hash = b4a.toString(normalizedPayload.txo.tx, "hex");
+        } else if ([OperationType.HTLC_LOCK, OperationType.HTLC_CLAIM, OperationType.HTLC_REFUND].includes(payload.type)) {
+            try {
+                normalizedPayload = normalizeMessageByOperationType(payload, this.#config);
+            } catch (error) {
+                throw new ValidationError(error.message || 'Invalid HTLC payload.');
+            }
+            try {
+                await this.validateHtlc(normalizedPayload);
+            } catch (error) {
+                if (error instanceof V1ProtocolError) throw new ValidationError(error.message);
+                throw error;
+            }
+            hash = b4a.toString(normalizedPayload[operationToPayload(payload.type)].tx, 'hex');
+        } else {
+            throw new ValidationError('Unsupported transaction operation.');
         }
 
         const success = await this.broadcastPartialTransaction(payload);

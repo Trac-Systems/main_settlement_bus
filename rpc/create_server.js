@@ -45,11 +45,20 @@ export const createServer = (msbInstance, config) => {
             const requestParts = requestPath.split('/');
             const routeParts = routeBase.split('/');
         
-            if (req.method === route.method && 
-            requestParts.length >= routeParts.length &&
-            routeParts.every((part, i) => part === requestParts[i])) {
+            const exact = route.exact || routeParts.some(part => part.startsWith(':'));
+            const params = {};
+            if (req.method === route.method &&
+            (exact ? requestParts.length === routeParts.length : requestParts.length >= routeParts.length) &&
+            routeParts.every((part, i) => {
+                if (part.startsWith(':') && requestParts[i]) {
+                    params[part.slice(1)] = requestParts[i];
+                    return true;
+                }
+                return part === requestParts[i];
+            })) {
             
                 foundRoute = true;
+                req.params = params;
                 try {
                 // This try/catch covers synchronous errors and errors from awaited promises
                 // within the route.handler function.

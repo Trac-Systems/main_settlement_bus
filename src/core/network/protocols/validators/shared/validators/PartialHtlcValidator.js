@@ -296,6 +296,7 @@ class PartialHtlcValidator extends PartialOperationValidator {
     }
 
     async #validateValidatorRewardBalance() {
+        if (!this.#selfAddress) return;
         const validatorEntry = await this.state.getNodeEntryUnsigned(this.#selfAddress);
         if (!validatorEntry) return;
 
