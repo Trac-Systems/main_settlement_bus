@@ -467,3 +467,86 @@ test('State.apply HTLC_LOCK persists and replicates optional metadata at its siz
         }
     }
 });
+
+test('State.apply HTLC_LOCK stores and replicates application metadata signed by two cosigners', async t => {
+    const context = await setupHtlcLockScenario(t, {nodes: 4});
+    const {makerPeer, claimantPeer} = context.htlcLockScenario;
+    const cosignerPeers = [claimantPeer, context.peers[3]];
+    const details = {
+        swapId: 'swap-816',
+        externalNetwork: 'bitcoin',
+        orderId: 'order-42',
+        cosigners: cosignerPeers.map(peer => peer.wallet.address),
+        note: 'Swap approved by two cosigners 🔒',
+    };
+    const metadata = b4a.from(JSON.stringify(details), 'utf8');
+    const payload = await buildHtlcLockPayload(context, {metadata, cosignerPeers});
+    const {hlo} = decodeHtlcLockPayload(payload);
+
+    t.is(hlo.ss.length, 3, 'the maker and two cosigners authorize the lock');
+    t.is(hlo.th[0], 3, 'all three signatures are required');
+    t.is(hlo.cs.length, 2, 'both cosigner signatures are present');
+    t.ok(tracCryptoApi.signature.verify(hlo.is, hlo.tx, makerPeer.wallet.publicKey),
+        'the maker signature is valid');
+    for (let index = 0; index < hlo.cs.length; index++) {
+        t.ok(tracCryptoApi.signature.verify(hlo.cs[index], hlo.tx, hlo.ss[index + 1]),
+            'each cosigner signs the transaction containing metadata');
+    }
+
+    await appendHtlcLock(context, payload);
+    await context.sync();
+
+    for (const peer of context.peers) {
+        const {escrow, operation} = await readLockState(peer.base, payload);
+        t.is(escrow.status, escrowEntryUtils.Status.PENDING);
+        t.ok(b4a.equals(escrow.metadata, metadata), 'escrow replicates the exact metadata bytes');
+        t.alike(JSON.parse(b4a.toString(escrow.metadata, 'utf8')), details,
+            'the application can read the swap details and cosigner information');
+        t.ok(b4a.equals(operation.value, payload), 'history retains the complete signed lock');
+        const storedLock = decodeHtlcLockPayload(operation.value).hlo;
+        t.alike(storedLock.cs, hlo.cs, 'history preserves both cosigner signatures');
+        t.ok(b4a.equals(storedLock.md, metadata), 'history and escrow contain identical metadata');
+    }
+});
+
+test('State.apply HTLC_LOCK rejects metadata changes without renewed cosigner signatures', async t => {
+    const context = await setupHtlcLockScenario(t, {nodes: 4});
+    const {validatorPeer, makerPeer, claimantPeer} = context.htlcLockScenario;
+    const cosignerPeers = [claimantPeer, context.peers[3]];
+    const metadata = b4a.from('{"swapId":"swap-816"}', 'utf8');
+    const originalPayload = await buildHtlcLockPayload(context, {metadata, cosignerPeers});
+    const original = decodeHtlcLockPayload(originalPayload);
+    const makerBefore = await readNodeEntry(validatorPeer.base, makerPeer.wallet.address);
+    const validatorBefore = await readNodeEntry(validatorPeer.base, validatorPeer.wallet.address);
+
+    for (const changedMetadata of [b4a.from('{"swapId":"swap-817"}', 'utf8'), undefined]) {
+        // Rebuild so the maker and validator authorize the new terms, but retain
+        // the cosigner signatures over the original metadata.
+        const changed = decodeHtlcLockPayload(await buildHtlcLockPayload(context, {
+            metadata: changedMetadata, cosignerPeers,
+        }));
+        changed.hlo.cs = original.hlo.cs;
+        t.absent(b4a.equals(changed.hlo.tx, original.hlo.tx), 'metadata changes the signed transaction hash');
+        t.ok(tracCryptoApi.signature.verify(changed.hlo.is, changed.hlo.tx, makerPeer.wallet.publicKey),
+            'the maker has signed the changed terms');
+        for (let index = 0; index < changed.hlo.cs.length; index++) {
+            t.absent(tracCryptoApi.signature.verify(changed.hlo.cs[index], changed.hlo.tx, changed.hlo.ss[index + 1]),
+                'the original cosigner signature does not authorize the changed metadata');
+        }
+        const payload = safeEncodeApplyOperation(changed);
+        await appendHtlcLock(context, payload);
+
+        const state = await readLockState(validatorPeer.base, payload);
+        t.is(state.escrow, null, 'changed metadata cannot create escrow with stale cosigner signatures');
+        t.is(state.operation, null, 'the unauthorized lock is not recorded');
+        t.alike((await readNodeEntry(validatorPeer.base, makerPeer.wallet.address)).balance,
+            makerBefore.balance, 'the maker is not charged');
+        t.alike((await readNodeEntry(validatorPeer.base, validatorPeer.wallet.address)).balance,
+            validatorBefore.balance, 'the validator receives no reward');
+    }
+
+    await appendHtlcLock(context, originalPayload);
+    const {escrow} = await readLockState(validatorPeer.base, originalPayload);
+    t.is(escrow.status, escrowEntryUtils.Status.PENDING, 'the original authorized lock is accepted');
+    t.ok(b4a.equals(escrow.metadata, metadata), 'only the originally signed metadata is stored');
+});

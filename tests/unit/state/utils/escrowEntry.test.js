@@ -390,3 +390,26 @@ test('Escrow Entry - malformed stored metadata is rejected in every settlement s
         }
     }
 });
+
+test('Escrow Entry - preserves application JSON metadata through claim and refund', t => {
+    const details = {
+        swapId: 'swap-816',
+        externalNetwork: 'bitcoin',
+        orderId: 'order-42',
+        note: 'Swap approved 🔒',
+    };
+    const metadata = b4a.from(JSON.stringify(details), 'utf8');
+    const inputs = {...makeInputs(), metadata};
+    const entry = init(inputs);
+    const claimed = makeClaim(entry, inputs.preimage, uint64ToBuffer(99));
+    const refunded = makeRefund(entry, uint64ToBuffer(100));
+
+    for (const [stored, status] of [[entry, Status.PENDING],
+        [claimed.claimedEscrowEntry, Status.CLAIMED], [refunded.refundedEscrowEntry, Status.REFUNDED]]) {
+        const decoded = decode(stored);
+        t.is(decoded.status, status);
+        t.ok(b4a.equals(decoded.metadata, metadata), 'application data retains its exact UTF-8 bytes');
+        t.alike(JSON.parse(b4a.toString(decoded.metadata, 'utf8')), details,
+            'the application can recover its structured data after settlement');
+    }
+});
