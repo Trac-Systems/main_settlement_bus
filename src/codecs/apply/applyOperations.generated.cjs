@@ -4227,7 +4227,7 @@ $root.apply = (function() {
              * @property {B4aBuffer|null} [fr] HtlcLockOperation fr
              * @property {B4aBuffer|null} [hl] HtlcLockOperation hl
              * @property {B4aBuffer|null} [re] HtlcLockOperation re
-             * @property {B4aBuffer|null} [ph] HtlcLockOperation ph
+             * @property {B4aBuffer|null} [md] HtlcLockOperation md
              * @property {Array.<B4aBuffer>|null} [ss] HtlcLockOperation ss
              * @property {B4aBuffer|null} [th] HtlcLockOperation th
              * @property {Array.<B4aBuffer>|null} [cs] HtlcLockOperation cs
@@ -4328,12 +4328,12 @@ $root.apply = (function() {
             HtlcLockOperation.prototype.re = $util.newBuffer([]);
 
             /**
-             * HtlcLockOperation ph.
-             * @member {B4aBuffer|null|undefined} ph
+             * HtlcLockOperation md.
+             * @member {B4aBuffer|null|undefined} md
              * @memberof apply.operations.HtlcLockOperation
              * @instance
              */
-            HtlcLockOperation.prototype.ph = null;
+            HtlcLockOperation.prototype.md = null;
 
             /**
              * HtlcLockOperation ss.
@@ -4409,8 +4409,8 @@ $root.apply = (function() {
             });
 
             // Virtual OneOf for proto3 optional field
-            Object.defineProperty(HtlcLockOperation.prototype, "_ph", {
-                get: $util.oneOfGetter($oneOfFields = ["ph"]),
+            Object.defineProperty(HtlcLockOperation.prototype, "_md", {
+                get: $util.oneOfGetter($oneOfFields = ["md"]),
                 set: $util.oneOfSetter($oneOfFields)
             });
 
@@ -4455,8 +4455,8 @@ $root.apply = (function() {
                     writer.uint32(/* id 8, wireType 2 =*/66).bytes(message.hl);
                 if (message.re != null && Object.hasOwnProperty.call(message, "re"))
                     writer.uint32(/* id 9, wireType 2 =*/74).bytes(message.re);
-                if (message.ph != null && Object.hasOwnProperty.call(message, "ph"))
-                    writer.uint32(/* id 10, wireType 2 =*/82).bytes(message.ph);
+                if (message.md != null && Object.hasOwnProperty.call(message, "md"))
+                    writer.uint32(/* id 10, wireType 2 =*/82).bytes(message.md);
                 if (message.ss != null && message.ss.length)
                     for (var i = 0; i < message.ss.length; ++i)
                         writer.uint32(/* id 11, wireType 2 =*/90).bytes(message.ss[i]);
@@ -4547,7 +4547,7 @@ $root.apply = (function() {
                             break;
                         }
                     case 10: {
-                            message.ph = $util.bytesFrom(reader.bytes());
+                            message.md = $util.bytesFrom(reader.bytes());
                             break;
                         }
                     case 11: {
@@ -4650,10 +4650,10 @@ $root.apply = (function() {
                 if (message.re != null && message.hasOwnProperty("re"))
                     if (!$util.isBytes(message.re))
                         return "re: buffer expected";
-                if (message.ph != null && message.hasOwnProperty("ph")) {
-                    properties._ph = 1;
-                    if (!$util.isBytes(message.ph))
-                        return "ph: buffer expected";
+                if (message.md != null && message.hasOwnProperty("md")) {
+                    properties._md = 1;
+                    if (!$util.isBytes(message.md))
+                        return "md: buffer expected";
                 }
                 if (message.ss != null && message.hasOwnProperty("ss")) {
                     if (!Array.isArray(message.ss))
@@ -4720,8 +4720,8 @@ $root.apply = (function() {
                     message.hl = $util.bytesFrom(object.hl);
                 if (object.re != null)
                     message.re = $util.bytesFrom(object.re);
-                if (object.ph != null)
-                    message.ph = $util.bytesFrom(object.ph);
+                if (object.md != null)
+                    message.md = $util.bytesFrom(object.md);
                 if (object.ss) {
                     if (!Array.isArray(object.ss))
                         throw TypeError(".apply.operations.HtlcLockOperation.ss: array expected");
@@ -4889,10 +4889,10 @@ $root.apply = (function() {
                     object.hl = $util.bytesTo(message.hl, options);
                 if (message.re != null && message.hasOwnProperty("re"))
                     object.re = $util.bytesTo(message.re, options);
-                if (message.ph != null && message.hasOwnProperty("ph")) {
-                    object.ph = $util.bytesTo(message.ph, options);
+                if (message.md != null && message.hasOwnProperty("md")) {
+                    object.md = $util.bytesTo(message.md, options);
                     if (options.oneofs)
-                        object._ph = "ph";
+                        object._md = "md";
                 }
                 if (message.ss && message.ss.length) {
                     object.ss = [];
