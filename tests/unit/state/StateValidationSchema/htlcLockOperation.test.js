@@ -4,8 +4,11 @@ import b4a from 'b4a';
 import StateValidationSchema from '../../../../src/core/state/validators/StateValidationSchema.js';
 import fixtures from '../../../fixtures/applyOperation.fixtures.js';
 import {config} from '../../../helpers/config.js';
+import {safeEncodeApplyOperation, safeDecodeApplyOperation} from '../../../../src/codecs/apply/applyOperationCodec.js';
+import {sanitizeDecodedPartialTransaction} from '../../../../src/core/network/protocols/validators/v1/handlers/broadcastTransaction/BroadcastTransactionPayloadUtils.js';
 import {
     HTLC_MAX_SIGNERS,
+    HTLC_METADATA_BYTE_LENGTH,
     PUBLIC_KEY_LENGTH,
     SIGNATURE_BYTE_LENGTH,
     OperationType,
@@ -41,7 +44,6 @@ const lockByteLengths = {
     fr: config.addressLength,
     hl: HASH_BYTE_LENGTH,
     re: EPOCH_BYTE_LENGTH,
-    ph: HASH_BYTE_LENGTH,
     th: HTLC_THRESHOLD_BYTE_LENGTH,
     va: config.addressLength,
     vn: NONCE_BYTE_LENGTH,
@@ -59,6 +61,11 @@ function makeValidOperation({complete = true} = {}) {
         }
     };
 
+    // The shared fixture still supplies policyHash-era builder and escrow tests.
+    // Use the new field locally while those layers are migrated separately.
+    delete operation.hlo.ph;
+    operation.hlo.md = b4a.from([0x00, 0xff, 0x80]);
+
     if (!complete) {
         delete operation.hlo.va;
         delete operation.hlo.vn;
@@ -72,11 +79,11 @@ test('validateHtlcLockOperation accepts complete and partial canonical locks', t
     t.ok(stateValidationSchema.validateHtlcLockOperation(makeValidOperation({complete: false})));
 });
 
-test('validateHtlcLockOperation accepts a fee-free lock and optional policy omission', t => {
+test('validateHtlcLockOperation accepts a fee-free lock and optional metadata omission', t => {
     const operation = makeValidOperation({complete: false});
     operation.hlo.fa = b4a.alloc(16);
     delete operation.hlo.fr;
-    delete operation.hlo.ph;
+    delete operation.hlo.md;
 
     t.ok(stateValidationSchema.validateHtlcLockOperation(operation));
 });
@@ -261,7 +268,7 @@ for (const complete of [false, true]) {
     const phase = complete ? 'complete' : 'partial';
     const scalarFields = ['tx', 'txv', 'ca', 'ra', 'am', 'fa', 'hl', 're', 'th', 'in', 'is'];
     if (complete) scalarFields.push('va', 'vn', 'vs');
-    const lengths = Object.fromEntries([...scalarFields, 'fr', 'ph'].map(field => [field, lockByteLengths[field]]));
+    const lengths = Object.fromEntries([...scalarFields, 'fr'].map(field => [field, lockByteLengths[field]]));
 
     test(`validateHtlcLockOperation - ${phase} top level validation`, t => {
         topLevelValidationTests(t, validate, makeValidOperation({complete}), 'hlo', not_allowed_data_types, ['type', 'address', 'hlo']);
@@ -279,11 +286,11 @@ for (const complete of [false, true]) {
 }
 
 test('validateHtlcLockOperation validates optional fields independently', t => {
-    for (const field of ['fr', 'ph']) {
+    for (const field of ['fr']) {
         for (const value of not_allowed_data_types) {
             const operation = makeValidOperation();
             operation.hlo[field] = value;
-            t.is(validate(operation), field === 'ph' && value === undefined, `${field}: ${String(value)}`);
+            t.is(validate(operation), false, `${field}: ${String(value)}`);
         }
     }
     for (const feeIsZero of [false, true]) {
@@ -366,13 +373,13 @@ test('validateHtlcLockOperation - operation contract', t => {
     operationContractTests(
         t,
         validate,
-        fixtures.validHtlcLockOperation,
+        makeValidOperation(),
         'hlo',
         [OperationType.HTLC_LOCK],
         lockByteLengths,
         true,
         ['fa'],
-        ['ph'],
+        ['md'],
         ['ss', 'cs']
     );
 });
@@ -385,3 +392,117 @@ test('validateHtlcLockOperation - builder, codec and partial sanitizer', async t
         'hlo'
     );
 });
+
+for (const complete of [false, true]) {
+    const phase = complete ? 'complete' : 'partial';
+
+    test(`validateHtlcLockOperation - ${phase} metadata is optional independently of the fee`, t => {
+        for (const feeIsZero of [false, true]) {
+            for (const presence of ['omitted', 'undefined', 'present']) {
+                const operation = makeValidOperation({complete});
+                if (feeIsZero) {
+                    operation.hlo.fa = b4a.alloc(AMOUNT_BYTE_LENGTH);
+                    delete operation.hlo.fr;
+                }
+                if (presence === 'omitted') delete operation.hlo.md;
+                if (presence === 'undefined') operation.hlo.md = undefined;
+                t.is(validate(operation), true, `zero fee=${feeIsZero}, metadata=${presence}`);
+                t.is(Object.hasOwn(operation.hlo, 'md'), presence !== 'omitted', 'presence is not normalized');
+            }
+        }
+    });
+
+    test(`validateHtlcLockOperation - ${phase} metadata byte-length boundaries`, t => {
+        t.is(HTLC_METADATA_BYTE_LENGTH, 1024, 'the protocol limit is 1024 bytes');
+        for (const [length, expected] of [[0, false], [1, true], [2, true], [31, true], [32, true],
+            [33, true], [1023, true], [1024, true], [1025, false], [2048, false]]) {
+            for (const byte of [0x00, 0x01, 0xff]) {
+                for (const asUint8Array of [false, true]) {
+                    const operation = makeValidOperation({complete});
+                    operation.hlo.md = asUint8Array ? new Uint8Array(length).fill(byte) : b4a.alloc(length, byte);
+                    t.is(validate(operation), expected, `length=${length}, byte=${byte}, Uint8Array=${asUint8Array}`);
+                }
+            }
+        }
+    });
+
+    test(`validateHtlcLockOperation - ${phase} metadata contents are opaque`, t => {
+        for (let byte = 0; byte <= 255; byte++) {
+            const operation = makeValidOperation({complete});
+            operation.hlo.md = b4a.from([byte]);
+            t.is(validate(operation), true, `single byte ${byte}`);
+        }
+        for (const md of [
+            b4a.from(Array.from({length: 256}, (_, byte) => byte)),
+            b4a.from('{"application":"swap"}'),
+            b4a.from('{invalid json'),
+            b4a.from([0xc3, 0x28, 0xff, 0x00]),
+            b4a.from('ą'.repeat(512))
+        ]) {
+            const operation = makeValidOperation({complete});
+            operation.hlo.md = md;
+            t.is(validate(operation), true, 'binary and text payloads require no content validation');
+        }
+        const operation = makeValidOperation({complete});
+        operation.hlo.md = b4a.from('ą'.repeat(513));
+        t.is(validate(operation), false, 'the limit counts encoded bytes, not characters');
+    });
+
+    test(`validateHtlcLockOperation - ${phase} metadata rejects non-byte-buffer types`, t => {
+        const invalidValues = [
+            ...not_allowed_data_types.filter(value => value !== undefined && !b4a.isBuffer(value)),
+            false, 0, -1, '', '00'.repeat(1024), Symbol('metadata'),
+            new Int8Array(1), new Uint8ClampedArray(1), new Uint16Array(1),
+            new ArrayBuffer(1), new DataView(new ArrayBuffer(1)),
+            [0], {type: 'Buffer', data: [0]}, {0: 0, length: 1}, Object.create(null)
+        ];
+        for (const [index, md] of invalidValues.entries()) {
+            const operation = makeValidOperation({complete});
+            operation.hlo.md = md;
+            t.is(validate(operation), false, `invalid type case ${index} is rejected without throwing`);
+        }
+    });
+
+    test(`validateHtlcLockOperation - ${phase} metadata uses the byte view length`, t => {
+        for (const backing of [b4a.alloc(4096, 0xff), new Uint8Array(4096).fill(0xff)]) {
+            for (const [length, expected] of [[0, false], [1, true], [1024, true], [1025, false]]) {
+                const operation = makeValidOperation({complete});
+                operation.hlo.md = backing.subarray(100, 100 + length);
+                const before = b4a.from(backing);
+                Object.freeze(operation.hlo);
+                Object.freeze(operation);
+                t.is(validate(operation), expected, `view length=${length}, backing length=${backing.length}`);
+                t.ok(b4a.equals(backing, before), 'validation does not mutate metadata or its backing buffer');
+            }
+        }
+    });
+
+    test(`validateHtlcLockOperation - ${phase} metadata validates after protobuf decoding`, t => {
+        for (const [md, expected] of [[undefined, true], [b4a.alloc(0), false],
+            [b4a.alloc(1), true], [b4a.alloc(1023, 0xff), true], [b4a.alloc(1024), true],
+            [new Uint8Array(1024).fill(0xff), true], [b4a.alloc(1025, 1), false]]) {
+            const operation = makeValidOperation({complete});
+            if (md === undefined) delete operation.hlo.md;
+            else operation.hlo.md = md;
+            const encoded = safeEncodeApplyOperation(operation);
+            t.ok(encoded.length > 0, 'protobuf can represent the input independently of the metadata size rule');
+            const decoded = safeDecodeApplyOperation(encoded);
+            t.ok(decoded, 'operation decodes');
+            if (!complete) sanitizeDecodedPartialTransaction(decoded);
+            t.is(validate(decoded), expected, `decoded metadata length=${md?.length ?? 'omitted'}`);
+            if (md === undefined) t.is(Object.hasOwn(decoded.hlo, 'md'), false, 'omission survives protobuf');
+            else t.ok(b4a.equals(decoded.hlo.md, md), 'metadata bytes survive protobuf and sanitization unchanged');
+        }
+    });
+
+    test(`validateHtlcLockOperation - ${phase} only md is accepted as the metadata field name`, t => {
+        for (const field of ['ph', 'policyHash', 'metadata']) {
+            for (const withMetadata of [false, true]) {
+                const operation = makeValidOperation({complete});
+                if (!withMetadata) delete operation.hlo.md;
+                operation.hlo[field] = b4a.alloc(32, 1);
+                t.is(validate(operation), false, `${field} is rejected with md present=${withMetadata}`);
+            }
+        }
+    });
+}
