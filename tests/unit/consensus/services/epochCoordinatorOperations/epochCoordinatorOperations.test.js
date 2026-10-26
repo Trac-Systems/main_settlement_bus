@@ -29,6 +29,7 @@ const makeState = (overrides = {}) => ({
     getRegisteredWriterKey: sinon.stub().resolves(b4a.alloc(32, 0xaa)),
     writingKey: b4a.alloc(32, 1),
     append: sinon.stub().resolves(),
+    appendEpoch: sinon.stub().resolves(),
     ...overrides,
 });
 
@@ -44,7 +45,7 @@ const makeConnectionManager = (overrides = {}) => ({
 });
 
 // EpochCoordinatorOperations takes no connectionManager - callers pass it per method call
-// (sendToIndexer/collectSignature), it is never stored on the instance.
+// (sendProofApprovalRequest/requestProofApproval), it is never stored on the instance.
 const makeOps = (overrides = {}) =>
     new EpochCoordinatorOperations(
         overrides.state ?? makeState(),
@@ -54,7 +55,7 @@ const makeOps = (overrides = {}) =>
     );
 
 for (const preparation of ['proposal signing', 'writer lookup']) {
-    test(`collectSignature ignores old preparation after ${preparation} finishes in a new attempt`, async t => {
+    test(`requestProofApproval ignores old preparation after ${preparation} finishes in a new attempt`, async t => {
         const address = addressToBuffer('trac1quszuupdwwk2h2mlfc5pdcgv8a78pdr30gcakyy7dw7xzasltwyspt524z', 'trac');
         const state = makeState({ getRegisteredWriterKey: sinon.stub().resolves(address) });
         const ops = makeOps({ state });
@@ -69,12 +70,12 @@ for (const preparation of ['proposal signing', 'writer lookup']) {
         });
         const manager = makeConnectionManager();
         const oldCollection = { closed: false };
-        const oldResult = ops.collectSignature({ key: b4a.alloc(32) }, {}, manager, oldCollection).catch(error => error);
+        const oldResult = ops.requestProofApproval({ key: b4a.alloc(32) }, {}, manager, oldCollection).catch(error => error);
         await entered.promise;
         oldCollection.closed = true;
 
         const currentCollection = { closed: false };
-        const currentResult = await ops.collectSignature({ key: b4a.alloc(32) }, {}, manager, currentCollection);
+        const currentResult = await ops.requestProofApproval({ key: b4a.alloc(32) }, {}, manager, currentCollection);
         release.resolve();
 
         t.is((await oldResult).message, 'Epoch approval request was cancelled');
@@ -136,61 +137,61 @@ nodeOnlyTest('createProofProposal targets epoch = prevEpochId + 1n and forwards 
     t.ok(b4a.equals(solution, vdf.solution));
 });
 
-// --- sendToIndexer ---
+// --- sendProofApprovalRequest ---
 
-test('sendToIndexer throws if the indexer is not in the connection manager', async t => {
+test('sendProofApprovalRequest throws if the indexer is not in the connection manager', async t => {
     const connectionManager = makeConnectionManager({ connected: sinon.stub().returns(false) });
     const ops = makeOps();
-    await t.exception(ops.sendToIndexer('abcd', {}, connectionManager), /Indexer not in the manager/);
+    await t.exception(ops.sendProofApprovalRequest('abcd', {}, connectionManager), /Indexer not in the manager/);
 });
 
-test('sendToIndexer returns resultCode and signature from the response', async t => {
+test('sendProofApprovalRequest returns resultCode and signature from the response', async t => {
     const sig = b4a.alloc(64, 0xaa);
     const connectionManager = makeConnectionManager({
         send: sinon.stub().resolves({ resultCode: ConsensusResultCode.OK, approval: { approval_sig: sig } }),
     });
     const ops = makeOps();
 
-    const result = await ops.sendToIndexer('abcd', { type: 1 }, connectionManager);
+    const result = await ops.sendProofApprovalRequest('abcd', { type: 1 }, connectionManager);
 
     t.is(result.resultCode, ConsensusResultCode.OK);
     t.ok(b4a.equals(result.signature, sig));
 });
 
-test('sendToIndexer surfaces a non-OK resultCode with no signature', async t => {
+test('sendProofApprovalRequest surfaces a non-OK resultCode with no signature', async t => {
     const connectionManager = makeConnectionManager({
         send: sinon.stub().resolves({ resultCode: ConsensusResultCode.EPOCH_INVALID }),
     });
     const ops = makeOps();
 
-    const result = await ops.sendToIndexer('abcd', { type: 1 }, connectionManager);
+    const result = await ops.sendProofApprovalRequest('abcd', { type: 1 }, connectionManager);
 
     t.is(result.resultCode, ConsensusResultCode.EPOCH_INVALID);
     t.absent(result.signature);
 });
 
-// --- collectSignature ---
+// --- requestProofApproval ---
 
-// collectSignature builds its own per-request proposal internally via createProofProposal
+// requestProofApproval builds its own per-request proposal internally via createProofProposal
 // (a fresh session id per approver) - that's covered by the createProofProposal tests above,
-// so here it's stubbed out and these tests focus on collectSignature's own logic.
+// so here it's stubbed out and these tests focus on requestProofApproval's own logic.
 
-test('collectSignature throws if getRegisteredWriterKey returns null', async t => {
+test('requestProofApproval throws if getRegisteredWriterKey returns null', async t => {
     const ops = makeOps({ state: makeState({ getRegisteredWriterKey: sinon.stub().resolves(null) }) });
     sinon.stub(ops, 'createProofProposal').resolves({});
-    await t.exception(ops.collectSignature({ key: b4a.alloc(32) }, {}, makeConnectionManager()), /Registered writer key not found/);
+    await t.exception(ops.requestProofApproval({ key: b4a.alloc(32) }, {}, makeConnectionManager()), /Registered writer key not found/);
 });
 
-nodeOnlyTest('collectSignature throws if address cannot be resolved', async t => {
+nodeOnlyTest('requestProofApproval throws if address cannot be resolved', async t => {
     const make = await opsWithMocks({
         [ADDRESS_UTILS_PATH]: { default: { bufferToAddress: sinon.stub().returns(null) } },
     });
     const ops = make();
     sinon.stub(ops, 'createProofProposal').resolves({});
-    await t.exception(ops.collectSignature({ key: b4a.alloc(32) }, {}, makeConnectionManager()), /Writer address could not be decoded/);
+    await t.exception(ops.requestProofApproval({ key: b4a.alloc(32) }, {}, makeConnectionManager()), /Writer address could not be decoded/);
 });
 
-nodeOnlyTest('collectSignature throws with resultCode attached when the peer rejects with a non-OK code', async t => {
+nodeOnlyTest('requestProofApproval throws with resultCode attached when the peer rejects with a non-OK code', async t => {
     const otherAddress = 'trac1otheraddress';
     const decodedPublicKey = b4a.alloc(32, 0x09);
     const make = await opsWithMocks({
@@ -205,14 +206,14 @@ nodeOnlyTest('collectSignature throws with resultCode attached when the peer rej
     sinon.stub(ops, 'createProofProposal').resolves({});
     let caught;
     try {
-        await ops.collectSignature({ key: b4a.alloc(32) }, {}, connectionManager);
+        await ops.requestProofApproval({ key: b4a.alloc(32) }, {}, connectionManager);
     } catch (err) {
         caught = err;
     }
     t.is(caught?.resultCode, ConsensusResultCode.EPOCH_INVALID);
 });
 
-nodeOnlyTest('collectSignature throws if resultCode is OK but no signature was returned', async t => {
+nodeOnlyTest('requestProofApproval throws if resultCode is OK but no signature was returned', async t => {
     const otherAddress = 'trac1otheraddress';
     const decodedPublicKey = b4a.alloc(32, 0x09);
     const make = await opsWithMocks({
@@ -225,10 +226,10 @@ nodeOnlyTest('collectSignature throws if resultCode is OK but no signature was r
 
     const ops = make();
     sinon.stub(ops, 'createProofProposal').resolves({});
-    await t.exception(ops.collectSignature({ key: b4a.alloc(32) }, {}, connectionManager), /Approval signature not received/);
+    await t.exception(ops.requestProofApproval({ key: b4a.alloc(32) }, {}, connectionManager), /Approval signature not received/);
 });
 
-nodeOnlyTest('collectSignature returns signature and approver address buffer on success', async t => {
+nodeOnlyTest('requestProofApproval returns signature and approver address buffer on success', async t => {
     const otherAddress = 'trac1otheraddress';
     const decodedPublicKey = b4a.alloc(32, 0x09);
     const sig = b4a.alloc(64, 0xbb);
@@ -243,13 +244,13 @@ nodeOnlyTest('collectSignature returns signature and approver address buffer on 
 
     const ops = make();
     sinon.stub(ops, 'createProofProposal').resolves({});
-    const result = await ops.collectSignature({ key: memberKey }, {}, connectionManager);
+    const result = await ops.requestProofApproval({ key: memberKey }, {}, connectionManager);
 
     t.ok(b4a.equals(result.signature, sig));
     t.ok(result.approver);
 });
 
-nodeOnlyTest('collectSignature does not send a request after its approval collection is closed', async t => {
+nodeOnlyTest('requestProofApproval does not send a request after its approval collection is closed', async t => {
     const otherAddress = 'trac1otheraddress';
     const decodedPublicKey = b4a.alloc(32, 0x09);
     const make = await opsWithMocks({
@@ -262,7 +263,7 @@ nodeOnlyTest('collectSignature does not send a request after its approval collec
     sinon.stub(ops, 'createProofProposal').resolves({});
 
     await t.exception(
-        ops.collectSignature(
+        ops.requestProofApproval(
             { key: b4a.alloc(32) },
             {},
             connectionManager,
@@ -316,20 +317,42 @@ nodeOnlyTest('buildSetEpochPayload does not append to state', async t => {
 
 // --- appendSetEpoch ---
 
-test('appendSetEpoch calls state.append with the given payload', async t => {
+test('appendSetEpoch forwards payload and authorization to state.appendEpoch', async t => {
     const state = makeState();
     const payload = b4a.alloc(64, 0xcc);
+    const authorizeEpochAppend = sinon.stub().resolves();
 
-    await makeOps({ state }).appendSetEpoch(payload);
+    await makeOps({ state }).appendSetEpoch(payload, authorizeEpochAppend);
 
-    t.ok(state.append.calledOnceWith(payload));
+    t.ok(state.appendEpoch.calledOnceWithExactly(payload, authorizeEpochAppend));
+    t.absent(state.append.called);
+});
+
+test('appendSetEpoch forwards selected-appender authorization to the guarded writer queue', async t => {
+    const failure = new Error('selection expired while queued');
+    const authorizeEpochAppend = sinon.stub().rejects(failure);
+    const location = { writerKey: '01'.repeat(32), from: 12 };
+    const state = makeState({
+        appendEpoch: sinon.stub().callsFake(async (_payload, authorizeEpochAppend) => {
+            await authorizeEpochAppend(location);
+            t.fail('a rejected authorization must stop the append');
+        }),
+    });
+    const payload = b4a.from('selected proof');
+
+    const result = await makeOps({ state }).appendSetEpoch(payload, authorizeEpochAppend).catch(error => error);
+
+    t.is(result, failure);
+    t.ok(state.appendEpoch.calledOnceWith(payload, authorizeEpochAppend));
+    t.ok(authorizeEpochAppend.calledOnceWith(location));
+    t.absent(state.append.called, 'selected appends cannot fall back to the unguarded path');
 });
 
 // --- approvers ---
 
 // approvers() only excludes self (writingKey) - it does not call getAdminEntry at all, so an
 // admin that is also a registered indexer is treated like any other approver.
-test('approvers excludes only self, including when an admin entry also appears as an indexer', async t => {
+test('getProofApprovers excludes only self, including when an admin entry also appears as an indexer', async t => {
     const writingKey = b4a.alloc(32, 1);
     const adminKey = b4a.alloc(32, 2);
     const otherKey = b4a.alloc(32, 3);
@@ -338,14 +361,14 @@ test('approvers excludes only self, including when an admin entry also appears a
     });
     const indexers = [{ key: writingKey }, { key: adminKey }, { key: otherKey }];
 
-    const result = makeOps({ state }).approvers(indexers);
+    const result = makeOps({ state }).getProofApprovers(indexers);
 
     t.is(result.length, 2);
     t.ok(result.some(({ key }) => b4a.equals(key, adminKey)));
     t.ok(result.some(({ key }) => b4a.equals(key, otherKey)));
 });
 
-test('approvers returns everyone but self', async t => {
+test('getProofApprovers returns everyone but self', async t => {
     const writingKey = b4a.alloc(32, 1);
     const otherKey = b4a.alloc(32, 3);
     const state = makeState({
@@ -353,7 +376,7 @@ test('approvers returns everyone but self', async t => {
     });
     const indexers = [{ key: writingKey }, { key: otherKey }];
 
-    const result = makeOps({ state }).approvers(indexers);
+    const result = makeOps({ state }).getProofApprovers(indexers);
 
     t.is(result.length, 1);
     t.ok(b4a.equals(result[0].key, otherKey));

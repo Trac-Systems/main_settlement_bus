@@ -2,7 +2,6 @@ import test from 'brittle';
 import b4a from 'b4a';
 
 import ConsensusValidationSchema from '../../../../../../src/core/network/protocols/consensus/v1/validators/ConsensusValidationSchema.js';
-import {V1ConsensusProtocolError} from '../../../../../../src/core/network/protocols/consensus/v1/V1ConsensusProtocolError.js';
 import {
     ConsensusOperationType,
     ConsensusResultCode,
@@ -45,21 +44,6 @@ const approval = () => ({
     approver: b4a.alloc(config.addressLength, 2),
     approval_sig: b4a.alloc(64, 3),
 });
-
-function assertProtocolError(t, action, resultCode, messageIncludes) {
-    let error;
-    try {
-        action();
-    } catch (err) {
-        error = err;
-    }
-
-    t.ok(error instanceof V1ConsensusProtocolError);
-    t.is(error.resultCode, resultCode);
-    if (messageIncludes) {
-        t.ok(error.message.includes(messageIncludes));
-    }
-}
 
 test('ConsensusValidationSchema accepts fixed-length proof proposal byte fields', t => {
     const schema = new ConsensusValidationSchema(config);
@@ -124,12 +108,11 @@ test('ConsensusValidationSchema requires approval only for OK proof proposal res
         ),
         true
     );
-    assertProtocolError(
-        t,
-        () => schema.validateV1EpochProofProposalResponse(
+    t.is(
+        schema.validateV1EpochProofProposalResponse(
             makeProofProposalResponsePayload(ConsensusResultCode.OK)
         ),
-        ConsensusResultCode.RESPONSE_APPROVAL_INVALID,
+        false,
         'approval is required'
     );
     t.is(
@@ -138,12 +121,11 @@ test('ConsensusValidationSchema requires approval only for OK proof proposal res
         ),
         true
     );
-    assertProtocolError(
-        t,
-        () => schema.validateV1EpochProofProposalResponse(
+    t.is(
+        schema.validateV1EpochProofProposalResponse(
             makeProofProposalResponsePayload(ConsensusResultCode.UNSPECIFIED, approval())
         ),
-        ConsensusResultCode.RESPONSE_APPROVAL_INVALID,
+        false,
         'approval is only allowed'
     );
 });
@@ -151,12 +133,27 @@ test('ConsensusValidationSchema requires approval only for OK proof proposal res
 test('ConsensusValidationSchema rejects network-only result codes in proof proposal responses', t => {
     const schema = new ConsensusValidationSchema(config);
 
-    assertProtocolError(
-        t,
-        () => schema.validateV1EpochProofProposalResponse(
+    t.is(
+        schema.validateV1EpochProofProposalResponse(
             makeProofProposalResponsePayload(NetworkResultCode.TX_INVALID_PAYLOAD)
         ),
-        ConsensusResultCode.SCHEMA_VALIDATION_FAILED,
-        'schema validation failed'
+        false
     );
+});
+
+test('ConsensusValidationSchema handles missing and malformed responses without throwing', t => {
+    const schema = new ConsensusValidationSchema(config);
+    for (const response of [undefined, null, 'invalid', [], {}, { result: ConsensusResultCode.OK }]) {
+        const operation = makeProofProposalResponsePayload(ConsensusResultCode.OK, approval());
+        operation.proof_proposal_response = response;
+        t.is(schema.validateV1EpochProofProposalResponse(operation), false);
+    }
+    for (const invalidApproval of [null, false, 'invalid', {}, { ...approval(), approval_sig: b4a.alloc(1, 1) }]) {
+        t.is(schema.validateV1EpochProofProposalResponse(
+            makeProofProposalResponsePayload(ConsensusResultCode.OK, invalidApproval)
+        ), false);
+    }
+    t.is(schema.validateV1EpochProofProposalResponse(
+        makeProofProposalResponsePayload(ConsensusResultCode.UNSPECIFIED, null)
+    ), true, 'a null optional approval still represents absence in a rejection');
 });

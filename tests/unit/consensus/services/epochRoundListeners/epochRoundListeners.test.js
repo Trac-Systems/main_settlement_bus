@@ -52,11 +52,6 @@ function makeMachine() {
         [EPOCH_STATES.COLLECT_APPROVALS]: {
             [EPOCH_EVENTS.APPROVAL_COLLECTION_FAILED]: EPOCH_STATES.BACKOFF,
         },
-        [EPOCH_STATES.APPEND_SET_EPOCH]: {
-            [EPOCH_EVENTS.APPEND_FAILED]: EPOCH_STATES.BACKOFF,
-            [EPOCH_EVENTS.APPEND_ACCEPTED]: EPOCH_STATES.SEND_APPEND_SIGNAL,
-            [EPOCH_EVENTS.TARGET_EPOCH_ALREADY_SIGNED]: EPOCH_STATES.RELOAD_SIGNED_CONTEXT,
-        },
     };
 
     machine.send = sinon.stub().callsFake(async event => {
@@ -85,20 +80,18 @@ function proposalEvent(epoch = 6n, previousHash = b4a.alloc(32, 0xaa)) {
 function setup(overrides = {}) {
     const state = overrides.state ?? makeEmitter();
     const machine = makeMachine();
-    const wallet = { address: 'trac1wallet' };
     const config = { ...CONFIG, ...(overrides.config ?? {}) };
-    const intervalMs = overrides.intervalMs ?? CONFIG.epochInterval;
+    const onEpochProgress = sinon.stub().resolves();
     const listeners = new EpochRoundListeners({
         state,
         machine,
-        wallet,
         config,
-        intervalMs,
         isRoundActive: () => machine.shouldRun(),
+        onEpochProgress,
     });
     listeners.start();
 
-    return { state, machine, wallet, config, intervalMs, listeners };
+    return { state, machine, config, listeners, onEpochProgress };
 }
 
 test('start registers round listeners and machine close removes them all', async t => {
@@ -197,70 +190,6 @@ for (const sameEpoch of [false, true]) {
     });
 }
 
-test('global EPOCH_CREATED closes a non-append state before scheduling the captured interval', async t => {
-    const { state, machine } = setup({
-        config: { epochInterval: 9999 },
-        intervalMs: 1234,
-    });
-    machine.state = EPOCH_STATES.COLLECT_APPROVALS;
-    const originalClose = machine.close;
-    t.teardown(async () => {
-        machine.close = originalClose;
-        await machine.close();
-    });
-    let resolveClose;
-    machine.close = sinon.stub().callsFake(() => new Promise(resolve => {
-        resolveClose = () => {
-            machine.trace.push('closed');
-            resolve();
-        };
-    }));
-
-    const emitted = state.emit(CustomEventType.EPOCH_CREATED);
-    await drainMicrotasks();
-    t.absent(machine.context.next.called, 'scheduling waits for machine.close()');
-
-    resolveClose();
-    await emitted;
-
-    t.alike(machine.trace, ['closed', 'next']);
-    t.ok(machine.context.next.calledOnceWith(1234));
-});
-
-test('target EPOCH_CREATED from self is handled by the append listener without global close', async t => {
-    const { state, machine, wallet } = setup();
-    machine.transition(EPOCH_STATES.APPEND_SET_EPOCH);
-
-    await state.emit(CustomEventType.EPOCH_CREATED, {
-        epoch: uint64ToBuffer(6n),
-        proposerAddress: wallet.address,
-    });
-
-    t.alike(machine.sentEvents, [EPOCH_EVENTS.APPEND_ACCEPTED]);
-    t.absent(machine.close.called);
-    t.absent(machine.context.next.called);
-    await machine.close();
-});
-
-test('append listener maps peer targets and ignores unrelated epochs', async t => {
-    const { state, machine } = setup();
-    machine.transition(EPOCH_STATES.APPEND_SET_EPOCH);
-
-    await state.emit(CustomEventType.EPOCH_CREATED, {
-        epoch: uint64ToBuffer(99n),
-        proposerAddress: 'trac1peer',
-    });
-    t.alike(machine.sentEvents, []);
-
-    await state.emit(CustomEventType.EPOCH_CREATED, {
-        epoch: uint64ToBuffer(6n),
-        proposerAddress: 'trac1peer',
-    });
-    t.alike(machine.sentEvents, [EPOCH_EVENTS.TARGET_EPOCH_ALREADY_SIGNED]);
-    t.absent(machine.close.called);
-    await machine.close();
-});
-
 test('signature timeout fires on deadline and is cancelled when collection ends', async t => {
     const clock = sinon.useFakeTimers();
     try {
@@ -283,36 +212,12 @@ test('signature timeout fires on deadline and is cancelled when collection ends'
     }
 });
 
-test('append timeout fires on deadline and is cancelled when append state ends', async t => {
-    const clock = sinon.useFakeTimers();
-    try {
-        const first = setup({ config: { epochAppendTimeout: 1000 } });
-        first.machine.transition(EPOCH_STATES.APPEND_SET_EPOCH);
-        await clock.tickAsync(999);
-        t.alike(first.machine.sentEvents, []);
-        await clock.tickAsync(1);
-        t.alike(first.machine.sentEvents, [EPOCH_EVENTS.APPEND_FAILED]);
-        await first.machine.close();
-
-        const second = setup({ config: { epochAppendTimeout: 1000 } });
-        second.machine.transition(EPOCH_STATES.APPEND_SET_EPOCH);
-        t.is(second.state.listenerCount(CustomEventType.EPOCH_CREATED), 2);
-        second.machine.transition(EPOCH_STATES.BACKOFF);
-        t.is(second.state.listenerCount(CustomEventType.EPOCH_CREATED), 1);
-        await clock.tickAsync(1100);
-        t.alike(second.machine.sentEvents, []);
-        await second.machine.close();
-    } finally {
-        clock.restore();
-    }
-});
-
-test('machine close in append state removes the target listener and cancels its timeout', async t => {
+test('machine close in append state removes the epoch progress listener', async t => {
     const clock = sinon.useFakeTimers();
     try {
         const { state, machine } = setup({ config: { epochAppendTimeout: 1000 } });
         machine.transition(EPOCH_STATES.APPEND_SET_EPOCH);
-        t.is(state.listenerCount(CustomEventType.EPOCH_CREATED), 2);
+        t.is(state.listenerCount(CustomEventType.EPOCH_CREATED), 1);
 
         await machine.close();
         await clock.tickAsync(1100);
@@ -324,18 +229,72 @@ test('machine close in append state removes the target listener and cancels its 
     }
 });
 
-test('global EPOCH_CREATED cancels the stale collection timeout', async t => {
+test('round completion after signed progress cancels the collection timeout', async t => {
     const clock = sinon.useFakeTimers();
     try {
-        const { state, machine } = setup({ config: { epochSignatureTimeout: 1000 } });
+        const { state, machine, onEpochProgress } = setup({ config: { epochSignatureTimeout: 1000 } });
+        onEpochProgress.callsFake(() => machine.close());
         machine.transition(EPOCH_STATES.COLLECT_APPROVALS);
 
         await state.emit(CustomEventType.EPOCH_CREATED);
         await clock.tickAsync(1100);
 
-        t.ok(machine.context.next.calledOnce);
+        t.ok(onEpochProgress.calledOnce);
+        t.ok(machine.close.calledOnce);
         t.alike(machine.sentEvents, []);
     } finally {
+        clock.restore();
+    }
+});
+
+for (const phase of [EPOCH_STATES.COLLECT_APPROVALS, EPOCH_STATES.APPEND_SET_EPOCH, EPOCH_STATES.WAIT_FOR_APPEND_OUTCOME]) {
+    test(`EPOCH_CREATED delegates signed progress verification in ${phase}`, async t => {
+        const { state, machine, onEpochProgress } = setup();
+        t.teardown(() => machine.close());
+        machine.transition(phase);
+
+        await state.emit(CustomEventType.EPOCH_CREATED, { epoch: uint64ToBuffer(6n), proposerAddress: 'trac1peer' });
+
+        t.ok(onEpochProgress.calledOnceWithExactly());
+        t.absent(machine.close.called, 'the round decides whether signed progress finishes it');
+        t.absent(machine.context.next.called);
+        t.alike(machine.sentEvents, []);
+    });
+}
+
+test('EPOCH_CREATED awaits the round progress check and ignores events after close', async t => {
+    const { state, machine, onEpochProgress } = setup();
+    const progress = Promise.withResolvers();
+    t.teardown(async () => {
+        progress.resolve();
+        await machine.close();
+    });
+    onEpochProgress.returns(progress.promise);
+    let finished = false;
+    const emitted = state.emit(CustomEventType.EPOCH_CREATED).then(() => { finished = true; });
+    await drainMicrotasks();
+    t.absent(finished);
+    progress.resolve();
+    await emitted;
+    t.ok(finished);
+
+    await machine.close();
+    await state.emit(CustomEventType.EPOCH_CREATED);
+    t.ok(onEpochProgress.calledOnce);
+});
+
+test('append states keep one epoch listener and do not start a legacy append deadline', async t => {
+    const clock = sinon.useFakeTimers();
+    const { state, machine } = setup();
+    try {
+        machine.transition(EPOCH_STATES.APPEND_SET_EPOCH);
+        machine.transition(EPOCH_STATES.WAIT_FOR_APPEND_OUTCOME);
+        t.is(state.listenerCount(CustomEventType.EPOCH_CREATED), 1);
+        await clock.tickAsync(CONFIG.epochAppendTimeout + 1);
+        t.alike(machine.sentEvents, []);
+        t.absent(machine.context.next.called);
+    } finally {
+        await machine.close();
         clock.restore();
     }
 });

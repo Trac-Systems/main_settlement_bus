@@ -7,6 +7,7 @@ async function runConsensusProtocolTests() {
     await import('./ConsensusIndexerChannels.test.js');
     await import('./v1/V1ConsensusProtocolError.test.js');
     await import('./v1/ConsensusValidationSchema.test.js');
+    await import('./v1/EpochAppendProtocol.test.js');
     await import('./v1/V1EpochProofProposalRequest.test.js');
     await import('./v1/V1EpochProofProposalApproval.test.js');
     await import('./v1/handlers/V1EpochProofProposalOperationHandler.test.js');

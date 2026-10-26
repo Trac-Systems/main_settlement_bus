@@ -1,22 +1,24 @@
 import { createVDFService } from './createVDFService.js';
 import { EpochCoordinatorOperations } from './EpochCoordinatorOperations.js';
 
-/** Manages the VDF service used by the epoch coordinator. */
+/**
+ * Manages the VDF worker and the epoch operations that use it. Opens, replaces and closes workers one
+ * at a time so config changes cannot start overlapping workers.
+ */
 export class VDFServiceManager {
     #state;
     #wallet;
     #config;
-    #service = null;
+    #vdfService = null;
     #operations = null;
-    #queue = Promise.resolve();
+    #lifecycleQueue = Promise.resolve();
 
     /**
-     * Creates an empty manager.
-     * The first VDF service is opened by {@link open}.
+     * Creates the manager. open() starts the first VDF service.
      *
-     * @param {object} state
-     * @param {object} wallet
-     * @param {object} config
+     * @param {import('../../state/State.js').default} state Ledger access used by epoch operations.
+     * @param {object} wallet Local proof signing identity.
+     * @param {object} config Message and network configuration.
      */
     constructor(state, wallet, config) {
         this.#state = state;
@@ -30,118 +32,116 @@ export class VDFServiceManager {
     }
 
     /**
-     * Returns current operations.
-     * It creates a new VDF service when there is no active service.
+     * Returns operations for the current VDF service. Starts a service if needed.
      *
      * @returns {Promise<EpochCoordinatorOperations>}
      */
     open() {
-        return this.#enqueue(() => this.#open());
+        return this.#enqueueLifecycleChange(() => this.#openVdfService());
     }
 
     /**
-     * Closes the current VDF service and creates a new one.
+     * Closes the current VDF service and starts a new one.
      *
      * @returns {Promise<EpochCoordinatorOperations>}
      */
     replace() {
-        return this.#enqueue(async () => {
-            await this.#close();
-            return this.#open();
+        return this.#enqueueLifecycleChange(async () => {
+            await this.#closeVdfService();
+            return this.#openVdfService();
         });
     }
 
     /**
-     * Closes the current VDF service.
-     * The manager can be opened again later.
+     * Closes the current VDF service. The manager can be opened again later.
      *
      * @returns {Promise<void>}
      */
     close() {
-        return this.#enqueue(() => this.#close());
+        return this.#enqueueLifecycleChange(() => this.#closeVdfService());
     }
 
     /**
-     * Creates a VDF service and its operations.
-     * A service which fails during start is closed before the error is returned.
+     * Starts a VDF service and creates the operations that use it. If startup fails, closes the
+     * service before returning the error.
      *
      * @returns {Promise<EpochCoordinatorOperations>}
      */
-    async #open() {
+    async #openVdfService() {
         if (this.#operations) return this.#operations;
-        if (this.#service) throw new Error('Previous VDF service is still open');
+        if (this.#vdfService) throw new Error('Previous VDF service is still open');
 
-        const service = await createVDFService();
+        const vdfService = await createVDFService();
 
         try {
-            await service.ready();
-            const operations = new EpochCoordinatorOperations(
+            await vdfService.ready();
+            const epochOperations = new EpochCoordinatorOperations(
                 this.#state,
-                service,
+                vdfService,
                 this.#wallet,
                 this.#config,
             );
 
-            this.#service = service;
-            this.#operations = operations;
-            return operations;
+            this.#vdfService = vdfService;
+            this.#operations = epochOperations;
+            return epochOperations;
         } catch (error) {
-            await this.#closeUnusedService(service);
+            await this.#closeUnusedService(vdfService);
             throw error;
         }
     }
 
     /**
-     * Closes the current VDF service.
-     * When close fails, another VDF worker cannot be started.
+     * Closes the current VDF service. If closing fails, keeps it registered so another worker cannot
+     * start while it may still be running.
      *
      * @returns {Promise<void>}
      */
-    async #close() {
-        const service = this.#service;
-        if (!service) return;
+    async #closeVdfService() {
+        const vdfService = this.#vdfService;
+        if (!vdfService) return;
 
         this.#operations = null;
 
         try {
-            await service.close();
+            await vdfService.close();
         } catch {
             throw new Error('Failed to close VDF service');
         }
 
-        if (this.#service === service) this.#service = null;
+        if (this.#vdfService === vdfService) this.#vdfService = null;
     }
 
     /**
-     * Closes a VDF service which failed before it was used.
-     * When close fails, the service is kept to avoid losing a running worker.
+     * Closes a service that failed during startup. If closing also fails, keeps the service registered
+     * because its worker may still be running.
      *
-     * @param {object} service
+     * @param {import('./VDFService.js').VDFService} vdfService Service whose startup failed.
      * @returns {Promise<void>}
      */
-    async #closeUnusedService(service) {
+    async #closeUnusedService(vdfService) {
         try {
-            await service.close();
+            await vdfService.close();
         } catch {
-            this.#service = service;
+            this.#vdfService = vdfService;
             this.#operations = null;
             throw new Error('Failed to close VDF service');
         }
     }
 
     /**
-     * Runs VDF open, replace, and close operations one by one.
-     * A failed operation does not block the next queue item.
+     * Runs worker startup, replacement and shutdown one at a time. An error does not block the next
+     * operation in the queue.
      *
-     * @param {() => Promise<unknown>} operation
+     * @param {() => Promise<unknown>} lifecycleChange Worker startup, replacement or shutdown to queue.
      * @returns {Promise<unknown>}
      */
-    #enqueue(operation) {
-        const result = this.#queue.then(operation);
+    #enqueueLifecycleChange(lifecycleChange) {
+        const lifecyclePromise = this.#lifecycleQueue.then(lifecycleChange);
 
         // Keep the internal queue usable after a failed operation.
-        this.#queue = result.catch(() => {});
+        this.#lifecycleQueue = lifecyclePromise.catch(() => {});
 
-        return result;
+        return lifecyclePromise;
     }
 }

@@ -2,6 +2,11 @@ import test from 'brittle';
 
 test.pause();
 await import('./epochs/epochCreation.test.js');
+await import('./epochs/appendOutcome.test.js');
+await import('./epochs/appendCoordination.test.js');
+await import('./epochs/appendElection.test.js');
+await import('./epochs/appenderMembership.test.js');
+await import('./epochs/appendCoordinationNetwork.test.js');
 await import('./membership/quorumRefresh.test.js');
 await import('./membership/indexerChannelPromotion.test.js');
 await import('./replication/consensusChannelLifecycle.test.js');

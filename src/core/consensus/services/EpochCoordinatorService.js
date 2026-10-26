@@ -4,85 +4,91 @@ import { CustomEventType } from '../../../utils/constants.js';
 import { EpochCoordinationRound } from './EpochCoordinationRound.js';
 import { VDFServiceManager } from './VDFServiceManager.js';
 
+/**
+ * Schedules epoch rounds on this indexer. When consensus config changes, cancels the current round,
+ * replaces the VDF worker and resumes scheduling. All rounds use the same appender selector.
+ */
 class EpochCoordinatorService extends SchedulableService {
     #state;
     #wallet;
     #config;
-    #manager;
-    #intervalMs;
+    #indexerConnectionManager;
+    #roundIntervalMs;
     #logger;
-    #vdfManager;
-    #enabled = false;
+    #vdfServiceManager;
+    #coordinationEnabled = false;
     #currentRound = null;
-    #unfinishedRounds = new Set();
-    #configReload = null;
+    #pendingRoundExecutions = new Set();
+    #configReloadPromise = null;
     #cancelReloadDelay = null;
-    #configChangeListener;
+    #consensusConfigChangeListener;
+    #appenderSelector;
 
     /**
-     * Creates the coordinator and its VDF manager.
-     * The scheduler is started later by {@link start}.
+     * Creates the scheduler and VDF service manager. Call start() to enable epoch rounds.
      *
-     * @param {object} state
-     * @param {object} wallet
-     * @param {object} config
-     * @param {object} manager
+     * @param {import('../../state/State.js').default} state Signed ledger access and consensus events.
+     * @param {object} wallet Wallet used to sign local proofs.
+     * @param {object} config Round intervals, timeouts and network configuration.
+     * @param {import('../../network/services/IndexerConnectionManager.js').default} indexerConnectionManager Authenticated peer sessions.
+     * @param {import('../epochAppenderSelection/EpochAppenderSelector.js').EpochAppenderSelector|null} [appenderSelector=null] Shared selector required once genesis is initialized.
      */
-    constructor(state, wallet, config, manager) {
+    constructor(state, wallet, config, indexerConnectionManager, appenderSelector = null) {
         super();
         this.#state = state;
         this.#wallet = wallet;
         this.#config = config;
-        this.#manager = manager;
-        this.#intervalMs = config.epochInterval;
+        this.#indexerConnectionManager = indexerConnectionManager;
+        this.#appenderSelector = appenderSelector;
+        this.#roundIntervalMs = config.epochInterval;
         this.#logger = new Logger(config);
-        this.#vdfManager = new VDFServiceManager(state, wallet, config);
-        this.#configChangeListener = this.#handleConfigChange.bind(this);
+        this.#vdfServiceManager = new VDFServiceManager(state, wallet, config);
+        this.#consensusConfigChangeListener = this.#handleConfigChange.bind(this);
     }
 
     /**
-     * Opens the first VDF service and starts listening for config changes.
+     * Opens the VDF service and starts listening for consensus config changes.
      *
      * @returns {Promise<void>}
      */
     async _open() {
-        await this.#vdfManager.open();
-        this.#state.on(CustomEventType.CONSENSUS_CONFIG_CHANGED, this.#configChangeListener);
+        await this.#vdfServiceManager.open();
+        this.#state.on(CustomEventType.CONSENSUS_CONFIG_CHANGED, this.#consensusConfigChangeListener);
     }
 
     /**
-     * Stops listening for config changes, cancels the current round and closes the VDF.
-     * It does not wait for network operations which cannot be cancelled.
+     * Removes the config listener, cancels the current round and closes the VDF service. Does not wait
+     * for network operations that cannot be cancelled.
      *
      * @returns {Promise<void>}
      */
     async _close() {
-        this.#state.off(CustomEventType.CONSENSUS_CONFIG_CHANGED, this.#configChangeListener);
-        this.#enabled = false;
+        this.#state.off(CustomEventType.CONSENSUS_CONFIG_CHANGED, this.#consensusConfigChangeListener);
+        this.#coordinationEnabled = false;
         this.#cancelReloadDelay?.();
 
         const roundCancelled = this.#cancelCurrentRound();
         const schedulerStopped = super.stop(false);
-        const vdfClosed = this.#vdfManager.close();
+        const vdfClosed = this.#vdfServiceManager.close();
 
         await Promise.all([
             roundCancelled,
             schedulerStopped,
-            this.#configReload,
+            this.#configReloadPromise,
             vdfClosed,
         ]);
     }
 
     /**
-     * Makes sure that VDF is ready and starts the scheduler.
+     * Opens the VDF service if needed and starts the scheduler.
      *
      * @param {number} initialDelayMs delay before the first coordination round
      * @returns {Promise<boolean>} true when the scheduler was started
      */
-    async start(initialDelayMs = this.#intervalMs) {
+    async start(initialDelayMs = this.#roundIntervalMs) {
         if (this.isSchedulerRunning || this.closing !== null || this.closed) return false;
 
-        this.#enabled = true;
+        this.#coordinationEnabled = true;
 
         try {
             await this.#openVdf();
@@ -102,84 +108,84 @@ class EpochCoordinatorService extends SchedulableService {
      * @returns {Promise<boolean>} true when a running scheduler was stopped
      */
     async stop(waitForCurrent = true) {
-        this.#enabled = false;
+        this.#coordinationEnabled = false;
         this.#cancelReloadDelay?.();
         const roundCancelled = this.#cancelCurrentRound();
-        const stopped = await super.stop(false);
+        const schedulerStopped = await super.stop(false);
 
         await roundCancelled;
         if (waitForCurrent) {
-            await Promise.allSettled([...this.#unfinishedRounds]);
+            await Promise.allSettled([...this.#pendingRoundExecutions]);
         }
 
-        return stopped;
+        return schedulerStopped;
     }
 
     /** @returns {number} delay between coordination rounds */
     getScheduleInterval() {
-        return this.#intervalMs;
+        return this.#roundIntervalMs;
     }
 
     /**
-     * Creates and runs one coordination round.
-     * The round is stored before async work starts, so stop() can always cancel it.
+     * Starts one round and lets it schedule the next run. Only the current round may set the next
+     * timer. A result from an older round cannot replace it.
      *
-     * @param {(delay: number) => void} next schedules the next worker run
-     * @param {() => void} hold marks scheduling as owned by the round
-     * @returns {Promise<void>}
+     * @param {function(number): void} scheduleNextRound Schedules the next round after the given delay in milliseconds.
+     * @param {function(): void} holdScheduling Prevent the scheduler from scheduling automatically.
+     * @returns {Promise<void>} Completes when run() returns. The round may still be active.
      */
-    async worker(next, hold) {
+    async worker(scheduleNextRound, holdScheduling) {
         if (!this.#canRun()) return;
 
-        const operations = this.#vdfManager.operations;
-        if (!operations) return;
+        const epochOperations = this.#vdfServiceManager.operations;
+        if (!epochOperations) return;
 
-        hold();
+        holdScheduling();
 
         const round = new EpochCoordinationRound({
             state: this.#state,
             wallet: this.#wallet,
             config: this.#config,
-            manager: this.#manager,
+            manager: this.#indexerConnectionManager,
             logger: this.#logger,
-            operations,
-            intervalMs: this.#intervalMs,
+            operations: epochOperations,
+            intervalMs: this.#roundIntervalMs,
+            appenderSelector: this.#appenderSelector,
         });
 
         this.#replaceCurrentRound(round);
 
-        const roundRun = round.run((delay) => this.#scheduleNextRound(round, next, delay));
-        this.#unfinishedRounds.add(roundRun);
+        const roundExecution = round.run((delayMs) => this.#scheduleNextRound(round, scheduleNextRound, delayMs));
+        this.#pendingRoundExecutions.add(roundExecution);
 
         try {
-            await roundRun;
+            await roundExecution;
         } catch (error) {
             if (round !== this.#currentRound || !this.#canRun()) return;
 
             this.#logger.error(`[EpochCoordinatorService] round failed: ${error.message}`);
             await this.#cancelRound(round);
-            this.#scheduleNextRound(round, next, this.#intervalMs);
+            this.#scheduleNextRound(round, scheduleNextRound, this.#roundIntervalMs);
         } finally {
-            this.#unfinishedRounds.delete(roundRun);
+            this.#pendingRoundExecutions.delete(roundExecution);
         }
     }
 
     /**
-     * Waits for the current config reload and opens VDF before the scheduler starts.
-     * It repeats when another reload starts while VDF is opening.
+     * Waits for any config reload and opens the VDF service before scheduling starts. Repeats if
+     * another reload starts while the service is opening.
      *
      * @returns {Promise<void>}
      */
     async #openVdf() {
         do {
-            if (this.#configReload) await this.#configReload;
-            await this.#vdfManager.open();
-        } while (this.#configReload);
+            if (this.#configReloadPromise) await this.#configReloadPromise;
+            await this.#vdfServiceManager.open();
+        } while (this.#configReloadPromise);
     }
 
     /**
-     * Checks if a worker can run or schedule an epoch round.
-     * It also checks if stop() interrupted the scheduler.
+     * Checks whether the scheduler can run or schedule another round.
      *
      * @returns {boolean}
      */
@@ -188,19 +194,19 @@ class EpochCoordinatorService extends SchedulableService {
     }
 
     /**
-     * Checks if the coordinator is enabled and can start the scheduler.
-     * It ignores the temporary scheduler stop used during a config reset.
+     * Checks whether coordination is enabled and the service can start. A temporary scheduler stop
+     * during config reload does not disable coordination.
      *
      * @returns {boolean}
      */
     #canStart() {
-        return this.#enabled && this.closing === null && !this.closed;
+        return this.#coordinationEnabled && this.closing === null && !this.closed;
     }
 
     /**
-     * Stores the new current round and cancels the previous one.
+     * Sets the current round and cancels the previous one.
      *
-     * @param {EpochCoordinationRound} round
+     * @param {EpochCoordinationRound} round New round to use for coordination.
      */
     #replaceCurrentRound(round) {
         const previousRound = this.#currentRound;
@@ -210,7 +216,7 @@ class EpochCoordinatorService extends SchedulableService {
     }
 
     /**
-     * Cancels the current round and removes it from the coordinator.
+     * Clears the current round and waits for its cancellation.
      *
      * @returns {Promise<void>}
      */
@@ -222,9 +228,9 @@ class EpochCoordinatorService extends SchedulableService {
     }
 
     /**
-     * Cancels a round and logs a cleanup error instead of passing it to the caller.
+     * Cancels a round and logs any cleanup error.
      *
-     * @param {EpochCoordinationRound} round
+     * @param {EpochCoordinationRound} round Round to cancel.
      * @returns {Promise<void>}
      */
     async #cancelRound(round) {
@@ -236,65 +242,63 @@ class EpochCoordinatorService extends SchedulableService {
     }
 
     /**
-     * Schedules the next run only for the current round.
-     * A callback from an old round cannot replace the new timer.
+     * Schedules the next run if this round is still current. A callback from an older round cannot
+     * change the timer.
      *
-     * @param {EpochCoordinationRound} round
-     * @param {(delay: number) => void} next
-     * @param {number} delay
+     * @param {EpochCoordinationRound} round Round requesting the next run.
+     * @param {(delay: number) => void} scheduleNextRound Callback that sets the next scheduler timer.
+     * @param {number} delayMs Delay before the next round, in milliseconds.
      */
-    #scheduleNextRound(round, next, delay) {
+    #scheduleNextRound(round, scheduleNextRound, delayMs) {
         if (round !== this.#currentRound || !this.#canRun()) return;
 
         this.#currentRound = null;
-        next(delay);
+        scheduleNextRound(delayMs);
     }
 
     /**
-     * Handles a consensus config change.
-     * It cancels the round first, replaces the old VDF and starts the scheduler again.
-     * Repeated signals use the same reset which is already running.
+     * Starts a consensus config reload. Events received during the same reload are ignored.
      *
      * @returns {void}
      */
     #handleConfigChange() {
-        if (this.closing !== null || this.closed || this.#configReload) return;
-        this.#configReload = this.#reloadConfig();
+        if (this.closing !== null || this.closed || this.#configReloadPromise) return;
+        this.#configReloadPromise = this.#reloadConfig();
     }
 
     /**
-     * Stops the current round and reloads VDF.
-     * If the coordinator was running, it starts again without delay.
+     * Cancels the round, stops the scheduler and reloads VDF. Restarts scheduling if coordination is
+     * still enabled.
      *
      * @returns {Promise<void>}
      */
     async #reloadConfig() {
-        const shouldRestart = this.#enabled;
+        const shouldRestart = this.#coordinationEnabled;
 
         try {
             await Promise.all([
                 this.#cancelCurrentRound(),
                 super.stop(false),
-                shouldRestart ? this.#reloadVdf() : this.#vdfManager.close(),
+                shouldRestart ? this.#reloadVdf() : this.#vdfServiceManager.close(),
             ]);
         } catch (error) {
             this.#logger.error(`[EpochCoordinatorService] config reload failed: ${error.message}`);
             return;
         } finally {
-            this.#configReload = null;
+            this.#configReloadPromise = null;
         }
 
         if (!shouldRestart) return;
-        if (!this.#vdfManager.operations || !this.#canStart()) return;
+        if (!this.#vdfServiceManager.operations || !this.#canStart()) return;
 
         super.start(0);
     }
 
-    /** Reloads VDF, retrying while the coordinator is running. */
+    /** Reloads VDF and retries on failure while coordination remains enabled. */
     async #reloadVdf() {
         while (this.#canStart()) {
             try {
-                await this.#vdfManager.replace();
+                await this.#vdfServiceManager.replace();
                 return true;
             } catch (error) {
                 if (!this.#canStart()) return false;
@@ -303,14 +307,19 @@ class EpochCoordinatorService extends SchedulableService {
                     `[EpochCoordinatorService] config reload failed: ${error.message}; ` +
                     `retrying in ${this.#config.epochBackoffDelay}ms`,
                 );
-                await this.#waitBeforeRetry();
+                await this.#waitBeforeVdfReloadRetry();
             }
         }
 
         return false;
     }
 
-    #waitBeforeRetry() {
+    /**
+     * Waits before retrying a VDF reload. stop() and close() end the wait early.
+     *
+     * @returns {Promise<void>} Resolves when the timer ends or the wait is cancelled.
+     */
+    #waitBeforeVdfReloadRetry() {
         return new Promise(resolve => {
             const timer = setTimeout(resolve, this.#config.epochBackoffDelay);
             this.#cancelReloadDelay = () => {

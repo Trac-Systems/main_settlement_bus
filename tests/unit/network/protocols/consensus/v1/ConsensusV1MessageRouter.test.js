@@ -76,6 +76,7 @@ function setupRouter(
         handleApprovalError = null
     } = {}
 ) {
+    if (pendingEntry) pendingEntry.requestType ??= ConsensusOperationType.PROOF_PROPOSAL;
     const calls = {
         getPendingRequest: [],
         resolvePendingRequest: [],

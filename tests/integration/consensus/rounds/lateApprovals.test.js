@@ -27,8 +27,8 @@ test('timed-out approvals cannot reach quorum in a later attempt over the same c
     });
     t.teardown(() => timers.restore());
     const responses = [];
-    const collect = proposer.operations.collectSignature.bind(proposer.operations);
-    proposer.operations.collectSignature = async (...args) => {
+    const collect = proposer.operations.requestProofApproval.bind(proposer.operations);
+    proposer.operations.requestProofApproval = async (...args) => {
         const result = await collect(...args);
         const release = network.deferred();
         responses.push({ release, collection: args[3], result });

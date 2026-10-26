@@ -27,7 +27,7 @@ export default class IndexerPendingRequestService extends BasePendingRequestServ
             throw new Error('Pending request ID must be a non-empty string.');
         }
 
-        if (message.type !== ConsensusOperationType.PROOF_PROPOSAL) {
+        if (message.type !== ConsensusOperationType.PROOF_PROPOSAL && message.type !== ConsensusOperationType.REQUEST) {
             throw new Error('Unsupported pending request type');
         }
     }
@@ -56,6 +56,10 @@ export default class IndexerPendingRequestService extends BasePendingRequestServ
             timeoutId: null,
             resolve: null,
             reject: null,
+        };
+
+        if (message.type === ConsensusOperationType.REQUEST) {
+            entry.appendRequest = message;
         }
 
         const promise = new Promise((resolve, reject) => {
@@ -79,11 +83,11 @@ export default class IndexerPendingRequestService extends BasePendingRequestServ
         return promise;
     }
 
-    // for now, we are resolving only resultCode, but we can extend it in the future if needed...
-    resolvePendingRequest(id, resultCode = ConsensusResultCode.OK) {
+    /** Complete a proof approval or a validated arbitration reply. */
+    resolvePendingRequest(id, result = ConsensusResultCode.OK) {
         const entry = this.getAndDeletePendingRequest(id);
         if (!entry) return false;
-        entry.resolve(resultCode);
+        entry.resolve(result);
         return true;
     }
 
@@ -96,7 +100,9 @@ export default class IndexerPendingRequestService extends BasePendingRequestServ
 
     rejectPendingRequestsForSession(session, error) {
         for (const [id, entry] of this._pendingRequests) {
-            if (entry.session === session) this.rejectPendingRequest(id, error);
+            if (entry.session === session) {
+                this.rejectPendingRequest(id, error);
+            }
         }
     }
 }

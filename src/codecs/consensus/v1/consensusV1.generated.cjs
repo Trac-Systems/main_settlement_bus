@@ -40,6 +40,8 @@ $root.consensus = (function() {
              * @property {number|Long|null} [timestamp] ConsensusMessageHeader timestamp
              * @property {consensus.v1.IProofProposal|null} [proof_proposal] ConsensusMessageHeader proof_proposal
              * @property {consensus.v1.IProofProposalResponse|null} [proof_proposal_response] ConsensusMessageHeader proof_proposal_response
+             * @property {consensus.v1.IEpochAppendRequest|null} [request] ConsensusMessageHeader request
+             * @property {consensus.v1.IEpochAppendReply|null} [reply] ConsensusMessageHeader reply
              */
 
             /**
@@ -97,17 +99,33 @@ $root.consensus = (function() {
              */
             ConsensusMessageHeader.prototype.proof_proposal_response = null;
 
+            /**
+             * ConsensusMessageHeader request.
+             * @member {consensus.v1.IEpochAppendRequest|null|undefined} request
+             * @memberof consensus.v1.ConsensusMessageHeader
+             * @instance
+             */
+            ConsensusMessageHeader.prototype.request = null;
+
+            /**
+             * ConsensusMessageHeader reply.
+             * @member {consensus.v1.IEpochAppendReply|null|undefined} reply
+             * @memberof consensus.v1.ConsensusMessageHeader
+             * @instance
+             */
+            ConsensusMessageHeader.prototype.reply = null;
+
             // OneOf field names bound to virtual getters and setters
             var $oneOfFields;
 
             /**
              * ConsensusMessageHeader field.
-             * @member {"proof_proposal"|"proof_proposal_response"|undefined} field
+             * @member {"proof_proposal"|"proof_proposal_response"|"request"|"reply"|undefined} field
              * @memberof consensus.v1.ConsensusMessageHeader
              * @instance
              */
             Object.defineProperty(ConsensusMessageHeader.prototype, "field", {
-                get: $util.oneOfGetter($oneOfFields = ["proof_proposal", "proof_proposal_response"]),
+                get: $util.oneOfGetter($oneOfFields = ["proof_proposal", "proof_proposal_response", "request", "reply"]),
                 set: $util.oneOfSetter($oneOfFields)
             });
 
@@ -144,6 +162,10 @@ $root.consensus = (function() {
                     $root.consensus.v1.ProofProposal.encode(message.proof_proposal, writer.uint32(/* id 4, wireType 2 =*/34).fork()).ldelim();
                 if (message.proof_proposal_response != null && Object.hasOwnProperty.call(message, "proof_proposal_response"))
                     $root.consensus.v1.ProofProposalResponse.encode(message.proof_proposal_response, writer.uint32(/* id 5, wireType 2 =*/42).fork()).ldelim();
+                if (message.request != null && Object.hasOwnProperty.call(message, "request"))
+                    $root.consensus.v1.EpochAppendRequest.encode(message.request, writer.uint32(/* id 6, wireType 2 =*/50).fork()).ldelim();
+                if (message.reply != null && Object.hasOwnProperty.call(message, "reply"))
+                    $root.consensus.v1.EpochAppendReply.encode(message.reply, writer.uint32(/* id 7, wireType 2 =*/58).fork()).ldelim();
                 return writer;
             };
 
@@ -199,6 +221,14 @@ $root.consensus = (function() {
                             message.proof_proposal_response = $root.consensus.v1.ProofProposalResponse.decode(reader, reader.uint32());
                             break;
                         }
+                    case 6: {
+                            message.request = $root.consensus.v1.EpochAppendRequest.decode(reader, reader.uint32());
+                            break;
+                        }
+                    case 7: {
+                            message.reply = $root.consensus.v1.EpochAppendReply.decode(reader, reader.uint32());
+                            break;
+                        }
                     default:
                         reader.skipType(tag & 7);
                         break;
@@ -241,6 +271,8 @@ $root.consensus = (function() {
                     case 0:
                     case 1:
                     case 2:
+                    case 3:
+                    case 4:
                         break;
                     }
                 if (message.session_id != null && message.hasOwnProperty("session_id"))
@@ -265,6 +297,26 @@ $root.consensus = (function() {
                         var error = $root.consensus.v1.ProofProposalResponse.verify(message.proof_proposal_response);
                         if (error)
                             return "proof_proposal_response." + error;
+                    }
+                }
+                if (message.request != null && message.hasOwnProperty("request")) {
+                    if (properties.field === 1)
+                        return "field: multiple values";
+                    properties.field = 1;
+                    {
+                        var error = $root.consensus.v1.EpochAppendRequest.verify(message.request);
+                        if (error)
+                            return "request." + error;
+                    }
+                }
+                if (message.reply != null && message.hasOwnProperty("reply")) {
+                    if (properties.field === 1)
+                        return "field: multiple values";
+                    properties.field = 1;
+                    {
+                        var error = $root.consensus.v1.EpochAppendReply.verify(message.reply);
+                        if (error)
+                            return "reply." + error;
                     }
                 }
                 return null;
@@ -301,6 +353,14 @@ $root.consensus = (function() {
                 case 2:
                     message.type = 2;
                     break;
+                case "MESSAGE_TYPE_REQUEST":
+                case 3:
+                    message.type = 3;
+                    break;
+                case "MESSAGE_TYPE_REPLY":
+                case 4:
+                    message.type = 4;
+                    break;
                 }
                 if (object.session_id != null)
                     message.session_id = String(object.session_id);
@@ -322,6 +382,16 @@ $root.consensus = (function() {
                     if (typeof object.proof_proposal_response !== "object")
                         throw TypeError(".consensus.v1.ConsensusMessageHeader.proof_proposal_response: object expected");
                     message.proof_proposal_response = $root.consensus.v1.ProofProposalResponse.fromObject(object.proof_proposal_response);
+                }
+                if (object.request != null) {
+                    if (typeof object.request !== "object")
+                        throw TypeError(".consensus.v1.ConsensusMessageHeader.request: object expected");
+                    message.request = $root.consensus.v1.EpochAppendRequest.fromObject(object.request);
+                }
+                if (object.reply != null) {
+                    if (typeof object.reply !== "object")
+                        throw TypeError(".consensus.v1.ConsensusMessageHeader.reply: object expected");
+                    message.reply = $root.consensus.v1.EpochAppendReply.fromObject(object.reply);
                 }
                 return message;
             };
@@ -367,6 +437,16 @@ $root.consensus = (function() {
                     if (options.oneofs)
                         object.field = "proof_proposal_response";
                 }
+                if (message.request != null && message.hasOwnProperty("request")) {
+                    object.request = $root.consensus.v1.EpochAppendRequest.toObject(message.request, options);
+                    if (options.oneofs)
+                        object.field = "request";
+                }
+                if (message.reply != null && message.hasOwnProperty("reply")) {
+                    object.reply = $root.consensus.v1.EpochAppendReply.toObject(message.reply, options);
+                    if (options.oneofs)
+                        object.field = "reply";
+                }
                 return object;
             };
 
@@ -406,12 +486,16 @@ $root.consensus = (function() {
          * @property {number} MESSAGE_TYPE_UNSPECIFIED=0 MESSAGE_TYPE_UNSPECIFIED value
          * @property {number} MESSAGE_TYPE_PROOF_PROPOSAL=1 MESSAGE_TYPE_PROOF_PROPOSAL value
          * @property {number} MESSAGE_TYPE_PROOF_PROPOSAL_APPROVAL=2 MESSAGE_TYPE_PROOF_PROPOSAL_APPROVAL value
+         * @property {number} MESSAGE_TYPE_REQUEST=3 MESSAGE_TYPE_REQUEST value
+         * @property {number} MESSAGE_TYPE_REPLY=4 MESSAGE_TYPE_REPLY value
          */
         v1.MessageType = (function() {
             var valuesById = {}, values = Object.create(valuesById);
             values[valuesById[0] = "MESSAGE_TYPE_UNSPECIFIED"] = 0;
             values[valuesById[1] = "MESSAGE_TYPE_PROOF_PROPOSAL"] = 1;
             values[valuesById[2] = "MESSAGE_TYPE_PROOF_PROPOSAL_APPROVAL"] = 2;
+            values[valuesById[3] = "MESSAGE_TYPE_REQUEST"] = 3;
+            values[valuesById[4] = "MESSAGE_TYPE_REPLY"] = 4;
             return values;
         })();
 
@@ -1717,6 +1801,1076 @@ $root.consensus = (function() {
             };
 
             return ProofProposalApproval;
+        })();
+
+        v1.EpochAppendIntent = (function() {
+
+            /**
+             * Properties of an EpochAppendIntent.
+             * @memberof consensus.v1
+             * @interface IEpochAppendIntent
+             * @property {B4aBuffer|null} [network_id] EpochAppendIntent network_id
+             * @property {B4aBuffer|null} [bootstrap] EpochAppendIntent bootstrap
+             * @property {B4aBuffer|null} [epoch] EpochAppendIntent epoch
+             * @property {B4aBuffer|null} [parent_hash] EpochAppendIntent parent_hash
+             * @property {B4aBuffer|null} [membership_context] EpochAppendIntent membership_context
+             * @property {B4aBuffer|null} [config_hash] EpochAppendIntent config_hash
+             * @property {string|null} [request_id] EpochAppendIntent request_id
+             * @property {B4aBuffer|null} [payload_hash] EpochAppendIntent payload_hash
+             * @property {B4aBuffer|null} [logical_counter] EpochAppendIntent logical_counter
+             * @property {B4aBuffer|null} [requester] EpochAppendIntent requester
+             * @property {number|null} [selection_version] EpochAppendIntent selection_version
+             */
+
+            /**
+             * Constructs a new EpochAppendIntent.
+             * @memberof consensus.v1
+             * @classdesc Represents an EpochAppendIntent.
+             * @implements IEpochAppendIntent
+             * @constructor
+             * @param {consensus.v1.IEpochAppendIntent=} [properties] Properties to set
+             */
+            function EpochAppendIntent(properties) {
+                if (properties)
+                    for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
+                        if (properties[keys[i]] != null)
+                            this[keys[i]] = properties[keys[i]];
+            }
+
+            /**
+             * EpochAppendIntent network_id.
+             * @member {B4aBuffer} network_id
+             * @memberof consensus.v1.EpochAppendIntent
+             * @instance
+             */
+            EpochAppendIntent.prototype.network_id = $util.newBuffer([]);
+
+            /**
+             * EpochAppendIntent bootstrap.
+             * @member {B4aBuffer} bootstrap
+             * @memberof consensus.v1.EpochAppendIntent
+             * @instance
+             */
+            EpochAppendIntent.prototype.bootstrap = $util.newBuffer([]);
+
+            /**
+             * EpochAppendIntent epoch.
+             * @member {B4aBuffer} epoch
+             * @memberof consensus.v1.EpochAppendIntent
+             * @instance
+             */
+            EpochAppendIntent.prototype.epoch = $util.newBuffer([]);
+
+            /**
+             * EpochAppendIntent parent_hash.
+             * @member {B4aBuffer} parent_hash
+             * @memberof consensus.v1.EpochAppendIntent
+             * @instance
+             */
+            EpochAppendIntent.prototype.parent_hash = $util.newBuffer([]);
+
+            /**
+             * EpochAppendIntent membership_context.
+             * @member {B4aBuffer} membership_context
+             * @memberof consensus.v1.EpochAppendIntent
+             * @instance
+             */
+            EpochAppendIntent.prototype.membership_context = $util.newBuffer([]);
+
+            /**
+             * EpochAppendIntent config_hash.
+             * @member {B4aBuffer} config_hash
+             * @memberof consensus.v1.EpochAppendIntent
+             * @instance
+             */
+            EpochAppendIntent.prototype.config_hash = $util.newBuffer([]);
+
+            /**
+             * EpochAppendIntent request_id.
+             * @member {string} request_id
+             * @memberof consensus.v1.EpochAppendIntent
+             * @instance
+             */
+            EpochAppendIntent.prototype.request_id = "";
+
+            /**
+             * EpochAppendIntent payload_hash.
+             * @member {B4aBuffer} payload_hash
+             * @memberof consensus.v1.EpochAppendIntent
+             * @instance
+             */
+            EpochAppendIntent.prototype.payload_hash = $util.newBuffer([]);
+
+            /**
+             * EpochAppendIntent logical_counter.
+             * @member {B4aBuffer} logical_counter
+             * @memberof consensus.v1.EpochAppendIntent
+             * @instance
+             */
+            EpochAppendIntent.prototype.logical_counter = $util.newBuffer([]);
+
+            /**
+             * EpochAppendIntent requester.
+             * @member {B4aBuffer} requester
+             * @memberof consensus.v1.EpochAppendIntent
+             * @instance
+             */
+            EpochAppendIntent.prototype.requester = $util.newBuffer([]);
+
+            /**
+             * EpochAppendIntent selection_version.
+             * @member {number} selection_version
+             * @memberof consensus.v1.EpochAppendIntent
+             * @instance
+             */
+            EpochAppendIntent.prototype.selection_version = 0;
+
+            /**
+             * Creates a new EpochAppendIntent instance using the specified properties.
+             * @function create
+             * @memberof consensus.v1.EpochAppendIntent
+             * @static
+             * @param {consensus.v1.IEpochAppendIntent=} [properties] Properties to set
+             * @returns {consensus.v1.EpochAppendIntent} EpochAppendIntent instance
+             */
+            EpochAppendIntent.create = function create(properties) {
+                return new EpochAppendIntent(properties);
+            };
+
+            /**
+             * Encodes the specified EpochAppendIntent message. Does not implicitly {@link consensus.v1.EpochAppendIntent.verify|verify} messages.
+             * @function encode
+             * @memberof consensus.v1.EpochAppendIntent
+             * @static
+             * @param {consensus.v1.IEpochAppendIntent} message EpochAppendIntent message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            EpochAppendIntent.encode = function encode(message, writer) {
+                writer = $Writer.create(writer);
+                if (message.network_id != null && Object.hasOwnProperty.call(message, "network_id"))
+                    writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.network_id);
+                if (message.bootstrap != null && Object.hasOwnProperty.call(message, "bootstrap"))
+                    writer.uint32(/* id 2, wireType 2 =*/18).bytes(message.bootstrap);
+                if (message.epoch != null && Object.hasOwnProperty.call(message, "epoch"))
+                    writer.uint32(/* id 3, wireType 2 =*/26).bytes(message.epoch);
+                if (message.parent_hash != null && Object.hasOwnProperty.call(message, "parent_hash"))
+                    writer.uint32(/* id 4, wireType 2 =*/34).bytes(message.parent_hash);
+                if (message.membership_context != null && Object.hasOwnProperty.call(message, "membership_context"))
+                    writer.uint32(/* id 5, wireType 2 =*/42).bytes(message.membership_context);
+                if (message.config_hash != null && Object.hasOwnProperty.call(message, "config_hash"))
+                    writer.uint32(/* id 6, wireType 2 =*/50).bytes(message.config_hash);
+                if (message.request_id != null && Object.hasOwnProperty.call(message, "request_id"))
+                    writer.uint32(/* id 7, wireType 2 =*/58).string(message.request_id);
+                if (message.payload_hash != null && Object.hasOwnProperty.call(message, "payload_hash"))
+                    writer.uint32(/* id 8, wireType 2 =*/66).bytes(message.payload_hash);
+                if (message.logical_counter != null && Object.hasOwnProperty.call(message, "logical_counter"))
+                    writer.uint32(/* id 9, wireType 2 =*/74).bytes(message.logical_counter);
+                if (message.requester != null && Object.hasOwnProperty.call(message, "requester"))
+                    writer.uint32(/* id 10, wireType 2 =*/82).bytes(message.requester);
+                if (message.selection_version != null && Object.hasOwnProperty.call(message, "selection_version"))
+                    writer.uint32(/* id 11, wireType 0 =*/88).uint32(message.selection_version);
+                return writer;
+            };
+
+            /**
+             * Encodes the specified EpochAppendIntent message, length delimited. Does not implicitly {@link consensus.v1.EpochAppendIntent.verify|verify} messages.
+             * @function encodeDelimited
+             * @memberof consensus.v1.EpochAppendIntent
+             * @static
+             * @param {consensus.v1.IEpochAppendIntent} message EpochAppendIntent message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            EpochAppendIntent.encodeDelimited = function encodeDelimited(message, writer) {
+                return this.encode(message, writer).ldelim();
+            };
+
+            /**
+             * Decodes an EpochAppendIntent message from the specified reader or buffer.
+             * @function decode
+             * @memberof consensus.v1.EpochAppendIntent
+             * @static
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
+             * @param {number} [length] Message length if known beforehand
+             * @returns {consensus.v1.EpochAppendIntent} EpochAppendIntent
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            EpochAppendIntent.decode = function decode(reader, length, error) {
+                reader = $Reader.create(reader);
+                var end = length === undefined ? reader.len : reader.pos + length, message = new $root.consensus.v1.EpochAppendIntent();
+                while (reader.pos < end) {
+                    var tag = reader.uint32();
+                    if (tag === error)
+                        break;
+                    switch (tag >>> 3) {
+                    case 1: {
+                            message.network_id = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 2: {
+                            message.bootstrap = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 3: {
+                            message.epoch = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 4: {
+                            message.parent_hash = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 5: {
+                            message.membership_context = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 6: {
+                            message.config_hash = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 7: {
+                            message.request_id = reader.string();
+                            break;
+                        }
+                    case 8: {
+                            message.payload_hash = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 9: {
+                            message.logical_counter = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 10: {
+                            message.requester = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 11: {
+                            message.selection_version = reader.uint32();
+                            break;
+                        }
+                    default:
+                        reader.skipType(tag & 7);
+                        break;
+                    }
+                }
+                return message;
+            };
+
+            /**
+             * Decodes an EpochAppendIntent message from the specified reader or buffer, length delimited.
+             * @function decodeDelimited
+             * @memberof consensus.v1.EpochAppendIntent
+             * @static
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
+             * @returns {consensus.v1.EpochAppendIntent} EpochAppendIntent
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            EpochAppendIntent.decodeDelimited = function decodeDelimited(reader) {
+                reader = $Reader.create(reader);
+                return this.decode(reader, reader.uint32());
+            };
+
+            /**
+             * Verifies an EpochAppendIntent message.
+             * @function verify
+             * @memberof consensus.v1.EpochAppendIntent
+             * @static
+             * @param {Object.<string,*>} message Plain object to verify
+             * @returns {string|null} `null` if valid, otherwise the reason why it is not
+             */
+            EpochAppendIntent.verify = function verify(message) {
+                if (typeof message !== "object" || message === null)
+                    return "object expected";
+                if (message.network_id != null && message.hasOwnProperty("network_id"))
+                    if (!$util.isBytes(message.network_id))
+                        return "network_id: buffer expected";
+                if (message.bootstrap != null && message.hasOwnProperty("bootstrap"))
+                    if (!$util.isBytes(message.bootstrap))
+                        return "bootstrap: buffer expected";
+                if (message.epoch != null && message.hasOwnProperty("epoch"))
+                    if (!$util.isBytes(message.epoch))
+                        return "epoch: buffer expected";
+                if (message.parent_hash != null && message.hasOwnProperty("parent_hash"))
+                    if (!$util.isBytes(message.parent_hash))
+                        return "parent_hash: buffer expected";
+                if (message.membership_context != null && message.hasOwnProperty("membership_context"))
+                    if (!$util.isBytes(message.membership_context))
+                        return "membership_context: buffer expected";
+                if (message.config_hash != null && message.hasOwnProperty("config_hash"))
+                    if (!$util.isBytes(message.config_hash))
+                        return "config_hash: buffer expected";
+                if (message.request_id != null && message.hasOwnProperty("request_id"))
+                    if (!$util.isString(message.request_id))
+                        return "request_id: string expected";
+                if (message.payload_hash != null && message.hasOwnProperty("payload_hash"))
+                    if (!$util.isBytes(message.payload_hash))
+                        return "payload_hash: buffer expected";
+                if (message.logical_counter != null && message.hasOwnProperty("logical_counter"))
+                    if (!$util.isBytes(message.logical_counter))
+                        return "logical_counter: buffer expected";
+                if (message.requester != null && message.hasOwnProperty("requester"))
+                    if (!$util.isBytes(message.requester))
+                        return "requester: buffer expected";
+                if (message.selection_version != null && message.hasOwnProperty("selection_version"))
+                    if (!$util.isInteger(message.selection_version))
+                        return "selection_version: integer expected";
+                return null;
+            };
+
+            /**
+             * Creates an EpochAppendIntent message from a plain object. Also converts values to their respective internal types.
+             * @function fromObject
+             * @memberof consensus.v1.EpochAppendIntent
+             * @static
+             * @param {Object.<string,*>} object Plain object
+             * @returns {consensus.v1.EpochAppendIntent} EpochAppendIntent
+             */
+            EpochAppendIntent.fromObject = function fromObject(object) {
+                if (object instanceof $root.consensus.v1.EpochAppendIntent)
+                    object = Object.assign({}, object);
+                var message = new $root.consensus.v1.EpochAppendIntent();
+                if (object.network_id != null)
+                    message.network_id = $util.bytesFrom(object.network_id);
+                if (object.bootstrap != null)
+                    message.bootstrap = $util.bytesFrom(object.bootstrap);
+                if (object.epoch != null)
+                    message.epoch = $util.bytesFrom(object.epoch);
+                if (object.parent_hash != null)
+                    message.parent_hash = $util.bytesFrom(object.parent_hash);
+                if (object.membership_context != null)
+                    message.membership_context = $util.bytesFrom(object.membership_context);
+                if (object.config_hash != null)
+                    message.config_hash = $util.bytesFrom(object.config_hash);
+                if (object.request_id != null)
+                    message.request_id = String(object.request_id);
+                if (object.payload_hash != null)
+                    message.payload_hash = $util.bytesFrom(object.payload_hash);
+                if (object.logical_counter != null)
+                    message.logical_counter = $util.bytesFrom(object.logical_counter);
+                if (object.requester != null)
+                    message.requester = $util.bytesFrom(object.requester);
+                if (object.selection_version != null)
+                    message.selection_version = object.selection_version >>> 0;
+                return message;
+            };
+
+            /**
+             * Creates a plain object from an EpochAppendIntent message. Also converts values to other types if specified.
+             * @function toObject
+             * @memberof consensus.v1.EpochAppendIntent
+             * @static
+             * @param {consensus.v1.EpochAppendIntent} message EpochAppendIntent
+             * @param {$protobuf.IConversionOptions} [options] Conversion options
+             * @returns {Object.<string,*>} Plain object
+             */
+            EpochAppendIntent.toObject = function toObject(message, options) {
+                if (!options)
+                    options = {};
+                var object = {};
+                if (options.defaults) {
+                    if (options.bytes === String)
+                        object.network_id = "";
+                    else {
+                        object.network_id = [];
+                        if (options.bytes !== Array)
+                            object.network_id = $util.newBuffer(object.network_id);
+                    }
+                    if (options.bytes === String)
+                        object.bootstrap = "";
+                    else {
+                        object.bootstrap = [];
+                        if (options.bytes !== Array)
+                            object.bootstrap = $util.newBuffer(object.bootstrap);
+                    }
+                    if (options.bytes === String)
+                        object.epoch = "";
+                    else {
+                        object.epoch = [];
+                        if (options.bytes !== Array)
+                            object.epoch = $util.newBuffer(object.epoch);
+                    }
+                    if (options.bytes === String)
+                        object.parent_hash = "";
+                    else {
+                        object.parent_hash = [];
+                        if (options.bytes !== Array)
+                            object.parent_hash = $util.newBuffer(object.parent_hash);
+                    }
+                    if (options.bytes === String)
+                        object.membership_context = "";
+                    else {
+                        object.membership_context = [];
+                        if (options.bytes !== Array)
+                            object.membership_context = $util.newBuffer(object.membership_context);
+                    }
+                    if (options.bytes === String)
+                        object.config_hash = "";
+                    else {
+                        object.config_hash = [];
+                        if (options.bytes !== Array)
+                            object.config_hash = $util.newBuffer(object.config_hash);
+                    }
+                    object.request_id = "";
+                    if (options.bytes === String)
+                        object.payload_hash = "";
+                    else {
+                        object.payload_hash = [];
+                        if (options.bytes !== Array)
+                            object.payload_hash = $util.newBuffer(object.payload_hash);
+                    }
+                    if (options.bytes === String)
+                        object.logical_counter = "";
+                    else {
+                        object.logical_counter = [];
+                        if (options.bytes !== Array)
+                            object.logical_counter = $util.newBuffer(object.logical_counter);
+                    }
+                    if (options.bytes === String)
+                        object.requester = "";
+                    else {
+                        object.requester = [];
+                        if (options.bytes !== Array)
+                            object.requester = $util.newBuffer(object.requester);
+                    }
+                    object.selection_version = 0;
+                }
+                if (message.network_id != null && message.hasOwnProperty("network_id"))
+                    object.network_id = $util.bytesTo(message.network_id, options);
+                if (message.bootstrap != null && message.hasOwnProperty("bootstrap"))
+                    object.bootstrap = $util.bytesTo(message.bootstrap, options);
+                if (message.epoch != null && message.hasOwnProperty("epoch"))
+                    object.epoch = $util.bytesTo(message.epoch, options);
+                if (message.parent_hash != null && message.hasOwnProperty("parent_hash"))
+                    object.parent_hash = $util.bytesTo(message.parent_hash, options);
+                if (message.membership_context != null && message.hasOwnProperty("membership_context"))
+                    object.membership_context = $util.bytesTo(message.membership_context, options);
+                if (message.config_hash != null && message.hasOwnProperty("config_hash"))
+                    object.config_hash = $util.bytesTo(message.config_hash, options);
+                if (message.request_id != null && message.hasOwnProperty("request_id"))
+                    object.request_id = message.request_id;
+                if (message.payload_hash != null && message.hasOwnProperty("payload_hash"))
+                    object.payload_hash = $util.bytesTo(message.payload_hash, options);
+                if (message.logical_counter != null && message.hasOwnProperty("logical_counter"))
+                    object.logical_counter = $util.bytesTo(message.logical_counter, options);
+                if (message.requester != null && message.hasOwnProperty("requester"))
+                    object.requester = $util.bytesTo(message.requester, options);
+                if (message.selection_version != null && message.hasOwnProperty("selection_version"))
+                    object.selection_version = message.selection_version;
+                return object;
+            };
+
+            /**
+             * Converts this EpochAppendIntent to JSON.
+             * @function toJSON
+             * @memberof consensus.v1.EpochAppendIntent
+             * @instance
+             * @returns {Object.<string,*>} JSON object
+             */
+            EpochAppendIntent.prototype.toJSON = function toJSON() {
+                return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
+            };
+
+            /**
+             * Gets the default type url for EpochAppendIntent
+             * @function getTypeUrl
+             * @memberof consensus.v1.EpochAppendIntent
+             * @static
+             * @param {string} [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
+             * @returns {string} The default type url
+             */
+            EpochAppendIntent.getTypeUrl = function getTypeUrl(typeUrlPrefix) {
+                if (typeUrlPrefix === undefined) {
+                    typeUrlPrefix = "type.googleapis.com";
+                }
+                return typeUrlPrefix + "/consensus.v1.EpochAppendIntent";
+            };
+
+            return EpochAppendIntent;
+        })();
+
+        v1.EpochAppendRequest = (function() {
+
+            /**
+             * Properties of an EpochAppendRequest.
+             * @memberof consensus.v1
+             * @interface IEpochAppendRequest
+             * @property {consensus.v1.IEpochAppendIntent|null} [intent] EpochAppendRequest intent
+             * @property {B4aBuffer|null} [signature] EpochAppendRequest signature
+             */
+
+            /**
+             * Constructs a new EpochAppendRequest.
+             * @memberof consensus.v1
+             * @classdesc Represents an EpochAppendRequest.
+             * @implements IEpochAppendRequest
+             * @constructor
+             * @param {consensus.v1.IEpochAppendRequest=} [properties] Properties to set
+             */
+            function EpochAppendRequest(properties) {
+                if (properties)
+                    for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
+                        if (properties[keys[i]] != null)
+                            this[keys[i]] = properties[keys[i]];
+            }
+
+            /**
+             * EpochAppendRequest intent.
+             * @member {consensus.v1.IEpochAppendIntent|null|undefined} intent
+             * @memberof consensus.v1.EpochAppendRequest
+             * @instance
+             */
+            EpochAppendRequest.prototype.intent = null;
+
+            /**
+             * EpochAppendRequest signature.
+             * @member {B4aBuffer} signature
+             * @memberof consensus.v1.EpochAppendRequest
+             * @instance
+             */
+            EpochAppendRequest.prototype.signature = $util.newBuffer([]);
+
+            /**
+             * Creates a new EpochAppendRequest instance using the specified properties.
+             * @function create
+             * @memberof consensus.v1.EpochAppendRequest
+             * @static
+             * @param {consensus.v1.IEpochAppendRequest=} [properties] Properties to set
+             * @returns {consensus.v1.EpochAppendRequest} EpochAppendRequest instance
+             */
+            EpochAppendRequest.create = function create(properties) {
+                return new EpochAppendRequest(properties);
+            };
+
+            /**
+             * Encodes the specified EpochAppendRequest message. Does not implicitly {@link consensus.v1.EpochAppendRequest.verify|verify} messages.
+             * @function encode
+             * @memberof consensus.v1.EpochAppendRequest
+             * @static
+             * @param {consensus.v1.IEpochAppendRequest} message EpochAppendRequest message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            EpochAppendRequest.encode = function encode(message, writer) {
+                writer = $Writer.create(writer);
+                if (message.intent != null && Object.hasOwnProperty.call(message, "intent"))
+                    $root.consensus.v1.EpochAppendIntent.encode(message.intent, writer.uint32(/* id 1, wireType 2 =*/10).fork()).ldelim();
+                if (message.signature != null && Object.hasOwnProperty.call(message, "signature"))
+                    writer.uint32(/* id 2, wireType 2 =*/18).bytes(message.signature);
+                return writer;
+            };
+
+            /**
+             * Encodes the specified EpochAppendRequest message, length delimited. Does not implicitly {@link consensus.v1.EpochAppendRequest.verify|verify} messages.
+             * @function encodeDelimited
+             * @memberof consensus.v1.EpochAppendRequest
+             * @static
+             * @param {consensus.v1.IEpochAppendRequest} message EpochAppendRequest message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            EpochAppendRequest.encodeDelimited = function encodeDelimited(message, writer) {
+                return this.encode(message, writer).ldelim();
+            };
+
+            /**
+             * Decodes an EpochAppendRequest message from the specified reader or buffer.
+             * @function decode
+             * @memberof consensus.v1.EpochAppendRequest
+             * @static
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
+             * @param {number} [length] Message length if known beforehand
+             * @returns {consensus.v1.EpochAppendRequest} EpochAppendRequest
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            EpochAppendRequest.decode = function decode(reader, length, error) {
+                reader = $Reader.create(reader);
+                var end = length === undefined ? reader.len : reader.pos + length, message = new $root.consensus.v1.EpochAppendRequest();
+                while (reader.pos < end) {
+                    var tag = reader.uint32();
+                    if (tag === error)
+                        break;
+                    switch (tag >>> 3) {
+                    case 1: {
+                            message.intent = $root.consensus.v1.EpochAppendIntent.decode(reader, reader.uint32());
+                            break;
+                        }
+                    case 2: {
+                            message.signature = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    default:
+                        reader.skipType(tag & 7);
+                        break;
+                    }
+                }
+                return message;
+            };
+
+            /**
+             * Decodes an EpochAppendRequest message from the specified reader or buffer, length delimited.
+             * @function decodeDelimited
+             * @memberof consensus.v1.EpochAppendRequest
+             * @static
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
+             * @returns {consensus.v1.EpochAppendRequest} EpochAppendRequest
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            EpochAppendRequest.decodeDelimited = function decodeDelimited(reader) {
+                reader = $Reader.create(reader);
+                return this.decode(reader, reader.uint32());
+            };
+
+            /**
+             * Verifies an EpochAppendRequest message.
+             * @function verify
+             * @memberof consensus.v1.EpochAppendRequest
+             * @static
+             * @param {Object.<string,*>} message Plain object to verify
+             * @returns {string|null} `null` if valid, otherwise the reason why it is not
+             */
+            EpochAppendRequest.verify = function verify(message) {
+                if (typeof message !== "object" || message === null)
+                    return "object expected";
+                if (message.intent != null && message.hasOwnProperty("intent")) {
+                    var error = $root.consensus.v1.EpochAppendIntent.verify(message.intent);
+                    if (error)
+                        return "intent." + error;
+                }
+                if (message.signature != null && message.hasOwnProperty("signature"))
+                    if (!$util.isBytes(message.signature))
+                        return "signature: buffer expected";
+                return null;
+            };
+
+            /**
+             * Creates an EpochAppendRequest message from a plain object. Also converts values to their respective internal types.
+             * @function fromObject
+             * @memberof consensus.v1.EpochAppendRequest
+             * @static
+             * @param {Object.<string,*>} object Plain object
+             * @returns {consensus.v1.EpochAppendRequest} EpochAppendRequest
+             */
+            EpochAppendRequest.fromObject = function fromObject(object) {
+                if (object instanceof $root.consensus.v1.EpochAppendRequest)
+                    object = Object.assign({}, object);
+                var message = new $root.consensus.v1.EpochAppendRequest();
+                if (object.intent != null) {
+                    if (typeof object.intent !== "object")
+                        throw TypeError(".consensus.v1.EpochAppendRequest.intent: object expected");
+                    message.intent = $root.consensus.v1.EpochAppendIntent.fromObject(object.intent);
+                }
+                if (object.signature != null)
+                    message.signature = $util.bytesFrom(object.signature);
+                return message;
+            };
+
+            /**
+             * Creates a plain object from an EpochAppendRequest message. Also converts values to other types if specified.
+             * @function toObject
+             * @memberof consensus.v1.EpochAppendRequest
+             * @static
+             * @param {consensus.v1.EpochAppendRequest} message EpochAppendRequest
+             * @param {$protobuf.IConversionOptions} [options] Conversion options
+             * @returns {Object.<string,*>} Plain object
+             */
+            EpochAppendRequest.toObject = function toObject(message, options) {
+                if (!options)
+                    options = {};
+                var object = {};
+                if (options.defaults) {
+                    object.intent = null;
+                    if (options.bytes === String)
+                        object.signature = "";
+                    else {
+                        object.signature = [];
+                        if (options.bytes !== Array)
+                            object.signature = $util.newBuffer(object.signature);
+                    }
+                }
+                if (message.intent != null && message.hasOwnProperty("intent"))
+                    object.intent = $root.consensus.v1.EpochAppendIntent.toObject(message.intent, options);
+                if (message.signature != null && message.hasOwnProperty("signature"))
+                    object.signature = $util.bytesTo(message.signature, options);
+                return object;
+            };
+
+            /**
+             * Converts this EpochAppendRequest to JSON.
+             * @function toJSON
+             * @memberof consensus.v1.EpochAppendRequest
+             * @instance
+             * @returns {Object.<string,*>} JSON object
+             */
+            EpochAppendRequest.prototype.toJSON = function toJSON() {
+                return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
+            };
+
+            /**
+             * Gets the default type url for EpochAppendRequest
+             * @function getTypeUrl
+             * @memberof consensus.v1.EpochAppendRequest
+             * @static
+             * @param {string} [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
+             * @returns {string} The default type url
+             */
+            EpochAppendRequest.getTypeUrl = function getTypeUrl(typeUrlPrefix) {
+                if (typeUrlPrefix === undefined) {
+                    typeUrlPrefix = "type.googleapis.com";
+                }
+                return typeUrlPrefix + "/consensus.v1.EpochAppendRequest";
+            };
+
+            return EpochAppendRequest;
+        })();
+
+        v1.EpochAppendReply = (function() {
+
+            /**
+             * Properties of an EpochAppendReply.
+             * @memberof consensus.v1
+             * @interface IEpochAppendReply
+             * @property {consensus.v1.IEpochAppendIntent|null} [intent] EpochAppendReply intent
+             * @property {B4aBuffer|null} [responder] EpochAppendReply responder
+             * @property {B4aBuffer|null} [signature] EpochAppendReply signature
+             * @property {number|null} [vote_status] EpochAppendReply vote_status
+             * @property {B4aBuffer|null} [observed_counter] EpochAppendReply observed_counter
+             * @property {consensus.v1.IEpochAppendIntent|null} [vote] EpochAppendReply vote
+             */
+
+            /**
+             * Constructs a new EpochAppendReply.
+             * @memberof consensus.v1
+             * @classdesc Represents an EpochAppendReply.
+             * @implements IEpochAppendReply
+             * @constructor
+             * @param {consensus.v1.IEpochAppendReply=} [properties] Properties to set
+             */
+            function EpochAppendReply(properties) {
+                if (properties)
+                    for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
+                        if (properties[keys[i]] != null)
+                            this[keys[i]] = properties[keys[i]];
+            }
+
+            /**
+             * EpochAppendReply intent.
+             * @member {consensus.v1.IEpochAppendIntent|null|undefined} intent
+             * @memberof consensus.v1.EpochAppendReply
+             * @instance
+             */
+            EpochAppendReply.prototype.intent = null;
+
+            /**
+             * EpochAppendReply responder.
+             * @member {B4aBuffer} responder
+             * @memberof consensus.v1.EpochAppendReply
+             * @instance
+             */
+            EpochAppendReply.prototype.responder = $util.newBuffer([]);
+
+            /**
+             * EpochAppendReply signature.
+             * @member {B4aBuffer} signature
+             * @memberof consensus.v1.EpochAppendReply
+             * @instance
+             */
+            EpochAppendReply.prototype.signature = $util.newBuffer([]);
+
+            /**
+             * EpochAppendReply vote_status.
+             * @member {number} vote_status
+             * @memberof consensus.v1.EpochAppendReply
+             * @instance
+             */
+            EpochAppendReply.prototype.vote_status = 0;
+
+            /**
+             * EpochAppendReply observed_counter.
+             * @member {B4aBuffer} observed_counter
+             * @memberof consensus.v1.EpochAppendReply
+             * @instance
+             */
+            EpochAppendReply.prototype.observed_counter = $util.newBuffer([]);
+
+            /**
+             * EpochAppendReply vote.
+             * @member {consensus.v1.IEpochAppendIntent|null|undefined} vote
+             * @memberof consensus.v1.EpochAppendReply
+             * @instance
+             */
+            EpochAppendReply.prototype.vote = null;
+
+            /**
+             * Creates a new EpochAppendReply instance using the specified properties.
+             * @function create
+             * @memberof consensus.v1.EpochAppendReply
+             * @static
+             * @param {consensus.v1.IEpochAppendReply=} [properties] Properties to set
+             * @returns {consensus.v1.EpochAppendReply} EpochAppendReply instance
+             */
+            EpochAppendReply.create = function create(properties) {
+                return new EpochAppendReply(properties);
+            };
+
+            /**
+             * Encodes the specified EpochAppendReply message. Does not implicitly {@link consensus.v1.EpochAppendReply.verify|verify} messages.
+             * @function encode
+             * @memberof consensus.v1.EpochAppendReply
+             * @static
+             * @param {consensus.v1.IEpochAppendReply} message EpochAppendReply message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            EpochAppendReply.encode = function encode(message, writer) {
+                writer = $Writer.create(writer);
+                if (message.intent != null && Object.hasOwnProperty.call(message, "intent"))
+                    $root.consensus.v1.EpochAppendIntent.encode(message.intent, writer.uint32(/* id 1, wireType 2 =*/10).fork()).ldelim();
+                if (message.responder != null && Object.hasOwnProperty.call(message, "responder"))
+                    writer.uint32(/* id 2, wireType 2 =*/18).bytes(message.responder);
+                if (message.signature != null && Object.hasOwnProperty.call(message, "signature"))
+                    writer.uint32(/* id 3, wireType 2 =*/26).bytes(message.signature);
+                if (message.vote_status != null && Object.hasOwnProperty.call(message, "vote_status"))
+                    writer.uint32(/* id 4, wireType 0 =*/32).uint32(message.vote_status);
+                if (message.observed_counter != null && Object.hasOwnProperty.call(message, "observed_counter"))
+                    writer.uint32(/* id 5, wireType 2 =*/42).bytes(message.observed_counter);
+                if (message.vote != null && Object.hasOwnProperty.call(message, "vote"))
+                    $root.consensus.v1.EpochAppendIntent.encode(message.vote, writer.uint32(/* id 6, wireType 2 =*/50).fork()).ldelim();
+                return writer;
+            };
+
+            /**
+             * Encodes the specified EpochAppendReply message, length delimited. Does not implicitly {@link consensus.v1.EpochAppendReply.verify|verify} messages.
+             * @function encodeDelimited
+             * @memberof consensus.v1.EpochAppendReply
+             * @static
+             * @param {consensus.v1.IEpochAppendReply} message EpochAppendReply message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            EpochAppendReply.encodeDelimited = function encodeDelimited(message, writer) {
+                return this.encode(message, writer).ldelim();
+            };
+
+            /**
+             * Decodes an EpochAppendReply message from the specified reader or buffer.
+             * @function decode
+             * @memberof consensus.v1.EpochAppendReply
+             * @static
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
+             * @param {number} [length] Message length if known beforehand
+             * @returns {consensus.v1.EpochAppendReply} EpochAppendReply
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            EpochAppendReply.decode = function decode(reader, length, error) {
+                reader = $Reader.create(reader);
+                var end = length === undefined ? reader.len : reader.pos + length, message = new $root.consensus.v1.EpochAppendReply();
+                while (reader.pos < end) {
+                    var tag = reader.uint32();
+                    if (tag === error)
+                        break;
+                    switch (tag >>> 3) {
+                    case 1: {
+                            message.intent = $root.consensus.v1.EpochAppendIntent.decode(reader, reader.uint32());
+                            break;
+                        }
+                    case 2: {
+                            message.responder = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 3: {
+                            message.signature = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 4: {
+                            message.vote_status = reader.uint32();
+                            break;
+                        }
+                    case 5: {
+                            message.observed_counter = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 6: {
+                            message.vote = $root.consensus.v1.EpochAppendIntent.decode(reader, reader.uint32());
+                            break;
+                        }
+                    default:
+                        reader.skipType(tag & 7);
+                        break;
+                    }
+                }
+                return message;
+            };
+
+            /**
+             * Decodes an EpochAppendReply message from the specified reader or buffer, length delimited.
+             * @function decodeDelimited
+             * @memberof consensus.v1.EpochAppendReply
+             * @static
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
+             * @returns {consensus.v1.EpochAppendReply} EpochAppendReply
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            EpochAppendReply.decodeDelimited = function decodeDelimited(reader) {
+                reader = $Reader.create(reader);
+                return this.decode(reader, reader.uint32());
+            };
+
+            /**
+             * Verifies an EpochAppendReply message.
+             * @function verify
+             * @memberof consensus.v1.EpochAppendReply
+             * @static
+             * @param {Object.<string,*>} message Plain object to verify
+             * @returns {string|null} `null` if valid, otherwise the reason why it is not
+             */
+            EpochAppendReply.verify = function verify(message) {
+                if (typeof message !== "object" || message === null)
+                    return "object expected";
+                if (message.intent != null && message.hasOwnProperty("intent")) {
+                    var error = $root.consensus.v1.EpochAppendIntent.verify(message.intent);
+                    if (error)
+                        return "intent." + error;
+                }
+                if (message.responder != null && message.hasOwnProperty("responder"))
+                    if (!$util.isBytes(message.responder))
+                        return "responder: buffer expected";
+                if (message.signature != null && message.hasOwnProperty("signature"))
+                    if (!$util.isBytes(message.signature))
+                        return "signature: buffer expected";
+                if (message.vote_status != null && message.hasOwnProperty("vote_status"))
+                    if (!$util.isInteger(message.vote_status))
+                        return "vote_status: integer expected";
+                if (message.observed_counter != null && message.hasOwnProperty("observed_counter"))
+                    if (!$util.isBytes(message.observed_counter))
+                        return "observed_counter: buffer expected";
+                if (message.vote != null && message.hasOwnProperty("vote")) {
+                    var error = $root.consensus.v1.EpochAppendIntent.verify(message.vote);
+                    if (error)
+                        return "vote." + error;
+                }
+                return null;
+            };
+
+            /**
+             * Creates an EpochAppendReply message from a plain object. Also converts values to their respective internal types.
+             * @function fromObject
+             * @memberof consensus.v1.EpochAppendReply
+             * @static
+             * @param {Object.<string,*>} object Plain object
+             * @returns {consensus.v1.EpochAppendReply} EpochAppendReply
+             */
+            EpochAppendReply.fromObject = function fromObject(object) {
+                if (object instanceof $root.consensus.v1.EpochAppendReply)
+                    object = Object.assign({}, object);
+                var message = new $root.consensus.v1.EpochAppendReply();
+                if (object.intent != null) {
+                    if (typeof object.intent !== "object")
+                        throw TypeError(".consensus.v1.EpochAppendReply.intent: object expected");
+                    message.intent = $root.consensus.v1.EpochAppendIntent.fromObject(object.intent);
+                }
+                if (object.responder != null)
+                    message.responder = $util.bytesFrom(object.responder);
+                if (object.signature != null)
+                    message.signature = $util.bytesFrom(object.signature);
+                if (object.vote_status != null)
+                    message.vote_status = object.vote_status >>> 0;
+                if (object.observed_counter != null)
+                    message.observed_counter = $util.bytesFrom(object.observed_counter);
+                if (object.vote != null) {
+                    if (typeof object.vote !== "object")
+                        throw TypeError(".consensus.v1.EpochAppendReply.vote: object expected");
+                    message.vote = $root.consensus.v1.EpochAppendIntent.fromObject(object.vote);
+                }
+                return message;
+            };
+
+            /**
+             * Creates a plain object from an EpochAppendReply message. Also converts values to other types if specified.
+             * @function toObject
+             * @memberof consensus.v1.EpochAppendReply
+             * @static
+             * @param {consensus.v1.EpochAppendReply} message EpochAppendReply
+             * @param {$protobuf.IConversionOptions} [options] Conversion options
+             * @returns {Object.<string,*>} Plain object
+             */
+            EpochAppendReply.toObject = function toObject(message, options) {
+                if (!options)
+                    options = {};
+                var object = {};
+                if (options.defaults) {
+                    object.intent = null;
+                    if (options.bytes === String)
+                        object.responder = "";
+                    else {
+                        object.responder = [];
+                        if (options.bytes !== Array)
+                            object.responder = $util.newBuffer(object.responder);
+                    }
+                    if (options.bytes === String)
+                        object.signature = "";
+                    else {
+                        object.signature = [];
+                        if (options.bytes !== Array)
+                            object.signature = $util.newBuffer(object.signature);
+                    }
+                    object.vote_status = 0;
+                    if (options.bytes === String)
+                        object.observed_counter = "";
+                    else {
+                        object.observed_counter = [];
+                        if (options.bytes !== Array)
+                            object.observed_counter = $util.newBuffer(object.observed_counter);
+                    }
+                    object.vote = null;
+                }
+                if (message.intent != null && message.hasOwnProperty("intent"))
+                    object.intent = $root.consensus.v1.EpochAppendIntent.toObject(message.intent, options);
+                if (message.responder != null && message.hasOwnProperty("responder"))
+                    object.responder = $util.bytesTo(message.responder, options);
+                if (message.signature != null && message.hasOwnProperty("signature"))
+                    object.signature = $util.bytesTo(message.signature, options);
+                if (message.vote_status != null && message.hasOwnProperty("vote_status"))
+                    object.vote_status = message.vote_status;
+                if (message.observed_counter != null && message.hasOwnProperty("observed_counter"))
+                    object.observed_counter = $util.bytesTo(message.observed_counter, options);
+                if (message.vote != null && message.hasOwnProperty("vote"))
+                    object.vote = $root.consensus.v1.EpochAppendIntent.toObject(message.vote, options);
+                return object;
+            };
+
+            /**
+             * Converts this EpochAppendReply to JSON.
+             * @function toJSON
+             * @memberof consensus.v1.EpochAppendReply
+             * @instance
+             * @returns {Object.<string,*>} JSON object
+             */
+            EpochAppendReply.prototype.toJSON = function toJSON() {
+                return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
+            };
+
+            /**
+             * Gets the default type url for EpochAppendReply
+             * @function getTypeUrl
+             * @memberof consensus.v1.EpochAppendReply
+             * @static
+             * @param {string} [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
+             * @returns {string} The default type url
+             */
+            EpochAppendReply.getTypeUrl = function getTypeUrl(typeUrlPrefix) {
+                if (typeUrlPrefix === undefined) {
+                    typeUrlPrefix = "type.googleapis.com";
+                }
+                return typeUrlPrefix + "/consensus.v1.EpochAppendReply";
+            };
+
+            return EpochAppendReply;
         })();
 
         return v1;

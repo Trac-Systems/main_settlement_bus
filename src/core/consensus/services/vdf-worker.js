@@ -1,6 +1,19 @@
+/**
+ * Receives calculations and returns their results. Node uses workerData.port to pass binary messages.
+ * Bare reads one JSON request per line from standard input and writes the response to standard output.
+ * Solver errors are included in the response.
+ */
 const { solveWesolowski } = await import('@tracsystems/trac-vdf');
 
-async function solve(challenge, difficulty, discriminantSizeBits) {
+/**
+ * Runs the Wesolowski solver and returns the proof with its input parameters.
+ *
+ * @param {Buffer} challenge Encoded epoch challenge.
+ * @param {number} difficulty VDF iteration count.
+ * @param {number} discriminantSizeBits Discriminant size in bits.
+ * @returns {Promise<import('./VDFService.js').VdfWorkerResponse>}
+ */
+async function solveVdfChallenge(challenge, difficulty, discriminantSizeBits) {
     try {
         const solution = await solveWesolowski(challenge, difficulty, discriminantSizeBits);
         return { result: { challenge, difficulty, discriminantSizeBits, solution } };
@@ -18,23 +31,29 @@ if (typeof globalThis.Bare !== 'undefined') {
     const stdin = new Pipe(0);
     const stdout = new Pipe(1);
 
-    let buffer = '';
+    let requestBuffer = '';
     stdin.on('data', async (chunk) => {
-        buffer += chunk.toString();
-        const newlineIndex = buffer.indexOf('\n');
+        requestBuffer += chunk.toString();
+        const newlineIndex = requestBuffer.indexOf('\n');
         if (newlineIndex === -1) return;
-        const request = JSON.parse(buffer.slice(0, newlineIndex));
-        const response = await solve(
-            Buffer.from(request.challenge, 'hex'),
-            request.difficulty,
-            request.discriminantSizeBits
+        const calculationRequest = JSON.parse(requestBuffer.slice(0, newlineIndex));
+        const calculationResponse = await solveVdfChallenge(
+            Buffer.from(calculationRequest.challenge, 'hex'),
+            calculationRequest.difficulty,
+            calculationRequest.discriminantSizeBits
         );
-        stdout.write(JSON.stringify(encodeResponse(response)) + '\n');
+        stdout.write(JSON.stringify(encodeWorkerResponse(calculationResponse)) + '\n');
     });
 
-    function encodeResponse(response) {
-        if (response.error) return { error: response.error };
-        const { challenge, difficulty, discriminantSizeBits, solution } = response.result;
+    /**
+     * Converts buffers to hex so the Bare worker can send the response as JSON.
+     *
+     * @param {import('./VDFService.js').VdfWorkerResponse} calculationResponse Worker result.
+     * @returns {object} Response that can be encoded as JSON.
+     */
+    function encodeWorkerResponse(calculationResponse) {
+        if (calculationResponse.error) return { error: calculationResponse.error };
+        const { challenge, difficulty, discriminantSizeBits, solution } = calculationResponse.result;
         return {
             result: {
                 challenge: challenge.toString('hex'),
@@ -46,9 +65,9 @@ if (typeof globalThis.Bare !== 'undefined') {
     }
 } else {
     const { workerData } = await import('worker_threads');
-    const port = workerData.port;
+    const workerPort = workerData.port;
 
-    port.on('message', async (request) => {
-        port.postMessage(await solve(request.challenge, request.difficulty, request.discriminantSizeBits));
+    workerPort.on('message', async (calculationRequest) => {
+        workerPort.postMessage(await solveVdfChallenge(calculationRequest.challenge, calculationRequest.difficulty, calculationRequest.discriminantSizeBits));
     });
 }

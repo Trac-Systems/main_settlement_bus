@@ -1,20 +1,24 @@
 import { decodeConsensusMessage } from '../../../../../codecs/consensus/v1/consensusV1OperationCodec.js'
 import b4a from 'b4a'
-import { ConsensusOperationType, CONSENSUS_MESSAGE_MAX_BYTE_SIZE } from '../../../../../utils/constants.js'
+import { ConsensusOperationType, ConsensusResultCode, CONSENSUS_MESSAGE_MAX_BYTE_SIZE } from '../../../../../utils/constants.js'
 import { publicKeyToAddress } from '../../../../../utils/helpers.js'
 import V1EpochProofProposalOperationHandler from './handlers/V1EpochProofProposalOperationHandler.js'
+import V1EpochAppendOperationHandler from './handlers/V1EpochAppendOperationHandler.js';
+import { V1ConsensusProtocolError } from './V1ConsensusProtocolError.js';
 
 class ConsensusV1MessageRouter {
     #config
     #connectionPolicy
     #epochProofProposalHandler
     #pendingRequestService
+    #appendHandler;
     constructor(
         state,
         wallet,
         config,
         pendingRequestService,
-        connectionPolicy
+        connectionPolicy,
+        appenderSelector = null
     ) {
         this.#config = config
         this.#connectionPolicy = connectionPolicy;
@@ -25,6 +29,7 @@ class ConsensusV1MessageRouter {
             connectionPolicy
         );
         this.#pendingRequestService = pendingRequestService;
+        this.#appendHandler = new V1EpochAppendOperationHandler(state, wallet, config, appenderSelector);
     }
 
     async route(incomingMessage, connection, protocolSession) {
@@ -49,14 +54,42 @@ class ConsensusV1MessageRouter {
             return;
         }
 
-        let pendingApproval;
+        let pendingRequest;
         try {
             switch (decodedMessage.type) {
+                case ConsensusOperationType.REQUEST:
+                    await this.#appendHandler.handleRequest(decodedMessage, connection, protocolSession);
+                    break;
+                case ConsensusOperationType.REPLY: {
+                    const entry = this.#pendingRequestService.getPendingRequest(decodedMessage.session_id);
+                    if (
+                        !entry || entry.requestType !== ConsensusOperationType.REQUEST ||
+                        entry.session !== protocolSession ||
+                        entry.requestedTo !== b4a.toString(connection.remotePublicKey, 'hex')
+                    ) {
+                        break;
+                    }
+                    pendingRequest = entry;
+                    const response = await this.#appendHandler.handleReply(
+                        decodedMessage,
+                        connection,
+                        protocolSession,
+                        entry.appendRequest
+                    );
+                    if (
+                        response && !protocolSession.closed &&
+                        this.#pendingRequestService.getPendingRequest(decodedMessage.session_id) === entry
+                    ) {
+                        this.#pendingRequestService.resolvePendingRequest(decodedMessage.session_id, response);
+                    }
+                    break;
+                }
                 case ConsensusOperationType.PROOF_PROPOSAL:
                     await this.#epochProofProposalHandler.handleRequest(decodedMessage, connection, protocolSession);
                     break;
                 case ConsensusOperationType.PROOF_PROPOSAL_APPROVAL: {
                     const pendingEntry = this.#pendingRequestService.getPendingRequest(decodedMessage.session_id)
+                    if (pendingEntry && pendingEntry.requestType !== ConsensusOperationType.PROOF_PROPOSAL) break;
                     const expectedPeer = pendingEntry?.requestedTo ? b4a.from(pendingEntry.requestedTo, 'hex') : null;
                     if (expectedPeer && !b4a.equals(expectedPeer, connection.remotePublicKey)) {
                         this.#handleInvalidMessage(connection, protocolSession, 'Consensus V1 message: approval received from unexpected peer')
@@ -64,7 +97,7 @@ class ConsensusV1MessageRouter {
                     }
                     if (this.#connectionPolicy.shouldIgnoreApproval(pendingEntry, protocolSession)) break;
 
-                    pendingApproval = pendingEntry;
+                    pendingRequest = pendingEntry;
                     const response = await this.#epochProofProposalHandler.handleApproval(
                         decodedMessage,
                         connection,
@@ -81,8 +114,16 @@ class ConsensusV1MessageRouter {
                     this.#handleInvalidMessage(connection, protocolSession, `Unsupported Consensus V1 message type: ${decodedMessage.type}`)
             }
         } catch (error) {
-            if (pendingApproval && this.#pendingRequestService.getPendingRequest(decodedMessage.session_id) === pendingApproval) {
+            if (pendingRequest && this.#pendingRequestService.getPendingRequest(decodedMessage.session_id) === pendingRequest) {
                 this.#pendingRequestService.rejectPendingRequest(decodedMessage.session_id, error);
+            }
+            const isArbitrationMessage = decodedMessage.type === ConsensusOperationType.REQUEST ||
+                decodedMessage.type === ConsensusOperationType.REPLY;
+            if (isArbitrationMessage && this.#connectionPolicy.requestPeerBan(connection, error)) {
+                return;
+            }
+            if (isArbitrationMessage && error instanceof V1ConsensusProtocolError && error.resultCode === ConsensusResultCode.EPOCH_INVALID) {
+                return;
             }
             this.#logError(connection, `Unhandled error while routing Consensus V1 message: ${error.message}`)
         }

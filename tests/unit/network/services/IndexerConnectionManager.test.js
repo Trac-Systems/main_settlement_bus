@@ -2,6 +2,7 @@ import sinon from 'sinon';
 import { test } from 'brittle';
 import { default as EventEmitter } from 'bare-events';
 import b4a from 'b4a';
+import tracCryptoApi from 'trac-crypto-api';
 import { testKeyPair1, testKeyPair2, testKeyPair3 } from '../../../fixtures/apply.fixtures.js';
 import IndexerConnectionManager from '../../../../src/core/network/services/IndexerConnectionManager.js';
 
@@ -37,6 +38,40 @@ const makeManager = async (...keys) => {
 };
 
 test('IndexerConnectionManager', () => {
+
+    for (let count = 1; count <= 7; count++) {
+        test(`connect refreshes a stale promotion capacity for ${count} indexers`, async t => {
+            const members = Array.from({ length: count }, (_, i) => ({
+                key: b4a.alloc(32, i + 10),
+                publicKey: b4a.alloc(32, i + 1).toString('hex'),
+                address: tracCryptoApi.address.encode('trac', b4a.alloc(32, i + 1)),
+            }));
+            const state = {
+                getIndexersEntry: async () => members,
+                getRegisteredWriterKey: async key => b4a.from(members.find(member => member.key.toString('hex') === key).address),
+            };
+            const connections = new Map(members.slice(1).map(member => [member.publicKey, makeConnection(member.publicKey)]));
+            let manager;
+            const network = {
+                isConnectionPending: () => false,
+                tryConnect: async peer => manager.add(peer, connections.get(peer)),
+            };
+            manager = new IndexerConnectionManager(
+                Math.max(0, count - 2), mockConfig, mockLogger, mockMessages, state, network, members[0],
+            );
+            t.teardown(() => manager.close());
+            // Model the pool filled up to a capacity calculated before the last promotion.
+            for (const [peer, connection] of connections) await manager.add(peer, connection);
+            await manager.connect();
+            t.is(manager.connectionCount(), count - 1, 'every other indexer has a usable session');
+            t.absent(manager.connected(members[0].publicKey), 'the local indexer is excluded');
+            await manager.connect();
+            for (const [peer, connection] of connections) {
+                t.is(manager.getConnection(peer), connection, 'existing transport is retained');
+                t.absent(connection.protocolSessions.indexer.close.called);
+            }
+        });
+    }
 
     test('add', () => {
         for (const sessions of [undefined, {}, { indexer: { closed: true } }]) {

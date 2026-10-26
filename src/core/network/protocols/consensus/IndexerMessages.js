@@ -13,13 +13,13 @@ class IndexerMessages {
     #onSessionClosed;
     #connectionPolicy;
 
-    constructor(state, wallet, config, pendingRequestService, onSessionClosed) {
+    constructor(state, wallet, config, pendingRequestService, onSessionClosed, appenderSelector = null) {
         this.#pendingRequestService = pendingRequestService;
         this.#onSessionClosed = onSessionClosed;
         const logger = new Logger(config);
         this.#connectionPolicy = new ConsensusV1ConnectionPolicy(state, logger, config);
         this.#consensusRouter = new ConsensusV1MessageRouter(
-            state, wallet, config, pendingRequestService, this.#connectionPolicy
+            state, wallet, config, pendingRequestService, this.#connectionPolicy, appenderSelector
         );
     }
 

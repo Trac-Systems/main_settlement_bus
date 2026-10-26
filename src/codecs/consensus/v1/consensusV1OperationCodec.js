@@ -4,7 +4,8 @@ import consensusV1Generated from './consensusV1.generated.cjs';
 const {
     ConsensusMessageHeader,
     ProofProposalApproval,
-    ProofProposal
+    ProofProposal,
+    EpochAppendIntent,
 } = consensusV1Generated.consensus.v1;
 
 // Options for converting protobuf messages to plain objects, ensuring that bytes are returned as Buffers and enums as numbers.
@@ -156,3 +157,5 @@ export const safeDecodeProofProposal = (payload) => {
     }
     return null;
 }
+
+export const encodeEpochAppendIntent = payload => encodeMessage(EpochAppendIntent, payload);

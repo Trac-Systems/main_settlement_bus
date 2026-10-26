@@ -273,3 +273,116 @@ test('async listeners are awaited before send resolves', async t => {
     order.push('after-send');
     t.alike(order, ['listener', 'after-send']);
 });
+
+for (const listenerEvent of [EVENTS.START, '*']) {
+    test(`a transition from a ${listenerEvent} listener supersedes the old handler and remaining listeners`, async t => {
+        const handled = [];
+        const notified = [];
+        const sm = new StateMachine(makeTransitions(), STATES.IDLE, null, {
+            [STATES.RUNNING]: () => handled.push(STATES.RUNNING),
+            [STATES.DONE]: () => handled.push(STATES.DONE),
+        });
+        t.teardown(() => sm.close());
+        sm.on(listenerEvent, async ({ next }) => {
+            if (next === STATES.RUNNING) await sm.send(EVENTS.FINISH);
+        });
+        sm.on(listenerEvent, ({ next }) => notified.push(next));
+
+        t.is(await sm.send(EVENTS.START), false);
+        t.is(sm.state, STATES.DONE);
+        t.alike(handled, [STATES.DONE], 'the previous handler cannot run in the new state');
+        t.alike(notified, listenerEvent === '*' ? [STATES.DONE] : [], 'stale listeners cannot start timers for an abandoned transition');
+    });
+}
+
+test('returning to the same state does not revive an earlier transition waiting on a listener', async t => {
+    const entered = Promise.withResolvers();
+    const release = Promise.withResolvers();
+    const handled = [];
+    const sm = new StateMachine(makeTransitions(), STATES.IDLE, STATES.IDLE, {
+        [STATES.RUNNING]: context => handled.push(context.attempt),
+    });
+    t.teardown(async () => {
+        release.resolve();
+        await sm.close();
+    });
+    let first = true;
+    sm.on(EVENTS.START, async () => {
+        if (!first) return;
+        first = false;
+        entered.resolve();
+        await release.promise;
+    });
+
+    const previous = sm.send(EVENTS.START, { attempt: 'previous' });
+    await entered.promise;
+    await sm.send(EVENTS.RESET);
+    await sm.send(EVENTS.START, { attempt: 'current' });
+    release.resolve();
+
+    t.is(await previous, false);
+    t.is(sm.state, STATES.RUNNING);
+    t.alike(handled, ['current'], 'only the current entry into RUNNING executes its handler');
+    t.is(sm.context.attempt, 'current');
+});
+
+test('a superseded transition to the discard state does not clear the new context', async t => {
+    let idleCalls = 0;
+    const sm = new StateMachine(makeTransitions(), STATES.IDLE, STATES.IDLE, {
+        [STATES.IDLE]: () => { idleCalls++; },
+    });
+    t.teardown(() => sm.close());
+    await sm.send(EVENTS.START, { attempt: 'previous' });
+    sm.on(EVENTS.RESET, () => sm.send(EVENTS.START, { attempt: 'current' }));
+
+    t.is(await sm.send(EVENTS.RESET), false);
+    t.is(sm.state, STATES.RUNNING);
+    t.is(sm.context.attempt, 'current');
+    t.is(idleCalls, 0);
+});
+
+test('a transition during ENTER does not dispatch a handler twice', async t => {
+    const handled = [];
+    const sm = new StateMachine(makeTransitions(), STATES.IDLE, null, {
+        [STATES.IDLE]: () => handled.push(STATES.IDLE),
+        [STATES.RUNNING]: () => handled.push(STATES.RUNNING),
+    });
+    t.teardown(() => sm.close());
+    sm.on('ENTER', () => sm.send(EVENTS.START));
+
+    t.is(await sm.enter(), false);
+    t.is(sm.state, STATES.RUNNING);
+    t.alike(handled, [STATES.RUNNING]);
+});
+
+test('a handler can await another transition without blocking it', async t => {
+    const handled = [];
+    const sm = new StateMachine(makeTransitions(), STATES.IDLE, null, {
+        [STATES.RUNNING]: async (_context, machine) => {
+            handled.push(STATES.RUNNING);
+            const transition = await machine.send(EVENTS.FINISH);
+            t.is(transition.next, STATES.DONE);
+            handled.push('resumed');
+        },
+        [STATES.DONE]: () => handled.push(STATES.DONE),
+    });
+    t.teardown(() => sm.close());
+
+    const transition = await sm.send(EVENTS.START);
+    t.is(transition.next, STATES.RUNNING);
+    t.is(sm.state, STATES.DONE);
+    t.alike(handled, [STATES.RUNNING, STATES.DONE, 'resumed']);
+});
+
+test('an invalid event during emission does not supersede the active transition', async t => {
+    let calls = 0;
+    const sm = new StateMachine(makeTransitions(), STATES.IDLE, null, {
+        [STATES.RUNNING]: () => { calls++; },
+    });
+    t.teardown(() => sm.close());
+    sm.on(EVENTS.START, () => sm.send('UNSUPPORTED'));
+
+    const transition = await sm.send(EVENTS.START);
+    t.is(transition.next, STATES.RUNNING);
+    t.is(calls, 1);
+});
