@@ -7,7 +7,7 @@ import {
     EPOCH_BYTE_LENGTH,
     HASH_BYTE_LENGTH,
     HTLC_MAX_SIGNERS,
-    HTLC_METADATA_BYTE_LENGTH,
+    HTLC_METADATA_MAX_BYTE_LENGTH,
     HTLC_THRESHOLD_BYTE_LENGTH,
     NONCE_BYTE_LENGTH,
     OperationType,
@@ -52,9 +52,9 @@ export function createHtlcLockSigningMessage(networkId, locker, operation) {
     requireBuffer(operation.in, NONCE_BYTE_LENGTH, 'HTLC nonce');
     if (operation.fr !== undefined) requireBuffer(operation.fr, locker.length, 'HTLC fee recipient');
     if (operation.md !== undefined && (
-        !b4a.isBuffer(operation.md) || operation.md.length === 0 || operation.md.length > HTLC_METADATA_BYTE_LENGTH
+        !b4a.isBuffer(operation.md) || operation.md.length === 0 || operation.md.length > HTLC_METADATA_MAX_BYTE_LENGTH
     )) {
-        throw new Error(`HTLC metadata must be a buffer containing 1 to ${HTLC_METADATA_BYTE_LENGTH} bytes.`);
+        throw new Error(`HTLC metadata must be a buffer containing 1 to ${HTLC_METADATA_MAX_BYTE_LENGTH} bytes.`);
     }
 
     const feeIsZero = isZeroBuffer(operation.fa);

@@ -19,7 +19,7 @@ import {
     HTLC_PREIMAGE_BYTE_LENGTH,
     HTLC_THRESHOLD_BYTE_LENGTH,
     PUBLIC_KEY_LENGTH,
-    HTLC_METADATA_BYTE_LENGTH,
+    HTLC_METADATA_MAX_BYTE_LENGTH,
 } from '../../../utils/constants.js';
 import {
     boundedHtlcBufferArray,
@@ -584,7 +584,7 @@ class StateValidationSchema {
                     fr: {type: 'buffer', length: this.#config.addressLength, optional: true},
                     hl: {type: 'buffer', length: HASH_BYTE_LENGTH, required: true},
                     re: {type: 'buffer', length: EPOCH_BYTE_LENGTH, required: true},
-                    md: {type: 'buffer_max_length', maxLength: HTLC_METADATA_BYTE_LENGTH, optional: true},
+                    md: {type: 'buffer_max_length', maxLength: HTLC_METADATA_MAX_BYTE_LENGTH, optional: true},
                     ss: boundedHtlcBufferArray(1, HTLC_MAX_SIGNERS, PUBLIC_KEY_LENGTH),
                     th: {type: 'buffer', length: HTLC_THRESHOLD_BYTE_LENGTH, required: true},
                     cs: boundedHtlcBufferArray(0, HTLC_MAX_SIGNERS - 1, SIGNATURE_BYTE_LENGTH),

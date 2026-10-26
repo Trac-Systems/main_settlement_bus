@@ -8,7 +8,7 @@ import {
     HASH_BYTE_LENGTH,
     HTLC_LOCK_ID_BYTE_LENGTH,
     HTLC_MAX_SIGNERS,
-    HTLC_METADATA_BYTE_LENGTH,
+    HTLC_METADATA_MAX_BYTE_LENGTH,
     HTLC_PREIMAGE_BYTE_LENGTH,
     HTLC_THRESHOLD_BYTE_LENGTH,
     NONCE_BYTE_LENGTH,
@@ -271,8 +271,8 @@ class ApplyStateMessageBuilder {
             return this;
         }
         const bytes = this.#normalizeBytesBuffer(metadata, 'HTLC metadata');
-        if (bytes.length > HTLC_METADATA_BYTE_LENGTH) {
-            throw new Error(`HTLC metadata must not exceed ${HTLC_METADATA_BYTE_LENGTH} bytes.`);
+        if (bytes.length > HTLC_METADATA_MAX_BYTE_LENGTH) {
+            throw new Error(`HTLC metadata must not exceed ${HTLC_METADATA_MAX_BYTE_LENGTH} bytes.`);
         }
         this.#htlcMetadata = b4a.from(bytes);
         return this;

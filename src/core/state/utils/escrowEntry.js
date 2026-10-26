@@ -8,7 +8,7 @@ import {
     EPOCH_BYTE_LENGTH,
     HASH_BYTE_LENGTH,
     HTLC_LOCK_ID_BYTE_LENGTH,
-    HTLC_METADATA_BYTE_LENGTH,
+    HTLC_METADATA_MAX_BYTE_LENGTH,
     HTLC_PREIMAGE_BYTE_LENGTH,
     PUBLIC_KEY_LENGTH,
 } from '../../../utils/constants.js';
@@ -62,7 +62,7 @@ function hasValidSettlementFields({
         ? additionalFeeRecipientAddress === undefined
         : isSettlementAddress(additionalFeeRecipientAddress, hrp);
     const metadataIsValid = metadata === undefined || (
-        b4a.isBuffer(metadata) && metadata.length > 0 && metadata.length <= HTLC_METADATA_BYTE_LENGTH
+        b4a.isBuffer(metadata) && metadata.length > 0 && metadata.length <= HTLC_METADATA_MAX_BYTE_LENGTH
     );
 
     if (!requiredFieldsAreValid || !feeFieldsAreValid || !metadataIsValid) return false;

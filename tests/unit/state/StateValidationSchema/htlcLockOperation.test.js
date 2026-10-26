@@ -8,7 +8,7 @@ import {safeEncodeApplyOperation, safeDecodeApplyOperation} from '../../../../sr
 import {sanitizeDecodedPartialTransaction} from '../../../../src/core/network/protocols/validators/v1/handlers/broadcastTransaction/BroadcastTransactionPayloadUtils.js';
 import {
     HTLC_MAX_SIGNERS,
-    HTLC_METADATA_BYTE_LENGTH,
+    HTLC_METADATA_MAX_BYTE_LENGTH,
     PUBLIC_KEY_LENGTH,
     SIGNATURE_BYTE_LENGTH,
     OperationType,
@@ -408,7 +408,7 @@ for (const complete of [false, true]) {
     });
 
     test(`validateHtlcLockOperation - ${phase} metadata byte-length boundaries`, t => {
-        t.is(HTLC_METADATA_BYTE_LENGTH, 1024, 'the protocol limit is 1024 bytes');
+        t.is(HTLC_METADATA_MAX_BYTE_LENGTH, 1024, 'the protocol limit is 1024 bytes');
         for (const [length, expected] of [[0, false], [1, true], [2, true], [31, true], [32, true],
             [33, true], [1023, true], [1024, true], [1025, false], [2048, false]]) {
             for (const byte of [0x00, 0x01, 0xff]) {
