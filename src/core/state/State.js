@@ -1065,7 +1065,7 @@ class State extends ReadyResource {
             additionalFeeRecipientAddress: op.hlo.fr,
             hashLock: op.hlo.hl,
             refundEpoch: op.hlo.re,
-            policyHash: op.hlo.ph,
+            metadata: op.hlo.md,
         }, this.#config.addressPrefix);
         if (escrowEntry.length === 0) {
             this.#safeLogApply(OperationType.HTLC_LOCK, "Failed to encode HTLC escrow.", node.from.key);

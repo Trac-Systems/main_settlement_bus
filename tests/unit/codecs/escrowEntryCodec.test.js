@@ -27,10 +27,10 @@ test('Escrow entry codec preserves absent optional fields', t => {
         ...validEscrowEntry,
         additionalFeeAmount: b4a.alloc(16),
         additionalFeeRecipientAddress: undefined,
-        policyHash: undefined,
+        metadata: undefined,
     };
     const decoded = decodeEscrowEntry(encodeEscrowEntry(entry));
-    for (const field of ['additionalFeeRecipientAddress', 'policyHash', 'preimage']) {
+    for (const field of ['additionalFeeRecipientAddress', 'metadata', 'preimage']) {
         t.absent(Object.prototype.hasOwnProperty.call(decoded, field), `${field} is omitted`);
     }
     t.alike(decoded.additionalFeeAmount, entry.additionalFeeAmount);
@@ -76,4 +76,26 @@ test('Escrow entry codec rejects invalid protobuf input with safe fallbacks', as
 test('Escrow entry codec leaves financial and version validation to the state helper', t => {
     const entry = {...validEscrowEntry, version: 99, amount: b4a.from([1])};
     t.alike(safeDecodeEscrowEntry(safeEncodeEscrowEntry(entry)), entry);
+});
+
+test('Escrow entry codec preserves arbitrary metadata and its explicit presence', t => {
+    for (const metadata of [b4a.alloc(1), b4a.from([0x00, 0xff, 0x80]), b4a.alloc(1024),
+        new Uint8Array(1024).fill(0xff)]) {
+        const entry = {...validEscrowEntry, metadata};
+        const encoded = encodeEscrowEntry(entry);
+        const decoded = decodeEscrowEntry(encoded);
+        t.ok(Object.hasOwn(decoded, 'metadata'), 'metadata is explicitly stored');
+        t.ok(b4a.equals(decoded.metadata, metadata), 'metadata survives without truncation or padding');
+        t.is(Object.hasOwn(decoded, 'policyHash'), false, 'the removed field is not exposed');
+        decoded.metadata.fill(0x42);
+        t.ok(b4a.equals(decodeEscrowEntry(encoded).metadata, metadata), 'decoded metadata does not alias storage');
+    }
+});
+
+test('Escrow entry codec leaves metadata size validation to the state helper', t => {
+    for (const metadata of [b4a.alloc(0), b4a.alloc(1025)]) {
+        const decoded = decodeEscrowEntry(encodeEscrowEntry({...validEscrowEntry, metadata}));
+        t.ok(Object.hasOwn(decoded, 'metadata'), 'invalid metadata is not silently omitted');
+        t.ok(b4a.equals(decoded.metadata, metadata), 'protobuf preserves bytes for semantic validation');
+    }
 });

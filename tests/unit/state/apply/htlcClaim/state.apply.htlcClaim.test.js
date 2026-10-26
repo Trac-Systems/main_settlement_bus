@@ -538,3 +538,23 @@ test('State.apply HTLC_CLAIM adds two escrow payouts to one account in a batch',
     t.is((await readLockState(validatorPeer.base, firstLock)).escrow.status, escrowEntryUtils.Status.CLAIMED);
     t.is((await readLockState(validatorPeer.base, secondLock)).escrow.status, escrowEntryUtils.Status.CLAIMED);
 });
+
+test('State.apply HTLC_CLAIM preserves metadata and its omission through settlement and replay', async t => {
+    const context = await setupHtlcLockScenario(t);
+    const {validatorPeer} = context.htlcLockScenario;
+    for (const metadata of [undefined, b4a.alloc(1), b4a.alloc(1024, 0xff)]) {
+        const lockPayload = await buildHtlcLockPayload(context, {metadata});
+        await appendHtlcLock(context, lockPayload);
+        const claimPayload = await buildClaimPayload(context, lockPayload);
+        await appendHtlcLock(context, claimPayload);
+        const settled = await readLockState(validatorPeer.base, lockPayload);
+        t.is(settled.escrow.status, escrowEntryUtils.Status.CLAIMED);
+        if (metadata === undefined) t.is(settled.escrow.metadata, null, 'claim preserves omission');
+        else t.ok(b4a.equals(settled.escrow.metadata, metadata), 'claim preserves metadata bytes');
+        t.ok(b4a.equals(settled.operation.value, lockPayload), 'original lock history is unchanged');
+
+        await appendHtlcLock(context, claimPayload);
+        const replayed = await readLockState(validatorPeer.base, lockPayload);
+        t.ok(b4a.equals(replayed.escrowRecord.value, settled.escrowRecord.value), 'replay preserves the complete escrow');
+    }
+});

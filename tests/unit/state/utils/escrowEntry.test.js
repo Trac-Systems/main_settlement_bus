@@ -61,7 +61,7 @@ test('Escrow Entry - init and decode preserve all settlement fields', t => {
     t.is(decoded.status, Status.PENDING);
     for (const field of [
         'lockId', 'lockerAddress', 'claimRecipientAddress', 'refundRecipientAddress', 'amount', 'additionalFeeAmount',
-        'additionalFeeRecipientAddress', 'hashLock', 'refundEpoch', 'policyHash'
+        'additionalFeeRecipientAddress', 'hashLock', 'refundEpoch', 'metadata'
     ]) {
         t.ok(b4a.equals(decoded[field], inputs[field]), `${field} matches`);
     }
@@ -118,26 +118,26 @@ test('Escrow Entry - requires the configured network prefix', t => {
     t.is(decodeEntry(entry), null);
 });
 
-test('Escrow Entry - fee and policy fields have canonical empty representations', t => {
+test('Escrow Entry - fee and metadata fields have canonical empty representations', t => {
     const inputs = makeInputs();
     inputs.additionalFeeAmount = b4a.alloc(BALANCE_BYTE_LENGTH);
     delete inputs.additionalFeeRecipientAddress;
-    delete inputs.policyHash;
+    delete inputs.metadata;
 
     const entry = init(inputs);
     const decoded = decode(entry);
     const stored = EscrowEntry.decode(entry);
     t.ok(decoded);
     t.is(decoded.additionalFeeRecipientAddress, null);
-    t.is(decoded.policyHash, null);
-    for (const field of ['additionalFeeRecipientAddress', 'policyHash', 'preimage']) {
+    t.is(decoded.metadata, null);
+    for (const field of ['additionalFeeRecipientAddress', 'metadata', 'preimage']) {
         t.absent(Object.prototype.hasOwnProperty.call(stored, field), `${field} is omitted rather than zero-padded`);
     }
 
     const claimed = makeClaim(entry, inputs.preimage, uint64ToBuffer(99));
     t.is(claimed.additionalFeeRecipientAddress, null);
     t.is(claimed.additionalFeeAmount.asBigInt(), 0n);
-    t.is(decode(claimed.claimedEscrowEntry).policyHash, null);
+    t.is(decode(claimed.claimedEscrowEntry).metadata, null);
 
     const refunded = makeRefund(entry, uint64ToBuffer(100));
     t.is(refunded.amount.asBigInt(), 100n);
@@ -150,7 +150,7 @@ test('Escrow Entry - protobuf encoding is deterministic and variable-length', t 
     t.ok(b4a.equals(entry, init(inputs)), 'the same input produces identical stored bytes');
     t.ok(b4a.equals(entry, init(Object.fromEntries(Object.entries(inputs).reverse()))), 'object property order does not change encoding');
 
-    const feeFreeEntry = init({...inputs, additionalFeeAmount: b4a.alloc(BALANCE_BYTE_LENGTH), additionalFeeRecipientAddress: undefined, policyHash: undefined});
+    const feeFreeEntry = init({...inputs, additionalFeeAmount: b4a.alloc(BALANCE_BYTE_LENGTH), additionalFeeRecipientAddress: undefined, metadata: undefined});
     t.ok(feeFreeEntry.length < entry.length, 'omitted optional fields reduce storage size');
 
     const claimed = makeClaim(entry, inputs.preimage, uint64ToBuffer(99));
@@ -297,8 +297,8 @@ test('Escrow Entry - decode validates optional fields and escrow amount overflow
         {additionalFeeRecipientAddress: b4a.alloc(config.addressLength)},
         {additionalFeeRecipientAddress: randomBuffer(config.addressLength - 1)},
         {additionalFeeAmount: b4a.alloc(BALANCE_BYTE_LENGTH)},
-        {policyHash: b4a.alloc(HASH_BYTE_LENGTH)},
-        {policyHash: randomBuffer(HASH_BYTE_LENGTH - 1)},
+        {metadata: b4a.alloc(0)},
+        {metadata: b4a.alloc(1025, 1)},
         {amount: b4a.alloc(BALANCE_BYTE_LENGTH, 0xff), additionalFeeAmount: bigIntToBuffer(1n)},
     ]) {
         const entry = encodeStoredEntry(inputs, overrides);
@@ -331,10 +331,62 @@ test('Escrow Entry - decode rejects the previous draft storage format and versio
         b4a.from([1, Status.PENDING]), inputs.amount, inputs.additionalFeeAmount, publicKeyFor(inputs.lockerAddress),
         publicKeyFor(inputs.claimRecipientAddress), publicKeyFor(inputs.refundRecipientAddress), publicKeyFor(inputs.additionalFeeRecipientAddress),
         inputs.lockId, applyOperationFixtures.validHtlcLockOperation.hlo.in, inputs.hashLock, b4a.alloc(HTLC_PREIMAGE_BYTE_LENGTH),
-        inputs.policyHash, inputs.refundEpoch
+        b4a.alloc(HASH_BYTE_LENGTH, 0x05), inputs.refundEpoch
     ]);
     t.is(decode(legacyEntry), null, 'the old fixed-layout entry is not interpreted as protobuf');
     for (const version of [1, 2]) {
         t.is(decode(encodeStoredEntry(inputs, {version})), null, `draft version ${version} is unsupported`);
+    }
+});
+
+test('Escrow Entry - metadata survives init, claim and refund unchanged', t => {
+    for (const feeIsZero of [false, true]) {
+        for (const metadata of [undefined, b4a.alloc(1), b4a.from([0x00, 0xff, 0x80]),
+            b4a.alloc(1023, 0xff), b4a.alloc(1024), new Uint8Array(1024).fill(0xff)]) {
+            const inputs = {...makeInputs(), metadata};
+            if (feeIsZero) {
+                inputs.additionalFeeAmount = b4a.alloc(BALANCE_BYTE_LENGTH);
+                delete inputs.additionalFeeRecipientAddress;
+            }
+            const entry = init(inputs);
+            const original = b4a.from(entry);
+            const claimed = makeClaim(entry, inputs.preimage, uint64ToBuffer(99));
+            const refunded = makeRefund(entry, uint64ToBuffer(100));
+            t.ok(claimed, 'metadata does not affect claim eligibility');
+            t.ok(refunded, 'metadata does not affect refund eligibility');
+            for (const [encoded, status] of [[entry, Status.PENDING],
+                [claimed.claimedEscrowEntry, Status.CLAIMED], [refunded.refundedEscrowEntry, Status.REFUNDED]]) {
+                const decoded = decode(encoded);
+                t.is(decoded.status, status);
+                t.is(Object.hasOwn(EscrowEntry.decode(encoded), 'metadata'), metadata !== undefined,
+                    'metadata presence survives settlement');
+                if (metadata === undefined) t.is(decoded.metadata, null, 'absent metadata decodes to null');
+                else t.ok(b4a.equals(decoded.metadata, metadata), 'metadata bytes are unchanged');
+                t.is(Object.hasOwn(decoded, 'policyHash'), false, 'no legacy property is returned');
+            }
+            t.ok(b4a.equals(entry, original), 'settlement does not mutate the pending entry');
+        }
+    }
+});
+
+test('Escrow Entry - init rejects invalid metadata types and sizes', t => {
+    for (const metadata of [null, '', '00', 0, false, 1n, Symbol('metadata'), {}, [0],
+        new ArrayBuffer(1), new Uint16Array(1), {type: 'Buffer', data: [0]},
+        b4a.alloc(0), new Uint8Array(0), b4a.alloc(1025), new Uint8Array(1025)]) {
+        t.alike(init({...makeInputs(), metadata}), NULL_BUFFER, 'invalid metadata cannot create escrow');
+    }
+});
+
+test('Escrow Entry - malformed stored metadata is rejected in every settlement status', t => {
+    const inputs = makeInputs();
+    for (const metadata of [b4a.alloc(0), b4a.alloc(1025, 1)]) {
+        for (const status of [Status.PENDING, Status.CLAIMED, Status.REFUNDED]) {
+            const entry = encodeStoredEntry(inputs, {
+                metadata, status, preimage: status === Status.CLAIMED ? inputs.preimage : undefined
+            });
+            t.is(decode(entry), null, 'decoding enforces the metadata limit');
+            t.is(makeClaim(entry, inputs.preimage, uint64ToBuffer(99)), null);
+            t.is(makeRefund(entry, uint64ToBuffer(100)), null);
+        }
     }
 });

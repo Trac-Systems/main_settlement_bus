@@ -365,7 +365,6 @@ test('HTLC signing frames metadata with a uint32 big-endian byte length', t => {
     for (const [md, prefix] of [[undefined, '00000000'], [b4a.alloc(1), '00000001'],
         [b4a.from([0x00, 0xff, 0x80]), '00000003'], [b4a.alloc(1024), '00000400']]) {
         const operation = {...hlo, md};
-        delete operation.ph;
         const expected = createMessage(
             config.networkId, address, hlo.txv, hlo.ca, hlo.ra, hlo.am, hlo.fa, hlo.fr,
             hlo.hl, hlo.re, b4a.from(prefix, 'hex'), md ?? b4a.alloc(0),

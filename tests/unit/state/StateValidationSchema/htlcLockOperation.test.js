@@ -61,11 +61,6 @@ function makeValidOperation({complete = true} = {}) {
         }
     };
 
-    // The shared fixture still supplies policyHash-era builder and escrow tests.
-    // Use the new field locally while those layers are migrated separately.
-    delete operation.hlo.ph;
-    operation.hlo.md = b4a.from([0x00, 0xff, 0x80]);
-
     if (!complete) {
         delete operation.hlo.va;
         delete operation.hlo.vn;

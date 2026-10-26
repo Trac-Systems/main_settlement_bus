@@ -28,7 +28,7 @@ import {
     appendHtlcLockBatch,
     buildHtlcLockPayload,
     decodeHtlcLockPayload,
-    DEFAULT_POLICY_HASH,
+    DEFAULT_METADATA,
     DEFAULT_PRINCIPAL,
     DEFAULT_REFUND_EPOCH,
     DEFAULT_SURCHARGE,
@@ -68,7 +68,7 @@ test('State.apply HTLC_LOCK creates escrow and applies balances once', async t =
     t.ok(b4a.equals(lockState.escrow.additionalFeeAmount, DEFAULT_SURCHARGE), 'escrow stores the surcharge');
     t.ok(b4a.equals(lockState.escrow.hashLock, operation.hlo.hl), 'escrow stores the hashlock');
     t.ok(b4a.equals(lockState.escrow.refundEpoch, DEFAULT_REFUND_EPOCH), 'escrow stores the refund epoch');
-    t.ok(b4a.equals(lockState.escrow.policyHash, DEFAULT_POLICY_HASH), 'escrow stores the policy commitment');
+    t.ok(b4a.equals(lockState.escrow.metadata, DEFAULT_METADATA), 'escrow stores the metadata');
     t.ok(b4a.equals(lockState.operation.value, payload), 'complete operation is retained for history and replay protection');
 
     const makerBalanceAfterFirstApply = b4a.from(makerAfter.balance);
@@ -251,7 +251,7 @@ test('State.apply HTLC_LOCK settles a cosigned lock with the stored terms', asyn
     const operation = decodeHtlcLockPayload(payload);
     t.is(state.escrow.status, escrowEntryUtils.Status.PENDING);
     t.ok(b4a.equals(state.escrow.lockId, operation.hlo.tx));
-    t.ok(b4a.equals(state.escrow.policyHash, operation.hlo.ph));
+    t.ok(b4a.equals(state.escrow.metadata, operation.hlo.md));
     t.is(operation.hlo.ss.length, 2);
     t.is(operation.hlo.cs.length, 1);
     t.ok(b4a.equals((await readNodeEntry(validatorPeer.base, makerPeer.wallet.address)).balance,
@@ -448,5 +448,22 @@ test('State.apply HTLC_LOCK rejects a second validator spending locked funds', a
         t.is(Boolean(peerSecond.escrow), Boolean(secondState.escrow), 'second lock agrees across peers');
         t.ok(toBalance((await readNodeEntry(peer.base, makerPeer.wallet.address)).balance)
             .equals(toBalance(b4a.alloc(16))), 'the maker spends only once');
+    }
+});
+
+test('State.apply HTLC_LOCK persists and replicates optional metadata at its size boundaries', async t => {
+    const context = await setupHtlcLockScenario(t);
+    const {validatorPeer, claimantPeer} = context.htlcLockScenario;
+    for (const metadata of [undefined, b4a.alloc(1), b4a.alloc(1024, 0xff)]) {
+        const payload = await buildHtlcLockPayload(context, {metadata});
+        await appendHtlcLock(context, payload);
+        await context.sync();
+        for (const peer of [validatorPeer, claimantPeer]) {
+            const {escrow, operation} = await readLockState(peer.base, payload);
+            t.is(escrow.status, escrowEntryUtils.Status.PENDING);
+            t.ok(b4a.equals(operation.value, payload), 'the signed operation remains in history');
+            if (metadata === undefined) t.is(escrow.metadata, null, 'omitted metadata stays absent');
+            else t.ok(b4a.equals(escrow.metadata, metadata), 'all metadata bytes are persisted and replicated');
+        }
     }
 });

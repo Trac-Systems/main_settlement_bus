@@ -18,5 +18,5 @@ export const validEscrowEntry = {
     additionalFeeRecipientAddress: b4a.from(hlo.fr),
     hashLock: tracCryptoApi.hash.sha256(escrowPreimage),
     refundEpoch: b4a.from(hlo.re),
-    policyHash: b4a.from(hlo.ph),
+    metadata: b4a.from(hlo.md),
 };
