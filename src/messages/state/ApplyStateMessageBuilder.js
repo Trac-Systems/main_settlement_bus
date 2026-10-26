@@ -8,6 +8,7 @@ import {
     HASH_BYTE_LENGTH,
     HTLC_LOCK_ID_BYTE_LENGTH,
     HTLC_MAX_SIGNERS,
+    HTLC_METADATA_BYTE_LENGTH,
     HTLC_PREIMAGE_BYTE_LENGTH,
     HTLC_THRESHOLD_BYTE_LENGTH,
     NONCE_BYTE_LENGTH,
@@ -65,7 +66,7 @@ class ApplyStateMessageBuilder {
     #htlcFeeAmount;
     #htlcFeeRecipient;
     #htlcHashLock;
-    #htlcPolicyHash;
+    #htlcMetadata;
     #htlcRefundAddress;
     #htlcRefundEpoch;
     #htlcSignerSet;
@@ -264,12 +265,16 @@ class ApplyStateMessageBuilder {
         return this;
     }
 
-    setHtlcPolicyHash(policyHash) {
-        if (policyHash === undefined || policyHash === null) {
-            this.#htlcPolicyHash = undefined;
+    setHtlcMetadata(metadata) {
+        if (metadata === undefined) {
+            this.#htlcMetadata = undefined;
             return this;
         }
-        this.#htlcPolicyHash = this.#normalizeHexBuffer(policyHash, HASH_BYTE_LENGTH, 'HTLC policy hash');
+        const bytes = this.#normalizeBytesBuffer(metadata, 'HTLC metadata');
+        if (bytes.length > HTLC_METADATA_BYTE_LENGTH) {
+            throw new Error(`HTLC metadata must not exceed ${HTLC_METADATA_BYTE_LENGTH} bytes.`);
+        }
+        this.#htlcMetadata = b4a.from(bytes);
         return this;
     }
 
@@ -482,7 +487,7 @@ class ApplyStateMessageBuilder {
             ...(this.#htlcFeeRecipient && {fr: this.#htlcFeeRecipient}),
             hl: this.#htlcHashLock,
             re: this.#htlcRefundEpoch,
-            ...(this.#htlcPolicyHash && {ph: this.#htlcPolicyHash}),
+            ...(this.#htlcMetadata !== undefined && {md: this.#htlcMetadata}),
             ss: this.#htlcSignerSet,
             th: this.#htlcThreshold,
             cs: this.#htlcCosignerSignatures
@@ -1118,7 +1123,7 @@ class ApplyStateMessageBuilder {
                     is: toHex(body.is)
                 };
                 if (body.fr) htlcLock.fr = bufferToAddress(body.fr, this.#config.addressPrefix);
-                if (body.ph) htlcLock.ph = toHex(body.ph);
+                if (body.md !== undefined) htlcLock.md = toHex(body.md);
 
                 return {...base, hlo: htlcLock};
             }
