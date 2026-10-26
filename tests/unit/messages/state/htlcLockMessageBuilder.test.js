@@ -17,6 +17,7 @@ import {testKeyPair1, testKeyPair2, testKeyPair3} from '../../../fixtures/apply.
 import applyOperationFixtures from '../../../fixtures/applyOperation.fixtures.js';
 import {config} from '../../../helpers/config.js';
 import {createHtlcLockTransactionHash} from '../../../helpers/htlcLock.js';
+import {normalizeMessageByOperationType} from '../../../../src/utils/normalizers.js';
 
 async function createWallet(mnemonic) {
     return new WalletProvider(config).fromMnemonic({mnemonic, derivationPath: config.derivationPath});
@@ -315,8 +316,11 @@ test('HTLC director preserves metadata through partial, JSON and complete builds
             t.is(json.hlo.md, b4a.toString(bytes, 'hex'), 'JSON contains canonical hex metadata');
             t.is(Object.hasOwn(json.hlo, 'ph'), false, 'JSON omits the legacy field');
 
+            const normalized = normalizeMessageByOperationType(json, config);
+            t.alike(normalized, partial, 'JSON normalization restores the signed partial operation');
+
             const complete = await applyStateMessageFactory(operator, config)
-                .buildCompleteHtlcLockOperationMessage(partial.address, partial.hlo);
+                .buildCompleteHtlcLockOperationMessage(normalized.address, normalized.hlo);
             t.ok(b4a.equals(complete.hlo.md, bytes), 'completion preserves metadata');
             t.is(schema.validateHtlcLockOperation(complete), true, 'complete conforms to the schema');
         }

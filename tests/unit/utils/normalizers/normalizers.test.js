@@ -18,6 +18,7 @@ import {
 } from '../../../../src/utils/normalizers.js';
 import { addressToBuffer } from '../../../../src/core/state/utils/address.js';
 import { bigIntTo16ByteBuffer } from '../../../../src/utils/amountSerialization.js';
+import StateValidationSchema from '../../../../src/core/state/validators/StateValidationSchema.js';
 
 const hex = (value, bytes) => value.repeat(bytes);
 const toBuffer = value => b4a.from(value, 'hex');
@@ -484,7 +485,7 @@ test('normalizeHtlcLockOperation normalizes hex strings and addresses', t => {
             fr: feeRecipient,
             hl: hex('55', 32),
             re: hex('66', 8),
-            ph: hex('88', 32),
+            md: '0088ff',
             ss: [hex('99', 32), hex('aa', 32)],
             th: '02',
             cs: [hex('bb', 64)],
@@ -506,7 +507,7 @@ test('normalizeHtlcLockOperation normalizes hex strings and addresses', t => {
     t.ok(b4a.equals(normalized.hlo.fr, addressToBuffer(feeRecipient, config.addressPrefix)));
     t.ok(b4a.equals(normalized.hlo.hl, toBuffer(hex('55', 32))));
     t.ok(b4a.equals(normalized.hlo.re, toBuffer(hex('66', 8))));
-    t.ok(b4a.equals(normalized.hlo.ph, toBuffer(hex('88', 32))));
+    t.ok(b4a.equals(normalized.hlo.md, toBuffer('0088ff')));
     t.ok(b4a.equals(normalized.hlo.ss[1], toBuffer(hex('aa', 32))));
     t.ok(b4a.equals(normalized.hlo.th, toBuffer('02')));
     t.ok(b4a.equals(normalized.hlo.cs[0], toBuffer(hex('bb', 64))));
@@ -607,4 +608,69 @@ test('normalizeDecodedPayloadForJson falls back to hex for invalid address buffe
 test('normalizeDecodedPayloadForJson returns input for non-objects', t => {
     t.is(normalizeDecodedPayloadForJson(null, config), null);
     t.is(normalizeDecodedPayloadForJson('value', config), 'value');
+});
+
+function makeHtlcMetadataPayload() {
+    const address = randomAddress(config.addressPrefix);
+    return {
+        type: OperationType.HTLC_LOCK,
+        address,
+        hlo: {
+            tx: hex('11', 32), txv: hex('22', 32), ca: address, ra: address,
+            am: hex('01', 16), fa: hex('00', 16), hl: hex('33', 32),
+            re: hex('01', 8), ss: [hex('44', 32)], th: '01', cs: [],
+            in: hex('55', 32), is: hex('66', 64)
+        }
+    };
+}
+
+test('HTLC normalization preserves omitted and undefined metadata', t => {
+    for (const explicitUndefined of [false, true]) {
+        const payload = makeHtlcMetadataPayload();
+        if (explicitUndefined) payload.hlo.md = undefined;
+        const normalized = normalizeMessageByOperationType(payload, config);
+        t.is(Object.hasOwn(normalized.hlo, 'md'), false, 'no metadata is introduced');
+        t.is(Object.hasOwn(normalized.hlo, 'ph'), false, 'no legacy policy field is introduced');
+    }
+});
+
+test('HTLC normalization preserves arbitrary metadata bytes without mutating the input', t => {
+    const schema = new StateValidationSchema(config);
+    for (const bytes of [b4a.alloc(1), b4a.from([0x00, 0xff, 0x80]), b4a.alloc(1024), b4a.alloc(1024, 0xff)]) {
+        for (const md of [bytes, new Uint8Array(bytes), b4a.toString(bytes, 'hex').toUpperCase()]) {
+            const payload = makeHtlcMetadataPayload();
+            payload.hlo.md = md;
+            const before = structuredClone(payload);
+            Object.freeze(payload.hlo);
+            Object.freeze(payload);
+            const normalized = normalizeMessageByOperationType(payload, config);
+            t.ok(b4a.equals(normalized.hlo.md, bytes), 'metadata bytes are preserved');
+            t.is(schema.validateHtlcLockOperation(normalized), true, 'normalized operation satisfies the schema');
+            t.alike(structuredClone(payload), before, 'input is unchanged');
+            const json = normalizeDecodedPayloadForJson(normalized, config);
+            t.is(json.hlo.md, b4a.toString(bytes, 'hex'), 'JSON renders metadata as hex');
+        }
+    }
+});
+
+test('HTLC normalization rejects malformed metadata encodings and types', t => {
+    for (const md of [null, '', '0', 'abc', 'zz', '0x00', ' 00', '00 ',
+        false, 1, 1n, Symbol('metadata'), {}, [0], new ArrayBuffer(1), new Uint16Array(1),
+        {type: 'Buffer', data: [0]}]) {
+        const payload = makeHtlcMetadataPayload();
+        payload.hlo.md = md;
+        t.exception(() => normalizeMessageByOperationType(payload, config), /hex|Buffer|null/);
+    }
+});
+
+test('HTLC normalization does not discard metadata that must fail schema size validation', t => {
+    const schema = new StateValidationSchema(config);
+    for (const md of [b4a.alloc(0), new Uint8Array(0), b4a.alloc(1025), hex('00', 1025)]) {
+        const payload = makeHtlcMetadataPayload();
+        payload.hlo.md = md;
+        const normalized = normalizeMessageByOperationType(payload, config);
+        t.is(Object.hasOwn(normalized.hlo, 'md'), true, 'invalid metadata is not silently omitted');
+        t.is(normalized.hlo.md.length, typeof md === 'string' ? md.length / 2 : md.length, 'bytes are not truncated');
+        t.is(schema.validateHtlcLockOperation(normalized), false, 'schema enforces the metadata size limit');
+    }
 });
