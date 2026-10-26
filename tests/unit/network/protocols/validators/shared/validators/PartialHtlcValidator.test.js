@@ -94,6 +94,18 @@ test('PartialHtlcValidator rejects validator reward overflow before completion',
         'a validator balance that reaches the maximum exactly is accepted');
 });
 
+test('PartialHtlcValidator supports RPC prevalidation without a local validator address', async t => {
+    const {requester: maker, recipient: claimant} = await getWalletSet();
+    const payload = await buildHtlcLockPayload(maker, claimant.address);
+    const state = createValidState(maker);
+    const getNodeEntryUnsigned = state.getNodeEntryUnsigned;
+    state.getNodeEntryUnsigned = async address => {
+        t.ok(address, 'RPC prevalidation does not query a null validator address');
+        return getNodeEntryUnsigned(address);
+    };
+    t.ok(await new PartialHtlcValidator(state, null, config).validate(payload));
+});
+
 async function resignLock(payload, maker) {
     const tx = await createHtlcLockTransactionHash(config.networkId, payload.address, payload.hlo);
     payload.hlo.tx = tx;

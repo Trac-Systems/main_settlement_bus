@@ -13,6 +13,7 @@ import { bufferToBigInt, licenseBufferToBigInt } from "../src/utils/amountSerial
 import { isAddressValid } from "../src/core/state/utils/address.js";
 import { getConfirmedParameter } from "./utils/confirmedParameter.js";
 import { BroadcastError, ValidationError } from "../src/utils/errors.js";
+import { OperationType } from "../src/utils/constants.js";
 
 export async function handleHealth({ msbInstance, respond }) {
     try {
@@ -46,24 +47,107 @@ export async function handleBalance({ req, respond, msbInstance }) {
     respond(200, { address, balance });
 }
 
-export async function handleHtlcLock({ msbInstance, respond }) {
-    await msbInstance.htlcLock();
-    respond(200, {});
+function readHtlcPayload(req, respond) {
+    return new Promise(resolve => {
+        let body = '';
+        let bytesRead = 0;
+        let finished = false;
+
+        req.on('data', chunk => {
+            if (finished) return;
+            bytesRead += chunk.length;
+            if (bytesRead > 2_000_000) {
+                finished = true;
+                respond(413, { error: 'Payload too large.' });
+                req.resume();
+                resolve(null);
+                return;
+            }
+            body += chunk.toString();
+        });
+        req.on('end', () => {
+            if (finished) return;
+            finished = true;
+            try {
+                const request = JSON.parse(body);
+                if (!request?.payload) throw new ValidationError('Payload is missing.');
+                if (typeof request.payload !== 'string' || !isBase64(request.payload)) {
+                    throw new ValidationError('Payload must be a valid base64 string.');
+                }
+                const payload = decodeBase64Payload(request.payload);
+                if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+                    throw new ValidationError('Invalid HTLC operation payload.');
+                }
+                resolve(payload);
+            } catch (error) {
+                respond(400, { error: error instanceof ValidationError ? error.message : 'Invalid JSON payload.' });
+                resolve(null);
+            }
+        });
+        req.on('error', () => {
+            if (finished) return;
+            finished = true;
+            respond(500, { error: 'Request stream failed during body transfer.' });
+            resolve(null);
+        });
+        req.on('aborted', () => {
+            finished = true;
+            resolve(null);
+        });
+    });
 }
 
-export async function handleHtlcClaim({ msbInstance, respond }) {
-    await msbInstance.htlcClaim();
-    respond(200, {});
+async function handleHtlcSubmission({ req, msbInstance, respond }, type, operationKey, submit) {
+    const payload = await readHtlcPayload(req, respond);
+    if (!payload) return;
+    if (payload.type !== type || !payload[operationKey] || typeof payload.address !== 'string') {
+        return respond(400, { error: 'Invalid HTLC operation payload.' });
+    }
+    if (type !== OperationType.HTLC_LOCK) {
+        const lockId = req.params?.id;
+        if (!isValidTxHash(lockId) || typeof payload[operationKey].li !== 'string' ||
+            payload[operationKey].li.toLowerCase() !== lockId.toLowerCase()) {
+            return respond(400, { error: 'HTLC lock ID does not match the payload.' });
+        }
+    }
+    try {
+        const result = await submit.call(msbInstance, payload);
+        respond(200, { result: { ...result, message: 'Transaction broadcasted successfully.' } });
+    } catch (error) {
+        if (error instanceof ValidationError) return respond(400, { error: error.message });
+        if (error instanceof BroadcastError) return respond(429, { error: error.message });
+        console.error('Error in HTLC submission:', error);
+        respond(500, { error: 'An error occurred processing the transaction.' });
+    }
 }
 
-export async function handleHtlcRefund({ msbInstance, respond }) {
-    await msbInstance.htlcRefund();
-    respond(200, {});
+export async function handleHtlcLock(context) {
+    return handleHtlcSubmission(context, OperationType.HTLC_LOCK, 'hlo', context.msbInstance.htlcLock);
 }
 
-export async function handleHtlc({ msbInstance, respond }) {
-    const htlc = await msbInstance.getHtlc();
-    respond(200, { htlc });
+export async function handleHtlcClaim(context) {
+    return handleHtlcSubmission(context, OperationType.HTLC_CLAIM, 'hco', context.msbInstance.htlcClaim);
+}
+
+export async function handleHtlcRefund(context) {
+    return handleHtlcSubmission(context, OperationType.HTLC_REFUND, 'hro', context.msbInstance.htlcRefund);
+}
+
+export async function handleHtlc({ req, msbInstance, respond }) {
+    const lockId = req.params?.id;
+    if (!isValidTxHash(lockId)) return respond(400, { error: 'Invalid HTLC lock ID.' });
+    const confirmed = getConfirmedParameter(buildRequestUrl(req));
+    if (confirmed === null) {
+        return respond(400, { error: 'Parameter "confirmed" must be exactly "true" or "false"' });
+    }
+    try {
+        const htlc = await msbInstance.getHtlc(lockId, confirmed);
+        if (!htlc) return respond(404, { error: `HTLC ${lockId.toLowerCase()} not found.` });
+        respond(200, { htlc });
+    } catch (error) {
+        console.error('Error in handleHtlc:', error);
+        respond(500, { error: 'An error occurred processing the request.' });
+    }
 }
 export async function handleTxv({ msbInstance, respond }) {
     const txv = await msbInstance.getTxv();

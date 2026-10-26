@@ -26,7 +26,7 @@ export const v1Routes = [
     { method: 'POST', path: '/broadcast-transaction', handler: handleBroadcastTransaction },
     { method: 'GET', path: '/tx-hashes/', handler: handleTxHashes },
     { method: 'GET', path: '/unconfirmed-length', handler: handleUnconfirmedLength },
-    { method: 'POST', path: '/htlc', handler: handleHtlcLock },
+    { method: 'POST', path: '/htlc', exact: true, handler: handleHtlcLock },
     { method: 'POST', path: '/htlc/:id/claim', handler: handleHtlcClaim },
     { method: 'POST', path: '/htlc/:id/refund', handler: handleHtlcRefund },
     { method: 'GET', path: '/htlc/:id', handler: handleHtlc },

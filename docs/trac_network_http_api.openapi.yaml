@@ -14,6 +14,7 @@ tags:
   - name: Wallet
   - name: Network
   - name: Transactions
+  - name: HTLC
 
 paths:
   /v1/health:
@@ -282,6 +283,130 @@ paths:
                   value:
                     error: Request stream failed during body transfer.
 
+  /v1/htlc:
+    post:
+      tags: [HTLC]
+      summary: Broadcast a signed HTLC lock
+      description: |
+        Available on deployments with native HTLC enabled. The caller supplies a complete,
+        signed HTLC_LOCK operation as Base64-encoded JSON. The RPC node does not sign for
+        the locker or any cosigner. The lock ID is the resulting transaction hash.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BroadcastTransactionRequest"
+      responses:
+        "200":
+          description: Lock operation accepted into local unsigned state.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BroadcastTransactionResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "429":
+          $ref: "#/components/responses/BroadcastFailed"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /v1/htlc/{id}:
+    get:
+      tags: [HTLC]
+      summary: Read HTLC escrow state
+      description: Defaults to signed state. Use confirmed=false to include unsigned local state.
+      parameters:
+        - $ref: "#/components/parameters/HtlcLockIdParam"
+        - $ref: "#/components/parameters/ConfirmedQueryParamStrict"
+      responses:
+        "200":
+          description: Escrow found.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [htlc]
+                properties:
+                  htlc:
+                    $ref: "#/components/schemas/HtlcEscrow"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          description: Escrow not found in the requested state view.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /v1/htlc/{id}/claim:
+    post:
+      tags: [HTLC]
+      summary: Broadcast a signed HTLC claim
+      description: |
+        Any caller may provide a signed HTLC_CLAIM operation containing the
+        preimage. The payload lock ID must equal the path ID. Escrow funds go to the
+        stored claim recipient, not the submitter.
+      parameters:
+        - $ref: "#/components/parameters/HtlcLockIdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BroadcastTransactionRequest"
+      responses:
+        "200":
+          description: Claim operation accepted into local unsigned state.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BroadcastTransactionResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "429":
+          $ref: "#/components/responses/BroadcastFailed"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /v1/htlc/{id}/refund:
+    post:
+      tags: [HTLC]
+      summary: Broadcast a signed HTLC refund
+      description: |
+        Any caller may provide a signed HTLC_REFUND operation after the
+        refund epoch. The payload lock ID must equal the path ID. Escrow funds go to
+        the stored refund recipient, not the submitter.
+      parameters:
+        - $ref: "#/components/parameters/HtlcLockIdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BroadcastTransactionRequest"
+      responses:
+        "200":
+          description: Refund operation accepted into local unsigned state.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BroadcastTransactionResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "429":
+          $ref: "#/components/responses/BroadcastFailed"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
   /v1/tx-hashes/{start_confirmed_length}/{end_confirmed_length}:
     get:
       tags: [Transactions]
@@ -540,6 +665,15 @@ paths:
 
 components:
   parameters:
+    HtlcLockIdParam:
+      name: id
+      in: path
+      required: true
+      description: Hash of the HTLC_LOCK transaction (64-character hexadecimal string).
+      schema:
+        type: string
+        pattern: "^[A-Fa-f0-9]{64}$"
+
     AddressParam:
       name: address
       in: path
@@ -610,6 +744,24 @@ components:
         minimum: 0
 
   responses:
+    BadRequest:
+      description: Invalid operation, lock ID or request body.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    PayloadTooLarge:
+      description: Request body exceeds 2 MB.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    BroadcastFailed:
+      description: No validator accepted the operation before retries were exhausted.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
     InternalServerError:
       description: Internal server error.
       content:
@@ -737,6 +889,57 @@ components:
       properties:
         result:
           $ref: "#/components/schemas/BroadcastResult"
+
+    HtlcEscrow:
+      type: object
+      required:
+        - lockId
+        - status
+        - lockerAddress
+        - claimRecipientAddress
+        - refundRecipientAddress
+        - amount
+        - additionalFeeAmount
+        - additionalFeeRecipientAddress
+        - hashLock
+        - refundEpoch
+        - policyHash
+        - preimage
+      properties:
+        lockId:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        status:
+          type: string
+          enum: [PENDING, CLAIMED, REFUNDED]
+        lockerAddress:
+          type: string
+        claimRecipientAddress:
+          type: string
+        refundRecipientAddress:
+          type: string
+        amount:
+          type: string
+          description: Principal amount in the MSB base unit.
+        additionalFeeAmount:
+          type: string
+          description: Surcharge paid to additionalFeeRecipientAddress on claim.
+        additionalFeeRecipientAddress:
+          type: string
+          nullable: true
+        hashLock:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        refundEpoch:
+          type: string
+          description: Decimal epoch number.
+        policyHash:
+          type: string
+          nullable: true
+        preimage:
+          type: string
+          nullable: true
+          description: Revealed after a successful claim.
 
     TxHashItem:
       type: object
