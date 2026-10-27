@@ -252,6 +252,7 @@ test('State.apply HTLC_REFUND distinguishes invalid submitter addresses from pub
     }
 });
 
+
 test('State.apply HTLC_REFUND rejects missing or forged validator metadata', async t => {
     const context = await setupHtlcLockScenario(t);
     const {validatorPeer} = context.htlcLockScenario;
@@ -431,5 +432,26 @@ test('State.apply HTLC_REFUND rejects stale validity and validator self-validati
         t.ok(b4a.equals((await readNodeEntry(validatorPeer.base, makerPeer.wallet.address)).balance,
             makerBefore.balance));
         t.is(await readRefundRecord(validatorPeer.base, payload), null);
+    }
+});
+
+test('State.apply HTLC_REFUND preserves metadata and its omission through settlement and replay', async t => {
+    const context = await setupHtlcLockScenario(t);
+    const {validatorPeer} = context.htlcLockScenario;
+    for (const metadata of [undefined, b4a.alloc(1), b4a.alloc(1024, 0xff)]) {
+        const lockPayload = await buildHtlcLockPayload(context, {metadata});
+        await appendHtlcLock(context, lockPayload);
+        const refundPayload = await buildRefundPayload(context, lockPayload);
+        const overrides = new Map([[EntryType.EPOCH_CURRENT, decodeHtlcLockPayload(lockPayload).hlo.re]]);
+        await applyWithEntryOverrides(context, refundPayload, overrides);
+        const settled = await readLockState(validatorPeer.base, lockPayload);
+        t.is(settled.escrow.status, escrowEntryUtils.Status.REFUNDED);
+        if (metadata === undefined) t.is(settled.escrow.metadata, null, 'refund preserves omission');
+        else t.ok(b4a.equals(settled.escrow.metadata, metadata), 'refund preserves metadata bytes');
+        t.ok(b4a.equals(settled.operation.value, lockPayload), 'original lock history is unchanged');
+
+        await applyWithEntryOverrides(context, refundPayload, overrides);
+        const replayed = await readLockState(validatorPeer.base, lockPayload);
+        t.ok(b4a.equals(replayed.escrowRecord.value, settled.escrowRecord.value), 'replay preserves the complete escrow');
     }
 });

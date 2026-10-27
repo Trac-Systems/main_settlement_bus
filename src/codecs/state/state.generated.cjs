@@ -53,7 +53,7 @@ $root.state = (function() {
          * @property {B4aBuffer|null} [lockId] EscrowEntry lockId
          * @property {B4aBuffer|null} [hashLock] EscrowEntry hashLock
          * @property {B4aBuffer|null} [preimage] EscrowEntry preimage
-         * @property {B4aBuffer|null} [policyHash] EscrowEntry policyHash
+         * @property {B4aBuffer|null} [metadata] EscrowEntry metadata
          * @property {B4aBuffer|null} [refundEpoch] EscrowEntry refundEpoch
          */
 
@@ -161,12 +161,12 @@ $root.state = (function() {
         EscrowEntry.prototype.preimage = null;
 
         /**
-         * EscrowEntry policyHash.
-         * @member {B4aBuffer|null|undefined} policyHash
+         * EscrowEntry metadata.
+         * @member {B4aBuffer|null|undefined} metadata
          * @memberof state.EscrowEntry
          * @instance
          */
-        EscrowEntry.prototype.policyHash = null;
+        EscrowEntry.prototype.metadata = null;
 
         /**
          * EscrowEntry refundEpoch.
@@ -198,8 +198,8 @@ $root.state = (function() {
         });
 
         // Virtual OneOf for proto3 optional field
-        Object.defineProperty(EscrowEntry.prototype, "_policyHash", {
-            get: $util.oneOfGetter($oneOfFields = ["policyHash"]),
+        Object.defineProperty(EscrowEntry.prototype, "_metadata", {
+            get: $util.oneOfGetter($oneOfFields = ["metadata"]),
             set: $util.oneOfSetter($oneOfFields)
         });
 
@@ -248,8 +248,8 @@ $root.state = (function() {
                 writer.uint32(/* id 10, wireType 2 =*/82).bytes(message.hashLock);
             if (message.preimage != null && Object.hasOwnProperty.call(message, "preimage"))
                 writer.uint32(/* id 11, wireType 2 =*/90).bytes(message.preimage);
-            if (message.policyHash != null && Object.hasOwnProperty.call(message, "policyHash"))
-                writer.uint32(/* id 12, wireType 2 =*/98).bytes(message.policyHash);
+            if (message.metadata != null && Object.hasOwnProperty.call(message, "metadata"))
+                writer.uint32(/* id 12, wireType 2 =*/98).bytes(message.metadata);
             if (message.refundEpoch != null && Object.hasOwnProperty.call(message, "refundEpoch"))
                 writer.uint32(/* id 13, wireType 2 =*/106).bytes(message.refundEpoch);
             return writer;
@@ -332,7 +332,7 @@ $root.state = (function() {
                         break;
                     }
                 case 12: {
-                        message.policyHash = $util.bytesFrom(reader.bytes());
+                        message.metadata = $util.bytesFrom(reader.bytes());
                         break;
                     }
                 case 13: {
@@ -419,10 +419,10 @@ $root.state = (function() {
                 if (!$util.isBytes(message.preimage))
                     return "preimage: buffer expected";
             }
-            if (message.policyHash != null && message.hasOwnProperty("policyHash")) {
-                properties._policyHash = 1;
-                if (!$util.isBytes(message.policyHash))
-                    return "policyHash: buffer expected";
+            if (message.metadata != null && message.hasOwnProperty("metadata")) {
+                properties._metadata = 1;
+                if (!$util.isBytes(message.metadata))
+                    return "metadata: buffer expected";
             }
             if (message.refundEpoch != null && message.hasOwnProperty("refundEpoch"))
                 if (!$util.isBytes(message.refundEpoch))
@@ -482,8 +482,8 @@ $root.state = (function() {
                 message.hashLock = $util.bytesFrom(object.hashLock);
             if (object.preimage != null)
                 message.preimage = $util.bytesFrom(object.preimage);
-            if (object.policyHash != null)
-                message.policyHash = $util.bytesFrom(object.policyHash);
+            if (object.metadata != null)
+                message.metadata = $util.bytesFrom(object.metadata);
             if (object.refundEpoch != null)
                 message.refundEpoch = $util.bytesFrom(object.refundEpoch);
             return message;
@@ -592,10 +592,10 @@ $root.state = (function() {
                 if (options.oneofs)
                     object._preimage = "preimage";
             }
-            if (message.policyHash != null && message.hasOwnProperty("policyHash")) {
-                object.policyHash = $util.bytesTo(message.policyHash, options);
+            if (message.metadata != null && message.hasOwnProperty("metadata")) {
+                object.metadata = $util.bytesTo(message.metadata, options);
                 if (options.oneofs)
-                    object._policyHash = "policyHash";
+                    object._metadata = "metadata";
             }
             if (message.refundEpoch != null && message.hasOwnProperty("refundEpoch"))
                 object.refundEpoch = $util.bytesTo(message.refundEpoch, options);

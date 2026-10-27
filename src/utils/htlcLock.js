@@ -1,12 +1,13 @@
 import b4a from 'b4a';
 import tracCryptoApi from 'trac-crypto-api';
 
-import {createMessage, isZeroBuffer, uint8ToBuffer} from './buffer.js';
+import {createMessage, isZeroBuffer, uint8ToBuffer, uint32ToBuffer} from './buffer.js';
 import {
     AMOUNT_BYTE_LENGTH,
     EPOCH_BYTE_LENGTH,
     HASH_BYTE_LENGTH,
     HTLC_MAX_SIGNERS,
+    HTLC_METADATA_MAX_BYTE_LENGTH,
     HTLC_THRESHOLD_BYTE_LENGTH,
     NONCE_BYTE_LENGTH,
     OperationType,
@@ -14,7 +15,7 @@ import {
     UINT32_MAX,
 } from './constants.js';
 
-const EMPTY_HASH = b4a.alloc(HASH_BYTE_LENGTH);
+const EMPTY_METADATA = b4a.alloc(0);
 
 function requireBuffer(value, length, field, allowZero = false) {
     if (!b4a.isBuffer(value) || value.length !== length || (!allowZero && isZeroBuffer(value))) {
@@ -50,7 +51,11 @@ export function createHtlcLockSigningMessage(networkId, locker, operation) {
     requireBuffer(operation.th, HTLC_THRESHOLD_BYTE_LENGTH, 'HTLC threshold');
     requireBuffer(operation.in, NONCE_BYTE_LENGTH, 'HTLC nonce');
     if (operation.fr !== undefined) requireBuffer(operation.fr, locker.length, 'HTLC fee recipient');
-    if (operation.ph !== undefined) requireBuffer(operation.ph, HASH_BYTE_LENGTH, 'HTLC policy hash');
+    if (operation.md !== undefined && (
+        !b4a.isBuffer(operation.md) || operation.md.length === 0 || operation.md.length > HTLC_METADATA_MAX_BYTE_LENGTH
+    )) {
+        throw new Error(`HTLC metadata must be a buffer containing 1 to ${HTLC_METADATA_MAX_BYTE_LENGTH} bytes.`);
+    }
 
     const feeIsZero = isZeroBuffer(operation.fa);
     if (feeIsZero === (operation.fr !== undefined)) {
@@ -85,7 +90,8 @@ export function createHtlcLockSigningMessage(networkId, locker, operation) {
         operation.fr ?? b4a.alloc(locker.length),
         operation.hl,
         operation.re,
-        operation.ph ?? EMPTY_HASH,
+        uint32ToBuffer(operation.md?.length ?? 0),
+        operation.md ?? EMPTY_METADATA,
         uint8ToBuffer(operation.ss.length),
         ...operation.ss,
         operation.th,

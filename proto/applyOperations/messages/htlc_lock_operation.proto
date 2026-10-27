@@ -12,7 +12,7 @@ message HtlcLockOperation {
     optional bytes fr             = 7;  // Surcharge recipient on claim; present only when fa is non-zero
     bytes hl                      = 8;  // SHA-256 hashlock
     bytes re                      = 9;  // Refund epoch
-    optional bytes ph             = 10; // Opaque application policy hash; MSB does not evaluate its rules
+    optional bytes md             = 10; // Opaque application metadata, up to 1024 bytes. MSB doesn't evaluate its rules
     repeated bytes ss             = 11; // Signer public keys; locker is always index zero
     bytes th                      = 12; // Total required signatures including is; range 1..ss.length
     repeated bytes cs             = 13; // Additional signatures in relative ss order; may be empty when th is 1

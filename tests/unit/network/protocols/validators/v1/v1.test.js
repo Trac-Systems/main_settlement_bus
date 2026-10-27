@@ -14,6 +14,7 @@ async function runTests() {
     await import('./V1ValidationSchema.test.js');
     await import('./V1BroadcastTransactionOperationHandler.test.js');
     await import('./ValidatorV1MessageRouter.test.js');
+    await import('./htlcTransportLimits.test.js');
     test.resume();
 }
 

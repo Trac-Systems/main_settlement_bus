@@ -21,6 +21,6 @@ message EscrowEntry {
     bytes lockId                                = 9;  // 32-byte lock transaction hash
     bytes hashLock                              = 10; // 32-byte SHA-256 hashlock
     optional bytes preimage                     = 11; // 32-byte secret; present only after claim
-    optional bytes policyHash                   = 12; // Optional 32-byte application commitment
+    optional bytes metadata                     = 12; // Optional opaque application metadata, up to 1024 bytes. MSB does not interpret its contents
     bytes refundEpoch                           = 13; // 8-byte unsigned, big-endian epoch
 }

@@ -29,7 +29,7 @@ export const DEFAULT_PRINCIPAL = $TNK(2n);
 export const DEFAULT_SURCHARGE = $TNK(1n);
 export const DEFAULT_REFUND_EPOCH = uint64ToBuffer(10n);
 export const DEFAULT_PREIMAGE = b4a.alloc(32, 0x31);
-export const DEFAULT_POLICY_HASH = b4a.alloc(32, 0x41);
+export const DEFAULT_METADATA = b4a.from([0x00, 0x80, 0xff]);
 
 export async function setupHtlcLockScenario(
     t,
@@ -56,20 +56,22 @@ export async function setupHtlcLockScenario(
 
 export async function buildHtlcLockPayload(
     context,
-    {
+    options = {}
+) {
+    const {
         amount = DEFAULT_PRINCIPAL,
         feeAmount = DEFAULT_SURCHARGE,
         feeRecipient = context.htlcLockScenario.claimantPeer.wallet.address,
         refundAddress = context.htlcLockScenario.makerPeer.wallet.address,
         hashLock = tracCryptoApi.hash.sha256(DEFAULT_PREIMAGE),
         refundEpoch = DEFAULT_REFUND_EPOCH,
-        policyHash = DEFAULT_POLICY_HASH,
         nonce,
         cosignerPeer = null,
+        cosignerPeers = cosignerPeer ? [cosignerPeer] : [],
         txValidity: suppliedTxValidity = null,
         signingValidatorPeer = context.htlcLockScenario.validatorPeer,
-    } = {}
-) {
+    } = options;
+    const metadata = Object.hasOwn(options, 'metadata') ? options.metadata : DEFAULT_METADATA;
     const {makerPeer, claimantPeer} = context.htlcLockScenario;
     const validatorPeer = signingValidatorPeer;
     const txValidity = suppliedTxValidity ?? await deriveIndexerSequenceState(validatorPeer.base);
@@ -82,17 +84,19 @@ export async function buildHtlcLockPayload(
         feeRecipient,
         hashLock,
         refundEpoch,
-        policyHash,
+        metadata,
         signerSet,
         threshold: 1,
         ...(nonce && {nonce}),
     };
 
-    if (cosignerPeer) {
+    if (cosignerPeers.length > 0) {
+        const orderedCosigners = [...cosignerPeers].sort((left, right) =>
+            b4a.compare(left.wallet.publicKey, right.wallet.publicKey));
         const effectiveNonce = nonce ?? b4a.alloc(32, 0x51);
         lock.nonce = effectiveNonce;
-        lock.signerSet = [makerPeer.wallet.publicKey, cosignerPeer.wallet.publicKey];
-        lock.threshold = 2;
+        lock.signerSet = [makerPeer.wallet.publicKey, ...orderedCosigners.map(peer => peer.wallet.publicKey)];
+        lock.threshold = lock.signerSet.length;
 
         const wireTerms = {
             txv: txValidity,
@@ -105,7 +109,7 @@ export async function buildHtlcLockPayload(
             }),
             hl: hashLock,
             re: refundEpoch,
-            ...(policyHash && {ph: policyHash}),
+            ...(metadata !== undefined && {md: metadata}),
             ss: lock.signerSet,
             th: b4a.from([lock.threshold]),
             in: effectiveNonce,
@@ -115,7 +119,7 @@ export async function buildHtlcLockPayload(
             addressUtils.addressToBuffer(makerPeer.wallet.address, config.addressPrefix),
             wireTerms
         );
-        lock.cosignerSignatures = [cosignerPeer.wallet.sign(tx)];
+        lock.cosignerSignatures = orderedCosigners.map(peer => peer.wallet.sign(tx));
     }
 
     const partial = await applyStateMessageFactory(makerPeer.wallet, config)

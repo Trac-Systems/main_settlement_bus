@@ -240,7 +240,7 @@ export function normalizeHtlcLockOperation(payload, config) {
         is: normalizeHex(hlo.is)
     };
     if (hlo.fr !== undefined) normalizedHlo.fr = addressToBuffer(hlo.fr, config.addressPrefix);
-    if (hlo.ph !== undefined) normalizedHlo.ph = normalizeHex(hlo.ph);
+    if (hlo.md !== undefined) normalizedHlo.md = normalizeHex(hlo.md);
 
     return {
         type,

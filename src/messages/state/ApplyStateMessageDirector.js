@@ -583,6 +583,7 @@ class ApplyStateMessageDirector {
      * @param {string|Buffer} invokerAddress Locker address.
      * @param {string|Buffer} txValidity Current transaction-validity value.
      * @param {object} lock Canonical HTLC lock terms and authorizations.
+     * @param {string|Buffer} [lock.metadata] Opaque application bytes (1–1024 bytes), or their hex representation.
      * @param {'json'|'buffer'} output Output format.
      * @returns {Promise<object>}
      */
@@ -596,7 +597,7 @@ class ApplyStateMessageDirector {
             feeRecipient,
             hashLock,
             refundEpoch,
-            policyHash,
+            metadata,
             signerSet,
             threshold,
             cosignerSignatures = [],
@@ -616,7 +617,7 @@ class ApplyStateMessageDirector {
             .setHtlcFeeRecipient(feeRecipient)
             .setHtlcHashLock(hashLock)
             .setHtlcRefundEpoch(refundEpoch)
-            .setHtlcPolicyHash(policyHash)
+            .setHtlcMetadata(metadata)
             .setHtlcSignerSet(signerSet)
             .setHtlcThreshold(threshold)
             .setHtlcCosignerSignatures(cosignerSignatures);
@@ -671,7 +672,7 @@ class ApplyStateMessageDirector {
             .setHtlcFeeRecipient(operation?.fr)
             .setHtlcHashLock(operation?.hl)
             .setHtlcRefundEpoch(operation?.re)
-            .setHtlcPolicyHash(operation?.ph)
+            .setHtlcMetadata(operation?.md)
             .setHtlcSignerSet(operation?.ss)
             .setHtlcThreshold(operation?.th)
             .setHtlcCosignerSignatures(operation?.cs)

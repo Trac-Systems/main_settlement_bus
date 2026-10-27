@@ -8,6 +8,7 @@ import {
     EPOCH_BYTE_LENGTH,
     HASH_BYTE_LENGTH,
     HTLC_LOCK_ID_BYTE_LENGTH,
+    HTLC_METADATA_MAX_BYTE_LENGTH,
     HTLC_PREIMAGE_BYTE_LENGTH,
     PUBLIC_KEY_LENGTH,
 } from '../../../utils/constants.js';
@@ -45,7 +46,7 @@ function hasValidSettlementFields({
     additionalFeeRecipientAddress,
     hashLock,
     refundEpoch,
-    policyHash,
+    metadata,
 }, hrp) {
     const feeIsZero = isBufferValid(additionalFeeAmount, BALANCE_BYTE_LENGTH) && isZeroBuffer(additionalFeeAmount);
     const requiredFieldsAreValid =
@@ -60,9 +61,11 @@ function hasValidSettlementFields({
     const feeFieldsAreValid = feeIsZero
         ? additionalFeeRecipientAddress === undefined
         : isSettlementAddress(additionalFeeRecipientAddress, hrp);
-    const policyHashIsValid = policyHash === undefined || isRequiredBuffer(policyHash, HASH_BYTE_LENGTH);
+    const metadataIsValid = metadata === undefined || (
+        b4a.isBuffer(metadata) && metadata.length > 0 && metadata.length <= HTLC_METADATA_MAX_BYTE_LENGTH
+    );
 
-    if (!requiredFieldsAreValid || !feeFieldsAreValid || !policyHashIsValid) return false;
+    if (!requiredFieldsAreValid || !feeFieldsAreValid || !metadataIsValid) return false;
 
     const totalLockedAmount = toBalance(amount).add(toBalance(additionalFeeAmount));
     return totalLockedAmount !== null;
@@ -82,7 +85,7 @@ export function init({
     additionalFeeRecipientAddress,
     hashLock,
     refundEpoch,
-    policyHash,
+    metadata,
 } = {}, hrp) {
     const entry = {
         version: ESCROW_ENTRY_VERSION,
@@ -96,7 +99,7 @@ export function init({
         additionalFeeRecipientAddress,
         hashLock,
         refundEpoch,
-        policyHash,
+        metadata,
     };
     if (!hasValidSettlementFields(entry, hrp)) return NULL_BUFFER;
     return safeEncodeEscrowEntry(entry);
@@ -118,7 +121,7 @@ export function decode(entry, hrp) {
 
         decoded.additionalFeeRecipientAddress ??= null;
         decoded.preimage ??= null;
-        decoded.policyHash ??= null;
+        decoded.metadata ??= null;
         return decoded;
     } catch {
         return null;

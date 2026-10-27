@@ -349,7 +349,7 @@ const validHtlcLockOperation = {
         fr: addressToBuffer(asAddress('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'), config.addressPrefix),
         hl: b4a.alloc(HASH_BYTE_LENGTH, 0x03),
         re: b4a.from('0000000000000064', 'hex'),
-        ph: b4a.alloc(HASH_BYTE_LENGTH, 0x05),
+        md: b4a.from([0x00, 0x80, 0xff]),
         ss: [
             b4a.from('544514242356432739de9af71deb8d526fb03d6c5c15e0a934d9a20b6710e2fe', 'hex'),
             b4a.alloc(HASH_BYTE_LENGTH, 0xaa)
