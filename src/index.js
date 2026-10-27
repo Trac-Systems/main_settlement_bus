@@ -179,7 +179,7 @@ export class MainSettlementBus extends ReadyResource {
             additionalFeeRecipientAddress: address(escrow.additionalFeeRecipientAddress),
             hashLock: hex(escrow.hashLock),
             refundEpoch: escrow.refundEpoch.readBigUInt64BE(0).toString(),
-            policyHash: hex(escrow.policyHash),
+            metadata: hex(escrow.metadata),
             preimage: hex(escrow.preimage),
         };
     }
