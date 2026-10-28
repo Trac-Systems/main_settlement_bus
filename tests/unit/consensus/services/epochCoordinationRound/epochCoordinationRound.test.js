@@ -813,6 +813,58 @@ test('cancel interrupts the backoff delay', async t => {
     t.absent(context.state.refresh.called);
 });
 
+test('solver failure waits before retrying and does not publish a proof', async t => {
+    const clock = sinon.useFakeTimers();
+    const retry = deferred();
+    const calculateVDF = sinon.stub().returns(retry.promise);
+    calculateVDF.onFirstCall().rejects(new Error('VDF worker killed'));
+    const context = setupRound({ opsOverrides: { calculateVDF } });
+    const round = context.createRound();
+    const running = round.run(sinon.stub());
+
+    try {
+        await clock.tickAsync(0);
+        t.is(calculateVDF.callCount, 1, 'failure does not immediately spawn another worker');
+        t.absent(context.operations.createProofProposal.called);
+        t.absent(context.operations.appendSetEpoch.called);
+        await clock.tickAsync(CONFIG.epochBackoffDelay - 1);
+        t.is(calculateVDF.callCount, 1);
+        await clock.tickAsync(1);
+        t.is(calculateVDF.callCount, 2, 'retry starts after the backoff');
+        t.ok(context.state.refresh.called, 'signed state is refreshed before retrying');
+    } finally {
+        await context.closeRounds();
+        retry.resolve({});
+        await running;
+        clock.restore();
+    }
+});
+
+test('solver failure reloads an epoch that advanced during backoff', async t => {
+    const clock = sinon.useFakeTimers();
+    const retry = deferred();
+    const calculateVDF = sinon.stub().returns(retry.promise);
+    calculateVDF.onFirstCall().rejects(new Error('VDF worker killed'));
+    const context = setupRound({ opsOverrides: { calculateVDF } });
+    const next = sinon.stub();
+    const running = context.createRound().run(next);
+
+    try {
+        await clock.tickAsync(0);
+        context.state.getCurrentEpoch.resolves(6n);
+        await clock.tickAsync(CONFIG.epochBackoffDelay);
+        t.is(calculateVDF.callCount, 1, 'no retry for the obsolete epoch');
+        t.ok(next.calledOnceWith(CONFIG.epochInterval), 'a fresh round is scheduled');
+        t.absent(context.operations.createProofProposal.called);
+        t.absent(context.operations.appendSetEpoch.called);
+    } finally {
+        await context.closeRounds();
+        retry.resolve({});
+        await running;
+        clock.restore();
+    }
+});
+
 test('a fresh round reads an epoch that advanced since the previous round', async t => {
     const getCurrentEpoch = sinon.stub().resolves(5n);
     const context = setupRound({ stateOverrides: { getCurrentEpoch } });

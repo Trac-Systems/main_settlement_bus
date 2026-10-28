@@ -3,6 +3,7 @@ import { default as test } from 'brittle';
 async function runConsensusModuleTests() {
     test.pause();
     await import('./services/VDFService.test.js');
+    await import('./services/VDFProgressWatchdog.test.js');
     await import('./services/epochCoordinatorService/epochCoordinatorService.test.js');
     await import('./epochAppenderSelection/epochAppenderSelector.test.js');
     await import('./epochAppenderSelection/epochAppenderElection.test.js');

@@ -177,6 +177,115 @@ test('close cancels the active calculation and prevents queued work from startin
 if (isBare) {
     const { VDFBare } = await import('../../../../src/core/consensus/services/VDFBare.js');
 
+    test('[bare] a longer healthy solve keeps reporting progress and returns a valid proof', { timeout: 60000 }, async t => {
+        const { default: subprocess } = await import('bare-subprocess');
+        const { verifyWesolowski } = await import('@tracsystems/trac-vdf');
+        const subscribe = subprocess.Subprocess.prototype.on;
+        let reports = 0;
+        const watch = sinon.stub(subprocess.Subprocess.prototype, 'on').callsFake(function (event, listener) {
+            const result = subscribe.call(this, event, listener);
+            if (event === 'exit') this.stdio[3].on('data', chunk => {
+                if (chunk.toString().includes('"progress"')) reports++;
+            });
+            return result;
+        });
+        const service = new VDFBare();
+        t.teardown(async () => { await service.close(); watch.restore(); }, { force: true });
+        await service.ready();
+        const challenge = Buffer.alloc(32, 3);
+        const { result, error } = await service.calculateVDF(challenge, 200_000, 1024);
+        t.absent(error);
+        t.ok(reports > 1, 'real progress crosses the pipe throughout native computation');
+        t.ok(await verifyWesolowski(challenge, 200_000, result.solution, 1024));
+    });
+
+    test('[bare] SIGSTOP after live progress is detected and a queued calculation succeeds', { timeout: 15000 }, async t => {
+        const { default: subprocess } = await import('bare-subprocess');
+        const { kill } = await import('bare-os');
+        const { verifyWesolowski } = await import('@tracsystems/trac-vdf');
+        const subscribe = subprocess.Subprocess.prototype.on;
+        let stoppedChild;
+        let reports = 0;
+        const watch = sinon.stub(subprocess.Subprocess.prototype, 'on').callsFake(function (event, listener) {
+            const result = subscribe.call(this, event, listener);
+            if (event === 'exit' && !stoppedChild) {
+                stoppedChild = this;
+                this.stdio[3].on('data', chunk => {
+                    if (reports || !chunk.toString().includes('"progress"')) return;
+                    reports++;
+                    // Subprocess.kill is one-shot even for SIGSTOP; inject the
+                    // external OS signal without consuming its termination call.
+                    kill(this.pid, 'SIGSTOP');
+                });
+            }
+            return result;
+        });
+        const service = new VDFBare();
+        t.teardown(async () => { await service.close(); watch.restore(); }, { force: true });
+        await service.ready();
+        const active = service.calculateVDF(Buffer.alloc(32, 1), 100_000_000, DISCRIMINANT_BITS);
+        const challenge = Buffer.alloc(32, 2);
+        const queued = service.calculateVDF(challenge, DIFFICULTY, DISCRIMINANT_BITS);
+        const failed = await withTimeout(active, 12000, 'stopped solver remained pending');
+        t.is(reports, 1, 'progress reached the parent while WASM was still computing');
+        t.absent(failed.result);
+        t.is(failed.error?.code, 'VDF_STALLED');
+        t.is(stoppedChild.signalCode, 9, 'watchdog killed the stopped process without SIGCONT');
+        t.ok(stoppedChild.stdio.every(pipe => pipe.destroyed));
+        const { result, error } = await queued;
+        t.absent(error);
+        t.ok(await verifyWesolowski(challenge, DIFFICULTY, result.solution, DISCRIMINANT_BITS));
+    });
+
+    test('[bare] SIGKILL during a real solve returns an error and the next request succeeds', { timeout: 10000 }, async t => {
+        const { default: subprocess } = await import('bare-subprocess');
+        const { verifyWesolowski } = await import('@tracsystems/trac-vdf');
+        const subscribe = sinon.spy(subprocess.Subprocess.prototype, 'on');
+        const service = new VDFBare();
+        t.teardown(async () => {
+            await service.close();
+            subscribe.restore();
+        }, { force: true });
+        await service.ready();
+
+        const calculation = service.calculateVDF(Buffer.alloc(32, 1), 100_000_000, DISCRIMINANT_BITS);
+        await withTimeout((async () => {
+            while (!subscribe.calledWith('exit') && !service.closed) await new Promise(resolve => setTimeout(resolve, 5));
+        })(), 2000, 'VDF process did not start');
+        const child = subscribe.getCalls().find(call => call.args[0] === 'exit').thisValue;
+        t.is(await isSettledWithin(calculation, 100), false, 'long calculation is still pending');
+        child.kill('SIGKILL');
+
+        const failed = await withTimeout(calculation, 2000, 'killed VDF calculation remained pending');
+        t.absent(failed.result);
+        t.ok(failed.error);
+        t.is(child.signalCode, 9, 'the actual subprocess was killed');
+        t.ok(child.stdio.every(pipe => pipe.destroyed), 'killed subprocess pipes are closed');
+
+        const challenge = Buffer.alloc(32, 2);
+        const { result, error } = await service.calculateVDF(challenge, DIFFICULTY, DISCRIMINANT_BITS);
+        t.absent(error);
+        t.ok(await verifyWesolowski(challenge, DIFFICULTY, result.solution, DISCRIMINANT_BITS), 'fresh process returns a valid proof');
+        t.is(subscribe.getCalls().filter(call => call.args[0] === 'exit').length, 2);
+    });
+
+    test('[bare] completed calculations release every subprocess pipe', { timeout: 10000 }, async t => {
+        const { default: subprocess } = await import('bare-subprocess');
+        const subscribe = sinon.spy(subprocess.Subprocess.prototype, 'on');
+        const service = new VDFBare();
+        t.teardown(async () => {
+            await service.close();
+            subscribe.restore();
+        }, { force: true });
+        await service.ready();
+        for (let i = 0; i < 3; i++) {
+            const { error } = await service.calculateVDF(Buffer.alloc(32, i), DIFFICULTY, DISCRIMINANT_BITS);
+            t.absent(error);
+            const child = subscribe.getCalls().filter(call => call.args[0] === 'exit')[i].thisValue;
+            t.ok(child.stdio.every(pipe => pipe.destroyed), 'stdin, stdout and stderr are released before the next calculation');
+        }
+    });
+
     // Each computation runs in its own disposable OS subprocess (see VDFBare.js for why:
     // a real solveWesolowski() call leaves native/WASM state that crashes Bare.Thread's
     // teardown). There's no persistent thread/channel to mock - the "[bare] real VDF" tests

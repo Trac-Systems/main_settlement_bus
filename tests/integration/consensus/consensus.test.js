@@ -1,6 +1,7 @@
 import test from 'brittle';
 
 test.pause();
+await import('./vdfLifecycle.test.js');
 await import('./epochs/epochCreation.test.js');
 await import('./epochs/appendOutcome.test.js');
 await import('./epochs/appendCoordination.test.js');

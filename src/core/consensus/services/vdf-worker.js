@@ -3,6 +3,7 @@
  * Bare reads one JSON request per line from standard input and writes the response to standard output.
  * Solver errors are included in the response.
  */
+import { VDF_PROGRESS_PHASES } from './VDFProgressWatchdog.js';
 const { solveWesolowski } = await import('@tracsystems/trac-vdf');
 
 /**
@@ -11,11 +12,12 @@ const { solveWesolowski } = await import('@tracsystems/trac-vdf');
  * @param {Buffer} challenge Encoded epoch challenge.
  * @param {number} difficulty VDF iteration count.
  * @param {number} discriminantSizeBits Discriminant size in bits.
+ * @param {function({phase: string, completed: bigint}): void} [onProgress] Native progress observer.
  * @returns {Promise<import('./VDFService.js').VdfWorkerResponse>}
  */
-async function solveVdfChallenge(challenge, difficulty, discriminantSizeBits) {
+async function solveVdfChallenge(challenge, difficulty, discriminantSizeBits, onProgress) {
     try {
-        const solution = await solveWesolowski(challenge, difficulty, discriminantSizeBits);
+        const solution = await solveWesolowski(challenge, difficulty, discriminantSizeBits, { onProgress });
         return { result: { challenge, difficulty, discriminantSizeBits, solution } };
     } catch (error) {
         return { error: error.message };
@@ -28,6 +30,19 @@ if (typeof globalThis.Bare !== 'undefined') {
     // Bare.Thread's teardown (V8's internal WASM compiler threads never rejoin cleanly), so
     // each computation gets its own disposable process instead - see VDFBare.js.
     const { default: Pipe } = await import('bare-pipe');
+    const { default: Thread } = await import('bare-thread');
+    const shared = new SharedArrayBuffer(8 + VDF_PROGRESS_PHASES.length * 8);
+    const ready = new Int32Array(shared, 0, 1);
+    const counters = new BigUint64Array(shared, 8, VDF_PROGRESS_PHASES.length);
+    // Keep the guardian alive for the whole disposable process. It owns fd 3.
+    const guardian = new Thread(new URL('./vdf-guardian.js', import.meta.url).href, { data: shared });
+    while (Atomics.load(ready, 0) === 0) Atomics.wait(ready, 0, 0);
+    if (guardian.joined) throw new Error('VDF guardian exited before calculation');
+    const onProgress = ({ phase, completed }) => {
+        const index = VDF_PROGRESS_PHASES.indexOf(phase);
+        if (index === -1) throw new Error(`Unknown VDF progress phase: ${phase}`);
+        Atomics.store(counters, index, completed);
+    };
     const stdin = new Pipe(0);
     const stdout = new Pipe(1);
 
@@ -36,11 +51,13 @@ if (typeof globalThis.Bare !== 'undefined') {
         requestBuffer += chunk.toString();
         const newlineIndex = requestBuffer.indexOf('\n');
         if (newlineIndex === -1) return;
+        stdin.pause();
         const calculationRequest = JSON.parse(requestBuffer.slice(0, newlineIndex));
         const calculationResponse = await solveVdfChallenge(
             Buffer.from(calculationRequest.challenge, 'hex'),
             calculationRequest.difficulty,
-            calculationRequest.discriminantSizeBits
+            calculationRequest.discriminantSizeBits,
+            onProgress
         );
         stdout.write(JSON.stringify(encodeWorkerResponse(calculationResponse)) + '\n');
     });
