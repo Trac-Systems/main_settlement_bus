@@ -1,4 +1,5 @@
 import { VDFService } from './VDFService.js';
+import { VDFProgressWatchdog } from './VDFProgressWatchdog.js';
 
 let bareBinaryPathPromise = null;
 
@@ -64,6 +65,7 @@ class SubprocessPort {
 
         const { spawn } = await import('bare-subprocess');
         const { fileURLToPath } = await import('bare-url');
+        const { default: hrtime } = await import('bare-hrtime');
 
         const bareBinaryPath = await resolveBareBinaryPath();
         if (this.#closed) throw new Error('VDF subprocess is closed');
@@ -71,7 +73,7 @@ class SubprocessPort {
         const workerProcess = spawn(
             bareBinaryPath,
             [fileURLToPath(new URL(this.#workerScriptUrl))],
-            { stdio: ['pipe', 'pipe', 'pipe'] }
+            { stdio: ['pipe', 'pipe', 'pipe', 'pipe'] }
         );
         this.#workerProcess = workerProcess;
 
@@ -79,6 +81,9 @@ class SubprocessPort {
         this.#workerExitPromise = new Promise(resolve => {
             resolveChildExit = resolve;
         });
+        const workerPipesClosed = Promise.all(workerProcess.stdio.map(pipe => (
+            new Promise(resolve => pipe.once('close', resolve))
+        )));
 
         // Attached synchronously, right after spawn, in the same tick as the write below -
         // no await/gap in between where a fast response or an unexpected early exit could
@@ -86,10 +91,12 @@ class SubprocessPort {
         this.#workerResponsePromise = new Promise(resolve => {
             let responseBuffer = '';
             let settled = false;
+            let watchdog;
 
             const resolveWorkerResponse = (workerResponse) => {
                 if (settled) return;
                 settled = true;
+                watchdog?.stop();
                 resolve(workerResponse);
                 // Deferred to the next tick: killing the child synchronously here, in the
                 // same tick as resolve(), was empirically linked to a downstream deadlock
@@ -98,15 +105,46 @@ class SubprocessPort {
                 setImmediate(() => workerProcess.kill('SIGKILL'));
             };
             this.#resolvePendingResponse = resolveWorkerResponse;
+            watchdog = new VDFProgressWatchdog({
+                now: () => Number(hrtime.bigint() / 1_000_000n),
+                onStall: error => resolveWorkerResponse({ error }),
+            });
+
+            let progressBuffer = '';
+            const ownership = workerProcess.stdio[3];
+            ownership.on('data', chunk => {
+                if (settled) return;
+                progressBuffer += chunk.toString();
+                try {
+                    if (progressBuffer.length > 64 * 1024) throw new Error('VDF progress message is too large');
+                    let newline;
+                    while ((newline = progressBuffer.indexOf('\n')) !== -1) {
+                        const message = JSON.parse(progressBuffer.slice(0, newline));
+                        progressBuffer = progressBuffer.slice(newline + 1);
+                        if (message.ready === true) watchdog.ready();
+                        else watchdog.progress(message.progress);
+                    }
+                } catch (error) {
+                    resolveWorkerResponse({ error });
+                }
+            });
+            ownership.on('end', () => resolveWorkerResponse({ error: 'VDF guardian disconnected' }));
+
+            for (const pipe of workerProcess.stdio) {
+                pipe.on('error', error => resolveWorkerResponse({ error }));
+            }
+            // An unread stderr pipe can block the worker when its buffer fills.
+            workerProcess.stderr.resume();
 
             workerProcess.stdout.on('data', (chunk) => {
+                if (settled) return;
                 responseBuffer += chunk.toString();
                 const newlineIndex = responseBuffer.indexOf('\n');
                 if (newlineIndex === -1) return;
                 const responseLine = responseBuffer.slice(0, newlineIndex);
-                let encodedResponse;
                 try {
-                    encodedResponse = JSON.parse(responseLine);
+                    const encodedResponse = JSON.parse(responseLine);
+                    resolveWorkerResponse(decodeWorkerResponse(encodedResponse));
                 } catch {
                     // Not a Bare.Thread/bare-subprocess assumption - stdout is a boundary to an
                     // external process, so unexpected content there (e.g. a CLI usage error
@@ -115,12 +153,14 @@ class SubprocessPort {
                     resolveWorkerResponse({ error: `VDF worker returned an invalid response: ${responseLine}` });
                     return;
                 }
-                resolveWorkerResponse(decodeWorkerResponse(encodedResponse));
             });
 
-            workerProcess.on('exit', () => {
-                resolveWorkerResponse({ error: 'VDF worker process exited unexpectedly' });
-                resolveChildExit();
+            workerProcess.on('exit', (exitCode, signalCode) => {
+                resolveWorkerResponse({ error: `VDF worker process exited unexpectedly (code ${exitCode}, signal ${signalCode})` });
+                // bare-subprocess does not close every pipe when the process exits.
+                // Await their native handles too, before allowing another calculation.
+                for (const pipe of workerProcess.stdio) pipe.destroy();
+                workerPipesClosed.then(resolveChildExit);
             });
         });
 
@@ -132,8 +172,7 @@ class SubprocessPort {
             }) + '\n');
         } catch (error) {
             this.#resolvePendingResponse?.({ error });
-            workerProcess.kill('SIGKILL');
-            throw error;
+            // read() still waits for process and pipe cleanup before the queue advances.
         }
     }
 

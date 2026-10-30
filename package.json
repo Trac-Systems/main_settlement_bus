@@ -29,13 +29,15 @@
     "test:integration:consensus": "npm run test:integration:consensus:node && npm run test:integration:consensus:bare"
   },
   "dependencies": {
-    "@tracsystems/trac-vdf": "^0.0.2",
+    "@tracsystems/trac-vdf": "^0.0.3",
     "autobase": "7.20.1",
     "b4a": "1.6.7",
     "bare-channel": "^5.2.3",
     "bare-crypto": "1.12.0",
     "bare-fs": "4.5.0",
+    "bare-hrtime": "^2.1.1",
     "bare-http1": "4.1.5",
+    "bare-os": "^3.6.1",
     "bare-pipe": "^4.1.0",
     "bare-readline": "1.0.7",
     "bare-runtime": "^1.31.0",
@@ -70,7 +72,6 @@
   },
   "devDependencies": {
     "bare-module": "^6.1.3",
-    "bare-os": "^3.6.1",
     "bip39-mnemonic": "^2.4.0",
     "brittle": "^3.19.1",
     "eslint": "^9.39.4",

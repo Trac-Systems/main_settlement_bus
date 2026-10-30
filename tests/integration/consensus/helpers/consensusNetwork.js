@@ -36,7 +36,7 @@ export async function waitFor(description, predicate) {
 
 /** Real State/Autobase nodes over local Noise streams; only peer discovery is replaced. */
 export async function createConsensusNetwork(t, {
-    indexerCount = 5, prepareConnections = true, beforeMembership, timings = {},
+    indexerCount = 5, nodeCount = 5, prepareConnections = true, beforeMembership, timings = {},
 } = {}) {
     const nodes = [];
     const links = [];
@@ -167,8 +167,8 @@ export async function createConsensusNetwork(t, {
         b.messages.prepareConnection(connectionFrom(b, a));
     }
 
-    // Each scenario uses five nodes; some start as writers awaiting promotion.
-    for (let id = 0; id < 5; id++) {
+    // Additional nodes start as writers awaiting promotion.
+    for (let id = 0; id < nodeCount; id++) {
         const store = new Corestore(`${directory}/node-${id}`);
         const node = { id, store, promoted: id === 0 };
         nodes.push(node);

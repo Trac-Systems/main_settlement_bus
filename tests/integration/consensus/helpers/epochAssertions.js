@@ -10,7 +10,7 @@ import { calculateProofSignatureQuorum } from '../../../../src/core/consensus/qu
 
 export async function assertSignedEpoch(t, network, { epoch = 1n, proposer = network.proposer } = {}) {
     const { nodes } = network;
-    await network.waitForReplication(`epoch ${epoch} signed on all five nodes`, async () =>
+    await network.waitForReplication(`epoch ${epoch} signed on all ${nodes.length} nodes`, async () =>
         (await Promise.all(nodes.map(node => node.state.getCurrentEpoch()))).every(current => current === epoch)
     );
     const hashes = await Promise.all(nodes.map(node => node.state.getEpoch(epoch)));
