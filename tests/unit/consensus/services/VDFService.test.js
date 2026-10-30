@@ -177,6 +177,23 @@ test('close cancels the active calculation and prevents queued work from startin
 if (isBare) {
     const { VDFBare } = await import('../../../../src/core/consensus/services/VDFBare.js');
 
+    for (const bits of [2048, 4096]) {
+        test(`[bare] sparse discriminant progress returns a valid ${bits}-bit proof`, { timeout: 120000 }, async t => {
+            const { verifyWesolowski } = await import('@tracsystems/trac-vdf');
+            const service = new VDFBare();
+            t.teardown(() => service.close(), { force: true });
+            await service.ready();
+
+            // Larger discriminants spend seconds between candidate reports even
+            // at tiny difficulty. A 512-bit solve does not exercise this gap.
+            const challenge = Buffer.alloc(32, 1);
+            const { result, error } = await service.calculateVDF(challenge, DIFFICULTY, bits);
+            t.absent(error);
+            t.ok(result, 'the watchdog lets the native solve complete');
+            if (result) t.ok(await verifyWesolowski(challenge, DIFFICULTY, result.solution, bits));
+        });
+    }
+
     test('[bare] a longer healthy solve keeps reporting progress and returns a valid proof', { timeout: 60000 }, async t => {
         const { default: subprocess } = await import('bare-subprocess');
         const { verifyWesolowski } = await import('@tracsystems/trac-vdf');
@@ -199,7 +216,7 @@ if (isBare) {
         t.ok(await verifyWesolowski(challenge, 200_000, result.solution, 1024));
     });
 
-    test('[bare] SIGSTOP after live progress is detected and a queued calculation succeeds', { timeout: 15000 }, async t => {
+    test('[bare] SIGSTOP after live progress is detected and a queued calculation succeeds', { timeout: 60000 }, async t => {
         const { default: subprocess } = await import('bare-subprocess');
         const { kill } = await import('bare-os');
         const { verifyWesolowski } = await import('@tracsystems/trac-vdf');
@@ -226,7 +243,7 @@ if (isBare) {
         const active = service.calculateVDF(Buffer.alloc(32, 1), 100_000_000, DISCRIMINANT_BITS);
         const challenge = Buffer.alloc(32, 2);
         const queued = service.calculateVDF(challenge, DIFFICULTY, DISCRIMINANT_BITS);
-        const failed = await withTimeout(active, 12000, 'stopped solver remained pending');
+        const failed = await withTimeout(active, 45000, 'stopped solver remained pending');
         t.is(reports, 1, 'progress reached the parent while WASM was still computing');
         t.absent(failed.result);
         t.is(failed.error?.code, 'VDF_STALLED');

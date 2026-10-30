@@ -5,6 +5,8 @@ export const VDF_PROGRESS_PHASES = [
     'proof-setup', 'proof-blocks', 'proof-aggregation', 'serialization',
 ];
 
+const MIN_PROGRESS_TIMEOUT_MS = 30_000;
+
 /** Detects silence without imposing a deadline on the complete calculation. */
 export class VDFProgressWatchdog {
     #now;
@@ -23,7 +25,7 @@ export class VDFProgressWatchdog {
         this.#lastProgress = now();
         // Before the first observation there is no measured pace. This is a
         // startup allowance, not a limit derived from VDF difficulty or length.
-        this.#arm(30_000);
+        this.#arm(MIN_PROGRESS_TIMEOUT_MS);
     }
 
     ready() {
@@ -57,9 +59,7 @@ export class VDFProgressWatchdog {
         this.#longestGap = Math.max(this.#longestGap, now - this.#lastProgress);
         this.#lastProgress = now;
         this.#counts = next;
-        // Learn from the slowest observed interval, including initialization.
-        // A scheduling floor tolerates brief pauses and the guardian's sampling.
-        this.#arm(Math.max(2_000, this.#longestGap * 8));
+        this.#arm(Math.max(MIN_PROGRESS_TIMEOUT_MS, this.#longestGap * 8));
     }
 
     stop() {
