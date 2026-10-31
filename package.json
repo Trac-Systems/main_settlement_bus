@@ -70,7 +70,7 @@
     "trac-crypto-api": "0.1.5",
     "trac-wallet": "2.1.0",
     "tty": "npm:bare-node-tty",
-    "uuid": "^13.0.0"
+    "uuid": "^14.0.0"
   },
   "devDependencies": {
     "bare-module": "^6.1.3",
