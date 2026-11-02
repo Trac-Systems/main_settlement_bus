@@ -9,7 +9,7 @@ var $protobuf = require("../../protobufRuntime.cjs");
 var $Reader = $protobuf.Reader, $Writer = $protobuf.Writer, $util = $protobuf.util;
 
 // Exported root namespace
-var $root = $protobuf.roots.consensusV1 || ($protobuf.roots.consensusV1 = {});
+var $root = $protobuf.roots["consensusV1"] || ($protobuf.roots["consensusV1"] = {});
 
 $root.consensus = (function() {
 
@@ -55,7 +55,7 @@ $root.consensus = (function() {
             function ConsensusMessageHeader(properties) {
                 if (properties)
                     for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
-                        if (properties[keys[i]] != null)
+                        if (properties[keys[i]] != null && keys[i] !== "__proto__")
                             this[keys[i]] = properties[keys[i]];
             }
 
@@ -150,8 +150,12 @@ $root.consensus = (function() {
              * @param {$protobuf.Writer} [writer] Writer to encode to
              * @returns {$protobuf.Writer} Writer
              */
-            ConsensusMessageHeader.encode = function encode(message, writer) {
+            ConsensusMessageHeader.encode = function encode(message, writer, q) {
                 writer = $Writer.create(writer);
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
                 if (message.type != null && Object.hasOwnProperty.call(message, "type"))
                     writer.uint32(/* id 1, wireType 0 =*/8).int32(message.type);
                 if (message.session_id != null && Object.hasOwnProperty.call(message, "session_id"))
@@ -159,13 +163,13 @@ $root.consensus = (function() {
                 if (message.timestamp != null && Object.hasOwnProperty.call(message, "timestamp"))
                     writer.uint32(/* id 3, wireType 0 =*/24).uint64(message.timestamp);
                 if (message.proof_proposal != null && Object.hasOwnProperty.call(message, "proof_proposal"))
-                    $root.consensus.v1.ProofProposal.encode(message.proof_proposal, writer.uint32(/* id 4, wireType 2 =*/34).fork()).ldelim();
+                    $root.consensus.v1.ProofProposal.encode(message.proof_proposal, writer.uint32(/* id 4, wireType 2 =*/34).fork(), q + 1).ldelim();
                 if (message.proof_proposal_response != null && Object.hasOwnProperty.call(message, "proof_proposal_response"))
-                    $root.consensus.v1.ProofProposalResponse.encode(message.proof_proposal_response, writer.uint32(/* id 5, wireType 2 =*/42).fork()).ldelim();
+                    $root.consensus.v1.ProofProposalResponse.encode(message.proof_proposal_response, writer.uint32(/* id 5, wireType 2 =*/42).fork(), q + 1).ldelim();
                 if (message.request != null && Object.hasOwnProperty.call(message, "request"))
-                    $root.consensus.v1.EpochAppendRequest.encode(message.request, writer.uint32(/* id 6, wireType 2 =*/50).fork()).ldelim();
+                    $root.consensus.v1.EpochAppendRequest.encode(message.request, writer.uint32(/* id 6, wireType 2 =*/50).fork(), q + 1).ldelim();
                 if (message.reply != null && Object.hasOwnProperty.call(message, "reply"))
-                    $root.consensus.v1.EpochAppendReply.encode(message.reply, writer.uint32(/* id 7, wireType 2 =*/58).fork()).ldelim();
+                    $root.consensus.v1.EpochAppendReply.encode(message.reply, writer.uint32(/* id 7, wireType 2 =*/58).fork(), q + 1).ldelim();
                 return writer;
             };
 
@@ -179,7 +183,7 @@ $root.consensus = (function() {
              * @returns {$protobuf.Writer} Writer
              */
             ConsensusMessageHeader.encodeDelimited = function encodeDelimited(message, writer) {
-                return this.encode(message, writer).ldelim();
+                return this.encode(message, writer && writer.len ? writer.fork() : writer).ldelim();
             };
 
             /**
@@ -193,8 +197,12 @@ $root.consensus = (function() {
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
-            ConsensusMessageHeader.decode = function decode(reader, length, error) {
+            ConsensusMessageHeader.decode = function decode(reader, length, error, long) {
                 reader = $Reader.create(reader);
+                if (long === undefined)
+                    long = 0;
+                if (long > $Reader.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
                 var end = length === undefined ? reader.len : reader.pos + length, message = new $root.consensus.v1.ConsensusMessageHeader();
                 while (reader.pos < end) {
                     var tag = reader.uint32();
@@ -214,23 +222,23 @@ $root.consensus = (function() {
                             break;
                         }
                     case 4: {
-                            message.proof_proposal = $root.consensus.v1.ProofProposal.decode(reader, reader.uint32());
+                            message.proof_proposal = $root.consensus.v1.ProofProposal.decode(reader, reader.uint32(), undefined, long + 1);
                             break;
                         }
                     case 5: {
-                            message.proof_proposal_response = $root.consensus.v1.ProofProposalResponse.decode(reader, reader.uint32());
+                            message.proof_proposal_response = $root.consensus.v1.ProofProposalResponse.decode(reader, reader.uint32(), undefined, long + 1);
                             break;
                         }
                     case 6: {
-                            message.request = $root.consensus.v1.EpochAppendRequest.decode(reader, reader.uint32());
+                            message.request = $root.consensus.v1.EpochAppendRequest.decode(reader, reader.uint32(), undefined, long + 1);
                             break;
                         }
                     case 7: {
-                            message.reply = $root.consensus.v1.EpochAppendReply.decode(reader, reader.uint32());
+                            message.reply = $root.consensus.v1.EpochAppendReply.decode(reader, reader.uint32(), undefined, long + 1);
                             break;
                         }
                     default:
-                        reader.skipType(tag & 7);
+                        reader.skipType(tag & 7, long);
                         break;
                     }
                 }
@@ -260,11 +268,15 @@ $root.consensus = (function() {
              * @param {Object.<string,*>} message Plain object to verify
              * @returns {string|null} `null` if valid, otherwise the reason why it is not
              */
-            ConsensusMessageHeader.verify = function verify(message) {
+            ConsensusMessageHeader.verify = function verify(message, long) {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    return "maximum nesting depth exceeded";
                 var properties = {};
-                if (message.type != null && message.hasOwnProperty("type"))
+                if (message.type != null && Object.hasOwnProperty.call(message, "type"))
                     switch (message.type) {
                     default:
                         return "type: enum value expected";
@@ -275,46 +287,46 @@ $root.consensus = (function() {
                     case 4:
                         break;
                     }
-                if (message.session_id != null && message.hasOwnProperty("session_id"))
+                if (message.session_id != null && Object.hasOwnProperty.call(message, "session_id"))
                     if (!$util.isString(message.session_id))
                         return "session_id: string expected";
-                if (message.timestamp != null && message.hasOwnProperty("timestamp"))
+                if (message.timestamp != null && Object.hasOwnProperty.call(message, "timestamp"))
                     if (!$util.isInteger(message.timestamp) && !(message.timestamp && $util.isInteger(message.timestamp.low) && $util.isInteger(message.timestamp.high)))
                         return "timestamp: integer|Long expected";
-                if (message.proof_proposal != null && message.hasOwnProperty("proof_proposal")) {
+                if (message.proof_proposal != null && Object.hasOwnProperty.call(message, "proof_proposal")) {
                     properties.field = 1;
                     {
-                        var error = $root.consensus.v1.ProofProposal.verify(message.proof_proposal);
+                        var error = $root.consensus.v1.ProofProposal.verify(message.proof_proposal, long + 1);
                         if (error)
                             return "proof_proposal." + error;
                     }
                 }
-                if (message.proof_proposal_response != null && message.hasOwnProperty("proof_proposal_response")) {
+                if (message.proof_proposal_response != null && Object.hasOwnProperty.call(message, "proof_proposal_response")) {
                     if (properties.field === 1)
                         return "field: multiple values";
                     properties.field = 1;
                     {
-                        var error = $root.consensus.v1.ProofProposalResponse.verify(message.proof_proposal_response);
+                        var error = $root.consensus.v1.ProofProposalResponse.verify(message.proof_proposal_response, long + 1);
                         if (error)
                             return "proof_proposal_response." + error;
                     }
                 }
-                if (message.request != null && message.hasOwnProperty("request")) {
+                if (message.request != null && Object.hasOwnProperty.call(message, "request")) {
                     if (properties.field === 1)
                         return "field: multiple values";
                     properties.field = 1;
                     {
-                        var error = $root.consensus.v1.EpochAppendRequest.verify(message.request);
+                        var error = $root.consensus.v1.EpochAppendRequest.verify(message.request, long + 1);
                         if (error)
                             return "request." + error;
                     }
                 }
-                if (message.reply != null && message.hasOwnProperty("reply")) {
+                if (message.reply != null && Object.hasOwnProperty.call(message, "reply")) {
                     if (properties.field === 1)
                         return "field: multiple values";
                     properties.field = 1;
                     {
-                        var error = $root.consensus.v1.EpochAppendReply.verify(message.reply);
+                        var error = $root.consensus.v1.EpochAppendReply.verify(message.reply, long + 1);
                         if (error)
                             return "reply." + error;
                     }
@@ -330,9 +342,15 @@ $root.consensus = (function() {
              * @param {Object.<string,*>} object Plain object
              * @returns {consensus.v1.ConsensusMessageHeader} ConsensusMessageHeader
              */
-            ConsensusMessageHeader.fromObject = function fromObject(object) {
+            ConsensusMessageHeader.fromObject = function fromObject(object, long) {
                 if (object instanceof $root.consensus.v1.ConsensusMessageHeader)
                     object = Object.assign({}, object);
+                if (!$util.isObject(object))
+                    throw TypeError(".consensus.v1.ConsensusMessageHeader: object expected");
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
                 var message = new $root.consensus.v1.ConsensusMessageHeader();
                 switch (object.type) {
                 default:
@@ -366,7 +384,7 @@ $root.consensus = (function() {
                     message.session_id = String(object.session_id);
                 if (object.timestamp != null)
                     if ($util.Long)
-                        (message.timestamp = $util.Long.fromValue(object.timestamp)).unsigned = true;
+                        message.timestamp = $util.Long.fromValue(object.timestamp, true);
                     else if (typeof object.timestamp === "string")
                         message.timestamp = parseInt(object.timestamp, 10);
                     else if (typeof object.timestamp === "number")
@@ -374,24 +392,24 @@ $root.consensus = (function() {
                     else if (typeof object.timestamp === "object")
                         message.timestamp = new $util.LongBits(object.timestamp.low >>> 0, object.timestamp.high >>> 0).toNumber(true);
                 if (object.proof_proposal != null) {
-                    if (typeof object.proof_proposal !== "object")
+                    if (!$util.isObject(object.proof_proposal))
                         throw TypeError(".consensus.v1.ConsensusMessageHeader.proof_proposal: object expected");
-                    message.proof_proposal = $root.consensus.v1.ProofProposal.fromObject(object.proof_proposal);
+                    message.proof_proposal = $root.consensus.v1.ProofProposal.fromObject(object.proof_proposal, long + 1);
                 }
                 if (object.proof_proposal_response != null) {
-                    if (typeof object.proof_proposal_response !== "object")
+                    if (!$util.isObject(object.proof_proposal_response))
                         throw TypeError(".consensus.v1.ConsensusMessageHeader.proof_proposal_response: object expected");
-                    message.proof_proposal_response = $root.consensus.v1.ProofProposalResponse.fromObject(object.proof_proposal_response);
+                    message.proof_proposal_response = $root.consensus.v1.ProofProposalResponse.fromObject(object.proof_proposal_response, long + 1);
                 }
                 if (object.request != null) {
-                    if (typeof object.request !== "object")
+                    if (!$util.isObject(object.request))
                         throw TypeError(".consensus.v1.ConsensusMessageHeader.request: object expected");
-                    message.request = $root.consensus.v1.EpochAppendRequest.fromObject(object.request);
+                    message.request = $root.consensus.v1.EpochAppendRequest.fromObject(object.request, long + 1);
                 }
                 if (object.reply != null) {
-                    if (typeof object.reply !== "object")
+                    if (!$util.isObject(object.reply))
                         throw TypeError(".consensus.v1.ConsensusMessageHeader.reply: object expected");
-                    message.reply = $root.consensus.v1.EpochAppendReply.fromObject(object.reply);
+                    message.reply = $root.consensus.v1.EpochAppendReply.fromObject(object.reply, long + 1);
                 }
                 return message;
             };
@@ -405,45 +423,51 @@ $root.consensus = (function() {
              * @param {$protobuf.IConversionOptions} [options] Conversion options
              * @returns {Object.<string,*>} Plain object
              */
-            ConsensusMessageHeader.toObject = function toObject(message, options) {
+            ConsensusMessageHeader.toObject = function toObject(message, options, q) {
                 if (!options)
                     options = {};
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
                 var object = {};
                 if (options.defaults) {
                     object.type = options.enums === String ? "MESSAGE_TYPE_UNSPECIFIED" : 0;
                     object.session_id = "";
                     if ($util.Long) {
                         var long = new $util.Long(0, 0, true);
-                        object.timestamp = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
+                        object.timestamp = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : typeof BigInt !== "undefined" && options.longs === BigInt ? long.toBigInt() : long;
                     } else
-                        object.timestamp = options.longs === String ? "0" : 0;
+                        object.timestamp = options.longs === String ? "0" : typeof BigInt !== "undefined" && options.longs === BigInt ? BigInt("0") : 0;
                 }
-                if (message.type != null && message.hasOwnProperty("type"))
+                if (message.type != null && Object.hasOwnProperty.call(message, "type"))
                     object.type = options.enums === String ? $root.consensus.v1.MessageType[message.type] === undefined ? message.type : $root.consensus.v1.MessageType[message.type] : message.type;
-                if (message.session_id != null && message.hasOwnProperty("session_id"))
+                if (message.session_id != null && Object.hasOwnProperty.call(message, "session_id"))
                     object.session_id = message.session_id;
-                if (message.timestamp != null && message.hasOwnProperty("timestamp"))
-                    if (typeof message.timestamp === "number")
+                if (message.timestamp != null && Object.hasOwnProperty.call(message, "timestamp"))
+                    if (typeof BigInt !== "undefined" && options.longs === BigInt)
+                        object.timestamp = typeof message.timestamp === "number" ? BigInt(message.timestamp) : $util.Long.fromBits(message.timestamp.low >>> 0, message.timestamp.high >>> 0, true).toBigInt();
+                    else if (typeof message.timestamp === "number")
                         object.timestamp = options.longs === String ? String(message.timestamp) : message.timestamp;
                     else
                         object.timestamp = options.longs === String ? $util.Long.prototype.toString.call(message.timestamp) : options.longs === Number ? new $util.LongBits(message.timestamp.low >>> 0, message.timestamp.high >>> 0).toNumber(true) : message.timestamp;
-                if (message.proof_proposal != null && message.hasOwnProperty("proof_proposal")) {
-                    object.proof_proposal = $root.consensus.v1.ProofProposal.toObject(message.proof_proposal, options);
+                if (message.proof_proposal != null && Object.hasOwnProperty.call(message, "proof_proposal")) {
+                    object.proof_proposal = $root.consensus.v1.ProofProposal.toObject(message.proof_proposal, options, q + 1);
                     if (options.oneofs)
                         object.field = "proof_proposal";
                 }
-                if (message.proof_proposal_response != null && message.hasOwnProperty("proof_proposal_response")) {
-                    object.proof_proposal_response = $root.consensus.v1.ProofProposalResponse.toObject(message.proof_proposal_response, options);
+                if (message.proof_proposal_response != null && Object.hasOwnProperty.call(message, "proof_proposal_response")) {
+                    object.proof_proposal_response = $root.consensus.v1.ProofProposalResponse.toObject(message.proof_proposal_response, options, q + 1);
                     if (options.oneofs)
                         object.field = "proof_proposal_response";
                 }
-                if (message.request != null && message.hasOwnProperty("request")) {
-                    object.request = $root.consensus.v1.EpochAppendRequest.toObject(message.request, options);
+                if (message.request != null && Object.hasOwnProperty.call(message, "request")) {
+                    object.request = $root.consensus.v1.EpochAppendRequest.toObject(message.request, options, q + 1);
                     if (options.oneofs)
                         object.field = "request";
                 }
-                if (message.reply != null && message.hasOwnProperty("reply")) {
-                    object.reply = $root.consensus.v1.EpochAppendReply.toObject(message.reply, options);
+                if (message.reply != null && Object.hasOwnProperty.call(message, "reply")) {
+                    object.reply = $root.consensus.v1.EpochAppendReply.toObject(message.reply, options, q + 1);
                     if (options.oneofs)
                         object.field = "reply";
                 }
@@ -526,7 +550,7 @@ $root.consensus = (function() {
             function ProofProposal(properties) {
                 if (properties)
                     for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
-                        if (properties[keys[i]] != null)
+                        if (properties[keys[i]] != null && keys[i] !== "__proto__")
                             this[keys[i]] = properties[keys[i]];
             }
 
@@ -615,8 +639,12 @@ $root.consensus = (function() {
              * @param {$protobuf.Writer} [writer] Writer to encode to
              * @returns {$protobuf.Writer} Writer
              */
-            ProofProposal.encode = function encode(message, writer) {
+            ProofProposal.encode = function encode(message, writer, q) {
                 writer = $Writer.create(writer);
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
                 if (message.network_id != null && Object.hasOwnProperty.call(message, "network_id"))
                     writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.network_id);
                 if (message.epoch != null && Object.hasOwnProperty.call(message, "epoch"))
@@ -646,7 +674,7 @@ $root.consensus = (function() {
              * @returns {$protobuf.Writer} Writer
              */
             ProofProposal.encodeDelimited = function encodeDelimited(message, writer) {
-                return this.encode(message, writer).ldelim();
+                return this.encode(message, writer && writer.len ? writer.fork() : writer).ldelim();
             };
 
             /**
@@ -660,8 +688,12 @@ $root.consensus = (function() {
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
-            ProofProposal.decode = function decode(reader, length, error) {
+            ProofProposal.decode = function decode(reader, length, error, long) {
                 reader = $Reader.create(reader);
+                if (long === undefined)
+                    long = 0;
+                if (long > $Reader.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
                 var end = length === undefined ? reader.len : reader.pos + length, message = new $root.consensus.v1.ProofProposal();
                 while (reader.pos < end) {
                     var tag = reader.uint32();
@@ -701,7 +733,7 @@ $root.consensus = (function() {
                             break;
                         }
                     default:
-                        reader.skipType(tag & 7);
+                        reader.skipType(tag & 7, long);
                         break;
                     }
                 }
@@ -731,31 +763,35 @@ $root.consensus = (function() {
              * @param {Object.<string,*>} message Plain object to verify
              * @returns {string|null} `null` if valid, otherwise the reason why it is not
              */
-            ProofProposal.verify = function verify(message) {
+            ProofProposal.verify = function verify(message, long) {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
-                if (message.network_id != null && message.hasOwnProperty("network_id"))
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    return "maximum nesting depth exceeded";
+                if (message.network_id != null && Object.hasOwnProperty.call(message, "network_id"))
                     if (!$util.isBytes(message.network_id))
                         return "network_id: buffer expected";
-                if (message.epoch != null && message.hasOwnProperty("epoch"))
+                if (message.epoch != null && Object.hasOwnProperty.call(message, "epoch"))
                     if (!$util.isBytes(message.epoch))
                         return "epoch: buffer expected";
-                if (message.previous_epoch_record_hash != null && message.hasOwnProperty("previous_epoch_record_hash"))
+                if (message.previous_epoch_record_hash != null && Object.hasOwnProperty.call(message, "previous_epoch_record_hash"))
                     if (!$util.isBytes(message.previous_epoch_record_hash))
                         return "previous_epoch_record_hash: buffer expected";
-                if (message.proposer != null && message.hasOwnProperty("proposer"))
+                if (message.proposer != null && Object.hasOwnProperty.call(message, "proposer"))
                     if (!$util.isBytes(message.proposer))
                         return "proposer: buffer expected";
-                if (message.difficulty != null && message.hasOwnProperty("difficulty"))
+                if (message.difficulty != null && Object.hasOwnProperty.call(message, "difficulty"))
                     if (!$util.isBytes(message.difficulty))
                         return "difficulty: buffer expected";
-                if (message.discriminant_bit_size != null && message.hasOwnProperty("discriminant_bit_size"))
+                if (message.discriminant_bit_size != null && Object.hasOwnProperty.call(message, "discriminant_bit_size"))
                     if (!$util.isBytes(message.discriminant_bit_size))
                         return "discriminant_bit_size: buffer expected";
-                if (message.proof != null && message.hasOwnProperty("proof"))
+                if (message.proof != null && Object.hasOwnProperty.call(message, "proof"))
                     if (!$util.isBytes(message.proof))
                         return "proof: buffer expected";
-                if (message.signature != null && message.hasOwnProperty("signature"))
+                if (message.signature != null && Object.hasOwnProperty.call(message, "signature"))
                     if (!$util.isBytes(message.signature))
                         return "signature: buffer expected";
                 return null;
@@ -769,9 +805,15 @@ $root.consensus = (function() {
              * @param {Object.<string,*>} object Plain object
              * @returns {consensus.v1.ProofProposal} ProofProposal
              */
-            ProofProposal.fromObject = function fromObject(object) {
+            ProofProposal.fromObject = function fromObject(object, long) {
                 if (object instanceof $root.consensus.v1.ProofProposal)
                     object = Object.assign({}, object);
+                if (!$util.isObject(object))
+                    throw TypeError(".consensus.v1.ProofProposal: object expected");
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
                 var message = new $root.consensus.v1.ProofProposal();
                 if (object.network_id != null)
                     message.network_id = $util.bytesFrom(object.network_id);
@@ -801,9 +843,13 @@ $root.consensus = (function() {
              * @param {$protobuf.IConversionOptions} [options] Conversion options
              * @returns {Object.<string,*>} Plain object
              */
-            ProofProposal.toObject = function toObject(message, options) {
+            ProofProposal.toObject = function toObject(message, options, q) {
                 if (!options)
                     options = {};
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
                 var object = {};
                 if (options.defaults) {
                     if (options.bytes === String)
@@ -863,21 +909,21 @@ $root.consensus = (function() {
                             object.signature = $util.newBuffer(object.signature);
                     }
                 }
-                if (message.network_id != null && message.hasOwnProperty("network_id"))
+                if (message.network_id != null && Object.hasOwnProperty.call(message, "network_id"))
                     object.network_id = $util.bytesTo(message.network_id, options);
-                if (message.epoch != null && message.hasOwnProperty("epoch"))
+                if (message.epoch != null && Object.hasOwnProperty.call(message, "epoch"))
                     object.epoch = $util.bytesTo(message.epoch, options);
-                if (message.previous_epoch_record_hash != null && message.hasOwnProperty("previous_epoch_record_hash"))
+                if (message.previous_epoch_record_hash != null && Object.hasOwnProperty.call(message, "previous_epoch_record_hash"))
                     object.previous_epoch_record_hash = $util.bytesTo(message.previous_epoch_record_hash, options);
-                if (message.proposer != null && message.hasOwnProperty("proposer"))
+                if (message.proposer != null && Object.hasOwnProperty.call(message, "proposer"))
                     object.proposer = $util.bytesTo(message.proposer, options);
-                if (message.difficulty != null && message.hasOwnProperty("difficulty"))
+                if (message.difficulty != null && Object.hasOwnProperty.call(message, "difficulty"))
                     object.difficulty = $util.bytesTo(message.difficulty, options);
-                if (message.discriminant_bit_size != null && message.hasOwnProperty("discriminant_bit_size"))
+                if (message.discriminant_bit_size != null && Object.hasOwnProperty.call(message, "discriminant_bit_size"))
                     object.discriminant_bit_size = $util.bytesTo(message.discriminant_bit_size, options);
-                if (message.proof != null && message.hasOwnProperty("proof"))
+                if (message.proof != null && Object.hasOwnProperty.call(message, "proof"))
                     object.proof = $util.bytesTo(message.proof, options);
-                if (message.signature != null && message.hasOwnProperty("signature"))
+                if (message.signature != null && Object.hasOwnProperty.call(message, "signature"))
                     object.signature = $util.bytesTo(message.signature, options);
                 return object;
             };
@@ -933,7 +979,7 @@ $root.consensus = (function() {
             function ProofProposalResponse(properties) {
                 if (properties)
                     for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
-                        if (properties[keys[i]] != null)
+                        if (properties[keys[i]] != null && keys[i] !== "__proto__")
                             this[keys[i]] = properties[keys[i]];
             }
 
@@ -982,12 +1028,16 @@ $root.consensus = (function() {
              * @param {$protobuf.Writer} [writer] Writer to encode to
              * @returns {$protobuf.Writer} Writer
              */
-            ProofProposalResponse.encode = function encode(message, writer) {
+            ProofProposalResponse.encode = function encode(message, writer, q) {
                 writer = $Writer.create(writer);
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
                 if (message.result != null && Object.hasOwnProperty.call(message, "result"))
                     writer.uint32(/* id 1, wireType 0 =*/8).int32(message.result);
                 if (message.approval != null && Object.hasOwnProperty.call(message, "approval"))
-                    $root.consensus.v1.ProofProposalApproval.encode(message.approval, writer.uint32(/* id 2, wireType 2 =*/18).fork()).ldelim();
+                    $root.consensus.v1.ProofProposalApproval.encode(message.approval, writer.uint32(/* id 2, wireType 2 =*/18).fork(), q + 1).ldelim();
                 if (message.response_sig != null && Object.hasOwnProperty.call(message, "response_sig"))
                     writer.uint32(/* id 3, wireType 2 =*/26).bytes(message.response_sig);
                 return writer;
@@ -1003,7 +1053,7 @@ $root.consensus = (function() {
              * @returns {$protobuf.Writer} Writer
              */
             ProofProposalResponse.encodeDelimited = function encodeDelimited(message, writer) {
-                return this.encode(message, writer).ldelim();
+                return this.encode(message, writer && writer.len ? writer.fork() : writer).ldelim();
             };
 
             /**
@@ -1017,8 +1067,12 @@ $root.consensus = (function() {
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
-            ProofProposalResponse.decode = function decode(reader, length, error) {
+            ProofProposalResponse.decode = function decode(reader, length, error, long) {
                 reader = $Reader.create(reader);
+                if (long === undefined)
+                    long = 0;
+                if (long > $Reader.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
                 var end = length === undefined ? reader.len : reader.pos + length, message = new $root.consensus.v1.ProofProposalResponse();
                 while (reader.pos < end) {
                     var tag = reader.uint32();
@@ -1030,7 +1084,7 @@ $root.consensus = (function() {
                             break;
                         }
                     case 2: {
-                            message.approval = $root.consensus.v1.ProofProposalApproval.decode(reader, reader.uint32());
+                            message.approval = $root.consensus.v1.ProofProposalApproval.decode(reader, reader.uint32(), undefined, long + 1);
                             break;
                         }
                     case 3: {
@@ -1038,7 +1092,7 @@ $root.consensus = (function() {
                             break;
                         }
                     default:
-                        reader.skipType(tag & 7);
+                        reader.skipType(tag & 7, long);
                         break;
                     }
                 }
@@ -1068,10 +1122,14 @@ $root.consensus = (function() {
              * @param {Object.<string,*>} message Plain object to verify
              * @returns {string|null} `null` if valid, otherwise the reason why it is not
              */
-            ProofProposalResponse.verify = function verify(message) {
+            ProofProposalResponse.verify = function verify(message, long) {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
-                if (message.result != null && message.hasOwnProperty("result"))
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    return "maximum nesting depth exceeded";
+                if (message.result != null && Object.hasOwnProperty.call(message, "result"))
                     switch (message.result) {
                     default:
                         return "result: enum value expected";
@@ -1154,12 +1212,12 @@ $root.consensus = (function() {
                     case 114:
                         break;
                     }
-                if (message.approval != null && message.hasOwnProperty("approval")) {
-                    var error = $root.consensus.v1.ProofProposalApproval.verify(message.approval);
+                if (message.approval != null && Object.hasOwnProperty.call(message, "approval")) {
+                    var error = $root.consensus.v1.ProofProposalApproval.verify(message.approval, long + 1);
                     if (error)
                         return "approval." + error;
                 }
-                if (message.response_sig != null && message.hasOwnProperty("response_sig"))
+                if (message.response_sig != null && Object.hasOwnProperty.call(message, "response_sig"))
                     if (!$util.isBytes(message.response_sig))
                         return "response_sig: buffer expected";
                 return null;
@@ -1173,9 +1231,15 @@ $root.consensus = (function() {
              * @param {Object.<string,*>} object Plain object
              * @returns {consensus.v1.ProofProposalResponse} ProofProposalResponse
              */
-            ProofProposalResponse.fromObject = function fromObject(object) {
+            ProofProposalResponse.fromObject = function fromObject(object, long) {
                 if (object instanceof $root.consensus.v1.ProofProposalResponse)
                     object = Object.assign({}, object);
+                if (!$util.isObject(object))
+                    throw TypeError(".consensus.v1.ProofProposalResponse: object expected");
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
                 var message = new $root.consensus.v1.ProofProposalResponse();
                 switch (object.result) {
                 default:
@@ -1494,9 +1558,9 @@ $root.consensus = (function() {
                     break;
                 }
                 if (object.approval != null) {
-                    if (typeof object.approval !== "object")
+                    if (!$util.isObject(object.approval))
                         throw TypeError(".consensus.v1.ProofProposalResponse.approval: object expected");
-                    message.approval = $root.consensus.v1.ProofProposalApproval.fromObject(object.approval);
+                    message.approval = $root.consensus.v1.ProofProposalApproval.fromObject(object.approval, long + 1);
                 }
                 if (object.response_sig != null)
                     message.response_sig = $util.bytesFrom(object.response_sig);
@@ -1512,9 +1576,13 @@ $root.consensus = (function() {
              * @param {$protobuf.IConversionOptions} [options] Conversion options
              * @returns {Object.<string,*>} Plain object
              */
-            ProofProposalResponse.toObject = function toObject(message, options) {
+            ProofProposalResponse.toObject = function toObject(message, options, q) {
                 if (!options)
                     options = {};
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
                 var object = {};
                 if (options.defaults) {
                     object.result = options.enums === String ? "RESULT_CODE_UNSPECIFIED" : 0;
@@ -1527,11 +1595,11 @@ $root.consensus = (function() {
                             object.response_sig = $util.newBuffer(object.response_sig);
                     }
                 }
-                if (message.result != null && message.hasOwnProperty("result"))
+                if (message.result != null && Object.hasOwnProperty.call(message, "result"))
                     object.result = options.enums === String ? $root.common.v1.ResultCode[message.result] === undefined ? message.result : $root.common.v1.ResultCode[message.result] : message.result;
-                if (message.approval != null && message.hasOwnProperty("approval"))
-                    object.approval = $root.consensus.v1.ProofProposalApproval.toObject(message.approval, options);
-                if (message.response_sig != null && message.hasOwnProperty("response_sig"))
+                if (message.approval != null && Object.hasOwnProperty.call(message, "approval"))
+                    object.approval = $root.consensus.v1.ProofProposalApproval.toObject(message.approval, options, q + 1);
+                if (message.response_sig != null && Object.hasOwnProperty.call(message, "response_sig"))
                     object.response_sig = $util.bytesTo(message.response_sig, options);
                 return object;
             };
@@ -1586,7 +1654,7 @@ $root.consensus = (function() {
             function ProofProposalApproval(properties) {
                 if (properties)
                     for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
-                        if (properties[keys[i]] != null)
+                        if (properties[keys[i]] != null && keys[i] !== "__proto__")
                             this[keys[i]] = properties[keys[i]];
             }
 
@@ -1627,8 +1695,12 @@ $root.consensus = (function() {
              * @param {$protobuf.Writer} [writer] Writer to encode to
              * @returns {$protobuf.Writer} Writer
              */
-            ProofProposalApproval.encode = function encode(message, writer) {
+            ProofProposalApproval.encode = function encode(message, writer, q) {
                 writer = $Writer.create(writer);
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
                 if (message.approver != null && Object.hasOwnProperty.call(message, "approver"))
                     writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.approver);
                 if (message.approval_sig != null && Object.hasOwnProperty.call(message, "approval_sig"))
@@ -1646,7 +1718,7 @@ $root.consensus = (function() {
              * @returns {$protobuf.Writer} Writer
              */
             ProofProposalApproval.encodeDelimited = function encodeDelimited(message, writer) {
-                return this.encode(message, writer).ldelim();
+                return this.encode(message, writer && writer.len ? writer.fork() : writer).ldelim();
             };
 
             /**
@@ -1660,8 +1732,12 @@ $root.consensus = (function() {
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
-            ProofProposalApproval.decode = function decode(reader, length, error) {
+            ProofProposalApproval.decode = function decode(reader, length, error, long) {
                 reader = $Reader.create(reader);
+                if (long === undefined)
+                    long = 0;
+                if (long > $Reader.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
                 var end = length === undefined ? reader.len : reader.pos + length, message = new $root.consensus.v1.ProofProposalApproval();
                 while (reader.pos < end) {
                     var tag = reader.uint32();
@@ -1677,7 +1753,7 @@ $root.consensus = (function() {
                             break;
                         }
                     default:
-                        reader.skipType(tag & 7);
+                        reader.skipType(tag & 7, long);
                         break;
                     }
                 }
@@ -1707,13 +1783,17 @@ $root.consensus = (function() {
              * @param {Object.<string,*>} message Plain object to verify
              * @returns {string|null} `null` if valid, otherwise the reason why it is not
              */
-            ProofProposalApproval.verify = function verify(message) {
+            ProofProposalApproval.verify = function verify(message, long) {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
-                if (message.approver != null && message.hasOwnProperty("approver"))
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    return "maximum nesting depth exceeded";
+                if (message.approver != null && Object.hasOwnProperty.call(message, "approver"))
                     if (!$util.isBytes(message.approver))
                         return "approver: buffer expected";
-                if (message.approval_sig != null && message.hasOwnProperty("approval_sig"))
+                if (message.approval_sig != null && Object.hasOwnProperty.call(message, "approval_sig"))
                     if (!$util.isBytes(message.approval_sig))
                         return "approval_sig: buffer expected";
                 return null;
@@ -1727,9 +1807,15 @@ $root.consensus = (function() {
              * @param {Object.<string,*>} object Plain object
              * @returns {consensus.v1.ProofProposalApproval} ProofProposalApproval
              */
-            ProofProposalApproval.fromObject = function fromObject(object) {
+            ProofProposalApproval.fromObject = function fromObject(object, long) {
                 if (object instanceof $root.consensus.v1.ProofProposalApproval)
                     object = Object.assign({}, object);
+                if (!$util.isObject(object))
+                    throw TypeError(".consensus.v1.ProofProposalApproval: object expected");
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
                 var message = new $root.consensus.v1.ProofProposalApproval();
                 if (object.approver != null)
                     message.approver = $util.bytesFrom(object.approver);
@@ -1747,9 +1833,13 @@ $root.consensus = (function() {
              * @param {$protobuf.IConversionOptions} [options] Conversion options
              * @returns {Object.<string,*>} Plain object
              */
-            ProofProposalApproval.toObject = function toObject(message, options) {
+            ProofProposalApproval.toObject = function toObject(message, options, q) {
                 if (!options)
                     options = {};
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
                 var object = {};
                 if (options.defaults) {
                     if (options.bytes === String)
@@ -1767,9 +1857,9 @@ $root.consensus = (function() {
                             object.approval_sig = $util.newBuffer(object.approval_sig);
                     }
                 }
-                if (message.approver != null && message.hasOwnProperty("approver"))
+                if (message.approver != null && Object.hasOwnProperty.call(message, "approver"))
                     object.approver = $util.bytesTo(message.approver, options);
-                if (message.approval_sig != null && message.hasOwnProperty("approval_sig"))
+                if (message.approval_sig != null && Object.hasOwnProperty.call(message, "approval_sig"))
                     object.approval_sig = $util.bytesTo(message.approval_sig, options);
                 return object;
             };
@@ -1833,7 +1923,7 @@ $root.consensus = (function() {
             function EpochAppendIntent(properties) {
                 if (properties)
                     for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
-                        if (properties[keys[i]] != null)
+                        if (properties[keys[i]] != null && keys[i] !== "__proto__")
                             this[keys[i]] = properties[keys[i]];
             }
 
@@ -1946,8 +2036,12 @@ $root.consensus = (function() {
              * @param {$protobuf.Writer} [writer] Writer to encode to
              * @returns {$protobuf.Writer} Writer
              */
-            EpochAppendIntent.encode = function encode(message, writer) {
+            EpochAppendIntent.encode = function encode(message, writer, q) {
                 writer = $Writer.create(writer);
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
                 if (message.network_id != null && Object.hasOwnProperty.call(message, "network_id"))
                     writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.network_id);
                 if (message.bootstrap != null && Object.hasOwnProperty.call(message, "bootstrap"))
@@ -1983,7 +2077,7 @@ $root.consensus = (function() {
              * @returns {$protobuf.Writer} Writer
              */
             EpochAppendIntent.encodeDelimited = function encodeDelimited(message, writer) {
-                return this.encode(message, writer).ldelim();
+                return this.encode(message, writer && writer.len ? writer.fork() : writer).ldelim();
             };
 
             /**
@@ -1997,8 +2091,12 @@ $root.consensus = (function() {
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
-            EpochAppendIntent.decode = function decode(reader, length, error) {
+            EpochAppendIntent.decode = function decode(reader, length, error, long) {
                 reader = $Reader.create(reader);
+                if (long === undefined)
+                    long = 0;
+                if (long > $Reader.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
                 var end = length === undefined ? reader.len : reader.pos + length, message = new $root.consensus.v1.EpochAppendIntent();
                 while (reader.pos < end) {
                     var tag = reader.uint32();
@@ -2050,7 +2148,7 @@ $root.consensus = (function() {
                             break;
                         }
                     default:
-                        reader.skipType(tag & 7);
+                        reader.skipType(tag & 7, long);
                         break;
                     }
                 }
@@ -2080,40 +2178,44 @@ $root.consensus = (function() {
              * @param {Object.<string,*>} message Plain object to verify
              * @returns {string|null} `null` if valid, otherwise the reason why it is not
              */
-            EpochAppendIntent.verify = function verify(message) {
+            EpochAppendIntent.verify = function verify(message, long) {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
-                if (message.network_id != null && message.hasOwnProperty("network_id"))
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    return "maximum nesting depth exceeded";
+                if (message.network_id != null && Object.hasOwnProperty.call(message, "network_id"))
                     if (!$util.isBytes(message.network_id))
                         return "network_id: buffer expected";
-                if (message.bootstrap != null && message.hasOwnProperty("bootstrap"))
+                if (message.bootstrap != null && Object.hasOwnProperty.call(message, "bootstrap"))
                     if (!$util.isBytes(message.bootstrap))
                         return "bootstrap: buffer expected";
-                if (message.epoch != null && message.hasOwnProperty("epoch"))
+                if (message.epoch != null && Object.hasOwnProperty.call(message, "epoch"))
                     if (!$util.isBytes(message.epoch))
                         return "epoch: buffer expected";
-                if (message.parent_hash != null && message.hasOwnProperty("parent_hash"))
+                if (message.parent_hash != null && Object.hasOwnProperty.call(message, "parent_hash"))
                     if (!$util.isBytes(message.parent_hash))
                         return "parent_hash: buffer expected";
-                if (message.membership_context != null && message.hasOwnProperty("membership_context"))
+                if (message.membership_context != null && Object.hasOwnProperty.call(message, "membership_context"))
                     if (!$util.isBytes(message.membership_context))
                         return "membership_context: buffer expected";
-                if (message.config_hash != null && message.hasOwnProperty("config_hash"))
+                if (message.config_hash != null && Object.hasOwnProperty.call(message, "config_hash"))
                     if (!$util.isBytes(message.config_hash))
                         return "config_hash: buffer expected";
-                if (message.request_id != null && message.hasOwnProperty("request_id"))
+                if (message.request_id != null && Object.hasOwnProperty.call(message, "request_id"))
                     if (!$util.isString(message.request_id))
                         return "request_id: string expected";
-                if (message.payload_hash != null && message.hasOwnProperty("payload_hash"))
+                if (message.payload_hash != null && Object.hasOwnProperty.call(message, "payload_hash"))
                     if (!$util.isBytes(message.payload_hash))
                         return "payload_hash: buffer expected";
-                if (message.logical_counter != null && message.hasOwnProperty("logical_counter"))
+                if (message.logical_counter != null && Object.hasOwnProperty.call(message, "logical_counter"))
                     if (!$util.isBytes(message.logical_counter))
                         return "logical_counter: buffer expected";
-                if (message.requester != null && message.hasOwnProperty("requester"))
+                if (message.requester != null && Object.hasOwnProperty.call(message, "requester"))
                     if (!$util.isBytes(message.requester))
                         return "requester: buffer expected";
-                if (message.selection_version != null && message.hasOwnProperty("selection_version"))
+                if (message.selection_version != null && Object.hasOwnProperty.call(message, "selection_version"))
                     if (!$util.isInteger(message.selection_version))
                         return "selection_version: integer expected";
                 return null;
@@ -2127,9 +2229,15 @@ $root.consensus = (function() {
              * @param {Object.<string,*>} object Plain object
              * @returns {consensus.v1.EpochAppendIntent} EpochAppendIntent
              */
-            EpochAppendIntent.fromObject = function fromObject(object) {
+            EpochAppendIntent.fromObject = function fromObject(object, long) {
                 if (object instanceof $root.consensus.v1.EpochAppendIntent)
                     object = Object.assign({}, object);
+                if (!$util.isObject(object))
+                    throw TypeError(".consensus.v1.EpochAppendIntent: object expected");
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
                 var message = new $root.consensus.v1.EpochAppendIntent();
                 if (object.network_id != null)
                     message.network_id = $util.bytesFrom(object.network_id);
@@ -2165,9 +2273,13 @@ $root.consensus = (function() {
              * @param {$protobuf.IConversionOptions} [options] Conversion options
              * @returns {Object.<string,*>} Plain object
              */
-            EpochAppendIntent.toObject = function toObject(message, options) {
+            EpochAppendIntent.toObject = function toObject(message, options, q) {
                 if (!options)
                     options = {};
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
                 var object = {};
                 if (options.defaults) {
                     if (options.bytes === String)
@@ -2236,27 +2348,27 @@ $root.consensus = (function() {
                     }
                     object.selection_version = 0;
                 }
-                if (message.network_id != null && message.hasOwnProperty("network_id"))
+                if (message.network_id != null && Object.hasOwnProperty.call(message, "network_id"))
                     object.network_id = $util.bytesTo(message.network_id, options);
-                if (message.bootstrap != null && message.hasOwnProperty("bootstrap"))
+                if (message.bootstrap != null && Object.hasOwnProperty.call(message, "bootstrap"))
                     object.bootstrap = $util.bytesTo(message.bootstrap, options);
-                if (message.epoch != null && message.hasOwnProperty("epoch"))
+                if (message.epoch != null && Object.hasOwnProperty.call(message, "epoch"))
                     object.epoch = $util.bytesTo(message.epoch, options);
-                if (message.parent_hash != null && message.hasOwnProperty("parent_hash"))
+                if (message.parent_hash != null && Object.hasOwnProperty.call(message, "parent_hash"))
                     object.parent_hash = $util.bytesTo(message.parent_hash, options);
-                if (message.membership_context != null && message.hasOwnProperty("membership_context"))
+                if (message.membership_context != null && Object.hasOwnProperty.call(message, "membership_context"))
                     object.membership_context = $util.bytesTo(message.membership_context, options);
-                if (message.config_hash != null && message.hasOwnProperty("config_hash"))
+                if (message.config_hash != null && Object.hasOwnProperty.call(message, "config_hash"))
                     object.config_hash = $util.bytesTo(message.config_hash, options);
-                if (message.request_id != null && message.hasOwnProperty("request_id"))
+                if (message.request_id != null && Object.hasOwnProperty.call(message, "request_id"))
                     object.request_id = message.request_id;
-                if (message.payload_hash != null && message.hasOwnProperty("payload_hash"))
+                if (message.payload_hash != null && Object.hasOwnProperty.call(message, "payload_hash"))
                     object.payload_hash = $util.bytesTo(message.payload_hash, options);
-                if (message.logical_counter != null && message.hasOwnProperty("logical_counter"))
+                if (message.logical_counter != null && Object.hasOwnProperty.call(message, "logical_counter"))
                     object.logical_counter = $util.bytesTo(message.logical_counter, options);
-                if (message.requester != null && message.hasOwnProperty("requester"))
+                if (message.requester != null && Object.hasOwnProperty.call(message, "requester"))
                     object.requester = $util.bytesTo(message.requester, options);
-                if (message.selection_version != null && message.hasOwnProperty("selection_version"))
+                if (message.selection_version != null && Object.hasOwnProperty.call(message, "selection_version"))
                     object.selection_version = message.selection_version;
                 return object;
             };
@@ -2311,7 +2423,7 @@ $root.consensus = (function() {
             function EpochAppendRequest(properties) {
                 if (properties)
                     for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
-                        if (properties[keys[i]] != null)
+                        if (properties[keys[i]] != null && keys[i] !== "__proto__")
                             this[keys[i]] = properties[keys[i]];
             }
 
@@ -2352,10 +2464,14 @@ $root.consensus = (function() {
              * @param {$protobuf.Writer} [writer] Writer to encode to
              * @returns {$protobuf.Writer} Writer
              */
-            EpochAppendRequest.encode = function encode(message, writer) {
+            EpochAppendRequest.encode = function encode(message, writer, q) {
                 writer = $Writer.create(writer);
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
                 if (message.intent != null && Object.hasOwnProperty.call(message, "intent"))
-                    $root.consensus.v1.EpochAppendIntent.encode(message.intent, writer.uint32(/* id 1, wireType 2 =*/10).fork()).ldelim();
+                    $root.consensus.v1.EpochAppendIntent.encode(message.intent, writer.uint32(/* id 1, wireType 2 =*/10).fork(), q + 1).ldelim();
                 if (message.signature != null && Object.hasOwnProperty.call(message, "signature"))
                     writer.uint32(/* id 2, wireType 2 =*/18).bytes(message.signature);
                 return writer;
@@ -2371,7 +2487,7 @@ $root.consensus = (function() {
              * @returns {$protobuf.Writer} Writer
              */
             EpochAppendRequest.encodeDelimited = function encodeDelimited(message, writer) {
-                return this.encode(message, writer).ldelim();
+                return this.encode(message, writer && writer.len ? writer.fork() : writer).ldelim();
             };
 
             /**
@@ -2385,8 +2501,12 @@ $root.consensus = (function() {
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
-            EpochAppendRequest.decode = function decode(reader, length, error) {
+            EpochAppendRequest.decode = function decode(reader, length, error, long) {
                 reader = $Reader.create(reader);
+                if (long === undefined)
+                    long = 0;
+                if (long > $Reader.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
                 var end = length === undefined ? reader.len : reader.pos + length, message = new $root.consensus.v1.EpochAppendRequest();
                 while (reader.pos < end) {
                     var tag = reader.uint32();
@@ -2394,7 +2514,7 @@ $root.consensus = (function() {
                         break;
                     switch (tag >>> 3) {
                     case 1: {
-                            message.intent = $root.consensus.v1.EpochAppendIntent.decode(reader, reader.uint32());
+                            message.intent = $root.consensus.v1.EpochAppendIntent.decode(reader, reader.uint32(), undefined, long + 1);
                             break;
                         }
                     case 2: {
@@ -2402,7 +2522,7 @@ $root.consensus = (function() {
                             break;
                         }
                     default:
-                        reader.skipType(tag & 7);
+                        reader.skipType(tag & 7, long);
                         break;
                     }
                 }
@@ -2432,15 +2552,19 @@ $root.consensus = (function() {
              * @param {Object.<string,*>} message Plain object to verify
              * @returns {string|null} `null` if valid, otherwise the reason why it is not
              */
-            EpochAppendRequest.verify = function verify(message) {
+            EpochAppendRequest.verify = function verify(message, long) {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
-                if (message.intent != null && message.hasOwnProperty("intent")) {
-                    var error = $root.consensus.v1.EpochAppendIntent.verify(message.intent);
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    return "maximum nesting depth exceeded";
+                if (message.intent != null && Object.hasOwnProperty.call(message, "intent")) {
+                    var error = $root.consensus.v1.EpochAppendIntent.verify(message.intent, long + 1);
                     if (error)
                         return "intent." + error;
                 }
-                if (message.signature != null && message.hasOwnProperty("signature"))
+                if (message.signature != null && Object.hasOwnProperty.call(message, "signature"))
                     if (!$util.isBytes(message.signature))
                         return "signature: buffer expected";
                 return null;
@@ -2454,14 +2578,20 @@ $root.consensus = (function() {
              * @param {Object.<string,*>} object Plain object
              * @returns {consensus.v1.EpochAppendRequest} EpochAppendRequest
              */
-            EpochAppendRequest.fromObject = function fromObject(object) {
+            EpochAppendRequest.fromObject = function fromObject(object, long) {
                 if (object instanceof $root.consensus.v1.EpochAppendRequest)
                     object = Object.assign({}, object);
+                if (!$util.isObject(object))
+                    throw TypeError(".consensus.v1.EpochAppendRequest: object expected");
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
                 var message = new $root.consensus.v1.EpochAppendRequest();
                 if (object.intent != null) {
-                    if (typeof object.intent !== "object")
+                    if (!$util.isObject(object.intent))
                         throw TypeError(".consensus.v1.EpochAppendRequest.intent: object expected");
-                    message.intent = $root.consensus.v1.EpochAppendIntent.fromObject(object.intent);
+                    message.intent = $root.consensus.v1.EpochAppendIntent.fromObject(object.intent, long + 1);
                 }
                 if (object.signature != null)
                     message.signature = $util.bytesFrom(object.signature);
@@ -2477,9 +2607,13 @@ $root.consensus = (function() {
              * @param {$protobuf.IConversionOptions} [options] Conversion options
              * @returns {Object.<string,*>} Plain object
              */
-            EpochAppendRequest.toObject = function toObject(message, options) {
+            EpochAppendRequest.toObject = function toObject(message, options, q) {
                 if (!options)
                     options = {};
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
                 var object = {};
                 if (options.defaults) {
                     object.intent = null;
@@ -2491,9 +2625,9 @@ $root.consensus = (function() {
                             object.signature = $util.newBuffer(object.signature);
                     }
                 }
-                if (message.intent != null && message.hasOwnProperty("intent"))
-                    object.intent = $root.consensus.v1.EpochAppendIntent.toObject(message.intent, options);
-                if (message.signature != null && message.hasOwnProperty("signature"))
+                if (message.intent != null && Object.hasOwnProperty.call(message, "intent"))
+                    object.intent = $root.consensus.v1.EpochAppendIntent.toObject(message.intent, options, q + 1);
+                if (message.signature != null && Object.hasOwnProperty.call(message, "signature"))
                     object.signature = $util.bytesTo(message.signature, options);
                 return object;
             };
@@ -2552,7 +2686,7 @@ $root.consensus = (function() {
             function EpochAppendReply(properties) {
                 if (properties)
                     for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
-                        if (properties[keys[i]] != null)
+                        if (properties[keys[i]] != null && keys[i] !== "__proto__")
                             this[keys[i]] = properties[keys[i]];
             }
 
@@ -2625,10 +2759,14 @@ $root.consensus = (function() {
              * @param {$protobuf.Writer} [writer] Writer to encode to
              * @returns {$protobuf.Writer} Writer
              */
-            EpochAppendReply.encode = function encode(message, writer) {
+            EpochAppendReply.encode = function encode(message, writer, q) {
                 writer = $Writer.create(writer);
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
                 if (message.intent != null && Object.hasOwnProperty.call(message, "intent"))
-                    $root.consensus.v1.EpochAppendIntent.encode(message.intent, writer.uint32(/* id 1, wireType 2 =*/10).fork()).ldelim();
+                    $root.consensus.v1.EpochAppendIntent.encode(message.intent, writer.uint32(/* id 1, wireType 2 =*/10).fork(), q + 1).ldelim();
                 if (message.responder != null && Object.hasOwnProperty.call(message, "responder"))
                     writer.uint32(/* id 2, wireType 2 =*/18).bytes(message.responder);
                 if (message.signature != null && Object.hasOwnProperty.call(message, "signature"))
@@ -2638,7 +2776,7 @@ $root.consensus = (function() {
                 if (message.observed_counter != null && Object.hasOwnProperty.call(message, "observed_counter"))
                     writer.uint32(/* id 5, wireType 2 =*/42).bytes(message.observed_counter);
                 if (message.vote != null && Object.hasOwnProperty.call(message, "vote"))
-                    $root.consensus.v1.EpochAppendIntent.encode(message.vote, writer.uint32(/* id 6, wireType 2 =*/50).fork()).ldelim();
+                    $root.consensus.v1.EpochAppendIntent.encode(message.vote, writer.uint32(/* id 6, wireType 2 =*/50).fork(), q + 1).ldelim();
                 return writer;
             };
 
@@ -2652,7 +2790,7 @@ $root.consensus = (function() {
              * @returns {$protobuf.Writer} Writer
              */
             EpochAppendReply.encodeDelimited = function encodeDelimited(message, writer) {
-                return this.encode(message, writer).ldelim();
+                return this.encode(message, writer && writer.len ? writer.fork() : writer).ldelim();
             };
 
             /**
@@ -2666,8 +2804,12 @@ $root.consensus = (function() {
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
-            EpochAppendReply.decode = function decode(reader, length, error) {
+            EpochAppendReply.decode = function decode(reader, length, error, long) {
                 reader = $Reader.create(reader);
+                if (long === undefined)
+                    long = 0;
+                if (long > $Reader.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
                 var end = length === undefined ? reader.len : reader.pos + length, message = new $root.consensus.v1.EpochAppendReply();
                 while (reader.pos < end) {
                     var tag = reader.uint32();
@@ -2675,7 +2817,7 @@ $root.consensus = (function() {
                         break;
                     switch (tag >>> 3) {
                     case 1: {
-                            message.intent = $root.consensus.v1.EpochAppendIntent.decode(reader, reader.uint32());
+                            message.intent = $root.consensus.v1.EpochAppendIntent.decode(reader, reader.uint32(), undefined, long + 1);
                             break;
                         }
                     case 2: {
@@ -2695,11 +2837,11 @@ $root.consensus = (function() {
                             break;
                         }
                     case 6: {
-                            message.vote = $root.consensus.v1.EpochAppendIntent.decode(reader, reader.uint32());
+                            message.vote = $root.consensus.v1.EpochAppendIntent.decode(reader, reader.uint32(), undefined, long + 1);
                             break;
                         }
                     default:
-                        reader.skipType(tag & 7);
+                        reader.skipType(tag & 7, long);
                         break;
                     }
                 }
@@ -2729,28 +2871,32 @@ $root.consensus = (function() {
              * @param {Object.<string,*>} message Plain object to verify
              * @returns {string|null} `null` if valid, otherwise the reason why it is not
              */
-            EpochAppendReply.verify = function verify(message) {
+            EpochAppendReply.verify = function verify(message, long) {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
-                if (message.intent != null && message.hasOwnProperty("intent")) {
-                    var error = $root.consensus.v1.EpochAppendIntent.verify(message.intent);
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    return "maximum nesting depth exceeded";
+                if (message.intent != null && Object.hasOwnProperty.call(message, "intent")) {
+                    var error = $root.consensus.v1.EpochAppendIntent.verify(message.intent, long + 1);
                     if (error)
                         return "intent." + error;
                 }
-                if (message.responder != null && message.hasOwnProperty("responder"))
+                if (message.responder != null && Object.hasOwnProperty.call(message, "responder"))
                     if (!$util.isBytes(message.responder))
                         return "responder: buffer expected";
-                if (message.signature != null && message.hasOwnProperty("signature"))
+                if (message.signature != null && Object.hasOwnProperty.call(message, "signature"))
                     if (!$util.isBytes(message.signature))
                         return "signature: buffer expected";
-                if (message.vote_status != null && message.hasOwnProperty("vote_status"))
+                if (message.vote_status != null && Object.hasOwnProperty.call(message, "vote_status"))
                     if (!$util.isInteger(message.vote_status))
                         return "vote_status: integer expected";
-                if (message.observed_counter != null && message.hasOwnProperty("observed_counter"))
+                if (message.observed_counter != null && Object.hasOwnProperty.call(message, "observed_counter"))
                     if (!$util.isBytes(message.observed_counter))
                         return "observed_counter: buffer expected";
-                if (message.vote != null && message.hasOwnProperty("vote")) {
-                    var error = $root.consensus.v1.EpochAppendIntent.verify(message.vote);
+                if (message.vote != null && Object.hasOwnProperty.call(message, "vote")) {
+                    var error = $root.consensus.v1.EpochAppendIntent.verify(message.vote, long + 1);
                     if (error)
                         return "vote." + error;
                 }
@@ -2765,14 +2911,20 @@ $root.consensus = (function() {
              * @param {Object.<string,*>} object Plain object
              * @returns {consensus.v1.EpochAppendReply} EpochAppendReply
              */
-            EpochAppendReply.fromObject = function fromObject(object) {
+            EpochAppendReply.fromObject = function fromObject(object, long) {
                 if (object instanceof $root.consensus.v1.EpochAppendReply)
                     object = Object.assign({}, object);
+                if (!$util.isObject(object))
+                    throw TypeError(".consensus.v1.EpochAppendReply: object expected");
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
                 var message = new $root.consensus.v1.EpochAppendReply();
                 if (object.intent != null) {
-                    if (typeof object.intent !== "object")
+                    if (!$util.isObject(object.intent))
                         throw TypeError(".consensus.v1.EpochAppendReply.intent: object expected");
-                    message.intent = $root.consensus.v1.EpochAppendIntent.fromObject(object.intent);
+                    message.intent = $root.consensus.v1.EpochAppendIntent.fromObject(object.intent, long + 1);
                 }
                 if (object.responder != null)
                     message.responder = $util.bytesFrom(object.responder);
@@ -2783,9 +2935,9 @@ $root.consensus = (function() {
                 if (object.observed_counter != null)
                     message.observed_counter = $util.bytesFrom(object.observed_counter);
                 if (object.vote != null) {
-                    if (typeof object.vote !== "object")
+                    if (!$util.isObject(object.vote))
                         throw TypeError(".consensus.v1.EpochAppendReply.vote: object expected");
-                    message.vote = $root.consensus.v1.EpochAppendIntent.fromObject(object.vote);
+                    message.vote = $root.consensus.v1.EpochAppendIntent.fromObject(object.vote, long + 1);
                 }
                 return message;
             };
@@ -2799,9 +2951,13 @@ $root.consensus = (function() {
              * @param {$protobuf.IConversionOptions} [options] Conversion options
              * @returns {Object.<string,*>} Plain object
              */
-            EpochAppendReply.toObject = function toObject(message, options) {
+            EpochAppendReply.toObject = function toObject(message, options, q) {
                 if (!options)
                     options = {};
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
                 var object = {};
                 if (options.defaults) {
                     object.intent = null;
@@ -2829,18 +2985,18 @@ $root.consensus = (function() {
                     }
                     object.vote = null;
                 }
-                if (message.intent != null && message.hasOwnProperty("intent"))
-                    object.intent = $root.consensus.v1.EpochAppendIntent.toObject(message.intent, options);
-                if (message.responder != null && message.hasOwnProperty("responder"))
+                if (message.intent != null && Object.hasOwnProperty.call(message, "intent"))
+                    object.intent = $root.consensus.v1.EpochAppendIntent.toObject(message.intent, options, q + 1);
+                if (message.responder != null && Object.hasOwnProperty.call(message, "responder"))
                     object.responder = $util.bytesTo(message.responder, options);
-                if (message.signature != null && message.hasOwnProperty("signature"))
+                if (message.signature != null && Object.hasOwnProperty.call(message, "signature"))
                     object.signature = $util.bytesTo(message.signature, options);
-                if (message.vote_status != null && message.hasOwnProperty("vote_status"))
+                if (message.vote_status != null && Object.hasOwnProperty.call(message, "vote_status"))
                     object.vote_status = message.vote_status;
-                if (message.observed_counter != null && message.hasOwnProperty("observed_counter"))
+                if (message.observed_counter != null && Object.hasOwnProperty.call(message, "observed_counter"))
                     object.observed_counter = $util.bytesTo(message.observed_counter, options);
-                if (message.vote != null && message.hasOwnProperty("vote"))
-                    object.vote = $root.consensus.v1.EpochAppendIntent.toObject(message.vote, options);
+                if (message.vote != null && Object.hasOwnProperty.call(message, "vote"))
+                    object.vote = $root.consensus.v1.EpochAppendIntent.toObject(message.vote, options, q + 1);
                 return object;
             };
 
@@ -3095,7 +3251,7 @@ $root.common = (function() {
                 this.app = [];
                 if (properties)
                     for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
-                        if (properties[keys[i]] != null)
+                        if (properties[keys[i]] != null && keys[i] !== "__proto__")
                             this[keys[i]] = properties[keys[i]];
             }
 
@@ -3136,8 +3292,12 @@ $root.common = (function() {
              * @param {$protobuf.Writer} [writer] Writer to encode to
              * @returns {$protobuf.Writer} Writer
              */
-            EpochProofV1.encode = function encode(message, writer) {
+            EpochProofV1.encode = function encode(message, writer, q) {
                 writer = $Writer.create(writer);
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
                 if (message.pd != null && Object.hasOwnProperty.call(message, "pd"))
                     writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.pd);
                 if (message.app != null && message.app.length)
@@ -3156,7 +3316,7 @@ $root.common = (function() {
              * @returns {$protobuf.Writer} Writer
              */
             EpochProofV1.encodeDelimited = function encodeDelimited(message, writer) {
-                return this.encode(message, writer).ldelim();
+                return this.encode(message, writer && writer.len ? writer.fork() : writer).ldelim();
             };
 
             /**
@@ -3170,8 +3330,12 @@ $root.common = (function() {
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
-            EpochProofV1.decode = function decode(reader, length, error) {
+            EpochProofV1.decode = function decode(reader, length, error, long) {
                 reader = $Reader.create(reader);
+                if (long === undefined)
+                    long = 0;
+                if (long > $Reader.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
                 var end = length === undefined ? reader.len : reader.pos + length, message = new $root.common.consensus.EpochProofV1();
                 while (reader.pos < end) {
                     var tag = reader.uint32();
@@ -3189,7 +3353,7 @@ $root.common = (function() {
                             break;
                         }
                     default:
-                        reader.skipType(tag & 7);
+                        reader.skipType(tag & 7, long);
                         break;
                     }
                 }
@@ -3219,13 +3383,17 @@ $root.common = (function() {
              * @param {Object.<string,*>} message Plain object to verify
              * @returns {string|null} `null` if valid, otherwise the reason why it is not
              */
-            EpochProofV1.verify = function verify(message) {
+            EpochProofV1.verify = function verify(message, long) {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
-                if (message.pd != null && message.hasOwnProperty("pd"))
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    return "maximum nesting depth exceeded";
+                if (message.pd != null && Object.hasOwnProperty.call(message, "pd"))
                     if (!$util.isBytes(message.pd))
                         return "pd: buffer expected";
-                if (message.app != null && message.hasOwnProperty("app")) {
+                if (message.app != null && Object.hasOwnProperty.call(message, "app")) {
                     if (!Array.isArray(message.app))
                         return "app: array expected";
                     for (var i = 0; i < message.app.length; ++i)
@@ -3243,9 +3411,15 @@ $root.common = (function() {
              * @param {Object.<string,*>} object Plain object
              * @returns {common.consensus.EpochProofV1} EpochProofV1
              */
-            EpochProofV1.fromObject = function fromObject(object) {
+            EpochProofV1.fromObject = function fromObject(object, long) {
                 if (object instanceof $root.common.consensus.EpochProofV1)
                     object = Object.assign({}, object);
+                if (!$util.isObject(object))
+                    throw TypeError(".common.consensus.EpochProofV1: object expected");
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
                 var message = new $root.common.consensus.EpochProofV1();
                 if (object.pd != null)
                     message.pd = $util.bytesFrom(object.pd);
@@ -3268,9 +3442,13 @@ $root.common = (function() {
              * @param {$protobuf.IConversionOptions} [options] Conversion options
              * @returns {Object.<string,*>} Plain object
              */
-            EpochProofV1.toObject = function toObject(message, options) {
+            EpochProofV1.toObject = function toObject(message, options, q) {
                 if (!options)
                     options = {};
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
                 var object = {};
                 if (options.arrays || options.defaults)
                     object.app = [];
@@ -3282,7 +3460,7 @@ $root.common = (function() {
                         if (options.bytes !== Array)
                             object.pd = $util.newBuffer(object.pd);
                     }
-                if (message.pd != null && message.hasOwnProperty("pd"))
+                if (message.pd != null && Object.hasOwnProperty.call(message, "pd"))
                     object.pd = $util.bytesTo(message.pd, options);
                 if (message.app && message.app.length) {
                     object.app = [];

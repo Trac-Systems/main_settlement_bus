@@ -9,7 +9,7 @@ var $protobuf = require("../protobufRuntime.cjs");
 var $Reader = $protobuf.Reader, $Writer = $protobuf.Writer, $util = $protobuf.util;
 
 // Exported root namespace
-var $root = $protobuf.roots.applyOperations || ($protobuf.roots.applyOperations = {});
+var $root = $protobuf.roots["applyOperations"] || ($protobuf.roots["applyOperations"] = {});
 
 $root.apply = (function() {
 
@@ -62,7 +62,7 @@ $root.apply = (function() {
             function Operation(properties) {
                 if (properties)
                     for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
-                        if (properties[keys[i]] != null)
+                        if (properties[keys[i]] != null && keys[i] !== "__proto__")
                             this[keys[i]] = properties[keys[i]];
             }
 
@@ -213,36 +213,40 @@ $root.apply = (function() {
              * @param {$protobuf.Writer} [writer] Writer to encode to
              * @returns {$protobuf.Writer} Writer
              */
-            Operation.encode = function encode(message, writer) {
+            Operation.encode = function encode(message, writer, q) {
                 writer = $Writer.create(writer);
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
                 if (message.type != null && Object.hasOwnProperty.call(message, "type"))
                     writer.uint32(/* id 1, wireType 0 =*/8).int32(message.type);
                 if (message.address != null && Object.hasOwnProperty.call(message, "address"))
                     writer.uint32(/* id 2, wireType 2 =*/18).bytes(message.address);
                 if (message.cao != null && Object.hasOwnProperty.call(message, "cao"))
-                    $root.apply.operations.CoreAdminOperation.encode(message.cao, writer.uint32(/* id 3, wireType 2 =*/26).fork()).ldelim();
+                    $root.apply.operations.CoreAdminOperation.encode(message.cao, writer.uint32(/* id 3, wireType 2 =*/26).fork(), q + 1).ldelim();
                 if (message.aco != null && Object.hasOwnProperty.call(message, "aco"))
-                    $root.apply.operations.AdminControlOperation.encode(message.aco, writer.uint32(/* id 4, wireType 2 =*/34).fork()).ldelim();
+                    $root.apply.operations.AdminControlOperation.encode(message.aco, writer.uint32(/* id 4, wireType 2 =*/34).fork(), q + 1).ldelim();
                 if (message.bio != null && Object.hasOwnProperty.call(message, "bio"))
-                    $root.apply.operations.BalanceInitializationOperation.encode(message.bio, writer.uint32(/* id 5, wireType 2 =*/42).fork()).ldelim();
+                    $root.apply.operations.BalanceInitializationOperation.encode(message.bio, writer.uint32(/* id 5, wireType 2 =*/42).fork(), q + 1).ldelim();
                 if (message.tro != null && Object.hasOwnProperty.call(message, "tro"))
-                    $root.apply.operations.TransferOperation.encode(message.tro, writer.uint32(/* id 6, wireType 2 =*/50).fork()).ldelim();
+                    $root.apply.operations.TransferOperation.encode(message.tro, writer.uint32(/* id 6, wireType 2 =*/50).fork(), q + 1).ldelim();
                 if (message.rao != null && Object.hasOwnProperty.call(message, "rao"))
-                    $root.apply.operations.RoleAccessOperation.encode(message.rao, writer.uint32(/* id 7, wireType 2 =*/58).fork()).ldelim();
+                    $root.apply.operations.RoleAccessOperation.encode(message.rao, writer.uint32(/* id 7, wireType 2 =*/58).fork(), q + 1).ldelim();
                 if (message.bdo != null && Object.hasOwnProperty.call(message, "bdo"))
-                    $root.apply.operations.BootstrapDeploymentOperation.encode(message.bdo, writer.uint32(/* id 8, wireType 2 =*/66).fork()).ldelim();
+                    $root.apply.operations.BootstrapDeploymentOperation.encode(message.bdo, writer.uint32(/* id 8, wireType 2 =*/66).fork(), q + 1).ldelim();
                 if (message.txo != null && Object.hasOwnProperty.call(message, "txo"))
-                    $root.apply.operations.TxOperation.encode(message.txo, writer.uint32(/* id 9, wireType 2 =*/74).fork()).ldelim();
+                    $root.apply.operations.TxOperation.encode(message.txo, writer.uint32(/* id 9, wireType 2 =*/74).fork(), q + 1).ldelim();
                 if (message.seo != null && Object.hasOwnProperty.call(message, "seo"))
-                    $root.apply.operations.SetEpochOperation.encode(message.seo, writer.uint32(/* id 10, wireType 2 =*/82).fork()).ldelim();
+                    $root.apply.operations.SetEpochOperation.encode(message.seo, writer.uint32(/* id 10, wireType 2 =*/82).fork(), q + 1).ldelim();
                 if (message.cco != null && Object.hasOwnProperty.call(message, "cco"))
-                    $root.apply.operations.ConsensusControlOperation.encode(message.cco, writer.uint32(/* id 11, wireType 2 =*/90).fork()).ldelim();
+                    $root.apply.operations.ConsensusControlOperation.encode(message.cco, writer.uint32(/* id 11, wireType 2 =*/90).fork(), q + 1).ldelim();
                 if (message.hlo != null && Object.hasOwnProperty.call(message, "hlo"))
-                    $root.apply.operations.HtlcLockOperation.encode(message.hlo, writer.uint32(/* id 12, wireType 2 =*/98).fork()).ldelim();
+                    $root.apply.operations.HtlcLockOperation.encode(message.hlo, writer.uint32(/* id 12, wireType 2 =*/98).fork(), q + 1).ldelim();
                 if (message.hco != null && Object.hasOwnProperty.call(message, "hco"))
-                    $root.apply.operations.HtlcClaimOperation.encode(message.hco, writer.uint32(/* id 13, wireType 2 =*/106).fork()).ldelim();
+                    $root.apply.operations.HtlcClaimOperation.encode(message.hco, writer.uint32(/* id 13, wireType 2 =*/106).fork(), q + 1).ldelim();
                 if (message.hro != null && Object.hasOwnProperty.call(message, "hro"))
-                    $root.apply.operations.HtlcRefundOperation.encode(message.hro, writer.uint32(/* id 14, wireType 2 =*/114).fork()).ldelim();
+                    $root.apply.operations.HtlcRefundOperation.encode(message.hro, writer.uint32(/* id 14, wireType 2 =*/114).fork(), q + 1).ldelim();
                 return writer;
             };
 
@@ -256,7 +260,7 @@ $root.apply = (function() {
              * @returns {$protobuf.Writer} Writer
              */
             Operation.encodeDelimited = function encodeDelimited(message, writer) {
-                return this.encode(message, writer).ldelim();
+                return this.encode(message, writer && writer.len ? writer.fork() : writer).ldelim();
             };
 
             /**
@@ -270,8 +274,12 @@ $root.apply = (function() {
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
-            Operation.decode = function decode(reader, length, error) {
+            Operation.decode = function decode(reader, length, error, long) {
                 reader = $Reader.create(reader);
+                if (long === undefined)
+                    long = 0;
+                if (long > $Reader.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
                 var end = length === undefined ? reader.len : reader.pos + length, message = new $root.apply.operations.Operation();
                 while (reader.pos < end) {
                     var tag = reader.uint32();
@@ -287,55 +295,55 @@ $root.apply = (function() {
                             break;
                         }
                     case 3: {
-                            message.cao = $root.apply.operations.CoreAdminOperation.decode(reader, reader.uint32());
+                            message.cao = $root.apply.operations.CoreAdminOperation.decode(reader, reader.uint32(), undefined, long + 1);
                             break;
                         }
                     case 4: {
-                            message.aco = $root.apply.operations.AdminControlOperation.decode(reader, reader.uint32());
+                            message.aco = $root.apply.operations.AdminControlOperation.decode(reader, reader.uint32(), undefined, long + 1);
                             break;
                         }
                     case 5: {
-                            message.bio = $root.apply.operations.BalanceInitializationOperation.decode(reader, reader.uint32());
+                            message.bio = $root.apply.operations.BalanceInitializationOperation.decode(reader, reader.uint32(), undefined, long + 1);
                             break;
                         }
                     case 6: {
-                            message.tro = $root.apply.operations.TransferOperation.decode(reader, reader.uint32());
+                            message.tro = $root.apply.operations.TransferOperation.decode(reader, reader.uint32(), undefined, long + 1);
                             break;
                         }
                     case 7: {
-                            message.rao = $root.apply.operations.RoleAccessOperation.decode(reader, reader.uint32());
+                            message.rao = $root.apply.operations.RoleAccessOperation.decode(reader, reader.uint32(), undefined, long + 1);
                             break;
                         }
                     case 8: {
-                            message.bdo = $root.apply.operations.BootstrapDeploymentOperation.decode(reader, reader.uint32());
+                            message.bdo = $root.apply.operations.BootstrapDeploymentOperation.decode(reader, reader.uint32(), undefined, long + 1);
                             break;
                         }
                     case 9: {
-                            message.txo = $root.apply.operations.TxOperation.decode(reader, reader.uint32());
+                            message.txo = $root.apply.operations.TxOperation.decode(reader, reader.uint32(), undefined, long + 1);
                             break;
                         }
                     case 10: {
-                            message.seo = $root.apply.operations.SetEpochOperation.decode(reader, reader.uint32());
+                            message.seo = $root.apply.operations.SetEpochOperation.decode(reader, reader.uint32(), undefined, long + 1);
                             break;
                         }
                     case 11: {
-                            message.cco = $root.apply.operations.ConsensusControlOperation.decode(reader, reader.uint32());
+                            message.cco = $root.apply.operations.ConsensusControlOperation.decode(reader, reader.uint32(), undefined, long + 1);
                             break;
                         }
                     case 12: {
-                            message.hlo = $root.apply.operations.HtlcLockOperation.decode(reader, reader.uint32());
+                            message.hlo = $root.apply.operations.HtlcLockOperation.decode(reader, reader.uint32(), undefined, long + 1);
                             break;
                         }
                     case 13: {
-                            message.hco = $root.apply.operations.HtlcClaimOperation.decode(reader, reader.uint32());
+                            message.hco = $root.apply.operations.HtlcClaimOperation.decode(reader, reader.uint32(), undefined, long + 1);
                             break;
                         }
                     case 14: {
-                            message.hro = $root.apply.operations.HtlcRefundOperation.decode(reader, reader.uint32());
+                            message.hro = $root.apply.operations.HtlcRefundOperation.decode(reader, reader.uint32(), undefined, long + 1);
                             break;
                         }
                     default:
-                        reader.skipType(tag & 7);
+                        reader.skipType(tag & 7, long);
                         break;
                     }
                 }
@@ -365,11 +373,15 @@ $root.apply = (function() {
              * @param {Object.<string,*>} message Plain object to verify
              * @returns {string|null} `null` if valid, otherwise the reason why it is not
              */
-            Operation.verify = function verify(message) {
+            Operation.verify = function verify(message, long) {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    return "maximum nesting depth exceeded";
                 var properties = {};
-                if (message.type != null && message.hasOwnProperty("type"))
+                if (message.type != null && Object.hasOwnProperty.call(message, "type"))
                     switch (message.type) {
                     default:
                         return "type: enum value expected";
@@ -395,123 +407,123 @@ $root.apply = (function() {
                     case 19:
                         break;
                     }
-                if (message.address != null && message.hasOwnProperty("address"))
+                if (message.address != null && Object.hasOwnProperty.call(message, "address"))
                     if (!$util.isBytes(message.address))
                         return "address: buffer expected";
-                if (message.cao != null && message.hasOwnProperty("cao")) {
+                if (message.cao != null && Object.hasOwnProperty.call(message, "cao")) {
                     properties.value = 1;
                     {
-                        var error = $root.apply.operations.CoreAdminOperation.verify(message.cao);
+                        var error = $root.apply.operations.CoreAdminOperation.verify(message.cao, long + 1);
                         if (error)
                             return "cao." + error;
                     }
                 }
-                if (message.aco != null && message.hasOwnProperty("aco")) {
+                if (message.aco != null && Object.hasOwnProperty.call(message, "aco")) {
                     if (properties.value === 1)
                         return "value: multiple values";
                     properties.value = 1;
                     {
-                        var error = $root.apply.operations.AdminControlOperation.verify(message.aco);
+                        var error = $root.apply.operations.AdminControlOperation.verify(message.aco, long + 1);
                         if (error)
                             return "aco." + error;
                     }
                 }
-                if (message.bio != null && message.hasOwnProperty("bio")) {
+                if (message.bio != null && Object.hasOwnProperty.call(message, "bio")) {
                     if (properties.value === 1)
                         return "value: multiple values";
                     properties.value = 1;
                     {
-                        var error = $root.apply.operations.BalanceInitializationOperation.verify(message.bio);
+                        var error = $root.apply.operations.BalanceInitializationOperation.verify(message.bio, long + 1);
                         if (error)
                             return "bio." + error;
                     }
                 }
-                if (message.tro != null && message.hasOwnProperty("tro")) {
+                if (message.tro != null && Object.hasOwnProperty.call(message, "tro")) {
                     if (properties.value === 1)
                         return "value: multiple values";
                     properties.value = 1;
                     {
-                        var error = $root.apply.operations.TransferOperation.verify(message.tro);
+                        var error = $root.apply.operations.TransferOperation.verify(message.tro, long + 1);
                         if (error)
                             return "tro." + error;
                     }
                 }
-                if (message.rao != null && message.hasOwnProperty("rao")) {
+                if (message.rao != null && Object.hasOwnProperty.call(message, "rao")) {
                     if (properties.value === 1)
                         return "value: multiple values";
                     properties.value = 1;
                     {
-                        var error = $root.apply.operations.RoleAccessOperation.verify(message.rao);
+                        var error = $root.apply.operations.RoleAccessOperation.verify(message.rao, long + 1);
                         if (error)
                             return "rao." + error;
                     }
                 }
-                if (message.bdo != null && message.hasOwnProperty("bdo")) {
+                if (message.bdo != null && Object.hasOwnProperty.call(message, "bdo")) {
                     if (properties.value === 1)
                         return "value: multiple values";
                     properties.value = 1;
                     {
-                        var error = $root.apply.operations.BootstrapDeploymentOperation.verify(message.bdo);
+                        var error = $root.apply.operations.BootstrapDeploymentOperation.verify(message.bdo, long + 1);
                         if (error)
                             return "bdo." + error;
                     }
                 }
-                if (message.txo != null && message.hasOwnProperty("txo")) {
+                if (message.txo != null && Object.hasOwnProperty.call(message, "txo")) {
                     if (properties.value === 1)
                         return "value: multiple values";
                     properties.value = 1;
                     {
-                        var error = $root.apply.operations.TxOperation.verify(message.txo);
+                        var error = $root.apply.operations.TxOperation.verify(message.txo, long + 1);
                         if (error)
                             return "txo." + error;
                     }
                 }
-                if (message.seo != null && message.hasOwnProperty("seo")) {
+                if (message.seo != null && Object.hasOwnProperty.call(message, "seo")) {
                     if (properties.value === 1)
                         return "value: multiple values";
                     properties.value = 1;
                     {
-                        var error = $root.apply.operations.SetEpochOperation.verify(message.seo);
+                        var error = $root.apply.operations.SetEpochOperation.verify(message.seo, long + 1);
                         if (error)
                             return "seo." + error;
                     }
                 }
-                if (message.cco != null && message.hasOwnProperty("cco")) {
+                if (message.cco != null && Object.hasOwnProperty.call(message, "cco")) {
                     if (properties.value === 1)
                         return "value: multiple values";
                     properties.value = 1;
                     {
-                        var error = $root.apply.operations.ConsensusControlOperation.verify(message.cco);
+                        var error = $root.apply.operations.ConsensusControlOperation.verify(message.cco, long + 1);
                         if (error)
                             return "cco." + error;
                     }
                 }
-                if (message.hlo != null && message.hasOwnProperty("hlo")) {
+                if (message.hlo != null && Object.hasOwnProperty.call(message, "hlo")) {
                     if (properties.value === 1)
                         return "value: multiple values";
                     properties.value = 1;
                     {
-                        var error = $root.apply.operations.HtlcLockOperation.verify(message.hlo);
+                        var error = $root.apply.operations.HtlcLockOperation.verify(message.hlo, long + 1);
                         if (error)
                             return "hlo." + error;
                     }
                 }
-                if (message.hco != null && message.hasOwnProperty("hco")) {
+                if (message.hco != null && Object.hasOwnProperty.call(message, "hco")) {
                     if (properties.value === 1)
                         return "value: multiple values";
                     properties.value = 1;
                     {
-                        var error = $root.apply.operations.HtlcClaimOperation.verify(message.hco);
+                        var error = $root.apply.operations.HtlcClaimOperation.verify(message.hco, long + 1);
                         if (error)
                             return "hco." + error;
                     }
                 }
-                if (message.hro != null && message.hasOwnProperty("hro")) {
+                if (message.hro != null && Object.hasOwnProperty.call(message, "hro")) {
                     if (properties.value === 1)
                         return "value: multiple values";
                     properties.value = 1;
                     {
-                        var error = $root.apply.operations.HtlcRefundOperation.verify(message.hro);
+                        var error = $root.apply.operations.HtlcRefundOperation.verify(message.hro, long + 1);
                         if (error)
                             return "hro." + error;
                     }
@@ -527,9 +539,15 @@ $root.apply = (function() {
              * @param {Object.<string,*>} object Plain object
              * @returns {apply.operations.Operation} Operation
              */
-            Operation.fromObject = function fromObject(object) {
+            Operation.fromObject = function fromObject(object, long) {
                 if (object instanceof $root.apply.operations.Operation)
                     object = Object.assign({}, object);
+                if (!$util.isObject(object))
+                    throw TypeError(".apply.operations.Operation: object expected");
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
                 var message = new $root.apply.operations.Operation();
                 switch (object.type) {
                 default:
@@ -622,64 +640,64 @@ $root.apply = (function() {
                 if (object.address != null)
                     message.address = $util.bytesFrom(object.address);
                 if (object.cao != null) {
-                    if (typeof object.cao !== "object")
+                    if (!$util.isObject(object.cao))
                         throw TypeError(".apply.operations.Operation.cao: object expected");
-                    message.cao = $root.apply.operations.CoreAdminOperation.fromObject(object.cao);
+                    message.cao = $root.apply.operations.CoreAdminOperation.fromObject(object.cao, long + 1);
                 }
                 if (object.aco != null) {
-                    if (typeof object.aco !== "object")
+                    if (!$util.isObject(object.aco))
                         throw TypeError(".apply.operations.Operation.aco: object expected");
-                    message.aco = $root.apply.operations.AdminControlOperation.fromObject(object.aco);
+                    message.aco = $root.apply.operations.AdminControlOperation.fromObject(object.aco, long + 1);
                 }
                 if (object.bio != null) {
-                    if (typeof object.bio !== "object")
+                    if (!$util.isObject(object.bio))
                         throw TypeError(".apply.operations.Operation.bio: object expected");
-                    message.bio = $root.apply.operations.BalanceInitializationOperation.fromObject(object.bio);
+                    message.bio = $root.apply.operations.BalanceInitializationOperation.fromObject(object.bio, long + 1);
                 }
                 if (object.tro != null) {
-                    if (typeof object.tro !== "object")
+                    if (!$util.isObject(object.tro))
                         throw TypeError(".apply.operations.Operation.tro: object expected");
-                    message.tro = $root.apply.operations.TransferOperation.fromObject(object.tro);
+                    message.tro = $root.apply.operations.TransferOperation.fromObject(object.tro, long + 1);
                 }
                 if (object.rao != null) {
-                    if (typeof object.rao !== "object")
+                    if (!$util.isObject(object.rao))
                         throw TypeError(".apply.operations.Operation.rao: object expected");
-                    message.rao = $root.apply.operations.RoleAccessOperation.fromObject(object.rao);
+                    message.rao = $root.apply.operations.RoleAccessOperation.fromObject(object.rao, long + 1);
                 }
                 if (object.bdo != null) {
-                    if (typeof object.bdo !== "object")
+                    if (!$util.isObject(object.bdo))
                         throw TypeError(".apply.operations.Operation.bdo: object expected");
-                    message.bdo = $root.apply.operations.BootstrapDeploymentOperation.fromObject(object.bdo);
+                    message.bdo = $root.apply.operations.BootstrapDeploymentOperation.fromObject(object.bdo, long + 1);
                 }
                 if (object.txo != null) {
-                    if (typeof object.txo !== "object")
+                    if (!$util.isObject(object.txo))
                         throw TypeError(".apply.operations.Operation.txo: object expected");
-                    message.txo = $root.apply.operations.TxOperation.fromObject(object.txo);
+                    message.txo = $root.apply.operations.TxOperation.fromObject(object.txo, long + 1);
                 }
                 if (object.seo != null) {
-                    if (typeof object.seo !== "object")
+                    if (!$util.isObject(object.seo))
                         throw TypeError(".apply.operations.Operation.seo: object expected");
-                    message.seo = $root.apply.operations.SetEpochOperation.fromObject(object.seo);
+                    message.seo = $root.apply.operations.SetEpochOperation.fromObject(object.seo, long + 1);
                 }
                 if (object.cco != null) {
-                    if (typeof object.cco !== "object")
+                    if (!$util.isObject(object.cco))
                         throw TypeError(".apply.operations.Operation.cco: object expected");
-                    message.cco = $root.apply.operations.ConsensusControlOperation.fromObject(object.cco);
+                    message.cco = $root.apply.operations.ConsensusControlOperation.fromObject(object.cco, long + 1);
                 }
                 if (object.hlo != null) {
-                    if (typeof object.hlo !== "object")
+                    if (!$util.isObject(object.hlo))
                         throw TypeError(".apply.operations.Operation.hlo: object expected");
-                    message.hlo = $root.apply.operations.HtlcLockOperation.fromObject(object.hlo);
+                    message.hlo = $root.apply.operations.HtlcLockOperation.fromObject(object.hlo, long + 1);
                 }
                 if (object.hco != null) {
-                    if (typeof object.hco !== "object")
+                    if (!$util.isObject(object.hco))
                         throw TypeError(".apply.operations.Operation.hco: object expected");
-                    message.hco = $root.apply.operations.HtlcClaimOperation.fromObject(object.hco);
+                    message.hco = $root.apply.operations.HtlcClaimOperation.fromObject(object.hco, long + 1);
                 }
                 if (object.hro != null) {
-                    if (typeof object.hro !== "object")
+                    if (!$util.isObject(object.hro))
                         throw TypeError(".apply.operations.Operation.hro: object expected");
-                    message.hro = $root.apply.operations.HtlcRefundOperation.fromObject(object.hro);
+                    message.hro = $root.apply.operations.HtlcRefundOperation.fromObject(object.hro, long + 1);
                 }
                 return message;
             };
@@ -693,9 +711,13 @@ $root.apply = (function() {
              * @param {$protobuf.IConversionOptions} [options] Conversion options
              * @returns {Object.<string,*>} Plain object
              */
-            Operation.toObject = function toObject(message, options) {
+            Operation.toObject = function toObject(message, options, q) {
                 if (!options)
                     options = {};
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
                 var object = {};
                 if (options.defaults) {
                     object.type = options.enums === String ? "UNKNOWN" : 0;
@@ -707,67 +729,67 @@ $root.apply = (function() {
                             object.address = $util.newBuffer(object.address);
                     }
                 }
-                if (message.type != null && message.hasOwnProperty("type"))
+                if (message.type != null && Object.hasOwnProperty.call(message, "type"))
                     object.type = options.enums === String ? $root.apply.operations.OperationType[message.type] === undefined ? message.type : $root.apply.operations.OperationType[message.type] : message.type;
-                if (message.address != null && message.hasOwnProperty("address"))
+                if (message.address != null && Object.hasOwnProperty.call(message, "address"))
                     object.address = $util.bytesTo(message.address, options);
-                if (message.cao != null && message.hasOwnProperty("cao")) {
-                    object.cao = $root.apply.operations.CoreAdminOperation.toObject(message.cao, options);
+                if (message.cao != null && Object.hasOwnProperty.call(message, "cao")) {
+                    object.cao = $root.apply.operations.CoreAdminOperation.toObject(message.cao, options, q + 1);
                     if (options.oneofs)
                         object.value = "cao";
                 }
-                if (message.aco != null && message.hasOwnProperty("aco")) {
-                    object.aco = $root.apply.operations.AdminControlOperation.toObject(message.aco, options);
+                if (message.aco != null && Object.hasOwnProperty.call(message, "aco")) {
+                    object.aco = $root.apply.operations.AdminControlOperation.toObject(message.aco, options, q + 1);
                     if (options.oneofs)
                         object.value = "aco";
                 }
-                if (message.bio != null && message.hasOwnProperty("bio")) {
-                    object.bio = $root.apply.operations.BalanceInitializationOperation.toObject(message.bio, options);
+                if (message.bio != null && Object.hasOwnProperty.call(message, "bio")) {
+                    object.bio = $root.apply.operations.BalanceInitializationOperation.toObject(message.bio, options, q + 1);
                     if (options.oneofs)
                         object.value = "bio";
                 }
-                if (message.tro != null && message.hasOwnProperty("tro")) {
-                    object.tro = $root.apply.operations.TransferOperation.toObject(message.tro, options);
+                if (message.tro != null && Object.hasOwnProperty.call(message, "tro")) {
+                    object.tro = $root.apply.operations.TransferOperation.toObject(message.tro, options, q + 1);
                     if (options.oneofs)
                         object.value = "tro";
                 }
-                if (message.rao != null && message.hasOwnProperty("rao")) {
-                    object.rao = $root.apply.operations.RoleAccessOperation.toObject(message.rao, options);
+                if (message.rao != null && Object.hasOwnProperty.call(message, "rao")) {
+                    object.rao = $root.apply.operations.RoleAccessOperation.toObject(message.rao, options, q + 1);
                     if (options.oneofs)
                         object.value = "rao";
                 }
-                if (message.bdo != null && message.hasOwnProperty("bdo")) {
-                    object.bdo = $root.apply.operations.BootstrapDeploymentOperation.toObject(message.bdo, options);
+                if (message.bdo != null && Object.hasOwnProperty.call(message, "bdo")) {
+                    object.bdo = $root.apply.operations.BootstrapDeploymentOperation.toObject(message.bdo, options, q + 1);
                     if (options.oneofs)
                         object.value = "bdo";
                 }
-                if (message.txo != null && message.hasOwnProperty("txo")) {
-                    object.txo = $root.apply.operations.TxOperation.toObject(message.txo, options);
+                if (message.txo != null && Object.hasOwnProperty.call(message, "txo")) {
+                    object.txo = $root.apply.operations.TxOperation.toObject(message.txo, options, q + 1);
                     if (options.oneofs)
                         object.value = "txo";
                 }
-                if (message.seo != null && message.hasOwnProperty("seo")) {
-                    object.seo = $root.apply.operations.SetEpochOperation.toObject(message.seo, options);
+                if (message.seo != null && Object.hasOwnProperty.call(message, "seo")) {
+                    object.seo = $root.apply.operations.SetEpochOperation.toObject(message.seo, options, q + 1);
                     if (options.oneofs)
                         object.value = "seo";
                 }
-                if (message.cco != null && message.hasOwnProperty("cco")) {
-                    object.cco = $root.apply.operations.ConsensusControlOperation.toObject(message.cco, options);
+                if (message.cco != null && Object.hasOwnProperty.call(message, "cco")) {
+                    object.cco = $root.apply.operations.ConsensusControlOperation.toObject(message.cco, options, q + 1);
                     if (options.oneofs)
                         object.value = "cco";
                 }
-                if (message.hlo != null && message.hasOwnProperty("hlo")) {
-                    object.hlo = $root.apply.operations.HtlcLockOperation.toObject(message.hlo, options);
+                if (message.hlo != null && Object.hasOwnProperty.call(message, "hlo")) {
+                    object.hlo = $root.apply.operations.HtlcLockOperation.toObject(message.hlo, options, q + 1);
                     if (options.oneofs)
                         object.value = "hlo";
                 }
-                if (message.hco != null && message.hasOwnProperty("hco")) {
-                    object.hco = $root.apply.operations.HtlcClaimOperation.toObject(message.hco, options);
+                if (message.hco != null && Object.hasOwnProperty.call(message, "hco")) {
+                    object.hco = $root.apply.operations.HtlcClaimOperation.toObject(message.hco, options, q + 1);
                     if (options.oneofs)
                         object.value = "hco";
                 }
-                if (message.hro != null && message.hasOwnProperty("hro")) {
-                    object.hro = $root.apply.operations.HtlcRefundOperation.toObject(message.hro, options);
+                if (message.hro != null && Object.hasOwnProperty.call(message, "hro")) {
+                    object.hro = $root.apply.operations.HtlcRefundOperation.toObject(message.hro, options, q + 1);
                     if (options.oneofs)
                         object.value = "hro";
                 }
@@ -877,7 +899,7 @@ $root.apply = (function() {
             function CoreAdminOperation(properties) {
                 if (properties)
                     for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
-                        if (properties[keys[i]] != null)
+                        if (properties[keys[i]] != null && keys[i] !== "__proto__")
                             this[keys[i]] = properties[keys[i]];
             }
 
@@ -942,8 +964,12 @@ $root.apply = (function() {
              * @param {$protobuf.Writer} [writer] Writer to encode to
              * @returns {$protobuf.Writer} Writer
              */
-            CoreAdminOperation.encode = function encode(message, writer) {
+            CoreAdminOperation.encode = function encode(message, writer, q) {
                 writer = $Writer.create(writer);
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
                 if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
                     writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.tx);
                 if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
@@ -967,7 +993,7 @@ $root.apply = (function() {
              * @returns {$protobuf.Writer} Writer
              */
             CoreAdminOperation.encodeDelimited = function encodeDelimited(message, writer) {
-                return this.encode(message, writer).ldelim();
+                return this.encode(message, writer && writer.len ? writer.fork() : writer).ldelim();
             };
 
             /**
@@ -981,8 +1007,12 @@ $root.apply = (function() {
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
-            CoreAdminOperation.decode = function decode(reader, length, error) {
+            CoreAdminOperation.decode = function decode(reader, length, error, long) {
                 reader = $Reader.create(reader);
+                if (long === undefined)
+                    long = 0;
+                if (long > $Reader.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
                 var end = length === undefined ? reader.len : reader.pos + length, message = new $root.apply.operations.CoreAdminOperation();
                 while (reader.pos < end) {
                     var tag = reader.uint32();
@@ -1010,7 +1040,7 @@ $root.apply = (function() {
                             break;
                         }
                     default:
-                        reader.skipType(tag & 7);
+                        reader.skipType(tag & 7, long);
                         break;
                     }
                 }
@@ -1040,22 +1070,26 @@ $root.apply = (function() {
              * @param {Object.<string,*>} message Plain object to verify
              * @returns {string|null} `null` if valid, otherwise the reason why it is not
              */
-            CoreAdminOperation.verify = function verify(message) {
+            CoreAdminOperation.verify = function verify(message, long) {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
-                if (message.tx != null && message.hasOwnProperty("tx"))
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    return "maximum nesting depth exceeded";
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
                     if (!$util.isBytes(message.tx))
                         return "tx: buffer expected";
-                if (message.txv != null && message.hasOwnProperty("txv"))
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
                     if (!$util.isBytes(message.txv))
                         return "txv: buffer expected";
-                if (message.iw != null && message.hasOwnProperty("iw"))
+                if (message.iw != null && Object.hasOwnProperty.call(message, "iw"))
                     if (!$util.isBytes(message.iw))
                         return "iw: buffer expected";
-                if (message["in"] != null && message.hasOwnProperty("in"))
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
                     if (!$util.isBytes(message["in"]))
                         return "in: buffer expected";
-                if (message.is != null && message.hasOwnProperty("is"))
+                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
                     if (!$util.isBytes(message.is))
                         return "is: buffer expected";
                 return null;
@@ -1069,9 +1103,15 @@ $root.apply = (function() {
              * @param {Object.<string,*>} object Plain object
              * @returns {apply.operations.CoreAdminOperation} CoreAdminOperation
              */
-            CoreAdminOperation.fromObject = function fromObject(object) {
+            CoreAdminOperation.fromObject = function fromObject(object, long) {
                 if (object instanceof $root.apply.operations.CoreAdminOperation)
                     object = Object.assign({}, object);
+                if (!$util.isObject(object))
+                    throw TypeError(".apply.operations.CoreAdminOperation: object expected");
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
                 var message = new $root.apply.operations.CoreAdminOperation();
                 if (object.tx != null)
                     message.tx = $util.bytesFrom(object.tx);
@@ -1095,9 +1135,13 @@ $root.apply = (function() {
              * @param {$protobuf.IConversionOptions} [options] Conversion options
              * @returns {Object.<string,*>} Plain object
              */
-            CoreAdminOperation.toObject = function toObject(message, options) {
+            CoreAdminOperation.toObject = function toObject(message, options, q) {
                 if (!options)
                     options = {};
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
                 var object = {};
                 if (options.defaults) {
                     if (options.bytes === String)
@@ -1136,15 +1180,15 @@ $root.apply = (function() {
                             object.is = $util.newBuffer(object.is);
                     }
                 }
-                if (message.tx != null && message.hasOwnProperty("tx"))
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
                     object.tx = $util.bytesTo(message.tx, options);
-                if (message.txv != null && message.hasOwnProperty("txv"))
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
                     object.txv = $util.bytesTo(message.txv, options);
-                if (message.iw != null && message.hasOwnProperty("iw"))
+                if (message.iw != null && Object.hasOwnProperty.call(message, "iw"))
                     object.iw = $util.bytesTo(message.iw, options);
-                if (message["in"] != null && message.hasOwnProperty("in"))
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
                     object["in"] = $util.bytesTo(message["in"], options);
-                if (message.is != null && message.hasOwnProperty("is"))
+                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
                     object.is = $util.bytesTo(message.is, options);
                 return object;
             };
@@ -1202,7 +1246,7 @@ $root.apply = (function() {
             function AdminControlOperation(properties) {
                 if (properties)
                     for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
-                        if (properties[keys[i]] != null)
+                        if (properties[keys[i]] != null && keys[i] !== "__proto__")
                             this[keys[i]] = properties[keys[i]];
             }
 
@@ -1267,8 +1311,12 @@ $root.apply = (function() {
              * @param {$protobuf.Writer} [writer] Writer to encode to
              * @returns {$protobuf.Writer} Writer
              */
-            AdminControlOperation.encode = function encode(message, writer) {
+            AdminControlOperation.encode = function encode(message, writer, q) {
                 writer = $Writer.create(writer);
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
                 if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
                     writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.tx);
                 if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
@@ -1292,7 +1340,7 @@ $root.apply = (function() {
              * @returns {$protobuf.Writer} Writer
              */
             AdminControlOperation.encodeDelimited = function encodeDelimited(message, writer) {
-                return this.encode(message, writer).ldelim();
+                return this.encode(message, writer && writer.len ? writer.fork() : writer).ldelim();
             };
 
             /**
@@ -1306,8 +1354,12 @@ $root.apply = (function() {
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
-            AdminControlOperation.decode = function decode(reader, length, error) {
+            AdminControlOperation.decode = function decode(reader, length, error, long) {
                 reader = $Reader.create(reader);
+                if (long === undefined)
+                    long = 0;
+                if (long > $Reader.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
                 var end = length === undefined ? reader.len : reader.pos + length, message = new $root.apply.operations.AdminControlOperation();
                 while (reader.pos < end) {
                     var tag = reader.uint32();
@@ -1335,7 +1387,7 @@ $root.apply = (function() {
                             break;
                         }
                     default:
-                        reader.skipType(tag & 7);
+                        reader.skipType(tag & 7, long);
                         break;
                     }
                 }
@@ -1365,22 +1417,26 @@ $root.apply = (function() {
              * @param {Object.<string,*>} message Plain object to verify
              * @returns {string|null} `null` if valid, otherwise the reason why it is not
              */
-            AdminControlOperation.verify = function verify(message) {
+            AdminControlOperation.verify = function verify(message, long) {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
-                if (message.tx != null && message.hasOwnProperty("tx"))
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    return "maximum nesting depth exceeded";
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
                     if (!$util.isBytes(message.tx))
                         return "tx: buffer expected";
-                if (message.txv != null && message.hasOwnProperty("txv"))
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
                     if (!$util.isBytes(message.txv))
                         return "txv: buffer expected";
-                if (message.ia != null && message.hasOwnProperty("ia"))
+                if (message.ia != null && Object.hasOwnProperty.call(message, "ia"))
                     if (!$util.isBytes(message.ia))
                         return "ia: buffer expected";
-                if (message["in"] != null && message.hasOwnProperty("in"))
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
                     if (!$util.isBytes(message["in"]))
                         return "in: buffer expected";
-                if (message.is != null && message.hasOwnProperty("is"))
+                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
                     if (!$util.isBytes(message.is))
                         return "is: buffer expected";
                 return null;
@@ -1394,9 +1450,15 @@ $root.apply = (function() {
              * @param {Object.<string,*>} object Plain object
              * @returns {apply.operations.AdminControlOperation} AdminControlOperation
              */
-            AdminControlOperation.fromObject = function fromObject(object) {
+            AdminControlOperation.fromObject = function fromObject(object, long) {
                 if (object instanceof $root.apply.operations.AdminControlOperation)
                     object = Object.assign({}, object);
+                if (!$util.isObject(object))
+                    throw TypeError(".apply.operations.AdminControlOperation: object expected");
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
                 var message = new $root.apply.operations.AdminControlOperation();
                 if (object.tx != null)
                     message.tx = $util.bytesFrom(object.tx);
@@ -1420,9 +1482,13 @@ $root.apply = (function() {
              * @param {$protobuf.IConversionOptions} [options] Conversion options
              * @returns {Object.<string,*>} Plain object
              */
-            AdminControlOperation.toObject = function toObject(message, options) {
+            AdminControlOperation.toObject = function toObject(message, options, q) {
                 if (!options)
                     options = {};
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
                 var object = {};
                 if (options.defaults) {
                     if (options.bytes === String)
@@ -1461,15 +1527,15 @@ $root.apply = (function() {
                             object.is = $util.newBuffer(object.is);
                     }
                 }
-                if (message.tx != null && message.hasOwnProperty("tx"))
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
                     object.tx = $util.bytesTo(message.tx, options);
-                if (message.txv != null && message.hasOwnProperty("txv"))
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
                     object.txv = $util.bytesTo(message.txv, options);
-                if (message.ia != null && message.hasOwnProperty("ia"))
+                if (message.ia != null && Object.hasOwnProperty.call(message, "ia"))
                     object.ia = $util.bytesTo(message.ia, options);
-                if (message["in"] != null && message.hasOwnProperty("in"))
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
                     object["in"] = $util.bytesTo(message["in"], options);
-                if (message.is != null && message.hasOwnProperty("is"))
+                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
                     object.is = $util.bytesTo(message.is, options);
                 return object;
             };
@@ -1528,7 +1594,7 @@ $root.apply = (function() {
             function BalanceInitializationOperation(properties) {
                 if (properties)
                     for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
-                        if (properties[keys[i]] != null)
+                        if (properties[keys[i]] != null && keys[i] !== "__proto__")
                             this[keys[i]] = properties[keys[i]];
             }
 
@@ -1601,8 +1667,12 @@ $root.apply = (function() {
              * @param {$protobuf.Writer} [writer] Writer to encode to
              * @returns {$protobuf.Writer} Writer
              */
-            BalanceInitializationOperation.encode = function encode(message, writer) {
+            BalanceInitializationOperation.encode = function encode(message, writer, q) {
                 writer = $Writer.create(writer);
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
                 if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
                     writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.tx);
                 if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
@@ -1628,7 +1698,7 @@ $root.apply = (function() {
              * @returns {$protobuf.Writer} Writer
              */
             BalanceInitializationOperation.encodeDelimited = function encodeDelimited(message, writer) {
-                return this.encode(message, writer).ldelim();
+                return this.encode(message, writer && writer.len ? writer.fork() : writer).ldelim();
             };
 
             /**
@@ -1642,8 +1712,12 @@ $root.apply = (function() {
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
-            BalanceInitializationOperation.decode = function decode(reader, length, error) {
+            BalanceInitializationOperation.decode = function decode(reader, length, error, long) {
                 reader = $Reader.create(reader);
+                if (long === undefined)
+                    long = 0;
+                if (long > $Reader.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
                 var end = length === undefined ? reader.len : reader.pos + length, message = new $root.apply.operations.BalanceInitializationOperation();
                 while (reader.pos < end) {
                     var tag = reader.uint32();
@@ -1675,7 +1749,7 @@ $root.apply = (function() {
                             break;
                         }
                     default:
-                        reader.skipType(tag & 7);
+                        reader.skipType(tag & 7, long);
                         break;
                     }
                 }
@@ -1705,25 +1779,29 @@ $root.apply = (function() {
              * @param {Object.<string,*>} message Plain object to verify
              * @returns {string|null} `null` if valid, otherwise the reason why it is not
              */
-            BalanceInitializationOperation.verify = function verify(message) {
+            BalanceInitializationOperation.verify = function verify(message, long) {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
-                if (message.tx != null && message.hasOwnProperty("tx"))
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    return "maximum nesting depth exceeded";
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
                     if (!$util.isBytes(message.tx))
                         return "tx: buffer expected";
-                if (message.txv != null && message.hasOwnProperty("txv"))
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
                     if (!$util.isBytes(message.txv))
                         return "txv: buffer expected";
-                if (message.ia != null && message.hasOwnProperty("ia"))
+                if (message.ia != null && Object.hasOwnProperty.call(message, "ia"))
                     if (!$util.isBytes(message.ia))
                         return "ia: buffer expected";
-                if (message.am != null && message.hasOwnProperty("am"))
+                if (message.am != null && Object.hasOwnProperty.call(message, "am"))
                     if (!$util.isBytes(message.am))
                         return "am: buffer expected";
-                if (message["in"] != null && message.hasOwnProperty("in"))
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
                     if (!$util.isBytes(message["in"]))
                         return "in: buffer expected";
-                if (message.is != null && message.hasOwnProperty("is"))
+                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
                     if (!$util.isBytes(message.is))
                         return "is: buffer expected";
                 return null;
@@ -1737,9 +1815,15 @@ $root.apply = (function() {
              * @param {Object.<string,*>} object Plain object
              * @returns {apply.operations.BalanceInitializationOperation} BalanceInitializationOperation
              */
-            BalanceInitializationOperation.fromObject = function fromObject(object) {
+            BalanceInitializationOperation.fromObject = function fromObject(object, long) {
                 if (object instanceof $root.apply.operations.BalanceInitializationOperation)
                     object = Object.assign({}, object);
+                if (!$util.isObject(object))
+                    throw TypeError(".apply.operations.BalanceInitializationOperation: object expected");
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
                 var message = new $root.apply.operations.BalanceInitializationOperation();
                 if (object.tx != null)
                     message.tx = $util.bytesFrom(object.tx);
@@ -1765,9 +1849,13 @@ $root.apply = (function() {
              * @param {$protobuf.IConversionOptions} [options] Conversion options
              * @returns {Object.<string,*>} Plain object
              */
-            BalanceInitializationOperation.toObject = function toObject(message, options) {
+            BalanceInitializationOperation.toObject = function toObject(message, options, q) {
                 if (!options)
                     options = {};
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
                 var object = {};
                 if (options.defaults) {
                     if (options.bytes === String)
@@ -1813,17 +1901,17 @@ $root.apply = (function() {
                             object.is = $util.newBuffer(object.is);
                     }
                 }
-                if (message.tx != null && message.hasOwnProperty("tx"))
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
                     object.tx = $util.bytesTo(message.tx, options);
-                if (message.txv != null && message.hasOwnProperty("txv"))
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
                     object.txv = $util.bytesTo(message.txv, options);
-                if (message.ia != null && message.hasOwnProperty("ia"))
+                if (message.ia != null && Object.hasOwnProperty.call(message, "ia"))
                     object.ia = $util.bytesTo(message.ia, options);
-                if (message.am != null && message.hasOwnProperty("am"))
+                if (message.am != null && Object.hasOwnProperty.call(message, "am"))
                     object.am = $util.bytesTo(message.am, options);
-                if (message["in"] != null && message.hasOwnProperty("in"))
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
                     object["in"] = $util.bytesTo(message["in"], options);
-                if (message.is != null && message.hasOwnProperty("is"))
+                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
                     object.is = $util.bytesTo(message.is, options);
                 return object;
             };
@@ -1885,7 +1973,7 @@ $root.apply = (function() {
             function TransferOperation(properties) {
                 if (properties)
                     for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
-                        if (properties[keys[i]] != null)
+                        if (properties[keys[i]] != null && keys[i] !== "__proto__")
                             this[keys[i]] = properties[keys[i]];
             }
 
@@ -1982,8 +2070,12 @@ $root.apply = (function() {
              * @param {$protobuf.Writer} [writer] Writer to encode to
              * @returns {$protobuf.Writer} Writer
              */
-            TransferOperation.encode = function encode(message, writer) {
+            TransferOperation.encode = function encode(message, writer, q) {
                 writer = $Writer.create(writer);
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
                 if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
                     writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.tx);
                 if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
@@ -2015,7 +2107,7 @@ $root.apply = (function() {
              * @returns {$protobuf.Writer} Writer
              */
             TransferOperation.encodeDelimited = function encodeDelimited(message, writer) {
-                return this.encode(message, writer).ldelim();
+                return this.encode(message, writer && writer.len ? writer.fork() : writer).ldelim();
             };
 
             /**
@@ -2029,8 +2121,12 @@ $root.apply = (function() {
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
-            TransferOperation.decode = function decode(reader, length, error) {
+            TransferOperation.decode = function decode(reader, length, error, long) {
                 reader = $Reader.create(reader);
+                if (long === undefined)
+                    long = 0;
+                if (long > $Reader.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
                 var end = length === undefined ? reader.len : reader.pos + length, message = new $root.apply.operations.TransferOperation();
                 while (reader.pos < end) {
                     var tag = reader.uint32();
@@ -2074,7 +2170,7 @@ $root.apply = (function() {
                             break;
                         }
                     default:
-                        reader.skipType(tag & 7);
+                        reader.skipType(tag & 7, long);
                         break;
                     }
                 }
@@ -2104,34 +2200,38 @@ $root.apply = (function() {
              * @param {Object.<string,*>} message Plain object to verify
              * @returns {string|null} `null` if valid, otherwise the reason why it is not
              */
-            TransferOperation.verify = function verify(message) {
+            TransferOperation.verify = function verify(message, long) {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
-                if (message.tx != null && message.hasOwnProperty("tx"))
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    return "maximum nesting depth exceeded";
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
                     if (!$util.isBytes(message.tx))
                         return "tx: buffer expected";
-                if (message.txv != null && message.hasOwnProperty("txv"))
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
                     if (!$util.isBytes(message.txv))
                         return "txv: buffer expected";
-                if (message.to != null && message.hasOwnProperty("to"))
+                if (message.to != null && Object.hasOwnProperty.call(message, "to"))
                     if (!$util.isBytes(message.to))
                         return "to: buffer expected";
-                if (message.am != null && message.hasOwnProperty("am"))
+                if (message.am != null && Object.hasOwnProperty.call(message, "am"))
                     if (!$util.isBytes(message.am))
                         return "am: buffer expected";
-                if (message["in"] != null && message.hasOwnProperty("in"))
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
                     if (!$util.isBytes(message["in"]))
                         return "in: buffer expected";
-                if (message.is != null && message.hasOwnProperty("is"))
+                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
                     if (!$util.isBytes(message.is))
                         return "is: buffer expected";
-                if (message.va != null && message.hasOwnProperty("va"))
+                if (message.va != null && Object.hasOwnProperty.call(message, "va"))
                     if (!$util.isBytes(message.va))
                         return "va: buffer expected";
-                if (message.vn != null && message.hasOwnProperty("vn"))
+                if (message.vn != null && Object.hasOwnProperty.call(message, "vn"))
                     if (!$util.isBytes(message.vn))
                         return "vn: buffer expected";
-                if (message.vs != null && message.hasOwnProperty("vs"))
+                if (message.vs != null && Object.hasOwnProperty.call(message, "vs"))
                     if (!$util.isBytes(message.vs))
                         return "vs: buffer expected";
                 return null;
@@ -2145,9 +2245,15 @@ $root.apply = (function() {
              * @param {Object.<string,*>} object Plain object
              * @returns {apply.operations.TransferOperation} TransferOperation
              */
-            TransferOperation.fromObject = function fromObject(object) {
+            TransferOperation.fromObject = function fromObject(object, long) {
                 if (object instanceof $root.apply.operations.TransferOperation)
                     object = Object.assign({}, object);
+                if (!$util.isObject(object))
+                    throw TypeError(".apply.operations.TransferOperation: object expected");
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
                 var message = new $root.apply.operations.TransferOperation();
                 if (object.tx != null)
                     message.tx = $util.bytesFrom(object.tx);
@@ -2179,9 +2285,13 @@ $root.apply = (function() {
              * @param {$protobuf.IConversionOptions} [options] Conversion options
              * @returns {Object.<string,*>} Plain object
              */
-            TransferOperation.toObject = function toObject(message, options) {
+            TransferOperation.toObject = function toObject(message, options, q) {
                 if (!options)
                     options = {};
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
                 var object = {};
                 if (options.defaults) {
                     if (options.bytes === String)
@@ -2248,23 +2358,23 @@ $root.apply = (function() {
                             object.vs = $util.newBuffer(object.vs);
                     }
                 }
-                if (message.tx != null && message.hasOwnProperty("tx"))
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
                     object.tx = $util.bytesTo(message.tx, options);
-                if (message.txv != null && message.hasOwnProperty("txv"))
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
                     object.txv = $util.bytesTo(message.txv, options);
-                if (message.to != null && message.hasOwnProperty("to"))
+                if (message.to != null && Object.hasOwnProperty.call(message, "to"))
                     object.to = $util.bytesTo(message.to, options);
-                if (message.am != null && message.hasOwnProperty("am"))
+                if (message.am != null && Object.hasOwnProperty.call(message, "am"))
                     object.am = $util.bytesTo(message.am, options);
-                if (message["in"] != null && message.hasOwnProperty("in"))
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
                     object["in"] = $util.bytesTo(message["in"], options);
-                if (message.is != null && message.hasOwnProperty("is"))
+                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
                     object.is = $util.bytesTo(message.is, options);
-                if (message.va != null && message.hasOwnProperty("va"))
+                if (message.va != null && Object.hasOwnProperty.call(message, "va"))
                     object.va = $util.bytesTo(message.va, options);
-                if (message.vn != null && message.hasOwnProperty("vn"))
+                if (message.vn != null && Object.hasOwnProperty.call(message, "vn"))
                     object.vn = $util.bytesTo(message.vn, options);
-                if (message.vs != null && message.hasOwnProperty("vs"))
+                if (message.vs != null && Object.hasOwnProperty.call(message, "vs"))
                     object.vs = $util.bytesTo(message.vs, options);
                 return object;
             };
@@ -2325,7 +2435,7 @@ $root.apply = (function() {
             function RoleAccessOperation(properties) {
                 if (properties)
                     for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
-                        if (properties[keys[i]] != null)
+                        if (properties[keys[i]] != null && keys[i] !== "__proto__")
                             this[keys[i]] = properties[keys[i]];
             }
 
@@ -2414,8 +2524,12 @@ $root.apply = (function() {
              * @param {$protobuf.Writer} [writer] Writer to encode to
              * @returns {$protobuf.Writer} Writer
              */
-            RoleAccessOperation.encode = function encode(message, writer) {
+            RoleAccessOperation.encode = function encode(message, writer, q) {
                 writer = $Writer.create(writer);
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
                 if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
                     writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.tx);
                 if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
@@ -2445,7 +2559,7 @@ $root.apply = (function() {
              * @returns {$protobuf.Writer} Writer
              */
             RoleAccessOperation.encodeDelimited = function encodeDelimited(message, writer) {
-                return this.encode(message, writer).ldelim();
+                return this.encode(message, writer && writer.len ? writer.fork() : writer).ldelim();
             };
 
             /**
@@ -2459,8 +2573,12 @@ $root.apply = (function() {
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
-            RoleAccessOperation.decode = function decode(reader, length, error) {
+            RoleAccessOperation.decode = function decode(reader, length, error, long) {
                 reader = $Reader.create(reader);
+                if (long === undefined)
+                    long = 0;
+                if (long > $Reader.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
                 var end = length === undefined ? reader.len : reader.pos + length, message = new $root.apply.operations.RoleAccessOperation();
                 while (reader.pos < end) {
                     var tag = reader.uint32();
@@ -2500,7 +2618,7 @@ $root.apply = (function() {
                             break;
                         }
                     default:
-                        reader.skipType(tag & 7);
+                        reader.skipType(tag & 7, long);
                         break;
                     }
                 }
@@ -2530,31 +2648,35 @@ $root.apply = (function() {
              * @param {Object.<string,*>} message Plain object to verify
              * @returns {string|null} `null` if valid, otherwise the reason why it is not
              */
-            RoleAccessOperation.verify = function verify(message) {
+            RoleAccessOperation.verify = function verify(message, long) {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
-                if (message.tx != null && message.hasOwnProperty("tx"))
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    return "maximum nesting depth exceeded";
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
                     if (!$util.isBytes(message.tx))
                         return "tx: buffer expected";
-                if (message.txv != null && message.hasOwnProperty("txv"))
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
                     if (!$util.isBytes(message.txv))
                         return "txv: buffer expected";
-                if (message.iw != null && message.hasOwnProperty("iw"))
+                if (message.iw != null && Object.hasOwnProperty.call(message, "iw"))
                     if (!$util.isBytes(message.iw))
                         return "iw: buffer expected";
-                if (message["in"] != null && message.hasOwnProperty("in"))
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
                     if (!$util.isBytes(message["in"]))
                         return "in: buffer expected";
-                if (message.is != null && message.hasOwnProperty("is"))
+                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
                     if (!$util.isBytes(message.is))
                         return "is: buffer expected";
-                if (message.va != null && message.hasOwnProperty("va"))
+                if (message.va != null && Object.hasOwnProperty.call(message, "va"))
                     if (!$util.isBytes(message.va))
                         return "va: buffer expected";
-                if (message.vn != null && message.hasOwnProperty("vn"))
+                if (message.vn != null && Object.hasOwnProperty.call(message, "vn"))
                     if (!$util.isBytes(message.vn))
                         return "vn: buffer expected";
-                if (message.vs != null && message.hasOwnProperty("vs"))
+                if (message.vs != null && Object.hasOwnProperty.call(message, "vs"))
                     if (!$util.isBytes(message.vs))
                         return "vs: buffer expected";
                 return null;
@@ -2568,9 +2690,15 @@ $root.apply = (function() {
              * @param {Object.<string,*>} object Plain object
              * @returns {apply.operations.RoleAccessOperation} RoleAccessOperation
              */
-            RoleAccessOperation.fromObject = function fromObject(object) {
+            RoleAccessOperation.fromObject = function fromObject(object, long) {
                 if (object instanceof $root.apply.operations.RoleAccessOperation)
                     object = Object.assign({}, object);
+                if (!$util.isObject(object))
+                    throw TypeError(".apply.operations.RoleAccessOperation: object expected");
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
                 var message = new $root.apply.operations.RoleAccessOperation();
                 if (object.tx != null)
                     message.tx = $util.bytesFrom(object.tx);
@@ -2600,9 +2728,13 @@ $root.apply = (function() {
              * @param {$protobuf.IConversionOptions} [options] Conversion options
              * @returns {Object.<string,*>} Plain object
              */
-            RoleAccessOperation.toObject = function toObject(message, options) {
+            RoleAccessOperation.toObject = function toObject(message, options, q) {
                 if (!options)
                     options = {};
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
                 var object = {};
                 if (options.defaults) {
                     if (options.bytes === String)
@@ -2662,21 +2794,21 @@ $root.apply = (function() {
                             object.vs = $util.newBuffer(object.vs);
                     }
                 }
-                if (message.tx != null && message.hasOwnProperty("tx"))
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
                     object.tx = $util.bytesTo(message.tx, options);
-                if (message.txv != null && message.hasOwnProperty("txv"))
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
                     object.txv = $util.bytesTo(message.txv, options);
-                if (message.iw != null && message.hasOwnProperty("iw"))
+                if (message.iw != null && Object.hasOwnProperty.call(message, "iw"))
                     object.iw = $util.bytesTo(message.iw, options);
-                if (message["in"] != null && message.hasOwnProperty("in"))
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
                     object["in"] = $util.bytesTo(message["in"], options);
-                if (message.is != null && message.hasOwnProperty("is"))
+                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
                     object.is = $util.bytesTo(message.is, options);
-                if (message.va != null && message.hasOwnProperty("va"))
+                if (message.va != null && Object.hasOwnProperty.call(message, "va"))
                     object.va = $util.bytesTo(message.va, options);
-                if (message.vn != null && message.hasOwnProperty("vn"))
+                if (message.vn != null && Object.hasOwnProperty.call(message, "vn"))
                     object.vn = $util.bytesTo(message.vn, options);
-                if (message.vs != null && message.hasOwnProperty("vs"))
+                if (message.vs != null && Object.hasOwnProperty.call(message, "vs"))
                     object.vs = $util.bytesTo(message.vs, options);
                 return object;
             };
@@ -2738,7 +2870,7 @@ $root.apply = (function() {
             function BootstrapDeploymentOperation(properties) {
                 if (properties)
                     for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
-                        if (properties[keys[i]] != null)
+                        if (properties[keys[i]] != null && keys[i] !== "__proto__")
                             this[keys[i]] = properties[keys[i]];
             }
 
@@ -2835,8 +2967,12 @@ $root.apply = (function() {
              * @param {$protobuf.Writer} [writer] Writer to encode to
              * @returns {$protobuf.Writer} Writer
              */
-            BootstrapDeploymentOperation.encode = function encode(message, writer) {
+            BootstrapDeploymentOperation.encode = function encode(message, writer, q) {
                 writer = $Writer.create(writer);
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
                 if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
                     writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.tx);
                 if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
@@ -2868,7 +3004,7 @@ $root.apply = (function() {
              * @returns {$protobuf.Writer} Writer
              */
             BootstrapDeploymentOperation.encodeDelimited = function encodeDelimited(message, writer) {
-                return this.encode(message, writer).ldelim();
+                return this.encode(message, writer && writer.len ? writer.fork() : writer).ldelim();
             };
 
             /**
@@ -2882,8 +3018,12 @@ $root.apply = (function() {
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
-            BootstrapDeploymentOperation.decode = function decode(reader, length, error) {
+            BootstrapDeploymentOperation.decode = function decode(reader, length, error, long) {
                 reader = $Reader.create(reader);
+                if (long === undefined)
+                    long = 0;
+                if (long > $Reader.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
                 var end = length === undefined ? reader.len : reader.pos + length, message = new $root.apply.operations.BootstrapDeploymentOperation();
                 while (reader.pos < end) {
                     var tag = reader.uint32();
@@ -2927,7 +3067,7 @@ $root.apply = (function() {
                             break;
                         }
                     default:
-                        reader.skipType(tag & 7);
+                        reader.skipType(tag & 7, long);
                         break;
                     }
                 }
@@ -2957,34 +3097,38 @@ $root.apply = (function() {
              * @param {Object.<string,*>} message Plain object to verify
              * @returns {string|null} `null` if valid, otherwise the reason why it is not
              */
-            BootstrapDeploymentOperation.verify = function verify(message) {
+            BootstrapDeploymentOperation.verify = function verify(message, long) {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
-                if (message.tx != null && message.hasOwnProperty("tx"))
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    return "maximum nesting depth exceeded";
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
                     if (!$util.isBytes(message.tx))
                         return "tx: buffer expected";
-                if (message.txv != null && message.hasOwnProperty("txv"))
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
                     if (!$util.isBytes(message.txv))
                         return "txv: buffer expected";
-                if (message.bs != null && message.hasOwnProperty("bs"))
+                if (message.bs != null && Object.hasOwnProperty.call(message, "bs"))
                     if (!$util.isBytes(message.bs))
                         return "bs: buffer expected";
-                if (message.ic != null && message.hasOwnProperty("ic"))
+                if (message.ic != null && Object.hasOwnProperty.call(message, "ic"))
                     if (!$util.isBytes(message.ic))
                         return "ic: buffer expected";
-                if (message["in"] != null && message.hasOwnProperty("in"))
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
                     if (!$util.isBytes(message["in"]))
                         return "in: buffer expected";
-                if (message.is != null && message.hasOwnProperty("is"))
+                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
                     if (!$util.isBytes(message.is))
                         return "is: buffer expected";
-                if (message.va != null && message.hasOwnProperty("va"))
+                if (message.va != null && Object.hasOwnProperty.call(message, "va"))
                     if (!$util.isBytes(message.va))
                         return "va: buffer expected";
-                if (message.vn != null && message.hasOwnProperty("vn"))
+                if (message.vn != null && Object.hasOwnProperty.call(message, "vn"))
                     if (!$util.isBytes(message.vn))
                         return "vn: buffer expected";
-                if (message.vs != null && message.hasOwnProperty("vs"))
+                if (message.vs != null && Object.hasOwnProperty.call(message, "vs"))
                     if (!$util.isBytes(message.vs))
                         return "vs: buffer expected";
                 return null;
@@ -2998,9 +3142,15 @@ $root.apply = (function() {
              * @param {Object.<string,*>} object Plain object
              * @returns {apply.operations.BootstrapDeploymentOperation} BootstrapDeploymentOperation
              */
-            BootstrapDeploymentOperation.fromObject = function fromObject(object) {
+            BootstrapDeploymentOperation.fromObject = function fromObject(object, long) {
                 if (object instanceof $root.apply.operations.BootstrapDeploymentOperation)
                     object = Object.assign({}, object);
+                if (!$util.isObject(object))
+                    throw TypeError(".apply.operations.BootstrapDeploymentOperation: object expected");
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
                 var message = new $root.apply.operations.BootstrapDeploymentOperation();
                 if (object.tx != null)
                     message.tx = $util.bytesFrom(object.tx);
@@ -3032,9 +3182,13 @@ $root.apply = (function() {
              * @param {$protobuf.IConversionOptions} [options] Conversion options
              * @returns {Object.<string,*>} Plain object
              */
-            BootstrapDeploymentOperation.toObject = function toObject(message, options) {
+            BootstrapDeploymentOperation.toObject = function toObject(message, options, q) {
                 if (!options)
                     options = {};
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
                 var object = {};
                 if (options.defaults) {
                     if (options.bytes === String)
@@ -3101,23 +3255,23 @@ $root.apply = (function() {
                             object.vs = $util.newBuffer(object.vs);
                     }
                 }
-                if (message.tx != null && message.hasOwnProperty("tx"))
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
                     object.tx = $util.bytesTo(message.tx, options);
-                if (message.txv != null && message.hasOwnProperty("txv"))
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
                     object.txv = $util.bytesTo(message.txv, options);
-                if (message.bs != null && message.hasOwnProperty("bs"))
+                if (message.bs != null && Object.hasOwnProperty.call(message, "bs"))
                     object.bs = $util.bytesTo(message.bs, options);
-                if (message.ic != null && message.hasOwnProperty("ic"))
+                if (message.ic != null && Object.hasOwnProperty.call(message, "ic"))
                     object.ic = $util.bytesTo(message.ic, options);
-                if (message["in"] != null && message.hasOwnProperty("in"))
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
                     object["in"] = $util.bytesTo(message["in"], options);
-                if (message.is != null && message.hasOwnProperty("is"))
+                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
                     object.is = $util.bytesTo(message.is, options);
-                if (message.va != null && message.hasOwnProperty("va"))
+                if (message.va != null && Object.hasOwnProperty.call(message, "va"))
                     object.va = $util.bytesTo(message.va, options);
-                if (message.vn != null && message.hasOwnProperty("vn"))
+                if (message.vn != null && Object.hasOwnProperty.call(message, "vn"))
                     object.vn = $util.bytesTo(message.vn, options);
-                if (message.vs != null && message.hasOwnProperty("vs"))
+                if (message.vs != null && Object.hasOwnProperty.call(message, "vs"))
                     object.vs = $util.bytesTo(message.vs, options);
                 return object;
             };
@@ -3181,7 +3335,7 @@ $root.apply = (function() {
             function TxOperation(properties) {
                 if (properties)
                     for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
-                        if (properties[keys[i]] != null)
+                        if (properties[keys[i]] != null && keys[i] !== "__proto__")
                             this[keys[i]] = properties[keys[i]];
             }
 
@@ -3294,8 +3448,12 @@ $root.apply = (function() {
              * @param {$protobuf.Writer} [writer] Writer to encode to
              * @returns {$protobuf.Writer} Writer
              */
-            TxOperation.encode = function encode(message, writer) {
+            TxOperation.encode = function encode(message, writer, q) {
                 writer = $Writer.create(writer);
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
                 if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
                     writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.tx);
                 if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
@@ -3331,7 +3489,7 @@ $root.apply = (function() {
              * @returns {$protobuf.Writer} Writer
              */
             TxOperation.encodeDelimited = function encodeDelimited(message, writer) {
-                return this.encode(message, writer).ldelim();
+                return this.encode(message, writer && writer.len ? writer.fork() : writer).ldelim();
             };
 
             /**
@@ -3345,8 +3503,12 @@ $root.apply = (function() {
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
-            TxOperation.decode = function decode(reader, length, error) {
+            TxOperation.decode = function decode(reader, length, error, long) {
                 reader = $Reader.create(reader);
+                if (long === undefined)
+                    long = 0;
+                if (long > $Reader.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
                 var end = length === undefined ? reader.len : reader.pos + length, message = new $root.apply.operations.TxOperation();
                 while (reader.pos < end) {
                     var tag = reader.uint32();
@@ -3398,7 +3560,7 @@ $root.apply = (function() {
                             break;
                         }
                     default:
-                        reader.skipType(tag & 7);
+                        reader.skipType(tag & 7, long);
                         break;
                     }
                 }
@@ -3428,40 +3590,44 @@ $root.apply = (function() {
              * @param {Object.<string,*>} message Plain object to verify
              * @returns {string|null} `null` if valid, otherwise the reason why it is not
              */
-            TxOperation.verify = function verify(message) {
+            TxOperation.verify = function verify(message, long) {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
-                if (message.tx != null && message.hasOwnProperty("tx"))
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    return "maximum nesting depth exceeded";
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
                     if (!$util.isBytes(message.tx))
                         return "tx: buffer expected";
-                if (message.txv != null && message.hasOwnProperty("txv"))
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
                     if (!$util.isBytes(message.txv))
                         return "txv: buffer expected";
-                if (message.iw != null && message.hasOwnProperty("iw"))
+                if (message.iw != null && Object.hasOwnProperty.call(message, "iw"))
                     if (!$util.isBytes(message.iw))
                         return "iw: buffer expected";
-                if (message.ch != null && message.hasOwnProperty("ch"))
+                if (message.ch != null && Object.hasOwnProperty.call(message, "ch"))
                     if (!$util.isBytes(message.ch))
                         return "ch: buffer expected";
-                if (message.bs != null && message.hasOwnProperty("bs"))
+                if (message.bs != null && Object.hasOwnProperty.call(message, "bs"))
                     if (!$util.isBytes(message.bs))
                         return "bs: buffer expected";
-                if (message.mbs != null && message.hasOwnProperty("mbs"))
+                if (message.mbs != null && Object.hasOwnProperty.call(message, "mbs"))
                     if (!$util.isBytes(message.mbs))
                         return "mbs: buffer expected";
-                if (message["in"] != null && message.hasOwnProperty("in"))
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
                     if (!$util.isBytes(message["in"]))
                         return "in: buffer expected";
-                if (message.is != null && message.hasOwnProperty("is"))
+                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
                     if (!$util.isBytes(message.is))
                         return "is: buffer expected";
-                if (message.va != null && message.hasOwnProperty("va"))
+                if (message.va != null && Object.hasOwnProperty.call(message, "va"))
                     if (!$util.isBytes(message.va))
                         return "va: buffer expected";
-                if (message.vn != null && message.hasOwnProperty("vn"))
+                if (message.vn != null && Object.hasOwnProperty.call(message, "vn"))
                     if (!$util.isBytes(message.vn))
                         return "vn: buffer expected";
-                if (message.vs != null && message.hasOwnProperty("vs"))
+                if (message.vs != null && Object.hasOwnProperty.call(message, "vs"))
                     if (!$util.isBytes(message.vs))
                         return "vs: buffer expected";
                 return null;
@@ -3475,9 +3641,15 @@ $root.apply = (function() {
              * @param {Object.<string,*>} object Plain object
              * @returns {apply.operations.TxOperation} TxOperation
              */
-            TxOperation.fromObject = function fromObject(object) {
+            TxOperation.fromObject = function fromObject(object, long) {
                 if (object instanceof $root.apply.operations.TxOperation)
                     object = Object.assign({}, object);
+                if (!$util.isObject(object))
+                    throw TypeError(".apply.operations.TxOperation: object expected");
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
                 var message = new $root.apply.operations.TxOperation();
                 if (object.tx != null)
                     message.tx = $util.bytesFrom(object.tx);
@@ -3513,9 +3685,13 @@ $root.apply = (function() {
              * @param {$protobuf.IConversionOptions} [options] Conversion options
              * @returns {Object.<string,*>} Plain object
              */
-            TxOperation.toObject = function toObject(message, options) {
+            TxOperation.toObject = function toObject(message, options, q) {
                 if (!options)
                     options = {};
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
                 var object = {};
                 if (options.defaults) {
                     if (options.bytes === String)
@@ -3596,27 +3772,27 @@ $root.apply = (function() {
                             object.vs = $util.newBuffer(object.vs);
                     }
                 }
-                if (message.tx != null && message.hasOwnProperty("tx"))
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
                     object.tx = $util.bytesTo(message.tx, options);
-                if (message.txv != null && message.hasOwnProperty("txv"))
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
                     object.txv = $util.bytesTo(message.txv, options);
-                if (message.iw != null && message.hasOwnProperty("iw"))
+                if (message.iw != null && Object.hasOwnProperty.call(message, "iw"))
                     object.iw = $util.bytesTo(message.iw, options);
-                if (message.ch != null && message.hasOwnProperty("ch"))
+                if (message.ch != null && Object.hasOwnProperty.call(message, "ch"))
                     object.ch = $util.bytesTo(message.ch, options);
-                if (message.bs != null && message.hasOwnProperty("bs"))
+                if (message.bs != null && Object.hasOwnProperty.call(message, "bs"))
                     object.bs = $util.bytesTo(message.bs, options);
-                if (message.mbs != null && message.hasOwnProperty("mbs"))
+                if (message.mbs != null && Object.hasOwnProperty.call(message, "mbs"))
                     object.mbs = $util.bytesTo(message.mbs, options);
-                if (message["in"] != null && message.hasOwnProperty("in"))
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
                     object["in"] = $util.bytesTo(message["in"], options);
-                if (message.is != null && message.hasOwnProperty("is"))
+                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
                     object.is = $util.bytesTo(message.is, options);
-                if (message.va != null && message.hasOwnProperty("va"))
+                if (message.va != null && Object.hasOwnProperty.call(message, "va"))
                     object.va = $util.bytesTo(message.va, options);
-                if (message.vn != null && message.hasOwnProperty("vn"))
+                if (message.vn != null && Object.hasOwnProperty.call(message, "vn"))
                     object.vn = $util.bytesTo(message.vn, options);
-                if (message.vs != null && message.hasOwnProperty("vs"))
+                if (message.vs != null && Object.hasOwnProperty.call(message, "vs"))
                     object.vs = $util.bytesTo(message.vs, options);
                 return object;
             };
@@ -3671,7 +3847,7 @@ $root.apply = (function() {
             function SetEpochOperation(properties) {
                 if (properties)
                     for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
-                        if (properties[keys[i]] != null)
+                        if (properties[keys[i]] != null && keys[i] !== "__proto__")
                             this[keys[i]] = properties[keys[i]];
             }
 
@@ -3712,8 +3888,12 @@ $root.apply = (function() {
              * @param {$protobuf.Writer} [writer] Writer to encode to
              * @returns {$protobuf.Writer} Writer
              */
-            SetEpochOperation.encode = function encode(message, writer) {
+            SetEpochOperation.encode = function encode(message, writer, q) {
                 writer = $Writer.create(writer);
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
                 if (message.sv != null && Object.hasOwnProperty.call(message, "sv"))
                     writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.sv);
                 if (message.data != null && Object.hasOwnProperty.call(message, "data"))
@@ -3731,7 +3911,7 @@ $root.apply = (function() {
              * @returns {$protobuf.Writer} Writer
              */
             SetEpochOperation.encodeDelimited = function encodeDelimited(message, writer) {
-                return this.encode(message, writer).ldelim();
+                return this.encode(message, writer && writer.len ? writer.fork() : writer).ldelim();
             };
 
             /**
@@ -3745,8 +3925,12 @@ $root.apply = (function() {
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
-            SetEpochOperation.decode = function decode(reader, length, error) {
+            SetEpochOperation.decode = function decode(reader, length, error, long) {
                 reader = $Reader.create(reader);
+                if (long === undefined)
+                    long = 0;
+                if (long > $Reader.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
                 var end = length === undefined ? reader.len : reader.pos + length, message = new $root.apply.operations.SetEpochOperation();
                 while (reader.pos < end) {
                     var tag = reader.uint32();
@@ -3762,7 +3946,7 @@ $root.apply = (function() {
                             break;
                         }
                     default:
-                        reader.skipType(tag & 7);
+                        reader.skipType(tag & 7, long);
                         break;
                     }
                 }
@@ -3792,13 +3976,17 @@ $root.apply = (function() {
              * @param {Object.<string,*>} message Plain object to verify
              * @returns {string|null} `null` if valid, otherwise the reason why it is not
              */
-            SetEpochOperation.verify = function verify(message) {
+            SetEpochOperation.verify = function verify(message, long) {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
-                if (message.sv != null && message.hasOwnProperty("sv"))
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    return "maximum nesting depth exceeded";
+                if (message.sv != null && Object.hasOwnProperty.call(message, "sv"))
                     if (!$util.isBytes(message.sv))
                         return "sv: buffer expected";
-                if (message.data != null && message.hasOwnProperty("data"))
+                if (message.data != null && Object.hasOwnProperty.call(message, "data"))
                     if (!$util.isBytes(message.data))
                         return "data: buffer expected";
                 return null;
@@ -3812,9 +4000,15 @@ $root.apply = (function() {
              * @param {Object.<string,*>} object Plain object
              * @returns {apply.operations.SetEpochOperation} SetEpochOperation
              */
-            SetEpochOperation.fromObject = function fromObject(object) {
+            SetEpochOperation.fromObject = function fromObject(object, long) {
                 if (object instanceof $root.apply.operations.SetEpochOperation)
                     object = Object.assign({}, object);
+                if (!$util.isObject(object))
+                    throw TypeError(".apply.operations.SetEpochOperation: object expected");
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
                 var message = new $root.apply.operations.SetEpochOperation();
                 if (object.sv != null)
                     message.sv = $util.bytesFrom(object.sv);
@@ -3832,9 +4026,13 @@ $root.apply = (function() {
              * @param {$protobuf.IConversionOptions} [options] Conversion options
              * @returns {Object.<string,*>} Plain object
              */
-            SetEpochOperation.toObject = function toObject(message, options) {
+            SetEpochOperation.toObject = function toObject(message, options, q) {
                 if (!options)
                     options = {};
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
                 var object = {};
                 if (options.defaults) {
                     if (options.bytes === String)
@@ -3852,9 +4050,9 @@ $root.apply = (function() {
                             object.data = $util.newBuffer(object.data);
                     }
                 }
-                if (message.sv != null && message.hasOwnProperty("sv"))
+                if (message.sv != null && Object.hasOwnProperty.call(message, "sv"))
                     object.sv = $util.bytesTo(message.sv, options);
-                if (message.data != null && message.hasOwnProperty("data"))
+                if (message.data != null && Object.hasOwnProperty.call(message, "data"))
                     object.data = $util.bytesTo(message.data, options);
                 return object;
             };
@@ -3912,7 +4110,7 @@ $root.apply = (function() {
             function ConsensusControlOperation(properties) {
                 if (properties)
                     for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
-                        if (properties[keys[i]] != null)
+                        if (properties[keys[i]] != null && keys[i] !== "__proto__")
                             this[keys[i]] = properties[keys[i]];
             }
 
@@ -3977,14 +4175,18 @@ $root.apply = (function() {
              * @param {$protobuf.Writer} [writer] Writer to encode to
              * @returns {$protobuf.Writer} Writer
              */
-            ConsensusControlOperation.encode = function encode(message, writer) {
+            ConsensusControlOperation.encode = function encode(message, writer, q) {
                 writer = $Writer.create(writer);
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
                 if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
                     writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.tx);
                 if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
                     writer.uint32(/* id 2, wireType 2 =*/18).bytes(message.txv);
                 if (message.cc != null && Object.hasOwnProperty.call(message, "cc"))
-                    $root.common.consensus.ConsensusConfig.encode(message.cc, writer.uint32(/* id 3, wireType 2 =*/26).fork()).ldelim();
+                    $root.common.consensus.ConsensusConfig.encode(message.cc, writer.uint32(/* id 3, wireType 2 =*/26).fork(), q + 1).ldelim();
                 if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
                     writer.uint32(/* id 4, wireType 2 =*/34).bytes(message["in"]);
                 if (message.is != null && Object.hasOwnProperty.call(message, "is"))
@@ -4002,7 +4204,7 @@ $root.apply = (function() {
              * @returns {$protobuf.Writer} Writer
              */
             ConsensusControlOperation.encodeDelimited = function encodeDelimited(message, writer) {
-                return this.encode(message, writer).ldelim();
+                return this.encode(message, writer && writer.len ? writer.fork() : writer).ldelim();
             };
 
             /**
@@ -4016,8 +4218,12 @@ $root.apply = (function() {
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
-            ConsensusControlOperation.decode = function decode(reader, length, error) {
+            ConsensusControlOperation.decode = function decode(reader, length, error, long) {
                 reader = $Reader.create(reader);
+                if (long === undefined)
+                    long = 0;
+                if (long > $Reader.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
                 var end = length === undefined ? reader.len : reader.pos + length, message = new $root.apply.operations.ConsensusControlOperation();
                 while (reader.pos < end) {
                     var tag = reader.uint32();
@@ -4033,7 +4239,7 @@ $root.apply = (function() {
                             break;
                         }
                     case 3: {
-                            message.cc = $root.common.consensus.ConsensusConfig.decode(reader, reader.uint32());
+                            message.cc = $root.common.consensus.ConsensusConfig.decode(reader, reader.uint32(), undefined, long + 1);
                             break;
                         }
                     case 4: {
@@ -4045,7 +4251,7 @@ $root.apply = (function() {
                             break;
                         }
                     default:
-                        reader.skipType(tag & 7);
+                        reader.skipType(tag & 7, long);
                         break;
                     }
                 }
@@ -4075,24 +4281,28 @@ $root.apply = (function() {
              * @param {Object.<string,*>} message Plain object to verify
              * @returns {string|null} `null` if valid, otherwise the reason why it is not
              */
-            ConsensusControlOperation.verify = function verify(message) {
+            ConsensusControlOperation.verify = function verify(message, long) {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
-                if (message.tx != null && message.hasOwnProperty("tx"))
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    return "maximum nesting depth exceeded";
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
                     if (!$util.isBytes(message.tx))
                         return "tx: buffer expected";
-                if (message.txv != null && message.hasOwnProperty("txv"))
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
                     if (!$util.isBytes(message.txv))
                         return "txv: buffer expected";
-                if (message.cc != null && message.hasOwnProperty("cc")) {
-                    var error = $root.common.consensus.ConsensusConfig.verify(message.cc);
+                if (message.cc != null && Object.hasOwnProperty.call(message, "cc")) {
+                    var error = $root.common.consensus.ConsensusConfig.verify(message.cc, long + 1);
                     if (error)
                         return "cc." + error;
                 }
-                if (message["in"] != null && message.hasOwnProperty("in"))
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
                     if (!$util.isBytes(message["in"]))
                         return "in: buffer expected";
-                if (message.is != null && message.hasOwnProperty("is"))
+                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
                     if (!$util.isBytes(message.is))
                         return "is: buffer expected";
                 return null;
@@ -4106,18 +4316,24 @@ $root.apply = (function() {
              * @param {Object.<string,*>} object Plain object
              * @returns {apply.operations.ConsensusControlOperation} ConsensusControlOperation
              */
-            ConsensusControlOperation.fromObject = function fromObject(object) {
+            ConsensusControlOperation.fromObject = function fromObject(object, long) {
                 if (object instanceof $root.apply.operations.ConsensusControlOperation)
                     object = Object.assign({}, object);
+                if (!$util.isObject(object))
+                    throw TypeError(".apply.operations.ConsensusControlOperation: object expected");
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
                 var message = new $root.apply.operations.ConsensusControlOperation();
                 if (object.tx != null)
                     message.tx = $util.bytesFrom(object.tx);
                 if (object.txv != null)
                     message.txv = $util.bytesFrom(object.txv);
                 if (object.cc != null) {
-                    if (typeof object.cc !== "object")
+                    if (!$util.isObject(object.cc))
                         throw TypeError(".apply.operations.ConsensusControlOperation.cc: object expected");
-                    message.cc = $root.common.consensus.ConsensusConfig.fromObject(object.cc);
+                    message.cc = $root.common.consensus.ConsensusConfig.fromObject(object.cc, long + 1);
                 }
                 if (object["in"] != null)
                     message["in"] = $util.bytesFrom(object["in"]);
@@ -4135,9 +4351,13 @@ $root.apply = (function() {
              * @param {$protobuf.IConversionOptions} [options] Conversion options
              * @returns {Object.<string,*>} Plain object
              */
-            ConsensusControlOperation.toObject = function toObject(message, options) {
+            ConsensusControlOperation.toObject = function toObject(message, options, q) {
                 if (!options)
                     options = {};
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
                 var object = {};
                 if (options.defaults) {
                     if (options.bytes === String)
@@ -4170,15 +4390,15 @@ $root.apply = (function() {
                             object.is = $util.newBuffer(object.is);
                     }
                 }
-                if (message.tx != null && message.hasOwnProperty("tx"))
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
                     object.tx = $util.bytesTo(message.tx, options);
-                if (message.txv != null && message.hasOwnProperty("txv"))
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
                     object.txv = $util.bytesTo(message.txv, options);
-                if (message.cc != null && message.hasOwnProperty("cc"))
-                    object.cc = $root.common.consensus.ConsensusConfig.toObject(message.cc, options);
-                if (message["in"] != null && message.hasOwnProperty("in"))
+                if (message.cc != null && Object.hasOwnProperty.call(message, "cc"))
+                    object.cc = $root.common.consensus.ConsensusConfig.toObject(message.cc, options, q + 1);
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
                     object["in"] = $util.bytesTo(message["in"], options);
-                if (message.is != null && message.hasOwnProperty("is"))
+                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
                     object.is = $util.bytesTo(message.is, options);
                 return object;
             };
@@ -4251,7 +4471,7 @@ $root.apply = (function() {
                 this.cs = [];
                 if (properties)
                     for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
-                        if (properties[keys[i]] != null)
+                        if (properties[keys[i]] != null && keys[i] !== "__proto__")
                             this[keys[i]] = properties[keys[i]];
             }
 
@@ -4435,8 +4655,12 @@ $root.apply = (function() {
              * @param {$protobuf.Writer} [writer] Writer to encode to
              * @returns {$protobuf.Writer} Writer
              */
-            HtlcLockOperation.encode = function encode(message, writer) {
+            HtlcLockOperation.encode = function encode(message, writer, q) {
                 writer = $Writer.create(writer);
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
                 if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
                     writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.tx);
                 if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
@@ -4488,7 +4712,7 @@ $root.apply = (function() {
              * @returns {$protobuf.Writer} Writer
              */
             HtlcLockOperation.encodeDelimited = function encodeDelimited(message, writer) {
-                return this.encode(message, writer).ldelim();
+                return this.encode(message, writer && writer.len ? writer.fork() : writer).ldelim();
             };
 
             /**
@@ -4502,8 +4726,12 @@ $root.apply = (function() {
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
-            HtlcLockOperation.decode = function decode(reader, length, error) {
+            HtlcLockOperation.decode = function decode(reader, length, error, long) {
                 reader = $Reader.create(reader);
+                if (long === undefined)
+                    long = 0;
+                if (long > $Reader.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
                 var end = length === undefined ? reader.len : reader.pos + length, message = new $root.apply.operations.HtlcLockOperation();
                 while (reader.pos < end) {
                     var tag = reader.uint32();
@@ -4587,7 +4815,7 @@ $root.apply = (function() {
                             break;
                         }
                     default:
-                        reader.skipType(tag & 7);
+                        reader.skipType(tag & 7, long);
                         break;
                     }
                 }
@@ -4617,74 +4845,78 @@ $root.apply = (function() {
              * @param {Object.<string,*>} message Plain object to verify
              * @returns {string|null} `null` if valid, otherwise the reason why it is not
              */
-            HtlcLockOperation.verify = function verify(message) {
+            HtlcLockOperation.verify = function verify(message, long) {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    return "maximum nesting depth exceeded";
                 var properties = {};
-                if (message.tx != null && message.hasOwnProperty("tx"))
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
                     if (!$util.isBytes(message.tx))
                         return "tx: buffer expected";
-                if (message.txv != null && message.hasOwnProperty("txv"))
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
                     if (!$util.isBytes(message.txv))
                         return "txv: buffer expected";
-                if (message.ca != null && message.hasOwnProperty("ca"))
+                if (message.ca != null && Object.hasOwnProperty.call(message, "ca"))
                     if (!$util.isBytes(message.ca))
                         return "ca: buffer expected";
-                if (message.ra != null && message.hasOwnProperty("ra"))
+                if (message.ra != null && Object.hasOwnProperty.call(message, "ra"))
                     if (!$util.isBytes(message.ra))
                         return "ra: buffer expected";
-                if (message.am != null && message.hasOwnProperty("am"))
+                if (message.am != null && Object.hasOwnProperty.call(message, "am"))
                     if (!$util.isBytes(message.am))
                         return "am: buffer expected";
-                if (message.fa != null && message.hasOwnProperty("fa"))
+                if (message.fa != null && Object.hasOwnProperty.call(message, "fa"))
                     if (!$util.isBytes(message.fa))
                         return "fa: buffer expected";
-                if (message.fr != null && message.hasOwnProperty("fr")) {
+                if (message.fr != null && Object.hasOwnProperty.call(message, "fr")) {
                     properties._fr = 1;
                     if (!$util.isBytes(message.fr))
                         return "fr: buffer expected";
                 }
-                if (message.hl != null && message.hasOwnProperty("hl"))
+                if (message.hl != null && Object.hasOwnProperty.call(message, "hl"))
                     if (!$util.isBytes(message.hl))
                         return "hl: buffer expected";
-                if (message.re != null && message.hasOwnProperty("re"))
+                if (message.re != null && Object.hasOwnProperty.call(message, "re"))
                     if (!$util.isBytes(message.re))
                         return "re: buffer expected";
-                if (message.md != null && message.hasOwnProperty("md")) {
+                if (message.md != null && Object.hasOwnProperty.call(message, "md")) {
                     properties._md = 1;
                     if (!$util.isBytes(message.md))
                         return "md: buffer expected";
                 }
-                if (message.ss != null && message.hasOwnProperty("ss")) {
+                if (message.ss != null && Object.hasOwnProperty.call(message, "ss")) {
                     if (!Array.isArray(message.ss))
                         return "ss: array expected";
                     for (var i = 0; i < message.ss.length; ++i)
                         if (!$util.isBytes(message.ss[i]))
                             return "ss: buffer[] expected";
                 }
-                if (message.th != null && message.hasOwnProperty("th"))
+                if (message.th != null && Object.hasOwnProperty.call(message, "th"))
                     if (!$util.isBytes(message.th))
                         return "th: buffer expected";
-                if (message.cs != null && message.hasOwnProperty("cs")) {
+                if (message.cs != null && Object.hasOwnProperty.call(message, "cs")) {
                     if (!Array.isArray(message.cs))
                         return "cs: array expected";
                     for (var i = 0; i < message.cs.length; ++i)
                         if (!$util.isBytes(message.cs[i]))
                             return "cs: buffer[] expected";
                 }
-                if (message["in"] != null && message.hasOwnProperty("in"))
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
                     if (!$util.isBytes(message["in"]))
                         return "in: buffer expected";
-                if (message.is != null && message.hasOwnProperty("is"))
+                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
                     if (!$util.isBytes(message.is))
                         return "is: buffer expected";
-                if (message.va != null && message.hasOwnProperty("va"))
+                if (message.va != null && Object.hasOwnProperty.call(message, "va"))
                     if (!$util.isBytes(message.va))
                         return "va: buffer expected";
-                if (message.vn != null && message.hasOwnProperty("vn"))
+                if (message.vn != null && Object.hasOwnProperty.call(message, "vn"))
                     if (!$util.isBytes(message.vn))
                         return "vn: buffer expected";
-                if (message.vs != null && message.hasOwnProperty("vs"))
+                if (message.vs != null && Object.hasOwnProperty.call(message, "vs"))
                     if (!$util.isBytes(message.vs))
                         return "vs: buffer expected";
                 return null;
@@ -4698,9 +4930,15 @@ $root.apply = (function() {
              * @param {Object.<string,*>} object Plain object
              * @returns {apply.operations.HtlcLockOperation} HtlcLockOperation
              */
-            HtlcLockOperation.fromObject = function fromObject(object) {
+            HtlcLockOperation.fromObject = function fromObject(object, long) {
                 if (object instanceof $root.apply.operations.HtlcLockOperation)
                     object = Object.assign({}, object);
+                if (!$util.isObject(object))
+                    throw TypeError(".apply.operations.HtlcLockOperation: object expected");
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
                 var message = new $root.apply.operations.HtlcLockOperation();
                 if (object.tx != null)
                     message.tx = $util.bytesFrom(object.tx);
@@ -4760,9 +4998,13 @@ $root.apply = (function() {
              * @param {$protobuf.IConversionOptions} [options] Conversion options
              * @returns {Object.<string,*>} Plain object
              */
-            HtlcLockOperation.toObject = function toObject(message, options) {
+            HtlcLockOperation.toObject = function toObject(message, options, q) {
                 if (!options)
                     options = {};
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
                 var object = {};
                 if (options.arrays || options.defaults) {
                     object.ss = [];
@@ -4868,28 +5110,28 @@ $root.apply = (function() {
                             object.vs = $util.newBuffer(object.vs);
                     }
                 }
-                if (message.tx != null && message.hasOwnProperty("tx"))
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
                     object.tx = $util.bytesTo(message.tx, options);
-                if (message.txv != null && message.hasOwnProperty("txv"))
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
                     object.txv = $util.bytesTo(message.txv, options);
-                if (message.ca != null && message.hasOwnProperty("ca"))
+                if (message.ca != null && Object.hasOwnProperty.call(message, "ca"))
                     object.ca = $util.bytesTo(message.ca, options);
-                if (message.ra != null && message.hasOwnProperty("ra"))
+                if (message.ra != null && Object.hasOwnProperty.call(message, "ra"))
                     object.ra = $util.bytesTo(message.ra, options);
-                if (message.am != null && message.hasOwnProperty("am"))
+                if (message.am != null && Object.hasOwnProperty.call(message, "am"))
                     object.am = $util.bytesTo(message.am, options);
-                if (message.fa != null && message.hasOwnProperty("fa"))
+                if (message.fa != null && Object.hasOwnProperty.call(message, "fa"))
                     object.fa = $util.bytesTo(message.fa, options);
-                if (message.fr != null && message.hasOwnProperty("fr")) {
+                if (message.fr != null && Object.hasOwnProperty.call(message, "fr")) {
                     object.fr = $util.bytesTo(message.fr, options);
                     if (options.oneofs)
                         object._fr = "fr";
                 }
-                if (message.hl != null && message.hasOwnProperty("hl"))
+                if (message.hl != null && Object.hasOwnProperty.call(message, "hl"))
                     object.hl = $util.bytesTo(message.hl, options);
-                if (message.re != null && message.hasOwnProperty("re"))
+                if (message.re != null && Object.hasOwnProperty.call(message, "re"))
                     object.re = $util.bytesTo(message.re, options);
-                if (message.md != null && message.hasOwnProperty("md")) {
+                if (message.md != null && Object.hasOwnProperty.call(message, "md")) {
                     object.md = $util.bytesTo(message.md, options);
                     if (options.oneofs)
                         object._md = "md";
@@ -4899,22 +5141,22 @@ $root.apply = (function() {
                     for (var j = 0; j < message.ss.length; ++j)
                         object.ss[j] = $util.bytesTo(message.ss[j], options);
                 }
-                if (message.th != null && message.hasOwnProperty("th"))
+                if (message.th != null && Object.hasOwnProperty.call(message, "th"))
                     object.th = $util.bytesTo(message.th, options);
                 if (message.cs && message.cs.length) {
                     object.cs = [];
                     for (var j = 0; j < message.cs.length; ++j)
                         object.cs[j] = $util.bytesTo(message.cs[j], options);
                 }
-                if (message["in"] != null && message.hasOwnProperty("in"))
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
                     object["in"] = $util.bytesTo(message["in"], options);
-                if (message.is != null && message.hasOwnProperty("is"))
+                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
                     object.is = $util.bytesTo(message.is, options);
-                if (message.va != null && message.hasOwnProperty("va"))
+                if (message.va != null && Object.hasOwnProperty.call(message, "va"))
                     object.va = $util.bytesTo(message.va, options);
-                if (message.vn != null && message.hasOwnProperty("vn"))
+                if (message.vn != null && Object.hasOwnProperty.call(message, "vn"))
                     object.vn = $util.bytesTo(message.vn, options);
-                if (message.vs != null && message.hasOwnProperty("vs"))
+                if (message.vs != null && Object.hasOwnProperty.call(message, "vs"))
                     object.vs = $util.bytesTo(message.vs, options);
                 return object;
             };
@@ -4976,7 +5218,7 @@ $root.apply = (function() {
             function HtlcClaimOperation(properties) {
                 if (properties)
                     for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
-                        if (properties[keys[i]] != null)
+                        if (properties[keys[i]] != null && keys[i] !== "__proto__")
                             this[keys[i]] = properties[keys[i]];
             }
 
@@ -5073,8 +5315,12 @@ $root.apply = (function() {
              * @param {$protobuf.Writer} [writer] Writer to encode to
              * @returns {$protobuf.Writer} Writer
              */
-            HtlcClaimOperation.encode = function encode(message, writer) {
+            HtlcClaimOperation.encode = function encode(message, writer, q) {
                 writer = $Writer.create(writer);
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
                 if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
                     writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.tx);
                 if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
@@ -5106,7 +5352,7 @@ $root.apply = (function() {
              * @returns {$protobuf.Writer} Writer
              */
             HtlcClaimOperation.encodeDelimited = function encodeDelimited(message, writer) {
-                return this.encode(message, writer).ldelim();
+                return this.encode(message, writer && writer.len ? writer.fork() : writer).ldelim();
             };
 
             /**
@@ -5120,8 +5366,12 @@ $root.apply = (function() {
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
-            HtlcClaimOperation.decode = function decode(reader, length, error) {
+            HtlcClaimOperation.decode = function decode(reader, length, error, long) {
                 reader = $Reader.create(reader);
+                if (long === undefined)
+                    long = 0;
+                if (long > $Reader.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
                 var end = length === undefined ? reader.len : reader.pos + length, message = new $root.apply.operations.HtlcClaimOperation();
                 while (reader.pos < end) {
                     var tag = reader.uint32();
@@ -5165,7 +5415,7 @@ $root.apply = (function() {
                             break;
                         }
                     default:
-                        reader.skipType(tag & 7);
+                        reader.skipType(tag & 7, long);
                         break;
                     }
                 }
@@ -5195,34 +5445,38 @@ $root.apply = (function() {
              * @param {Object.<string,*>} message Plain object to verify
              * @returns {string|null} `null` if valid, otherwise the reason why it is not
              */
-            HtlcClaimOperation.verify = function verify(message) {
+            HtlcClaimOperation.verify = function verify(message, long) {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
-                if (message.tx != null && message.hasOwnProperty("tx"))
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    return "maximum nesting depth exceeded";
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
                     if (!$util.isBytes(message.tx))
                         return "tx: buffer expected";
-                if (message.txv != null && message.hasOwnProperty("txv"))
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
                     if (!$util.isBytes(message.txv))
                         return "txv: buffer expected";
-                if (message.li != null && message.hasOwnProperty("li"))
+                if (message.li != null && Object.hasOwnProperty.call(message, "li"))
                     if (!$util.isBytes(message.li))
                         return "li: buffer expected";
-                if (message.pi != null && message.hasOwnProperty("pi"))
+                if (message.pi != null && Object.hasOwnProperty.call(message, "pi"))
                     if (!$util.isBytes(message.pi))
                         return "pi: buffer expected";
-                if (message["in"] != null && message.hasOwnProperty("in"))
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
                     if (!$util.isBytes(message["in"]))
                         return "in: buffer expected";
-                if (message.is != null && message.hasOwnProperty("is"))
+                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
                     if (!$util.isBytes(message.is))
                         return "is: buffer expected";
-                if (message.va != null && message.hasOwnProperty("va"))
+                if (message.va != null && Object.hasOwnProperty.call(message, "va"))
                     if (!$util.isBytes(message.va))
                         return "va: buffer expected";
-                if (message.vn != null && message.hasOwnProperty("vn"))
+                if (message.vn != null && Object.hasOwnProperty.call(message, "vn"))
                     if (!$util.isBytes(message.vn))
                         return "vn: buffer expected";
-                if (message.vs != null && message.hasOwnProperty("vs"))
+                if (message.vs != null && Object.hasOwnProperty.call(message, "vs"))
                     if (!$util.isBytes(message.vs))
                         return "vs: buffer expected";
                 return null;
@@ -5236,9 +5490,15 @@ $root.apply = (function() {
              * @param {Object.<string,*>} object Plain object
              * @returns {apply.operations.HtlcClaimOperation} HtlcClaimOperation
              */
-            HtlcClaimOperation.fromObject = function fromObject(object) {
+            HtlcClaimOperation.fromObject = function fromObject(object, long) {
                 if (object instanceof $root.apply.operations.HtlcClaimOperation)
                     object = Object.assign({}, object);
+                if (!$util.isObject(object))
+                    throw TypeError(".apply.operations.HtlcClaimOperation: object expected");
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
                 var message = new $root.apply.operations.HtlcClaimOperation();
                 if (object.tx != null)
                     message.tx = $util.bytesFrom(object.tx);
@@ -5270,9 +5530,13 @@ $root.apply = (function() {
              * @param {$protobuf.IConversionOptions} [options] Conversion options
              * @returns {Object.<string,*>} Plain object
              */
-            HtlcClaimOperation.toObject = function toObject(message, options) {
+            HtlcClaimOperation.toObject = function toObject(message, options, q) {
                 if (!options)
                     options = {};
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
                 var object = {};
                 if (options.defaults) {
                     if (options.bytes === String)
@@ -5339,23 +5603,23 @@ $root.apply = (function() {
                             object.vs = $util.newBuffer(object.vs);
                     }
                 }
-                if (message.tx != null && message.hasOwnProperty("tx"))
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
                     object.tx = $util.bytesTo(message.tx, options);
-                if (message.txv != null && message.hasOwnProperty("txv"))
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
                     object.txv = $util.bytesTo(message.txv, options);
-                if (message.li != null && message.hasOwnProperty("li"))
+                if (message.li != null && Object.hasOwnProperty.call(message, "li"))
                     object.li = $util.bytesTo(message.li, options);
-                if (message.pi != null && message.hasOwnProperty("pi"))
+                if (message.pi != null && Object.hasOwnProperty.call(message, "pi"))
                     object.pi = $util.bytesTo(message.pi, options);
-                if (message["in"] != null && message.hasOwnProperty("in"))
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
                     object["in"] = $util.bytesTo(message["in"], options);
-                if (message.is != null && message.hasOwnProperty("is"))
+                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
                     object.is = $util.bytesTo(message.is, options);
-                if (message.va != null && message.hasOwnProperty("va"))
+                if (message.va != null && Object.hasOwnProperty.call(message, "va"))
                     object.va = $util.bytesTo(message.va, options);
-                if (message.vn != null && message.hasOwnProperty("vn"))
+                if (message.vn != null && Object.hasOwnProperty.call(message, "vn"))
                     object.vn = $util.bytesTo(message.vn, options);
-                if (message.vs != null && message.hasOwnProperty("vs"))
+                if (message.vs != null && Object.hasOwnProperty.call(message, "vs"))
                     object.vs = $util.bytesTo(message.vs, options);
                 return object;
             };
@@ -5416,7 +5680,7 @@ $root.apply = (function() {
             function HtlcRefundOperation(properties) {
                 if (properties)
                     for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
-                        if (properties[keys[i]] != null)
+                        if (properties[keys[i]] != null && keys[i] !== "__proto__")
                             this[keys[i]] = properties[keys[i]];
             }
 
@@ -5505,8 +5769,12 @@ $root.apply = (function() {
              * @param {$protobuf.Writer} [writer] Writer to encode to
              * @returns {$protobuf.Writer} Writer
              */
-            HtlcRefundOperation.encode = function encode(message, writer) {
+            HtlcRefundOperation.encode = function encode(message, writer, q) {
                 writer = $Writer.create(writer);
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
                 if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
                     writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.tx);
                 if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
@@ -5536,7 +5804,7 @@ $root.apply = (function() {
              * @returns {$protobuf.Writer} Writer
              */
             HtlcRefundOperation.encodeDelimited = function encodeDelimited(message, writer) {
-                return this.encode(message, writer).ldelim();
+                return this.encode(message, writer && writer.len ? writer.fork() : writer).ldelim();
             };
 
             /**
@@ -5550,8 +5818,12 @@ $root.apply = (function() {
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
-            HtlcRefundOperation.decode = function decode(reader, length, error) {
+            HtlcRefundOperation.decode = function decode(reader, length, error, long) {
                 reader = $Reader.create(reader);
+                if (long === undefined)
+                    long = 0;
+                if (long > $Reader.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
                 var end = length === undefined ? reader.len : reader.pos + length, message = new $root.apply.operations.HtlcRefundOperation();
                 while (reader.pos < end) {
                     var tag = reader.uint32();
@@ -5591,7 +5863,7 @@ $root.apply = (function() {
                             break;
                         }
                     default:
-                        reader.skipType(tag & 7);
+                        reader.skipType(tag & 7, long);
                         break;
                     }
                 }
@@ -5621,31 +5893,35 @@ $root.apply = (function() {
              * @param {Object.<string,*>} message Plain object to verify
              * @returns {string|null} `null` if valid, otherwise the reason why it is not
              */
-            HtlcRefundOperation.verify = function verify(message) {
+            HtlcRefundOperation.verify = function verify(message, long) {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
-                if (message.tx != null && message.hasOwnProperty("tx"))
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    return "maximum nesting depth exceeded";
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
                     if (!$util.isBytes(message.tx))
                         return "tx: buffer expected";
-                if (message.txv != null && message.hasOwnProperty("txv"))
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
                     if (!$util.isBytes(message.txv))
                         return "txv: buffer expected";
-                if (message.li != null && message.hasOwnProperty("li"))
+                if (message.li != null && Object.hasOwnProperty.call(message, "li"))
                     if (!$util.isBytes(message.li))
                         return "li: buffer expected";
-                if (message["in"] != null && message.hasOwnProperty("in"))
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
                     if (!$util.isBytes(message["in"]))
                         return "in: buffer expected";
-                if (message.is != null && message.hasOwnProperty("is"))
+                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
                     if (!$util.isBytes(message.is))
                         return "is: buffer expected";
-                if (message.va != null && message.hasOwnProperty("va"))
+                if (message.va != null && Object.hasOwnProperty.call(message, "va"))
                     if (!$util.isBytes(message.va))
                         return "va: buffer expected";
-                if (message.vn != null && message.hasOwnProperty("vn"))
+                if (message.vn != null && Object.hasOwnProperty.call(message, "vn"))
                     if (!$util.isBytes(message.vn))
                         return "vn: buffer expected";
-                if (message.vs != null && message.hasOwnProperty("vs"))
+                if (message.vs != null && Object.hasOwnProperty.call(message, "vs"))
                     if (!$util.isBytes(message.vs))
                         return "vs: buffer expected";
                 return null;
@@ -5659,9 +5935,15 @@ $root.apply = (function() {
              * @param {Object.<string,*>} object Plain object
              * @returns {apply.operations.HtlcRefundOperation} HtlcRefundOperation
              */
-            HtlcRefundOperation.fromObject = function fromObject(object) {
+            HtlcRefundOperation.fromObject = function fromObject(object, long) {
                 if (object instanceof $root.apply.operations.HtlcRefundOperation)
                     object = Object.assign({}, object);
+                if (!$util.isObject(object))
+                    throw TypeError(".apply.operations.HtlcRefundOperation: object expected");
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
                 var message = new $root.apply.operations.HtlcRefundOperation();
                 if (object.tx != null)
                     message.tx = $util.bytesFrom(object.tx);
@@ -5691,9 +5973,13 @@ $root.apply = (function() {
              * @param {$protobuf.IConversionOptions} [options] Conversion options
              * @returns {Object.<string,*>} Plain object
              */
-            HtlcRefundOperation.toObject = function toObject(message, options) {
+            HtlcRefundOperation.toObject = function toObject(message, options, q) {
                 if (!options)
                     options = {};
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
                 var object = {};
                 if (options.defaults) {
                     if (options.bytes === String)
@@ -5753,21 +6039,21 @@ $root.apply = (function() {
                             object.vs = $util.newBuffer(object.vs);
                     }
                 }
-                if (message.tx != null && message.hasOwnProperty("tx"))
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
                     object.tx = $util.bytesTo(message.tx, options);
-                if (message.txv != null && message.hasOwnProperty("txv"))
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
                     object.txv = $util.bytesTo(message.txv, options);
-                if (message.li != null && message.hasOwnProperty("li"))
+                if (message.li != null && Object.hasOwnProperty.call(message, "li"))
                     object.li = $util.bytesTo(message.li, options);
-                if (message["in"] != null && message.hasOwnProperty("in"))
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
                     object["in"] = $util.bytesTo(message["in"], options);
-                if (message.is != null && message.hasOwnProperty("is"))
+                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
                     object.is = $util.bytesTo(message.is, options);
-                if (message.va != null && message.hasOwnProperty("va"))
+                if (message.va != null && Object.hasOwnProperty.call(message, "va"))
                     object.va = $util.bytesTo(message.va, options);
-                if (message.vn != null && message.hasOwnProperty("vn"))
+                if (message.vn != null && Object.hasOwnProperty.call(message, "vn"))
                     object.vn = $util.bytesTo(message.vn, options);
-                if (message.vs != null && message.hasOwnProperty("vs"))
+                if (message.vs != null && Object.hasOwnProperty.call(message, "vs"))
                     object.vs = $util.bytesTo(message.vs, options);
                 return object;
             };
@@ -5846,7 +6132,7 @@ $root.common = (function() {
             function ConsensusConfig(properties) {
                 if (properties)
                     for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
-                        if (properties[keys[i]] != null)
+                        if (properties[keys[i]] != null && keys[i] !== "__proto__")
                             this[keys[i]] = properties[keys[i]];
             }
 
@@ -5887,8 +6173,12 @@ $root.common = (function() {
              * @param {$protobuf.Writer} [writer] Writer to encode to
              * @returns {$protobuf.Writer} Writer
              */
-            ConsensusConfig.encode = function encode(message, writer) {
+            ConsensusConfig.encode = function encode(message, writer, q) {
                 writer = $Writer.create(writer);
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
                 if (message.sv != null && Object.hasOwnProperty.call(message, "sv"))
                     writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.sv);
                 if (message.cd != null && Object.hasOwnProperty.call(message, "cd"))
@@ -5906,7 +6196,7 @@ $root.common = (function() {
              * @returns {$protobuf.Writer} Writer
              */
             ConsensusConfig.encodeDelimited = function encodeDelimited(message, writer) {
-                return this.encode(message, writer).ldelim();
+                return this.encode(message, writer && writer.len ? writer.fork() : writer).ldelim();
             };
 
             /**
@@ -5920,8 +6210,12 @@ $root.common = (function() {
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
-            ConsensusConfig.decode = function decode(reader, length, error) {
+            ConsensusConfig.decode = function decode(reader, length, error, long) {
                 reader = $Reader.create(reader);
+                if (long === undefined)
+                    long = 0;
+                if (long > $Reader.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
                 var end = length === undefined ? reader.len : reader.pos + length, message = new $root.common.consensus.ConsensusConfig();
                 while (reader.pos < end) {
                     var tag = reader.uint32();
@@ -5937,7 +6231,7 @@ $root.common = (function() {
                             break;
                         }
                     default:
-                        reader.skipType(tag & 7);
+                        reader.skipType(tag & 7, long);
                         break;
                     }
                 }
@@ -5967,13 +6261,17 @@ $root.common = (function() {
              * @param {Object.<string,*>} message Plain object to verify
              * @returns {string|null} `null` if valid, otherwise the reason why it is not
              */
-            ConsensusConfig.verify = function verify(message) {
+            ConsensusConfig.verify = function verify(message, long) {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
-                if (message.sv != null && message.hasOwnProperty("sv"))
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    return "maximum nesting depth exceeded";
+                if (message.sv != null && Object.hasOwnProperty.call(message, "sv"))
                     if (!$util.isBytes(message.sv))
                         return "sv: buffer expected";
-                if (message.cd != null && message.hasOwnProperty("cd"))
+                if (message.cd != null && Object.hasOwnProperty.call(message, "cd"))
                     if (!$util.isBytes(message.cd))
                         return "cd: buffer expected";
                 return null;
@@ -5987,9 +6285,15 @@ $root.common = (function() {
              * @param {Object.<string,*>} object Plain object
              * @returns {common.consensus.ConsensusConfig} ConsensusConfig
              */
-            ConsensusConfig.fromObject = function fromObject(object) {
+            ConsensusConfig.fromObject = function fromObject(object, long) {
                 if (object instanceof $root.common.consensus.ConsensusConfig)
                     object = Object.assign({}, object);
+                if (!$util.isObject(object))
+                    throw TypeError(".common.consensus.ConsensusConfig: object expected");
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
                 var message = new $root.common.consensus.ConsensusConfig();
                 if (object.sv != null)
                     message.sv = $util.bytesFrom(object.sv);
@@ -6007,9 +6311,13 @@ $root.common = (function() {
              * @param {$protobuf.IConversionOptions} [options] Conversion options
              * @returns {Object.<string,*>} Plain object
              */
-            ConsensusConfig.toObject = function toObject(message, options) {
+            ConsensusConfig.toObject = function toObject(message, options, q) {
                 if (!options)
                     options = {};
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
                 var object = {};
                 if (options.defaults) {
                     if (options.bytes === String)
@@ -6027,9 +6335,9 @@ $root.common = (function() {
                             object.cd = $util.newBuffer(object.cd);
                     }
                 }
-                if (message.sv != null && message.hasOwnProperty("sv"))
+                if (message.sv != null && Object.hasOwnProperty.call(message, "sv"))
                     object.sv = $util.bytesTo(message.sv, options);
-                if (message.cd != null && message.hasOwnProperty("cd"))
+                if (message.cd != null && Object.hasOwnProperty.call(message, "cd"))
                     object.cd = $util.bytesTo(message.cd, options);
                 return object;
             };

@@ -54,11 +54,13 @@ const configData = {
         rateLimitConnectionTimeoutMs: 60_000, // Rate limiting constants
         rateLimitMaxTransactionsPerSecond: 50, // Rate limiting constants
         maxPendingRequestsInPendingRequestsService: 50_000, // Maximum number of pending requests in PendingRequestService (This value should not exceed 256MB)
-        pendingRequestTimeout: 3000, // constant after which time the transaction will be considered invalid
+        pendingRequestTimeout: 10_000, // Deadline for a pending V1 response (ms), including health checks
         indexerPendingRequestTimeout: 20000, // constant after which time the transaction will be considered invalid
-        txCommitTimeout: 2200,
+        txCommitTimeout: 5_000, // Wait for local append and publication proof (ms); shorter than the response deadline
         txPoolSize: 1000, // size of transaction pool
         validatorHealthCheckInterval: 5 * 60 * 1000, // How often to check validator health (ms)
+        validatorHealthCheckFailureThreshold: 3, // Consecutive failed health checks before a validator is removed
+        confirmationStallTimeout: 120_000, // Force a fast-forward when confirmations stall with unconfirmed entries (ms, 0 = off)
         epochInterval: 3 * 60 * 1000, // How often to trigger epoch proof proposal (ms)
         epochBackoffDelay: 30_000, // Delay before retrying epoch coordination after a failed attempt (ms)
         epochSignatureTimeout: 20_000, // Max time delay an indexer have to sign a proposal
@@ -111,11 +113,13 @@ const configData = {
         rateLimitConnectionTimeoutMs: 60_000, // Rate limiting constants
         rateLimitMaxTransactionsPerSecond: 50, // Rate limiting constants
         maxPendingRequestsInPendingRequestsService: 50_000, // Maximum number of pending requests in PendingRequestService (This value should not exceed 256MB)
-        pendingRequestTimeout: 3000, // constant after which time the transaction will be considered invalid
+        pendingRequestTimeout: 10_000, // Deadline for a pending V1 response (ms), including health checks
         indexerPendingRequestTimeout: 20000, // constant after which time the transaction will be considered invalid
-        txCommitTimeout: 2200,
+        txCommitTimeout: 5_000, // Wait for local append and publication proof (ms); shorter than the response deadline
         txPoolSize: 1000, // size of transaction pool
         validatorHealthCheckInterval: 5 * 60 * 1000, // How often to check validator health (ms)
+        validatorHealthCheckFailureThreshold: 3, // Consecutive failed health checks before a validator is removed
+        confirmationStallTimeout: 120_000, // Force a fast-forward when confirmations stall with unconfirmed entries (ms, 0 = off)
         epochInterval: 3 * 60 * 1000, // How often to trigger epoch proof proposal (ms)
         epochBackoffDelay: 30_000, // Delay before retrying epoch coordination after a failed attempt (ms)
         epochSignatureTimeout: 20_000, // Max time delay an indexer have to sign a proposal
@@ -168,11 +172,13 @@ const configData = {
         rateLimitConnectionTimeoutMs: 60_000, // Rate limiting constants
         rateLimitMaxTransactionsPerSecond: 50, // Rate limiting constants
         maxPendingRequestsInPendingRequestsService: 50_000, // Maximum number of pending requests in PendingRequestService (This value should not exceed 256MB)
-        pendingRequestTimeout: 3000, // constant after which time the transaction will be considered invalid
+        pendingRequestTimeout: 10_000, // Deadline for a pending V1 response (ms), including health checks
         indexerPendingRequestTimeout: 20000, // constant after which time the transaction will be considered invalid
-        txCommitTimeout: 2200,
+        txCommitTimeout: 5_000, // Wait for local append and publication proof (ms); shorter than the response deadline
         txPoolSize: 1000, // size of transaction pool
         validatorHealthCheckInterval: 1_000, // How often to check validator health (ms)
+        validatorHealthCheckFailureThreshold: 3, // Consecutive failed health checks before a validator is removed
+        confirmationStallTimeout: 120_000, // Force a fast-forward when confirmations stall with unconfirmed entries (ms, 0 = off)
         epochInterval: 30 * 1000, // How often to trigger epoch proof proposal (ms)
         epochBackoffDelay: 30_000, // Delay before retrying epoch coordination after a failed attempt (ms)
         epochSignatureTimeout: 40_000, // Max time delay an indexer have to sign a proposal

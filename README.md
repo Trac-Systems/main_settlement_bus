@@ -18,9 +18,9 @@ The MSB leverages the [Pear Runtime and Holepunch](https://pears.com/).
 
 Node.js is required to run the application. Before installing Node.js, refer to the official [Node.js documentation](https://nodejs.org) for the latest recommended version and installation instructions. For this project, Node.js v22.22.0 (LTS) and npm 11.6.1 or newer are compatible.
 
-The Pear Runtime CLI is required to run the application. Before installing Pear, refer to the official [Pear documentation](https://docs.pears.com/guides/getting-started) for the latest recommended version and installation instructions. For this project, the latest Pear CLI is compatible.
+MSB supports both Pear v2 and Pear v3. Its Pear runner uses `pear run` with Pear v2 and the embedded [`pear-runtime`](https://docs.pears.com/reference/pear/runtime/) module with Pear v3.
 
-Install Pear globally:
+The Pear CLI is required for Pear v2 and for Pear deployment commands. Pear v3 can run MSB through the embedded module without a globally installed CLI. Install the CLI when it is needed:
 
 ```sh
 npm install -g pear
@@ -55,7 +55,7 @@ Runtime entry points cover CLI-driven runs (`start`, `rpc`) and `.env`-aware run
 
 ### Startup input validation
 
-Startup input is validated before MSB finishes booting. This applies to direct CLI flags and to the `.env` / inline environment-variable entry points, because those scripts ultimately pass the same runtime flags into `pear run .`.
+Startup input is validated before MSB finishes booting. This applies to direct CLI flags and to the `.env` / inline environment-variable entry points, because those scripts pass the same flags through the Pear v2/v3 runner.
 
 - `--network` / `NETWORK` must be one of `mainnet`, `development`, `testnet1`, or `testnet` (`testnet` is treated as an alias for `testnet1`).
 - `--stores-directory` / `STORES_DIRECTORY` must be a non-empty string.

@@ -46,6 +46,7 @@ class Network extends ReadyResource {
     #indexerConnectionManager;
     #consensusPeerBanRequestedListener;
     #epochAppenderSelector;
+    #closing = false;
 
     /**
      * @param {State} state
@@ -97,7 +98,9 @@ class Network extends ReadyResource {
     async _open() {
         this.#logger.info('Network initialization...');        
 
+        this.#assertCanReplicate();
         const { wallet: wrappedWallet, keyPair } = await this.#getOrGenerateWallet();
+        this.#assertCanReplicate();
         this.#wallet = wrappedWallet
 
         // Recover durable votes before starting network resources.
@@ -110,6 +113,7 @@ class Network extends ReadyResource {
             this.#indexerPendingRequestService
         );
         await this.#epochAppenderSelector.open();
+        this.#assertCanReplicate();
         this.transactionPoolService.start();
 
         this.#swarm = new Hyperswarm({
@@ -158,6 +162,7 @@ class Network extends ReadyResource {
             this.#state, this.#wallet, this.#config, this.#indexerConnectionManager, this.#epochAppenderSelector,
         );
         await this.#epochCoordinatorService.ready();
+        this.#assertCanReplicate();
 
         this.#logger.info(`Channel: ${b4a.toString(this.#config.channel)}`);
         this.#listeners();
@@ -175,6 +180,7 @@ class Network extends ReadyResource {
 
     async _close() {
         this.#logger.info('Network: closing gracefully...');
+        this.#closing = true;
         this.#state.off(CustomEventType.CONSENSUS_PEER_BAN_REQUESTED, this.#consensusPeerBanRequestedListener);
         await this.#epochCoordinatorService.close();
         await this.#epochAppenderSelector.close();
@@ -188,7 +194,12 @@ class Network extends ReadyResource {
         this.#indexerPendingRequestService.close();
         await this.#indexerConnectionManager.close();
         await this.#validatorConnectionManager.close()
-        await this.#swarm.destroy();
+        const swarm = this.#swarm;
+        if (swarm) {
+            swarm.removeAllListeners('connection');
+            await swarm.destroy();
+            if (this.#swarm === swarm) this.#swarm = null;
+        }
     }
 
     #handleConsensusSessionClosed(connection) {
@@ -196,6 +207,7 @@ class Network extends ReadyResource {
     }
 
     #prepareConnection(connection) {
+        this.#assertCanReplicate();
         connection.protocolSessions = {};
         const stream = this.#store.replicate(connection);
         wakeup.addStream(stream);
@@ -241,6 +253,10 @@ class Network extends ReadyResource {
         });
 
         this.#swarm.prependListener('connection', async (connection) => {
+            if (this.#closing || this.closed) {
+                this.#destroyConnection(connection);
+                return;
+            }
             // A handshake accepted before a ban can finish after the ban was applied.
             if (this.#isPeerBanned(connection.remotePublicKey)) {
                 connection.destroy();
@@ -256,23 +272,13 @@ class Network extends ReadyResource {
              This is leaky for two reasons: first we need to keep a reference to messages and disclose the connection structure in this class.
              second is that the protocol itself doesnt fit the connection life-cycle (this is a bigger problem that also touched on DHT factory structure being "swallowed by swarm")
              */
-            this.#prepareConnection(connection);
-            this.#validatorMessages.prepareConnection(connection);
-            this.#indexerMessages.prepareConnection(connection);
-        })
-        this.#swarm.on('connection', async (connection) => {
-            // Returning from the prepended listener does not stop this listener.
-            if (this.#isPeerBanned(connection.remotePublicKey)) return;
-
             const publicKey = b4a.toString(connection.remotePublicKey, 'hex');
-            // This function will ignore connections that havent been triggered by the observer. In this case, the promotion will happen during tryConnect when the connection entity will be qualified.
-            await this.#promotePendingConnection(publicKey, connection);
 
             connection.on('close', () => {
                 this.#rejectAllPendingRequests(publicKey, new Error('Connection closed before response'));
-                this.#swarm.leavePeer(connection.remotePublicKey);
+                this.#swarm?.leavePeer(connection.remotePublicKey);
                 this.#validatorConnectionManager.remove(publicKey, connection);
-                connection.end();
+                this.#closeProtocolSessions(connection);
             });
 
             connection.on('error', (error) => {
@@ -288,6 +294,24 @@ class Network extends ReadyResource {
                 }
                 this.#logger.error(error?.message ?? 'Unknown network connection error');
             });
+
+            try {
+                this.#prepareConnection(connection);
+                this.#validatorMessages.prepareConnection(connection);
+                this.#indexerMessages.prepareConnection(connection);
+                await this.#promotePendingConnection(publicKey, connection);
+                if (this.#closing || this.closed) {
+                    this.#validatorConnectionManager.remove(publicKey, connection);
+                    this.#indexerConnectionManager.remove(publicKey, connection);
+                    this.#destroyConnection(connection);
+                }
+            } catch (error) {
+                this.#rejectAllPendingRequests(publicKey, error ?? new Error('Connection setup failed'));
+                this.#destroyConnection(connection);
+                if (!this.#closing) {
+                    this.#logger.error(error?.message ?? 'Unknown network connection setup error');
+                }
+            }
         });
     }
 
@@ -377,6 +401,7 @@ class Network extends ReadyResource {
     }
 
     async tryConnect(publicKey, type) {
+        this.#assertCanReplicate();
         if (!this.#swarm) throw new Error('Network swarm is not initialized');
         if (this.#isPeerBanned(publicKey)) return CONNECTION_STATUS.IGNORED;
         if (this.#pendingConnections.has(publicKey) || this.#pendingConnections.size >= this.#config.maxPendingConnections) {
@@ -394,14 +419,13 @@ class Network extends ReadyResource {
         this.#pendingConnections.set(publicKey, { type, timeoutId });
 
         const target = b4a.from(publicKey, 'hex');
-        if (!this.#swarm.peers.has(publicKey)) {
-            // if the connection is not managed by the swarm, we actively connect and the flow will be managed by the on('connection') subscriber
+        // A retained peer may have lost explicit retries after leavePeer().
+        if (!this.#swarm.peers.get(publicKey)?.explicit) {
             this.#swarm.joinPeer(target);
-            return CONNECTION_STATUS.PENDING;
         } 
 
         const peerInfo = this.#swarm.peers.get(publicKey);
-        if (!peerInfo) return;
+        if (!peerInfo) return CONNECTION_STATUS.PENDING;
 
         const connection = this.#swarm._allConnections.get(peerInfo.publicKey);
         // _allConnections also contains transports whose handshake is still in progress.
@@ -410,6 +434,7 @@ class Network extends ReadyResource {
         const isConnectionReady = (type === 'validator' && !this.#validatorPendingRequestService.isProbePending(connection.remotePublicKey.toString('hex'))) || type === 'indexer'
         if (isConnectionReady) {
             await this.#promotePendingConnection(publicKey, connection);
+            if (this.#closing || this.closed) return CONNECTION_STATUS.IGNORED;
             if (this.#isPeerBanned(publicKey)) return CONNECTION_STATUS.IGNORED;
             if (type === 'indexer' && !this.#indexerConnectionManager.connected(publicKey)) {
                 return CONNECTION_STATUS.IGNORED;
@@ -431,7 +456,7 @@ class Network extends ReadyResource {
             } else if (pending.type === 'validator') {
                 await this.#validatorConnectionManager.add(publicKey, connection);
                 // A pending probe may settle after its peer has been banned.
-                if (this.#isPeerBanned(publicKey)) {
+                if (this.#closing || this.closed || this.#isPeerBanned(publicKey)) {
                     this.#validatorConnectionManager.remove(publicKey, connection);
                 }
             }
@@ -458,6 +483,27 @@ class Network extends ReadyResource {
         clearTimeout(timeoutId);
         this.#pendingConnections.delete(publicKeyHex);
         return true;
+    }
+
+    #assertCanReplicate() {
+        if (this.#closing || this.closed) {
+            throw new Error('Network is closing or already closed');
+        }
+    }
+
+    #closeProtocolSessions(connection) {
+        for (const session of Object.values(connection.protocolSessions ?? {})) {
+            try {
+                session?.close();
+            } catch {}
+        }
+    }
+
+    #destroyConnection(connection) {
+        if (!connection) return;
+        this.#closeProtocolSessions(connection);
+        if (typeof connection.destroy === 'function') connection.destroy();
+        else if (typeof connection.end === 'function') connection.end();
     }
 }
 
