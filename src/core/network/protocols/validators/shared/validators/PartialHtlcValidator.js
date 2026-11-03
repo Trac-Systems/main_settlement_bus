@@ -33,11 +33,13 @@ class PartialHtlcValidator extends PartialOperationValidator {
             return this.#validateClaim(payload);
         }
         if (payload?.type === OperationType.HTLC_REFUND) return this.#validateRefund(payload);
+        if (payload?.type !== OperationType.HTLC_LOCK) {
+            throw new V1ProtocolError(ResultCode.OPERATION_TYPE_UNKNOWN, 'Unsupported HTLC operation type.');
+        }
         this.isPayloadSchemaValid(payload);
         this.validateNoSelfValidation(payload);
         this.validateRequesterAddress(payload);
-        await this.validateTransactionUniqueness(payload);
-        await this.#validateEscrowUniqueness(payload.hlo.tx);
+        await this.#validateLockUniqueness(payload.hlo.tx);
         await this.validateSignature(payload);
         await this.validateTransactionValidity(payload);
         this.isOperationNotCompleted(payload);
@@ -201,9 +203,19 @@ class PartialHtlcValidator extends PartialOperationValidator {
         return true;
     }
 
-    async #validateEscrowUniqueness(lockId) {
-        const escrowKey = EntryType.HTLC_ESCROW + b4a.toString(lockId, 'hex');
-        if (await this.state.get(escrowKey) !== null) {
+    async #validateLockUniqueness(lockId) {
+        const txHex = b4a.toString(lockId, 'hex');
+        const escrowKey = EntryType.HTLC_ESCROW + txHex;
+        const [transaction, signedTransaction, escrow, signedEscrow] = await Promise.all([
+            this.state.get(txHex),
+            this.state.getSigned(txHex),
+            this.state.get(escrowKey),
+            this.state.getSigned(escrowKey)
+        ]);
+        if (transaction !== null || signedTransaction !== null) {
+            throw new V1ProtocolError(ResultCode.TX_ALREADY_EXISTS, 'HTLC lock transaction already exists.');
+        }
+        if (escrow !== null || signedEscrow !== null) {
             throw new V1ProtocolError(ResultCode.TX_ALREADY_EXISTS, 'HTLC escrow already exists.');
         }
     }
