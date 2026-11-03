@@ -85,6 +85,7 @@ import {
     createHtlcLockSigningMessage,
     verifyOrderedHtlcCosignerSignatures,
 } from '../../utils/htlcLock.js';
+import { ConfirmationWatch } from './ConfirmationWatch.js';
 
 const OVERSIZED_BATCH_PENALTY_MULTIPLIER = BATCH_SIZE;
 
@@ -102,6 +103,7 @@ class State extends ReadyResource {
     #activeWriterCountCache = new Map();
     #stateEventQueue = new StateEventQueue();
     #viewUpdateListener;
+    #confirmationWatch = null;
 
     /**
      * @param {Corestore} store
@@ -152,10 +154,13 @@ class State extends ReadyResource {
         this.#stateEventQueue.clear();
         this.#base.on('update', this.#viewUpdateListener);
         await this.#listeners()
+        this.#confirmationWatch = new ConfirmationWatch(this.#base, { timeout: this.#config.confirmationStallTimeout });
+        this.#confirmationWatch.start();
     }
 
     async _close() {
         console.log("State: closing gracefully...");
+        this.#confirmationWatch?.stop();
 
         this.#base.off('update', this.#viewUpdateListener);
         this.#stateEventQueue.clear();
@@ -628,18 +633,13 @@ class State extends ReadyResource {
             throw new Error("Invalid hash format");
         }
 
-        const confirmedLength = this.getSignedLength();
-        const historyStream = this.#base.view.createHistoryStream({
-            gte: 0,
-            lte: confirmedLength
-        });
-
-        for await (const entry of historyStream) {
-            if (isTransactionRecordPut(entry) && entry.key === hash) {
-                return entry.seq;
-            }
+        const snapshot = this.#base.view.checkout(this.getSignedLength());
+        try {
+            const entry = await snapshot.get(hash);
+            return entry ? entry.seq : null;
+        } finally {
+            await snapshot.close();
         }
-        return null;
     }
 
     async confirmedTransactionsBetween(startSignedLength, endSignedLength) {

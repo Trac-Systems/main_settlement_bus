@@ -9,7 +9,7 @@ var $protobuf = require("../../protobufRuntime.cjs");
 var $Reader = $protobuf.Reader, $Writer = $protobuf.Writer, $util = $protobuf.util;
 
 // Exported root namespace
-var $root = $protobuf.roots.networkV1 || ($protobuf.roots.networkV1 = {});
+var $root = $protobuf.roots["networkV1"] || ($protobuf.roots["networkV1"] = {});
 
 $root.network = (function() {
 
@@ -57,7 +57,7 @@ $root.network = (function() {
                 this.capabilities = [];
                 if (properties)
                     for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
-                        if (properties[keys[i]] != null)
+                        if (properties[keys[i]] != null && keys[i] !== "__proto__")
                             this[keys[i]] = properties[keys[i]];
             }
 
@@ -160,8 +160,12 @@ $root.network = (function() {
              * @param {$protobuf.Writer} [writer] Writer to encode to
              * @returns {$protobuf.Writer} Writer
              */
-            MessageHeader.encode = function encode(message, writer) {
+            MessageHeader.encode = function encode(message, writer, q) {
                 writer = $Writer.create(writer);
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
                 if (message.type != null && Object.hasOwnProperty.call(message, "type"))
                     writer.uint32(/* id 1, wireType 0 =*/8).int32(message.type);
                 if (message.id != null && Object.hasOwnProperty.call(message, "id"))
@@ -169,13 +173,13 @@ $root.network = (function() {
                 if (message.timestamp != null && Object.hasOwnProperty.call(message, "timestamp"))
                     writer.uint32(/* id 3, wireType 0 =*/24).uint64(message.timestamp);
                 if (message.liveness_request != null && Object.hasOwnProperty.call(message, "liveness_request"))
-                    $root.network.v1.LivenessRequest.encode(message.liveness_request, writer.uint32(/* id 4, wireType 2 =*/34).fork()).ldelim();
+                    $root.network.v1.LivenessRequest.encode(message.liveness_request, writer.uint32(/* id 4, wireType 2 =*/34).fork(), q + 1).ldelim();
                 if (message.liveness_response != null && Object.hasOwnProperty.call(message, "liveness_response"))
-                    $root.network.v1.LivenessResponse.encode(message.liveness_response, writer.uint32(/* id 5, wireType 2 =*/42).fork()).ldelim();
+                    $root.network.v1.LivenessResponse.encode(message.liveness_response, writer.uint32(/* id 5, wireType 2 =*/42).fork(), q + 1).ldelim();
                 if (message.broadcast_transaction_request != null && Object.hasOwnProperty.call(message, "broadcast_transaction_request"))
-                    $root.network.v1.BroadcastTransactionRequest.encode(message.broadcast_transaction_request, writer.uint32(/* id 6, wireType 2 =*/50).fork()).ldelim();
+                    $root.network.v1.BroadcastTransactionRequest.encode(message.broadcast_transaction_request, writer.uint32(/* id 6, wireType 2 =*/50).fork(), q + 1).ldelim();
                 if (message.broadcast_transaction_response != null && Object.hasOwnProperty.call(message, "broadcast_transaction_response"))
-                    $root.network.v1.BroadcastTransactionResponse.encode(message.broadcast_transaction_response, writer.uint32(/* id 7, wireType 2 =*/58).fork()).ldelim();
+                    $root.network.v1.BroadcastTransactionResponse.encode(message.broadcast_transaction_response, writer.uint32(/* id 7, wireType 2 =*/58).fork(), q + 1).ldelim();
                 if (message.capabilities != null && message.capabilities.length)
                     for (var i = 0; i < message.capabilities.length; ++i)
                         writer.uint32(/* id 8, wireType 2 =*/66).string(message.capabilities[i]);
@@ -192,7 +196,7 @@ $root.network = (function() {
              * @returns {$protobuf.Writer} Writer
              */
             MessageHeader.encodeDelimited = function encodeDelimited(message, writer) {
-                return this.encode(message, writer).ldelim();
+                return this.encode(message, writer && writer.len ? writer.fork() : writer).ldelim();
             };
 
             /**
@@ -206,8 +210,12 @@ $root.network = (function() {
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
-            MessageHeader.decode = function decode(reader, length, error) {
+            MessageHeader.decode = function decode(reader, length, error, long) {
                 reader = $Reader.create(reader);
+                if (long === undefined)
+                    long = 0;
+                if (long > $Reader.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
                 var end = length === undefined ? reader.len : reader.pos + length, message = new $root.network.v1.MessageHeader();
                 while (reader.pos < end) {
                     var tag = reader.uint32();
@@ -227,19 +235,19 @@ $root.network = (function() {
                             break;
                         }
                     case 4: {
-                            message.liveness_request = $root.network.v1.LivenessRequest.decode(reader, reader.uint32());
+                            message.liveness_request = $root.network.v1.LivenessRequest.decode(reader, reader.uint32(), undefined, long + 1);
                             break;
                         }
                     case 5: {
-                            message.liveness_response = $root.network.v1.LivenessResponse.decode(reader, reader.uint32());
+                            message.liveness_response = $root.network.v1.LivenessResponse.decode(reader, reader.uint32(), undefined, long + 1);
                             break;
                         }
                     case 6: {
-                            message.broadcast_transaction_request = $root.network.v1.BroadcastTransactionRequest.decode(reader, reader.uint32());
+                            message.broadcast_transaction_request = $root.network.v1.BroadcastTransactionRequest.decode(reader, reader.uint32(), undefined, long + 1);
                             break;
                         }
                     case 7: {
-                            message.broadcast_transaction_response = $root.network.v1.BroadcastTransactionResponse.decode(reader, reader.uint32());
+                            message.broadcast_transaction_response = $root.network.v1.BroadcastTransactionResponse.decode(reader, reader.uint32(), undefined, long + 1);
                             break;
                         }
                     case 8: {
@@ -249,7 +257,7 @@ $root.network = (function() {
                             break;
                         }
                     default:
-                        reader.skipType(tag & 7);
+                        reader.skipType(tag & 7, long);
                         break;
                     }
                 }
@@ -279,11 +287,15 @@ $root.network = (function() {
              * @param {Object.<string,*>} message Plain object to verify
              * @returns {string|null} `null` if valid, otherwise the reason why it is not
              */
-            MessageHeader.verify = function verify(message) {
+            MessageHeader.verify = function verify(message, long) {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    return "maximum nesting depth exceeded";
                 var properties = {};
-                if (message.type != null && message.hasOwnProperty("type"))
+                if (message.type != null && Object.hasOwnProperty.call(message, "type"))
                     switch (message.type) {
                     default:
                         return "type: enum value expected";
@@ -294,51 +306,51 @@ $root.network = (function() {
                     case 4:
                         break;
                     }
-                if (message.id != null && message.hasOwnProperty("id"))
+                if (message.id != null && Object.hasOwnProperty.call(message, "id"))
                     if (!$util.isString(message.id))
                         return "id: string expected";
-                if (message.timestamp != null && message.hasOwnProperty("timestamp"))
+                if (message.timestamp != null && Object.hasOwnProperty.call(message, "timestamp"))
                     if (!$util.isInteger(message.timestamp) && !(message.timestamp && $util.isInteger(message.timestamp.low) && $util.isInteger(message.timestamp.high)))
                         return "timestamp: integer|Long expected";
-                if (message.liveness_request != null && message.hasOwnProperty("liveness_request")) {
+                if (message.liveness_request != null && Object.hasOwnProperty.call(message, "liveness_request")) {
                     properties.field = 1;
                     {
-                        var error = $root.network.v1.LivenessRequest.verify(message.liveness_request);
+                        var error = $root.network.v1.LivenessRequest.verify(message.liveness_request, long + 1);
                         if (error)
                             return "liveness_request." + error;
                     }
                 }
-                if (message.liveness_response != null && message.hasOwnProperty("liveness_response")) {
+                if (message.liveness_response != null && Object.hasOwnProperty.call(message, "liveness_response")) {
                     if (properties.field === 1)
                         return "field: multiple values";
                     properties.field = 1;
                     {
-                        var error = $root.network.v1.LivenessResponse.verify(message.liveness_response);
+                        var error = $root.network.v1.LivenessResponse.verify(message.liveness_response, long + 1);
                         if (error)
                             return "liveness_response." + error;
                     }
                 }
-                if (message.broadcast_transaction_request != null && message.hasOwnProperty("broadcast_transaction_request")) {
+                if (message.broadcast_transaction_request != null && Object.hasOwnProperty.call(message, "broadcast_transaction_request")) {
                     if (properties.field === 1)
                         return "field: multiple values";
                     properties.field = 1;
                     {
-                        var error = $root.network.v1.BroadcastTransactionRequest.verify(message.broadcast_transaction_request);
+                        var error = $root.network.v1.BroadcastTransactionRequest.verify(message.broadcast_transaction_request, long + 1);
                         if (error)
                             return "broadcast_transaction_request." + error;
                     }
                 }
-                if (message.broadcast_transaction_response != null && message.hasOwnProperty("broadcast_transaction_response")) {
+                if (message.broadcast_transaction_response != null && Object.hasOwnProperty.call(message, "broadcast_transaction_response")) {
                     if (properties.field === 1)
                         return "field: multiple values";
                     properties.field = 1;
                     {
-                        var error = $root.network.v1.BroadcastTransactionResponse.verify(message.broadcast_transaction_response);
+                        var error = $root.network.v1.BroadcastTransactionResponse.verify(message.broadcast_transaction_response, long + 1);
                         if (error)
                             return "broadcast_transaction_response." + error;
                     }
                 }
-                if (message.capabilities != null && message.hasOwnProperty("capabilities")) {
+                if (message.capabilities != null && Object.hasOwnProperty.call(message, "capabilities")) {
                     if (!Array.isArray(message.capabilities))
                         return "capabilities: array expected";
                     for (var i = 0; i < message.capabilities.length; ++i)
@@ -356,9 +368,15 @@ $root.network = (function() {
              * @param {Object.<string,*>} object Plain object
              * @returns {network.v1.MessageHeader} MessageHeader
              */
-            MessageHeader.fromObject = function fromObject(object) {
+            MessageHeader.fromObject = function fromObject(object, long) {
                 if (object instanceof $root.network.v1.MessageHeader)
                     object = Object.assign({}, object);
+                if (!$util.isObject(object))
+                    throw TypeError(".network.v1.MessageHeader: object expected");
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
                 var message = new $root.network.v1.MessageHeader();
                 switch (object.type) {
                 default:
@@ -392,7 +410,7 @@ $root.network = (function() {
                     message.id = String(object.id);
                 if (object.timestamp != null)
                     if ($util.Long)
-                        (message.timestamp = $util.Long.fromValue(object.timestamp)).unsigned = true;
+                        message.timestamp = $util.Long.fromValue(object.timestamp, true);
                     else if (typeof object.timestamp === "string")
                         message.timestamp = parseInt(object.timestamp, 10);
                     else if (typeof object.timestamp === "number")
@@ -400,24 +418,24 @@ $root.network = (function() {
                     else if (typeof object.timestamp === "object")
                         message.timestamp = new $util.LongBits(object.timestamp.low >>> 0, object.timestamp.high >>> 0).toNumber(true);
                 if (object.liveness_request != null) {
-                    if (typeof object.liveness_request !== "object")
+                    if (!$util.isObject(object.liveness_request))
                         throw TypeError(".network.v1.MessageHeader.liveness_request: object expected");
-                    message.liveness_request = $root.network.v1.LivenessRequest.fromObject(object.liveness_request);
+                    message.liveness_request = $root.network.v1.LivenessRequest.fromObject(object.liveness_request, long + 1);
                 }
                 if (object.liveness_response != null) {
-                    if (typeof object.liveness_response !== "object")
+                    if (!$util.isObject(object.liveness_response))
                         throw TypeError(".network.v1.MessageHeader.liveness_response: object expected");
-                    message.liveness_response = $root.network.v1.LivenessResponse.fromObject(object.liveness_response);
+                    message.liveness_response = $root.network.v1.LivenessResponse.fromObject(object.liveness_response, long + 1);
                 }
                 if (object.broadcast_transaction_request != null) {
-                    if (typeof object.broadcast_transaction_request !== "object")
+                    if (!$util.isObject(object.broadcast_transaction_request))
                         throw TypeError(".network.v1.MessageHeader.broadcast_transaction_request: object expected");
-                    message.broadcast_transaction_request = $root.network.v1.BroadcastTransactionRequest.fromObject(object.broadcast_transaction_request);
+                    message.broadcast_transaction_request = $root.network.v1.BroadcastTransactionRequest.fromObject(object.broadcast_transaction_request, long + 1);
                 }
                 if (object.broadcast_transaction_response != null) {
-                    if (typeof object.broadcast_transaction_response !== "object")
+                    if (!$util.isObject(object.broadcast_transaction_response))
                         throw TypeError(".network.v1.MessageHeader.broadcast_transaction_response: object expected");
-                    message.broadcast_transaction_response = $root.network.v1.BroadcastTransactionResponse.fromObject(object.broadcast_transaction_response);
+                    message.broadcast_transaction_response = $root.network.v1.BroadcastTransactionResponse.fromObject(object.broadcast_transaction_response, long + 1);
                 }
                 if (object.capabilities) {
                     if (!Array.isArray(object.capabilities))
@@ -438,9 +456,13 @@ $root.network = (function() {
              * @param {$protobuf.IConversionOptions} [options] Conversion options
              * @returns {Object.<string,*>} Plain object
              */
-            MessageHeader.toObject = function toObject(message, options) {
+            MessageHeader.toObject = function toObject(message, options, q) {
                 if (!options)
                     options = {};
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
                 var object = {};
                 if (options.arrays || options.defaults)
                     object.capabilities = [];
@@ -449,36 +471,38 @@ $root.network = (function() {
                     object.id = "";
                     if ($util.Long) {
                         var long = new $util.Long(0, 0, true);
-                        object.timestamp = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
+                        object.timestamp = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : typeof BigInt !== "undefined" && options.longs === BigInt ? long.toBigInt() : long;
                     } else
-                        object.timestamp = options.longs === String ? "0" : 0;
+                        object.timestamp = options.longs === String ? "0" : typeof BigInt !== "undefined" && options.longs === BigInt ? BigInt("0") : 0;
                 }
-                if (message.type != null && message.hasOwnProperty("type"))
+                if (message.type != null && Object.hasOwnProperty.call(message, "type"))
                     object.type = options.enums === String ? $root.network.v1.MessageType[message.type] === undefined ? message.type : $root.network.v1.MessageType[message.type] : message.type;
-                if (message.id != null && message.hasOwnProperty("id"))
+                if (message.id != null && Object.hasOwnProperty.call(message, "id"))
                     object.id = message.id;
-                if (message.timestamp != null && message.hasOwnProperty("timestamp"))
-                    if (typeof message.timestamp === "number")
+                if (message.timestamp != null && Object.hasOwnProperty.call(message, "timestamp"))
+                    if (typeof BigInt !== "undefined" && options.longs === BigInt)
+                        object.timestamp = typeof message.timestamp === "number" ? BigInt(message.timestamp) : $util.Long.fromBits(message.timestamp.low >>> 0, message.timestamp.high >>> 0, true).toBigInt();
+                    else if (typeof message.timestamp === "number")
                         object.timestamp = options.longs === String ? String(message.timestamp) : message.timestamp;
                     else
                         object.timestamp = options.longs === String ? $util.Long.prototype.toString.call(message.timestamp) : options.longs === Number ? new $util.LongBits(message.timestamp.low >>> 0, message.timestamp.high >>> 0).toNumber(true) : message.timestamp;
-                if (message.liveness_request != null && message.hasOwnProperty("liveness_request")) {
-                    object.liveness_request = $root.network.v1.LivenessRequest.toObject(message.liveness_request, options);
+                if (message.liveness_request != null && Object.hasOwnProperty.call(message, "liveness_request")) {
+                    object.liveness_request = $root.network.v1.LivenessRequest.toObject(message.liveness_request, options, q + 1);
                     if (options.oneofs)
                         object.field = "liveness_request";
                 }
-                if (message.liveness_response != null && message.hasOwnProperty("liveness_response")) {
-                    object.liveness_response = $root.network.v1.LivenessResponse.toObject(message.liveness_response, options);
+                if (message.liveness_response != null && Object.hasOwnProperty.call(message, "liveness_response")) {
+                    object.liveness_response = $root.network.v1.LivenessResponse.toObject(message.liveness_response, options, q + 1);
                     if (options.oneofs)
                         object.field = "liveness_response";
                 }
-                if (message.broadcast_transaction_request != null && message.hasOwnProperty("broadcast_transaction_request")) {
-                    object.broadcast_transaction_request = $root.network.v1.BroadcastTransactionRequest.toObject(message.broadcast_transaction_request, options);
+                if (message.broadcast_transaction_request != null && Object.hasOwnProperty.call(message, "broadcast_transaction_request")) {
+                    object.broadcast_transaction_request = $root.network.v1.BroadcastTransactionRequest.toObject(message.broadcast_transaction_request, options, q + 1);
                     if (options.oneofs)
                         object.field = "broadcast_transaction_request";
                 }
-                if (message.broadcast_transaction_response != null && message.hasOwnProperty("broadcast_transaction_response")) {
-                    object.broadcast_transaction_response = $root.network.v1.BroadcastTransactionResponse.toObject(message.broadcast_transaction_response, options);
+                if (message.broadcast_transaction_response != null && Object.hasOwnProperty.call(message, "broadcast_transaction_response")) {
+                    object.broadcast_transaction_response = $root.network.v1.BroadcastTransactionResponse.toObject(message.broadcast_transaction_response, options, q + 1);
                     if (options.oneofs)
                         object.field = "broadcast_transaction_response";
                 }
@@ -560,7 +584,7 @@ $root.network = (function() {
             function LivenessRequest(properties) {
                 if (properties)
                     for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
-                        if (properties[keys[i]] != null)
+                        if (properties[keys[i]] != null && keys[i] !== "__proto__")
                             this[keys[i]] = properties[keys[i]];
             }
 
@@ -601,8 +625,12 @@ $root.network = (function() {
              * @param {$protobuf.Writer} [writer] Writer to encode to
              * @returns {$protobuf.Writer} Writer
              */
-            LivenessRequest.encode = function encode(message, writer) {
+            LivenessRequest.encode = function encode(message, writer, q) {
                 writer = $Writer.create(writer);
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
                 if (message.nonce != null && Object.hasOwnProperty.call(message, "nonce"))
                     writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.nonce);
                 if (message.signature != null && Object.hasOwnProperty.call(message, "signature"))
@@ -620,7 +648,7 @@ $root.network = (function() {
              * @returns {$protobuf.Writer} Writer
              */
             LivenessRequest.encodeDelimited = function encodeDelimited(message, writer) {
-                return this.encode(message, writer).ldelim();
+                return this.encode(message, writer && writer.len ? writer.fork() : writer).ldelim();
             };
 
             /**
@@ -634,8 +662,12 @@ $root.network = (function() {
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
-            LivenessRequest.decode = function decode(reader, length, error) {
+            LivenessRequest.decode = function decode(reader, length, error, long) {
                 reader = $Reader.create(reader);
+                if (long === undefined)
+                    long = 0;
+                if (long > $Reader.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
                 var end = length === undefined ? reader.len : reader.pos + length, message = new $root.network.v1.LivenessRequest();
                 while (reader.pos < end) {
                     var tag = reader.uint32();
@@ -651,7 +683,7 @@ $root.network = (function() {
                             break;
                         }
                     default:
-                        reader.skipType(tag & 7);
+                        reader.skipType(tag & 7, long);
                         break;
                     }
                 }
@@ -681,13 +713,17 @@ $root.network = (function() {
              * @param {Object.<string,*>} message Plain object to verify
              * @returns {string|null} `null` if valid, otherwise the reason why it is not
              */
-            LivenessRequest.verify = function verify(message) {
+            LivenessRequest.verify = function verify(message, long) {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
-                if (message.nonce != null && message.hasOwnProperty("nonce"))
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    return "maximum nesting depth exceeded";
+                if (message.nonce != null && Object.hasOwnProperty.call(message, "nonce"))
                     if (!$util.isBytes(message.nonce))
                         return "nonce: buffer expected";
-                if (message.signature != null && message.hasOwnProperty("signature"))
+                if (message.signature != null && Object.hasOwnProperty.call(message, "signature"))
                     if (!$util.isBytes(message.signature))
                         return "signature: buffer expected";
                 return null;
@@ -701,9 +737,15 @@ $root.network = (function() {
              * @param {Object.<string,*>} object Plain object
              * @returns {network.v1.LivenessRequest} LivenessRequest
              */
-            LivenessRequest.fromObject = function fromObject(object) {
+            LivenessRequest.fromObject = function fromObject(object, long) {
                 if (object instanceof $root.network.v1.LivenessRequest)
                     object = Object.assign({}, object);
+                if (!$util.isObject(object))
+                    throw TypeError(".network.v1.LivenessRequest: object expected");
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
                 var message = new $root.network.v1.LivenessRequest();
                 if (object.nonce != null)
                     message.nonce = $util.bytesFrom(object.nonce);
@@ -721,9 +763,13 @@ $root.network = (function() {
              * @param {$protobuf.IConversionOptions} [options] Conversion options
              * @returns {Object.<string,*>} Plain object
              */
-            LivenessRequest.toObject = function toObject(message, options) {
+            LivenessRequest.toObject = function toObject(message, options, q) {
                 if (!options)
                     options = {};
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
                 var object = {};
                 if (options.defaults) {
                     if (options.bytes === String)
@@ -741,9 +787,9 @@ $root.network = (function() {
                             object.signature = $util.newBuffer(object.signature);
                     }
                 }
-                if (message.nonce != null && message.hasOwnProperty("nonce"))
+                if (message.nonce != null && Object.hasOwnProperty.call(message, "nonce"))
                     object.nonce = $util.bytesTo(message.nonce, options);
-                if (message.signature != null && message.hasOwnProperty("signature"))
+                if (message.signature != null && Object.hasOwnProperty.call(message, "signature"))
                     object.signature = $util.bytesTo(message.signature, options);
                 return object;
             };
@@ -799,7 +845,7 @@ $root.network = (function() {
             function LivenessResponse(properties) {
                 if (properties)
                     for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
-                        if (properties[keys[i]] != null)
+                        if (properties[keys[i]] != null && keys[i] !== "__proto__")
                             this[keys[i]] = properties[keys[i]];
             }
 
@@ -848,8 +894,12 @@ $root.network = (function() {
              * @param {$protobuf.Writer} [writer] Writer to encode to
              * @returns {$protobuf.Writer} Writer
              */
-            LivenessResponse.encode = function encode(message, writer) {
+            LivenessResponse.encode = function encode(message, writer, q) {
                 writer = $Writer.create(writer);
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
                 if (message.nonce != null && Object.hasOwnProperty.call(message, "nonce"))
                     writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.nonce);
                 if (message.signature != null && Object.hasOwnProperty.call(message, "signature"))
@@ -869,7 +919,7 @@ $root.network = (function() {
              * @returns {$protobuf.Writer} Writer
              */
             LivenessResponse.encodeDelimited = function encodeDelimited(message, writer) {
-                return this.encode(message, writer).ldelim();
+                return this.encode(message, writer && writer.len ? writer.fork() : writer).ldelim();
             };
 
             /**
@@ -883,8 +933,12 @@ $root.network = (function() {
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
-            LivenessResponse.decode = function decode(reader, length, error) {
+            LivenessResponse.decode = function decode(reader, length, error, long) {
                 reader = $Reader.create(reader);
+                if (long === undefined)
+                    long = 0;
+                if (long > $Reader.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
                 var end = length === undefined ? reader.len : reader.pos + length, message = new $root.network.v1.LivenessResponse();
                 while (reader.pos < end) {
                     var tag = reader.uint32();
@@ -904,7 +958,7 @@ $root.network = (function() {
                             break;
                         }
                     default:
-                        reader.skipType(tag & 7);
+                        reader.skipType(tag & 7, long);
                         break;
                     }
                 }
@@ -934,16 +988,20 @@ $root.network = (function() {
              * @param {Object.<string,*>} message Plain object to verify
              * @returns {string|null} `null` if valid, otherwise the reason why it is not
              */
-            LivenessResponse.verify = function verify(message) {
+            LivenessResponse.verify = function verify(message, long) {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
-                if (message.nonce != null && message.hasOwnProperty("nonce"))
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    return "maximum nesting depth exceeded";
+                if (message.nonce != null && Object.hasOwnProperty.call(message, "nonce"))
                     if (!$util.isBytes(message.nonce))
                         return "nonce: buffer expected";
-                if (message.signature != null && message.hasOwnProperty("signature"))
+                if (message.signature != null && Object.hasOwnProperty.call(message, "signature"))
                     if (!$util.isBytes(message.signature))
                         return "signature: buffer expected";
-                if (message.result != null && message.hasOwnProperty("result"))
+                if (message.result != null && Object.hasOwnProperty.call(message, "result"))
                     switch (message.result) {
                     default:
                         return "result: enum value expected";
@@ -1037,9 +1095,15 @@ $root.network = (function() {
              * @param {Object.<string,*>} object Plain object
              * @returns {network.v1.LivenessResponse} LivenessResponse
              */
-            LivenessResponse.fromObject = function fromObject(object) {
+            LivenessResponse.fromObject = function fromObject(object, long) {
                 if (object instanceof $root.network.v1.LivenessResponse)
                     object = Object.assign({}, object);
+                if (!$util.isObject(object))
+                    throw TypeError(".network.v1.LivenessResponse: object expected");
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
                 var message = new $root.network.v1.LivenessResponse();
                 if (object.nonce != null)
                     message.nonce = $util.bytesFrom(object.nonce);
@@ -1373,9 +1437,13 @@ $root.network = (function() {
              * @param {$protobuf.IConversionOptions} [options] Conversion options
              * @returns {Object.<string,*>} Plain object
              */
-            LivenessResponse.toObject = function toObject(message, options) {
+            LivenessResponse.toObject = function toObject(message, options, q) {
                 if (!options)
                     options = {};
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
                 var object = {};
                 if (options.defaults) {
                     if (options.bytes === String)
@@ -1394,11 +1462,11 @@ $root.network = (function() {
                     }
                     object.result = options.enums === String ? "RESULT_CODE_UNSPECIFIED" : 0;
                 }
-                if (message.nonce != null && message.hasOwnProperty("nonce"))
+                if (message.nonce != null && Object.hasOwnProperty.call(message, "nonce"))
                     object.nonce = $util.bytesTo(message.nonce, options);
-                if (message.signature != null && message.hasOwnProperty("signature"))
+                if (message.signature != null && Object.hasOwnProperty.call(message, "signature"))
                     object.signature = $util.bytesTo(message.signature, options);
-                if (message.result != null && message.hasOwnProperty("result"))
+                if (message.result != null && Object.hasOwnProperty.call(message, "result"))
                     object.result = options.enums === String ? $root.common.v1.ResultCode[message.result] === undefined ? message.result : $root.common.v1.ResultCode[message.result] : message.result;
                 return object;
             };
@@ -1454,7 +1522,7 @@ $root.network = (function() {
             function BroadcastTransactionRequest(properties) {
                 if (properties)
                     for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
-                        if (properties[keys[i]] != null)
+                        if (properties[keys[i]] != null && keys[i] !== "__proto__")
                             this[keys[i]] = properties[keys[i]];
             }
 
@@ -1503,8 +1571,12 @@ $root.network = (function() {
              * @param {$protobuf.Writer} [writer] Writer to encode to
              * @returns {$protobuf.Writer} Writer
              */
-            BroadcastTransactionRequest.encode = function encode(message, writer) {
+            BroadcastTransactionRequest.encode = function encode(message, writer, q) {
                 writer = $Writer.create(writer);
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
                 if (message.data != null && Object.hasOwnProperty.call(message, "data"))
                     writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.data);
                 if (message.nonce != null && Object.hasOwnProperty.call(message, "nonce"))
@@ -1524,7 +1596,7 @@ $root.network = (function() {
              * @returns {$protobuf.Writer} Writer
              */
             BroadcastTransactionRequest.encodeDelimited = function encodeDelimited(message, writer) {
-                return this.encode(message, writer).ldelim();
+                return this.encode(message, writer && writer.len ? writer.fork() : writer).ldelim();
             };
 
             /**
@@ -1538,8 +1610,12 @@ $root.network = (function() {
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
-            BroadcastTransactionRequest.decode = function decode(reader, length, error) {
+            BroadcastTransactionRequest.decode = function decode(reader, length, error, long) {
                 reader = $Reader.create(reader);
+                if (long === undefined)
+                    long = 0;
+                if (long > $Reader.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
                 var end = length === undefined ? reader.len : reader.pos + length, message = new $root.network.v1.BroadcastTransactionRequest();
                 while (reader.pos < end) {
                     var tag = reader.uint32();
@@ -1559,7 +1635,7 @@ $root.network = (function() {
                             break;
                         }
                     default:
-                        reader.skipType(tag & 7);
+                        reader.skipType(tag & 7, long);
                         break;
                     }
                 }
@@ -1589,16 +1665,20 @@ $root.network = (function() {
              * @param {Object.<string,*>} message Plain object to verify
              * @returns {string|null} `null` if valid, otherwise the reason why it is not
              */
-            BroadcastTransactionRequest.verify = function verify(message) {
+            BroadcastTransactionRequest.verify = function verify(message, long) {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
-                if (message.data != null && message.hasOwnProperty("data"))
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    return "maximum nesting depth exceeded";
+                if (message.data != null && Object.hasOwnProperty.call(message, "data"))
                     if (!$util.isBytes(message.data))
                         return "data: buffer expected";
-                if (message.nonce != null && message.hasOwnProperty("nonce"))
+                if (message.nonce != null && Object.hasOwnProperty.call(message, "nonce"))
                     if (!$util.isBytes(message.nonce))
                         return "nonce: buffer expected";
-                if (message.signature != null && message.hasOwnProperty("signature"))
+                if (message.signature != null && Object.hasOwnProperty.call(message, "signature"))
                     if (!$util.isBytes(message.signature))
                         return "signature: buffer expected";
                 return null;
@@ -1612,9 +1692,15 @@ $root.network = (function() {
              * @param {Object.<string,*>} object Plain object
              * @returns {network.v1.BroadcastTransactionRequest} BroadcastTransactionRequest
              */
-            BroadcastTransactionRequest.fromObject = function fromObject(object) {
+            BroadcastTransactionRequest.fromObject = function fromObject(object, long) {
                 if (object instanceof $root.network.v1.BroadcastTransactionRequest)
                     object = Object.assign({}, object);
+                if (!$util.isObject(object))
+                    throw TypeError(".network.v1.BroadcastTransactionRequest: object expected");
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
                 var message = new $root.network.v1.BroadcastTransactionRequest();
                 if (object.data != null)
                     message.data = $util.bytesFrom(object.data);
@@ -1634,9 +1720,13 @@ $root.network = (function() {
              * @param {$protobuf.IConversionOptions} [options] Conversion options
              * @returns {Object.<string,*>} Plain object
              */
-            BroadcastTransactionRequest.toObject = function toObject(message, options) {
+            BroadcastTransactionRequest.toObject = function toObject(message, options, q) {
                 if (!options)
                     options = {};
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
                 var object = {};
                 if (options.defaults) {
                     if (options.bytes === String)
@@ -1661,11 +1751,11 @@ $root.network = (function() {
                             object.signature = $util.newBuffer(object.signature);
                     }
                 }
-                if (message.data != null && message.hasOwnProperty("data"))
+                if (message.data != null && Object.hasOwnProperty.call(message, "data"))
                     object.data = $util.bytesTo(message.data, options);
-                if (message.nonce != null && message.hasOwnProperty("nonce"))
+                if (message.nonce != null && Object.hasOwnProperty.call(message, "nonce"))
                     object.nonce = $util.bytesTo(message.nonce, options);
-                if (message.signature != null && message.hasOwnProperty("signature"))
+                if (message.signature != null && Object.hasOwnProperty.call(message, "signature"))
                     object.signature = $util.bytesTo(message.signature, options);
                 return object;
             };
@@ -1723,7 +1813,7 @@ $root.network = (function() {
             function BroadcastTransactionResponse(properties) {
                 if (properties)
                     for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
-                        if (properties[keys[i]] != null)
+                        if (properties[keys[i]] != null && keys[i] !== "__proto__")
                             this[keys[i]] = properties[keys[i]];
             }
 
@@ -1788,8 +1878,12 @@ $root.network = (function() {
              * @param {$protobuf.Writer} [writer] Writer to encode to
              * @returns {$protobuf.Writer} Writer
              */
-            BroadcastTransactionResponse.encode = function encode(message, writer) {
+            BroadcastTransactionResponse.encode = function encode(message, writer, q) {
                 writer = $Writer.create(writer);
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
                 if (message.nonce != null && Object.hasOwnProperty.call(message, "nonce"))
                     writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.nonce);
                 if (message.signature != null && Object.hasOwnProperty.call(message, "signature"))
@@ -1813,7 +1907,7 @@ $root.network = (function() {
              * @returns {$protobuf.Writer} Writer
              */
             BroadcastTransactionResponse.encodeDelimited = function encodeDelimited(message, writer) {
-                return this.encode(message, writer).ldelim();
+                return this.encode(message, writer && writer.len ? writer.fork() : writer).ldelim();
             };
 
             /**
@@ -1827,8 +1921,12 @@ $root.network = (function() {
              * @throws {Error} If the payload is not a reader or valid buffer
              * @throws {$protobuf.util.ProtocolError} If required fields are missing
              */
-            BroadcastTransactionResponse.decode = function decode(reader, length, error) {
+            BroadcastTransactionResponse.decode = function decode(reader, length, error, long) {
                 reader = $Reader.create(reader);
+                if (long === undefined)
+                    long = 0;
+                if (long > $Reader.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
                 var end = length === undefined ? reader.len : reader.pos + length, message = new $root.network.v1.BroadcastTransactionResponse();
                 while (reader.pos < end) {
                     var tag = reader.uint32();
@@ -1856,7 +1954,7 @@ $root.network = (function() {
                             break;
                         }
                     default:
-                        reader.skipType(tag & 7);
+                        reader.skipType(tag & 7, long);
                         break;
                     }
                 }
@@ -1886,22 +1984,26 @@ $root.network = (function() {
              * @param {Object.<string,*>} message Plain object to verify
              * @returns {string|null} `null` if valid, otherwise the reason why it is not
              */
-            BroadcastTransactionResponse.verify = function verify(message) {
+            BroadcastTransactionResponse.verify = function verify(message, long) {
                 if (typeof message !== "object" || message === null)
                     return "object expected";
-                if (message.nonce != null && message.hasOwnProperty("nonce"))
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    return "maximum nesting depth exceeded";
+                if (message.nonce != null && Object.hasOwnProperty.call(message, "nonce"))
                     if (!$util.isBytes(message.nonce))
                         return "nonce: buffer expected";
-                if (message.signature != null && message.hasOwnProperty("signature"))
+                if (message.signature != null && Object.hasOwnProperty.call(message, "signature"))
                     if (!$util.isBytes(message.signature))
                         return "signature: buffer expected";
-                if (message.proof != null && message.hasOwnProperty("proof"))
+                if (message.proof != null && Object.hasOwnProperty.call(message, "proof"))
                     if (!$util.isBytes(message.proof))
                         return "proof: buffer expected";
-                if (message.timestamp != null && message.hasOwnProperty("timestamp"))
+                if (message.timestamp != null && Object.hasOwnProperty.call(message, "timestamp"))
                     if (!$util.isInteger(message.timestamp) && !(message.timestamp && $util.isInteger(message.timestamp.low) && $util.isInteger(message.timestamp.high)))
                         return "timestamp: integer|Long expected";
-                if (message.result != null && message.hasOwnProperty("result"))
+                if (message.result != null && Object.hasOwnProperty.call(message, "result"))
                     switch (message.result) {
                     default:
                         return "result: enum value expected";
@@ -1995,9 +2097,15 @@ $root.network = (function() {
              * @param {Object.<string,*>} object Plain object
              * @returns {network.v1.BroadcastTransactionResponse} BroadcastTransactionResponse
              */
-            BroadcastTransactionResponse.fromObject = function fromObject(object) {
+            BroadcastTransactionResponse.fromObject = function fromObject(object, long) {
                 if (object instanceof $root.network.v1.BroadcastTransactionResponse)
                     object = Object.assign({}, object);
+                if (!$util.isObject(object))
+                    throw TypeError(".network.v1.BroadcastTransactionResponse: object expected");
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
                 var message = new $root.network.v1.BroadcastTransactionResponse();
                 if (object.nonce != null)
                     message.nonce = $util.bytesFrom(object.nonce);
@@ -2007,7 +2115,7 @@ $root.network = (function() {
                     message.proof = $util.bytesFrom(object.proof);
                 if (object.timestamp != null)
                     if ($util.Long)
-                        (message.timestamp = $util.Long.fromValue(object.timestamp)).unsigned = true;
+                        message.timestamp = $util.Long.fromValue(object.timestamp, true);
                     else if (typeof object.timestamp === "string")
                         message.timestamp = parseInt(object.timestamp, 10);
                     else if (typeof object.timestamp === "number")
@@ -2342,9 +2450,13 @@ $root.network = (function() {
              * @param {$protobuf.IConversionOptions} [options] Conversion options
              * @returns {Object.<string,*>} Plain object
              */
-            BroadcastTransactionResponse.toObject = function toObject(message, options) {
+            BroadcastTransactionResponse.toObject = function toObject(message, options, q) {
                 if (!options)
                     options = {};
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
                 var object = {};
                 if (options.defaults) {
                     if (options.bytes === String)
@@ -2370,23 +2482,25 @@ $root.network = (function() {
                     }
                     if ($util.Long) {
                         var long = new $util.Long(0, 0, true);
-                        object.timestamp = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : long;
+                        object.timestamp = options.longs === String ? long.toString() : options.longs === Number ? long.toNumber() : typeof BigInt !== "undefined" && options.longs === BigInt ? long.toBigInt() : long;
                     } else
-                        object.timestamp = options.longs === String ? "0" : 0;
+                        object.timestamp = options.longs === String ? "0" : typeof BigInt !== "undefined" && options.longs === BigInt ? BigInt("0") : 0;
                     object.result = options.enums === String ? "RESULT_CODE_UNSPECIFIED" : 0;
                 }
-                if (message.nonce != null && message.hasOwnProperty("nonce"))
+                if (message.nonce != null && Object.hasOwnProperty.call(message, "nonce"))
                     object.nonce = $util.bytesTo(message.nonce, options);
-                if (message.signature != null && message.hasOwnProperty("signature"))
+                if (message.signature != null && Object.hasOwnProperty.call(message, "signature"))
                     object.signature = $util.bytesTo(message.signature, options);
-                if (message.proof != null && message.hasOwnProperty("proof"))
+                if (message.proof != null && Object.hasOwnProperty.call(message, "proof"))
                     object.proof = $util.bytesTo(message.proof, options);
-                if (message.timestamp != null && message.hasOwnProperty("timestamp"))
-                    if (typeof message.timestamp === "number")
+                if (message.timestamp != null && Object.hasOwnProperty.call(message, "timestamp"))
+                    if (typeof BigInt !== "undefined" && options.longs === BigInt)
+                        object.timestamp = typeof message.timestamp === "number" ? BigInt(message.timestamp) : $util.Long.fromBits(message.timestamp.low >>> 0, message.timestamp.high >>> 0, true).toBigInt();
+                    else if (typeof message.timestamp === "number")
                         object.timestamp = options.longs === String ? String(message.timestamp) : message.timestamp;
                     else
                         object.timestamp = options.longs === String ? $util.Long.prototype.toString.call(message.timestamp) : options.longs === Number ? new $util.LongBits(message.timestamp.low >>> 0, message.timestamp.high >>> 0).toNumber(true) : message.timestamp;
-                if (message.result != null && message.hasOwnProperty("result"))
+                if (message.result != null && Object.hasOwnProperty.call(message, "result"))
                     object.result = options.enums === String ? $root.common.v1.ResultCode[message.result] === undefined ? message.result : $root.common.v1.ResultCode[message.result] : message.result;
                 return object;
             };

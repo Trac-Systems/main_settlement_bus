@@ -9,7 +9,7 @@ var $protobuf = require("../protobufRuntime.cjs");
 var $Reader = $protobuf.Reader, $Writer = $protobuf.Writer, $util = $protobuf.util;
 
 // Exported root namespace
-var $root = $protobuf.roots.state || ($protobuf.roots.state = {});
+var $root = $protobuf.roots["state"] || ($protobuf.roots["state"] = {});
 
 $root.state = (function() {
 
@@ -68,7 +68,7 @@ $root.state = (function() {
         function EscrowEntry(properties) {
             if (properties)
                 for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
-                    if (properties[keys[i]] != null)
+                    if (properties[keys[i]] != null && keys[i] !== "__proto__")
                         this[keys[i]] = properties[keys[i]];
         }
 
@@ -224,8 +224,12 @@ $root.state = (function() {
          * @param {$protobuf.Writer} [writer] Writer to encode to
          * @returns {$protobuf.Writer} Writer
          */
-        EscrowEntry.encode = function encode(message, writer) {
+        EscrowEntry.encode = function encode(message, writer, q) {
             writer = $Writer.create(writer);
+            if (q === undefined)
+                q = 0;
+            if (q > $util.recursionLimit)
+                throw Error("max depth exceeded");
             if (message.version != null && Object.hasOwnProperty.call(message, "version"))
                 writer.uint32(/* id 1, wireType 0 =*/8).uint32(message.version);
             if (message.status != null && Object.hasOwnProperty.call(message, "status"))
@@ -265,7 +269,7 @@ $root.state = (function() {
          * @returns {$protobuf.Writer} Writer
          */
         EscrowEntry.encodeDelimited = function encodeDelimited(message, writer) {
-            return this.encode(message, writer).ldelim();
+            return this.encode(message, writer && writer.len ? writer.fork() : writer).ldelim();
         };
 
         /**
@@ -279,8 +283,12 @@ $root.state = (function() {
          * @throws {Error} If the payload is not a reader or valid buffer
          * @throws {$protobuf.util.ProtocolError} If required fields are missing
          */
-        EscrowEntry.decode = function decode(reader, length, error) {
+        EscrowEntry.decode = function decode(reader, length, error, long) {
             reader = $Reader.create(reader);
+            if (long === undefined)
+                long = 0;
+            if (long > $Reader.recursionLimit)
+                throw Error("maximum nesting depth exceeded");
             var end = length === undefined ? reader.len : reader.pos + length, message = new $root.state.EscrowEntry();
             while (reader.pos < end) {
                 var tag = reader.uint32();
@@ -340,7 +348,7 @@ $root.state = (function() {
                         break;
                     }
                 default:
-                    reader.skipType(tag & 7);
+                    reader.skipType(tag & 7, long);
                     break;
                 }
             }
@@ -370,14 +378,18 @@ $root.state = (function() {
          * @param {Object.<string,*>} message Plain object to verify
          * @returns {string|null} `null` if valid, otherwise the reason why it is not
          */
-        EscrowEntry.verify = function verify(message) {
+        EscrowEntry.verify = function verify(message, long) {
             if (typeof message !== "object" || message === null)
                 return "object expected";
+            if (long === undefined)
+                long = 0;
+            if (long > $util.recursionLimit)
+                return "maximum nesting depth exceeded";
             var properties = {};
-            if (message.version != null && message.hasOwnProperty("version"))
+            if (message.version != null && Object.hasOwnProperty.call(message, "version"))
                 if (!$util.isInteger(message.version))
                     return "version: integer expected";
-            if (message.status != null && message.hasOwnProperty("status")) {
+            if (message.status != null && Object.hasOwnProperty.call(message, "status")) {
                 properties._status = 1;
                 switch (message.status) {
                 default:
@@ -388,43 +400,43 @@ $root.state = (function() {
                     break;
                 }
             }
-            if (message.amount != null && message.hasOwnProperty("amount"))
+            if (message.amount != null && Object.hasOwnProperty.call(message, "amount"))
                 if (!$util.isBytes(message.amount))
                     return "amount: buffer expected";
-            if (message.additionalFeeAmount != null && message.hasOwnProperty("additionalFeeAmount"))
+            if (message.additionalFeeAmount != null && Object.hasOwnProperty.call(message, "additionalFeeAmount"))
                 if (!$util.isBytes(message.additionalFeeAmount))
                     return "additionalFeeAmount: buffer expected";
-            if (message.lockerAddress != null && message.hasOwnProperty("lockerAddress"))
+            if (message.lockerAddress != null && Object.hasOwnProperty.call(message, "lockerAddress"))
                 if (!$util.isBytes(message.lockerAddress))
                     return "lockerAddress: buffer expected";
-            if (message.claimRecipientAddress != null && message.hasOwnProperty("claimRecipientAddress"))
+            if (message.claimRecipientAddress != null && Object.hasOwnProperty.call(message, "claimRecipientAddress"))
                 if (!$util.isBytes(message.claimRecipientAddress))
                     return "claimRecipientAddress: buffer expected";
-            if (message.refundRecipientAddress != null && message.hasOwnProperty("refundRecipientAddress"))
+            if (message.refundRecipientAddress != null && Object.hasOwnProperty.call(message, "refundRecipientAddress"))
                 if (!$util.isBytes(message.refundRecipientAddress))
                     return "refundRecipientAddress: buffer expected";
-            if (message.additionalFeeRecipientAddress != null && message.hasOwnProperty("additionalFeeRecipientAddress")) {
+            if (message.additionalFeeRecipientAddress != null && Object.hasOwnProperty.call(message, "additionalFeeRecipientAddress")) {
                 properties._additionalFeeRecipientAddress = 1;
                 if (!$util.isBytes(message.additionalFeeRecipientAddress))
                     return "additionalFeeRecipientAddress: buffer expected";
             }
-            if (message.lockId != null && message.hasOwnProperty("lockId"))
+            if (message.lockId != null && Object.hasOwnProperty.call(message, "lockId"))
                 if (!$util.isBytes(message.lockId))
                     return "lockId: buffer expected";
-            if (message.hashLock != null && message.hasOwnProperty("hashLock"))
+            if (message.hashLock != null && Object.hasOwnProperty.call(message, "hashLock"))
                 if (!$util.isBytes(message.hashLock))
                     return "hashLock: buffer expected";
-            if (message.preimage != null && message.hasOwnProperty("preimage")) {
+            if (message.preimage != null && Object.hasOwnProperty.call(message, "preimage")) {
                 properties._preimage = 1;
                 if (!$util.isBytes(message.preimage))
                     return "preimage: buffer expected";
             }
-            if (message.metadata != null && message.hasOwnProperty("metadata")) {
+            if (message.metadata != null && Object.hasOwnProperty.call(message, "metadata")) {
                 properties._metadata = 1;
                 if (!$util.isBytes(message.metadata))
                     return "metadata: buffer expected";
             }
-            if (message.refundEpoch != null && message.hasOwnProperty("refundEpoch"))
+            if (message.refundEpoch != null && Object.hasOwnProperty.call(message, "refundEpoch"))
                 if (!$util.isBytes(message.refundEpoch))
                     return "refundEpoch: buffer expected";
             return null;
@@ -438,9 +450,15 @@ $root.state = (function() {
          * @param {Object.<string,*>} object Plain object
          * @returns {state.EscrowEntry} EscrowEntry
          */
-        EscrowEntry.fromObject = function fromObject(object) {
+        EscrowEntry.fromObject = function fromObject(object, long) {
             if (object instanceof $root.state.EscrowEntry)
                 object = Object.assign({}, object);
+            if (!$util.isObject(object))
+                throw TypeError(".state.EscrowEntry: object expected");
+            if (long === undefined)
+                long = 0;
+            if (long > $util.recursionLimit)
+                throw Error("maximum nesting depth exceeded");
             var message = new $root.state.EscrowEntry();
             if (object.version != null)
                 message.version = object.version >>> 0;
@@ -498,9 +516,13 @@ $root.state = (function() {
          * @param {$protobuf.IConversionOptions} [options] Conversion options
          * @returns {Object.<string,*>} Plain object
          */
-        EscrowEntry.toObject = function toObject(message, options) {
+        EscrowEntry.toObject = function toObject(message, options, q) {
             if (!options)
                 options = {};
+            if (q === undefined)
+                q = 0;
+            if (q > $util.recursionLimit)
+                throw Error("max depth exceeded");
             var object = {};
             if (options.defaults) {
                 object.version = 0;
@@ -561,43 +583,43 @@ $root.state = (function() {
                         object.refundEpoch = $util.newBuffer(object.refundEpoch);
                 }
             }
-            if (message.version != null && message.hasOwnProperty("version"))
+            if (message.version != null && Object.hasOwnProperty.call(message, "version"))
                 object.version = message.version;
-            if (message.status != null && message.hasOwnProperty("status")) {
+            if (message.status != null && Object.hasOwnProperty.call(message, "status")) {
                 object.status = options.enums === String ? $root.state.EscrowStatus[message.status] === undefined ? message.status : $root.state.EscrowStatus[message.status] : message.status;
                 if (options.oneofs)
                     object._status = "status";
             }
-            if (message.amount != null && message.hasOwnProperty("amount"))
+            if (message.amount != null && Object.hasOwnProperty.call(message, "amount"))
                 object.amount = $util.bytesTo(message.amount, options);
-            if (message.additionalFeeAmount != null && message.hasOwnProperty("additionalFeeAmount"))
+            if (message.additionalFeeAmount != null && Object.hasOwnProperty.call(message, "additionalFeeAmount"))
                 object.additionalFeeAmount = $util.bytesTo(message.additionalFeeAmount, options);
-            if (message.lockerAddress != null && message.hasOwnProperty("lockerAddress"))
+            if (message.lockerAddress != null && Object.hasOwnProperty.call(message, "lockerAddress"))
                 object.lockerAddress = $util.bytesTo(message.lockerAddress, options);
-            if (message.claimRecipientAddress != null && message.hasOwnProperty("claimRecipientAddress"))
+            if (message.claimRecipientAddress != null && Object.hasOwnProperty.call(message, "claimRecipientAddress"))
                 object.claimRecipientAddress = $util.bytesTo(message.claimRecipientAddress, options);
-            if (message.refundRecipientAddress != null && message.hasOwnProperty("refundRecipientAddress"))
+            if (message.refundRecipientAddress != null && Object.hasOwnProperty.call(message, "refundRecipientAddress"))
                 object.refundRecipientAddress = $util.bytesTo(message.refundRecipientAddress, options);
-            if (message.additionalFeeRecipientAddress != null && message.hasOwnProperty("additionalFeeRecipientAddress")) {
+            if (message.additionalFeeRecipientAddress != null && Object.hasOwnProperty.call(message, "additionalFeeRecipientAddress")) {
                 object.additionalFeeRecipientAddress = $util.bytesTo(message.additionalFeeRecipientAddress, options);
                 if (options.oneofs)
                     object._additionalFeeRecipientAddress = "additionalFeeRecipientAddress";
             }
-            if (message.lockId != null && message.hasOwnProperty("lockId"))
+            if (message.lockId != null && Object.hasOwnProperty.call(message, "lockId"))
                 object.lockId = $util.bytesTo(message.lockId, options);
-            if (message.hashLock != null && message.hasOwnProperty("hashLock"))
+            if (message.hashLock != null && Object.hasOwnProperty.call(message, "hashLock"))
                 object.hashLock = $util.bytesTo(message.hashLock, options);
-            if (message.preimage != null && message.hasOwnProperty("preimage")) {
+            if (message.preimage != null && Object.hasOwnProperty.call(message, "preimage")) {
                 object.preimage = $util.bytesTo(message.preimage, options);
                 if (options.oneofs)
                     object._preimage = "preimage";
             }
-            if (message.metadata != null && message.hasOwnProperty("metadata")) {
+            if (message.metadata != null && Object.hasOwnProperty.call(message, "metadata")) {
                 object.metadata = $util.bytesTo(message.metadata, options);
                 if (options.oneofs)
                     object._metadata = "metadata";
             }
-            if (message.refundEpoch != null && message.hasOwnProperty("refundEpoch"))
+            if (message.refundEpoch != null && Object.hasOwnProperty.call(message, "refundEpoch"))
                 object.refundEpoch = $util.bytesTo(message.refundEpoch, options);
             return object;
         };

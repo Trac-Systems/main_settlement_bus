@@ -27,7 +27,7 @@ function normalizePublicKey(publicKey) {
 }
 
 function createPeerInfo(publicKey) {
-    const peerInfo = { publicKey, banned: false };
+    const peerInfo = { publicKey, banned: false, explicit: true };
     peerInfo.ban = sinon.stub().callsFake(value => { peerInfo.banned = !!value; });
     return peerInfo;
 }
@@ -79,6 +79,7 @@ async function loadNetwork({ isIndexer = false, currentEpoch = null, indexerCoun
             this.joinPeer = sinon.stub().callsFake((target) => {
                 const publicKeyHex = b4a.toString(target, 'hex');
                 if (!this.peers.has(publicKeyHex)) this.peers.set(publicKeyHex, createPeerInfo(target));
+                this.peers.get(publicKeyHex).explicit = true;
             });
             this.leavePeer = sinon.stub();
             this.join = sinon.stub();
@@ -90,7 +91,7 @@ async function loadNetwork({ isIndexer = false, currentEpoch = null, indexerCoun
     class ValidatorConnectionManagerMock {
         constructor() {
             validatorConnectionManagerInstance = this;
-            this.validators = new Set();
+            this.validators = new Map();
             this.removed = [];
         }
 
@@ -98,14 +99,15 @@ async function loadNetwork({ isIndexer = false, currentEpoch = null, indexerCoun
             return this.validators.has(normalizePublicKey(publicKey));
         }
 
-        remove(publicKey) {
+        remove(publicKey, connection = null) {
             const publicKeyHex = normalizePublicKey(publicKey);
+            if (connection && this.validators.get(publicKeyHex) !== connection) return;
             this.removed.push({ publicKey: publicKeyHex });
             this.validators.delete(publicKeyHex);
         }
 
-        add(publicKey) {
-            this.validators.add(normalizePublicKey(publicKey));
+        add(publicKey, connection = null) {
+            this.validators.set(normalizePublicKey(publicKey), connection);
             return true;
         }
 
@@ -114,7 +116,7 @@ async function loadNetwork({ isIndexer = false, currentEpoch = null, indexerCoun
         }
 
         connectedPeers() {
-            return Array.from(this.validators);
+            return Array.from(this.validators.keys());
         }
 
         connectionCount() {
@@ -328,6 +330,114 @@ if (isBareRuntime) {
         t.pass('skipped in Bare because esmock depends on node:module');
     });
 } else {
+    test('Network rejoins a retained peer without explicit retries', async t => {
+        const { network, swarmInstance } = await loadNetwork();
+        t.teardown(() => network.close());
+        const publicKey = 'dd'.repeat(32);
+        const target = b4a.from(publicKey, 'hex');
+        swarmInstance.peers.set(publicKey, { publicKey: target, explicit: false });
+        t.is(await network.tryConnect(publicKey, 'validator'), CONNECTION_STATUS.PENDING);
+        t.ok(swarmInstance.joinPeer.calledOnceWithExactly(target));
+        t.is(await network.tryConnect(publicKey, 'validator'), CONNECTION_STATUS.IGNORED);
+        t.is(swarmInstance.joinPeer.callCount, 1, 'pending attempts stay deduplicated');
+    });
+
+    test('Network preserves backoff for an already explicit peer', async t => {
+        const { network, swarmInstance } = await loadNetwork();
+        t.teardown(() => network.close());
+        const publicKey = 'dd'.repeat(32);
+        swarmInstance.peers.set(publicKey, {
+            publicKey: b4a.from(publicKey, 'hex'), explicit: true, waiting: true,
+        });
+        t.is(await network.tryConnect(publicKey, 'validator'), CONNECTION_STATUS.PENDING);
+        t.absent(swarmInstance.joinPeer.called);
+    });
+
+    test('Network keeps a replacement validator when an older connection closes', async t => {
+        const { network, swarmInstance, validatorConnectionManagerInstance: manager,
+            validatorPendingRequestServiceInstance, indexerPendingRequestServiceInstance } = await loadNetwork();
+        t.teardown(() => network.close());
+        const rejectIndexer = sinon.spy(indexerPendingRequestServiceInstance, 'rejectPendingRequestsForPeer');
+        const publicKey = 'dd'.repeat(32);
+        const handler = swarmInstance.rawListeners('connection')[0];
+        const old = new EventEmitter();
+        const replacement = new EventEmitter();
+        for (const connection of [old, replacement]) {
+            connection.remotePublicKey = b4a.from(publicKey, 'hex');
+            connection.destroy = sinon.stub();
+            await handler(connection);
+        }
+        manager.add(publicKey, replacement);
+        old.emit('close');
+        t.is(manager.validators.get(publicKey), replacement);
+        t.alike(manager.removed, []);
+        t.ok(old.protocolSessions.validator.close.calledOnce);
+        t.ok(validatorPendingRequestServiceInstance.rejectPendingRequestsForPeer.calledOnce);
+        t.ok(rejectIndexer.calledOnce);
+        replacement.emit('close');
+        t.absent(manager.exists(publicKey), 'closing the tracked connection removes the validator');
+    });
+
+    test('Network rejects late connections during and after shutdown without replicating', async t => {
+        const { network, swarmInstance, store, epochCoordinatorServiceInstance } = await loadNetwork();
+        let closeEntered, resumeClose;
+        const entered = new Promise(resolve => { closeEntered = resolve; });
+        const paused = new Promise(resolve => { resumeClose = resolve; });
+        epochCoordinatorServiceInstance.close = async () => {
+            closeEntered();
+            await paused;
+        };
+        const handler = swarmInstance.rawListeners('connection')[0];
+        const closing = network.close();
+        await entered;
+        try {
+            const late = createMockConnection('dd'.repeat(32));
+            await handler(late);
+            t.absent(store.replicate.called);
+            t.ok(late.destroy.calledOnce);
+            t.ok(late.protocolSessions.validator.close.calledOnce);
+            await t.exception(() => network.tryConnect('ee'.repeat(32), 'validator'), /closing or already closed/);
+        } finally {
+            resumeClose();
+            await closing;
+        }
+        const afterClose = createMockConnection('ee'.repeat(32));
+        await handler(afterClose);
+        t.absent(store.replicate.called);
+        t.ok(afterClose.destroy.calledOnce);
+        t.is(network.swarm, null);
+        t.is(swarmInstance.listenerCount('connection'), 0);
+    });
+
+    test('Network cleans up both protocol sessions when connection setup fails', async t => {
+        const { network, swarmInstance, consensusMessagesInstance,
+            validatorPendingRequestServiceInstance, indexerPendingRequestServiceInstance } = await loadNetwork();
+        t.teardown(() => network.close());
+        const rejectIndexer = sinon.spy(indexerPendingRequestServiceInstance, 'rejectPendingRequestsForPeer');
+        const error = new Error('consensus setup failed');
+        const closeIndexer = sinon.stub();
+        consensusMessagesInstance.prepareConnection = connection => {
+            connection.protocolSessions.indexer = { close: closeIndexer };
+            throw error;
+        };
+        const connection = createMockConnection('dd'.repeat(32));
+        await swarmInstance.rawListeners('connection')[0](connection);
+        t.ok(connection.destroy.calledOnce);
+        t.ok(connection.protocolSessions.validator.close.calledOnce);
+        t.ok(closeIndexer.calledOnce);
+        t.ok(validatorPendingRequestServiceInstance.rejectPendingRequestsForPeer.calledWith('dd'.repeat(32), error));
+        t.ok(rejectIndexer.calledWith('dd'.repeat(32), error));
+    });
+
+    test('Network handles a replication failure without leaving an unhandled connection', async t => {
+        const { network, swarmInstance, store } = await loadNetwork();
+        t.teardown(() => network.close());
+        store.replicate.throws(new Error('Corestore is closed'));
+        const connection = createMockConnection('dd'.repeat(32));
+        await swarmInstance.rawListeners('connection')[0](connection);
+        t.ok(connection.destroy.calledOnce);
+    });
+
     test('Network does not start the epoch coordinator before genesis initialization', async t => {
         const { network, epochCoordinatorServiceInstance, epochAppenderSelector } = await loadNetwork({
             isIndexer: true,
@@ -896,7 +1006,7 @@ if (isBareRuntime) {
         const probe = new Promise(resolve => { finishProbe = resolve; });
         validatorConnectionManagerInstance.add = async key => {
             await probe;
-            validatorConnectionManagerInstance.validators.add(normalizePublicKey(key));
+            validatorConnectionManagerInstance.validators.set(normalizePublicKey(key), connection);
         };
         const connecting = network.tryConnect(publicKey, 'validator');
         state.emit(CustomEventType.CONSENSUS_PEER_BAN_REQUESTED, {

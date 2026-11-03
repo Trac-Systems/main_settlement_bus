@@ -77,8 +77,8 @@ const makeManager = (maxValidators = 6, conns = null) => {
 // so exercising it means opening the manager for real and advancing its own interval timer.
 const HEALTH_CHECK_INTERVAL_MS = 10
 
-const makeHealthCheckManager = async () => {
-    const merged = createConfig(ENV.DEVELOPMENT, { maxValidators: 6, validatorHealthCheckInterval: HEALTH_CHECK_INTERVAL_MS })
+const makeHealthCheckManager = async (options = {}) => {
+    const merged = createConfig(ENV.DEVELOPMENT, { maxValidators: 6, validatorHealthCheckInterval: HEALTH_CHECK_INTERVAL_MS, ...options })
     const validatorConnectionManager = new ValidatorConnectionManager(6, merged, makeLogger(), makeMessages())
     await validatorConnectionManager.ready()
     return validatorConnectionManager
@@ -292,7 +292,7 @@ test('ConnectionManager', () => {
         })
     })
 
-    test('health checks (strict)', async () => {
+    test('health checks with failure threshold', async () => {
         test('keeps validator on OK response', async t => {
             const clock = sinon.useFakeTimers();
             const stopSpy = sinon.spy(ValidatorHealthCheckService.prototype, 'stop');
@@ -313,7 +313,7 @@ test('ConnectionManager', () => {
             }
         });
 
-        test('removes validator on non-OK response', async t => {
+        test('removes validator after repeated non-OK responses', async t => {
             const clock = sinon.useFakeTimers();
             const stopSpy = sinon.spy(ValidatorHealthCheckService.prototype, 'stop');
             try {
@@ -322,6 +322,9 @@ test('ConnectionManager', () => {
                 v1Conn.connection.protocolSessions.validator.isHealthCheckSupported = () => true;
                 await validatorConnectionManager.add(v1Conn.key, v1Conn.connection);
 
+                await clock.tickAsync(HEALTH_CHECK_INTERVAL_MS * 2);
+                t.ok(validatorConnectionManager.connected(v1Conn.key), 'transient failures retain the validator');
+                t.is(stopSpy.callCount, 0);
                 await clock.tickAsync(HEALTH_CHECK_INTERVAL_MS);
 
                 t.ok(!validatorConnectionManager.connected(v1Conn.key));
@@ -332,7 +335,7 @@ test('ConnectionManager', () => {
             }
         });
 
-        test('removes validator on send rejection', async t => {
+        test('removes validator after repeated send rejections', async t => {
             const clock = sinon.useFakeTimers();
             const stopSpy = sinon.spy(ValidatorHealthCheckService.prototype, 'stop');
             try {
@@ -341,6 +344,9 @@ test('ConnectionManager', () => {
                 v1Conn.connection.protocolSessions.validator.isHealthCheckSupported = () => true;
                 await validatorConnectionManager.add(v1Conn.key, v1Conn.connection);
 
+                await clock.tickAsync(HEALTH_CHECK_INTERVAL_MS * 2);
+                t.ok(validatorConnectionManager.connected(v1Conn.key), 'transient failures retain the validator');
+                t.is(stopSpy.callCount, 0);
                 await clock.tickAsync(HEALTH_CHECK_INTERVAL_MS);
 
                 t.ok(!validatorConnectionManager.connected(v1Conn.key));
@@ -351,6 +357,93 @@ test('ConnectionManager', () => {
             }
         });
     })
+
+    test('a successful health check resets consecutive failures', async t => {
+        const clock = sinon.useFakeTimers();
+        let manager;
+        try {
+            manager = await makeHealthCheckManager();
+            const send = sinon.stub().resolves(ResultCode.TIMEOUT);
+            send.onCall(2).resolves(ResultCode.OK);
+            const data = createV1Connection(testKeyPair3.publicKey, send);
+            data.connection.protocolSessions.validator.isHealthCheckSupported = () => true;
+            await manager.add(data.key, data.connection);
+            await clock.tickAsync(HEALTH_CHECK_INTERVAL_MS * 5);
+            t.ok(manager.connected(data.key), 'two failures after success keep the validator');
+            await clock.tickAsync(HEALTH_CHECK_INTERVAL_MS);
+            t.absent(manager.connected(data.key), 'three new failures remove the validator');
+        } finally {
+            await manager?.close();
+            clock.restore();
+        }
+    });
+
+    for (const [threshold, expected] of [[1, 1], [5, 5], [0, 3], [-1, 3], [1.5, 3]]) {
+        test(`health check threshold ${threshold} removes after ${expected} failures`, async t => {
+            const clock = sinon.useFakeTimers();
+            let manager;
+            try {
+                manager = await makeHealthCheckManager({ validatorHealthCheckFailureThreshold: threshold });
+                const data = createV1Connection(testKeyPair3.publicKey, sinon.stub().resolves(ResultCode.TIMEOUT));
+                data.connection.protocolSessions.validator.isHealthCheckSupported = () => true;
+                await manager.add(data.key, data.connection);
+                await clock.tickAsync(HEALTH_CHECK_INTERVAL_MS * (expected - 1));
+                t.ok(manager.connected(data.key));
+                await clock.tickAsync(HEALTH_CHECK_INTERVAL_MS);
+                t.absent(manager.connected(data.key));
+            } finally {
+                await manager?.close();
+                clock.restore();
+            }
+        });
+    }
+
+    test('a replacement connection starts with no health check failures', async t => {
+        const clock = sinon.useFakeTimers();
+        let manager;
+        try {
+            manager = await makeHealthCheckManager();
+            const old = createV1Connection(testKeyPair3.publicKey, sinon.stub().resolves(ResultCode.TIMEOUT));
+            old.connection.protocolSessions.validator.isHealthCheckSupported = () => true;
+            await manager.add(old.key, old.connection);
+            await clock.tickAsync(HEALTH_CHECK_INTERVAL_MS * 2);
+            manager.remove(old.key);
+            const replacement = createV1Connection(testKeyPair3.publicKey, sinon.stub().resolves(ResultCode.TIMEOUT));
+            replacement.connection.protocolSessions.validator.isHealthCheckSupported = () => true;
+            await manager.add(replacement.key, replacement.connection);
+            old.connection.emit('close');
+            await clock.tickAsync(HEALTH_CHECK_INTERVAL_MS * 2);
+            t.is(manager.getConnection(old.key), replacement.connection, 'stale close and old failures do not remove the replacement');
+            await clock.tickAsync(HEALTH_CHECK_INTERVAL_MS);
+            t.absent(manager.connected(old.key));
+        } finally {
+            await manager?.close();
+            clock.restore();
+        }
+    });
+
+    test('an in-flight failed health check does not remove a replacement connection', async t => {
+        const clock = sinon.useFakeTimers();
+        let manager;
+        try {
+            manager = await makeHealthCheckManager({ validatorHealthCheckFailureThreshold: 1 });
+            let finishCheck;
+            const pending = new Promise(resolve => { finishCheck = resolve; });
+            const old = createV1Connection(testKeyPair3.publicKey, () => pending);
+            old.connection.protocolSessions.validator.isHealthCheckSupported = () => true;
+            await manager.add(old.key, old.connection);
+            await clock.tickAsync(HEALTH_CHECK_INTERVAL_MS);
+            manager.remove(old.key);
+            const replacement = createV1Connection(testKeyPair3.publicKey);
+            await manager.add(replacement.key, replacement.connection);
+            finishCheck(ResultCode.TIMEOUT);
+            await clock.tickAsync(0);
+            t.is(manager.getConnection(old.key), replacement.connection);
+        } finally {
+            await manager?.close();
+            clock.restore();
+        }
+    });
 
     test('edge branches', async () => {
         test('remove missing validator keeps state unchanged', async t => {
@@ -380,7 +473,7 @@ test('ConnectionManager', () => {
             t.is(validatorConnectionManager.getSentCount(testKeyPair8.publicKey), 0)
         })
 
-        test('health check removes validator when protocolSession is missing', async t => {
+        test('health check removes validator after repeated failures when protocolSession is missing', async t => {
             const clock = sinon.useFakeTimers();
             try {
                 const validatorConnectionManager = await makeHealthCheckManager();
@@ -390,7 +483,7 @@ test('ConnectionManager', () => {
                 data.connection.protocolSessions.validator.isHealthCheckSupported = () => true
                 await validatorConnectionManager.add(data.key, data.connection)
 
-                await clock.tickAsync(HEALTH_CHECK_INTERVAL_MS)
+                await clock.tickAsync(HEALTH_CHECK_INTERVAL_MS * 3)
 
                 t.absent(validatorConnectionManager.connected(data.key))
             } finally {

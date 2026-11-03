@@ -2,6 +2,8 @@ import {EventType, ResultCode} from '../../../utils/constants.js';
 import {publicKeyToAddress} from "../../../utils/helpers.js";
 import { PeerConnectionManager, PeerConnectionManagerError } from '../shared/PeerConnectionManager.js'
 import ValidatorHealthCheckService from './ValidatorHealthCheckService.js'
+
+const DEFAULT_HEALTH_CHECK_FAILURE_THRESHOLD = 3;
 /**
  * @typedef {import('hyperswarm').Connection} Connection
  */
@@ -9,6 +11,8 @@ import ValidatorHealthCheckService from './ValidatorHealthCheckService.js'
 class ValidatorConnectionManager extends PeerConnectionManager {
     #healthCheckService
     #messages
+    #healthCheckFailures = new Map();
+    #healthCheckFailureThreshold;
     // Note: _connections is using publicKey (Buffer) as key
     // As Buffers are objects, we will rely on internal conversions done by JS to compare them.
     // It would be better to handle these conversions manually by using hex strings as keys to avoid issues
@@ -19,6 +23,9 @@ class ValidatorConnectionManager extends PeerConnectionManager {
         super(maxValidators, config, logger, messages);
         this.#messages = messages
         this.#healthCheckService = new ValidatorHealthCheckService(config);
+        const threshold = Number(config.validatorHealthCheckFailureThreshold);
+        this.#healthCheckFailureThreshold = Number.isInteger(threshold) && threshold > 0
+            ? threshold : DEFAULT_HEALTH_CHECK_FAILURE_THRESHOLD;
     }
 
     async _open() {
@@ -59,9 +66,15 @@ class ValidatorConnectionManager extends PeerConnectionManager {
                 success = false;
             }
 
+            // An in-flight health check must not affect a replacement connection.
+            if (this.getConnection(publicKey) !== connection) return;
+            const publicKeyHex = this._toHexString(publicKey);
             if (!success) {
-                this.remove(publicKey);
-                this.#stopHealthCheck(publicKey);
+                const failures = (this.#healthCheckFailures.get(publicKeyHex) ?? 0) + 1;
+                this.#healthCheckFailures.set(publicKeyHex, failures);
+                if (failures >= this.#healthCheckFailureThreshold) this.remove(publicKey, connection);
+            } else {
+                this.#healthCheckFailures.delete(publicKeyHex);
             }
         });
     }
@@ -83,7 +96,9 @@ class ValidatorConnectionManager extends PeerConnectionManager {
         } catch (err) {
             this._logger.error(`failed to probe peer with publicKey ${publicKey}: ${err?.message ?? err}`);
         }        
-        this._add(publicKey, connection);
+        if (this._add(publicKey, connection)) {
+            this.#healthCheckFailures.delete(this._toHexString(publicKey));
+        }
         
         if (connection.protocolSessions.validator.isHealthCheckSupported()) {
             this.#healthCheckService.start(publicKey);
@@ -99,6 +114,7 @@ class ValidatorConnectionManager extends PeerConnectionManager {
         if (connection && entry.connection !== connection) return;
 
         this.#stopHealthCheck(publicKeyHex);
+        this.#healthCheckFailures.delete(publicKeyHex);
         this._connections.delete(publicKeyHex);
     }
 

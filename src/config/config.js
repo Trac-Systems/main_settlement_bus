@@ -239,6 +239,16 @@ export class Config {
         return this.#config.epochAppendTimeout
     }
 
+    get validatorHealthCheckFailureThreshold() {
+        if (this.#isOverriden('validatorHealthCheckFailureThreshold')) return this.#options.validatorHealthCheckFailureThreshold
+        return this.#config.validatorHealthCheckFailureThreshold
+    }
+
+    get confirmationStallTimeout() {
+        if (this.#isOverriden('confirmationStallTimeout')) return this.#options.confirmationStallTimeout
+        return this.#config.confirmationStallTimeout
+    }
+
     get maxPendingRequestsInPendingRequestsService() {
         return this.#config.maxPendingRequestsInPendingRequestsService
     }
