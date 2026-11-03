@@ -15,6 +15,7 @@ import {config} from '../../../../../../helpers/config.js';
 import {createHtlcLockTransactionHash} from '../../../../../../helpers/htlcLock.js';
 import {
     buildHtlcLockPayload,
+    buildTransferPayload,
     createNodeEntry,
     createState,
     DEFAULT_TX_VALIDITY,
@@ -45,6 +46,41 @@ test('PartialHtlcValidator rejects a lock with an existing escrow entry', async 
         () => new PartialHtlcValidator(state, validator.address, config).validate(payload),
         ResultCode.TX_ALREADY_EXISTS,
         'escrow already exists'
+    );
+});
+
+test('PartialHtlcValidator rejects lock transactions and escrows in signed or current state', async t => {
+    const {requester: maker, validator, recipient: claimant} = await getWalletSet();
+    const payload = await buildHtlcLockPayload(maker, claimant.address);
+    const txHex = b4a.toString(payload.hlo.tx, 'hex');
+    const escrowKey = EntryType.HTLC_ESCROW + txHex;
+
+    for (const [entryName, key] of [['transaction', txHex], ['escrow', escrowKey]]) {
+        for (const stateName of ['current', 'signed']) {
+            const entries = new Map([[key, b4a.from([1])]]);
+            const state = createValidState(maker, {
+                [stateName === 'current' ? 'get' : 'getSigned']: async entryKey => entries.get(entryKey) ?? null
+            });
+            await expectSharedValidatorError(
+                t,
+                () => new PartialHtlcValidator(state, validator.address, config).validate(payload),
+                ResultCode.TX_ALREADY_EXISTS,
+                `${entryName} already exists`
+            );
+        }
+    }
+});
+
+test('PartialHtlcValidator does not validate unrelated operations as locks', async t => {
+    const {requester: maker, validator, recipient: claimant} = await getWalletSet();
+    const state = createValidState(maker);
+    const transfer = await buildTransferPayload(maker, claimant.address, bigIntToBuffer(1n));
+
+    await expectSharedValidatorError(
+        t,
+        () => new PartialHtlcValidator(state, validator.address, config).validate(transfer),
+        ResultCode.OPERATION_TYPE_UNKNOWN,
+        'Unsupported HTLC operation type'
     );
 });
 
@@ -525,6 +561,36 @@ test('PartialHtlcValidator rejects signed high-bit settlement-address aliases', 
             () => validatorInstance.validate(payload),
             ResultCode.TX_INVALID_PAYLOAD,
             `${label} address`
+        );
+    }
+});
+
+test('PartialHtlcValidator rejects signed addresses with invalid checksums', async t => {
+    const {requester: maker, validator, recipient: claimant} = await getWalletSet();
+    const validatorInstance = new PartialHtlcValidator(createValidState(maker), validator.address, config);
+
+    for (const [field, label] of [
+        ['address', 'requesting address'],
+        ['ca', 'claim address'],
+        ['ra', 'refund address'],
+        ['fr', 'fee recipient address']
+    ]) {
+        const payload = await buildHtlcLockPayload(maker, claimant.address, undefined, {
+            feeAmount: bigIntToBuffer(5n),
+            feeRecipient: claimant.address
+        });
+        const address = field === 'address' ? payload.address : payload.hlo[field];
+        const altered = b4a.from(address);
+        altered[altered.length - 1] = altered[altered.length - 1] === 0x71 ? 0x70 : 0x71;
+        if (field === 'address') payload.address = altered;
+        else payload.hlo[field] = altered;
+        await resignLock(payload, maker);
+
+        await expectSharedValidatorError(
+            t,
+            () => validatorInstance.validate(payload),
+            field === 'address' ? ResultCode.REQUESTER_ADDRESS_INVALID : ResultCode.TX_INVALID_PAYLOAD,
+            label
         );
     }
 });
