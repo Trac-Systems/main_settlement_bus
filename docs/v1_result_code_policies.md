@@ -1,6 +1,8 @@
-# V1 Result Code Policies
+# Network V1 Result Code Policies
 
-This table shows, for each V1 `ResultCode`, the boolean policy flags that determine whether the sender rotates the validator and whether the validator closes the connection after sending the response.
+This table shows, for each Network V1 `NetworkResultCode`, the boolean policy flags that determine whether the sender rotates the validator and whether the validator closes the connection after sending the response.
+
+Network and consensus result codes are registered in the shared protobuf enum `common.v1.ResultCode`; this document intentionally covers only the Network V1 subset used by network connection policies.
 
 `true` in `Sender` means the sender rotates the validator for that result code. `true` in `Validator` means the validator closes the connection after sending the response. `false` means the corresponding action is not executed for that result code. These columns should be interpreted as boolean flags that control execution for each code, not as descriptive status fields.
 

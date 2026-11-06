@@ -1,6 +1,6 @@
 import { eventFlush } from '../../../../helpers/autobaseTestHelpers.js';
 import OperationValidationScenarioBase from '../common/base/OperationValidationScenarioBase.js';
-import { safeDecodeApplyOperation, safeEncodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
+import { safeDecodeApplyOperation, safeEncodeApplyOperation } from '../../../../../src/codecs/apply/applyOperationCodec.js';
 import setupBalanceInitializationScenario, {
     buildDefaultBalanceInitializationPayload,
     assertBalanceInitializationFailureState
@@ -32,14 +32,14 @@ async function bypassSchemaAndApply(context, invalidPayload) {
         throw new Error('Invalid amount scenario requires admin bootstrap context.');
     }
 
-    const originalValidator = adminNode.state.check.validateBalanceInitialization;
-    adminNode.state.check.validateBalanceInitialization = () => true;
+    const originalValidator = adminNode.state.stateValidationSchema.validateBalanceInitialization;
+    adminNode.state.stateValidationSchema.validateBalanceInitialization = () => true;
 
     try {
         await adminNode.base.append(invalidPayload);
         await adminNode.base.update();
         await eventFlush();
     } finally {
-        adminNode.state.check.validateBalanceInitialization = originalValidator;
+        adminNode.state.stateValidationSchema.validateBalanceInitialization = originalValidator;
     }
 }

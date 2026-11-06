@@ -2,7 +2,7 @@ import { eventFlush } from '../../../../../helpers/autobaseTestHelpers.js';
 import {
     safeDecodeApplyOperation,
     safeEncodeApplyOperation
-} from '../../../../../../src/utils/protobuf/operationHelpers.js';
+} from '../../../../../../src/codecs/apply/applyOperationCodec.js';
 import OperationValidationScenarioBase from '../base/OperationValidationScenarioBase.js';
 import tracCryptoApi from 'trac-crypto-api'
 
@@ -55,6 +55,9 @@ async function defaultMutateHash(t, validPayload) {
             break;
         case Boolean(decodedPayload.txo?.tx):
             decodedPayload.txo.tx = invalidHash;
+            break;
+        case Boolean(decodedPayload.cco?.tx):
+            decodedPayload.cco.tx = invalidHash;
             break;
         default:
             return validPayload;

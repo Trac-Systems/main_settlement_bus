@@ -1,7 +1,7 @@
 import b4a from 'b4a';
 import { test } from 'brittle';
 import { eventFlush } from '../../../../helpers/autobaseTestHelpers.js';
-import { safeDecodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
+import { safeDecodeApplyOperation } from '../../../../../src/codecs/apply/applyOperationCodec.js';
 import {
     setupTransferScenario,
     buildTransferPayload,

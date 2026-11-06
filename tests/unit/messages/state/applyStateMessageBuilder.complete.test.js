@@ -1,11 +1,25 @@
 import { test } from 'brittle';
 import b4a from 'b4a';
+import tracCryptoApi from 'trac-crypto-api';
 import { WalletProvider } from 'trac-wallet';
 import ApplyStateMessageBuilder from '../../../../src/messages/state/ApplyStateMessageBuilder.js';
+import {
+    decodeEpochProofV1,
+    encodeConsensusConfig,
+    encodeEpochProofV1,
+    safeDecodeApplyOperation,
+    safeEncodeApplyOperation,
+} from '../../../../src/codecs/apply/applyOperationCodec.js';
 import { OperationType } from '../../../../src/utils/constants.js';
 import { config } from '../../../helpers/config.js';
 import { testKeyPair1, testKeyPair2 } from '../../../fixtures/apply.fixtures.js';
+import applyOperationFixtures from '../../../fixtures/applyOperation.fixtures.js';
 import { addressToBuffer } from '../../../../src/core/state/utils/address.js';
+import {
+    proofProposalApproval as approval,
+    proofProposalData
+} from '../../../helpers/proofProposal.js';
+import { createMessage } from '../../../../src/utils/buffer.js';
 
 const hex = (value, bytes) => value.repeat(bytes);
 const toBuf = value => b4a.from(value, 'hex');
@@ -13,6 +27,8 @@ const toBuf = value => b4a.from(value, 'hex');
 async function createWallet(mnemonic) {
     return await new WalletProvider(config).fromMnemonic({ mnemonic, derivationPath: config.derivationPath })
 }
+
+await tracCryptoApi.hash.blake3(b4a.from('warmup'));
 
 function expectBufferField(t, value, bytes, label) {
     t.ok(b4a.isBuffer(value), `${label} type`);
@@ -515,4 +531,395 @@ test('ApplyStateMessageBuilder complete transfer operation (tro)', async t => {
     t.ok(b4a.equals(payload.tro.am, amount));
     t.ok(b4a.equals(payload.tro.in, incomingNonce));
     t.ok(b4a.equals(payload.tro.is, incomingSignature));
+});
+
+test('ApplyStateMessageBuilder complete HTLC claim preserves the submitter signature and adds validator metadata', async t => {
+    const requesterWallet = await createWallet(testKeyPair1.mnemonic);
+    const validatorWallet = await createWallet(testKeyPair2.mnemonic);
+    const { txv, li: lockId, pi: preimage } = applyOperationFixtures.validHtlcClaimOperation.hco;
+
+    const partialBuilder = new ApplyStateMessageBuilder(requesterWallet, config);
+    await partialBuilder
+        .setPhase('partial')
+        .setOutput('buffer')
+        .setOperationType(OperationType.HTLC_CLAIM)
+        .setAddress(requesterWallet.address)
+        .setTxValidity(txv)
+        .setHtlcLockId(lockId)
+        .setHtlcPreimage(preimage)
+        .build();
+    const partial = partialBuilder.getPayload();
+
+    const completeBuilder = new ApplyStateMessageBuilder(validatorWallet, config);
+    await completeBuilder
+        .setPhase('complete')
+        .setOutput('buffer')
+        .setOperationType(OperationType.HTLC_CLAIM)
+        .setAddress(requesterWallet.address)
+        .setTxHash(partial.hco.tx)
+        .setTxValidity(partial.hco.txv)
+        .setHtlcLockId(partial.hco.li)
+        .setHtlcPreimage(partial.hco.pi)
+        .setIncomingNonce(partial.hco.in)
+        .setIncomingSignature(partial.hco.is)
+        .build();
+
+    const complete = completeBuilder.getPayload();
+    const encoded = safeEncodeApplyOperation(complete);
+    const decoded = safeDecodeApplyOperation(encoded);
+
+    t.is(complete.type, OperationType.HTLC_CLAIM);
+    expectPayloadKeys(t, complete, 'hco');
+    expectKeys(t, complete.hco, ['tx', 'txv', 'li', 'pi', 'in', 'is', 'va', 'vn', 'vs'], 'hco');
+    for (const field of ['tx', 'txv', 'li', 'pi', 'in', 'is']) {
+        t.ok(b4a.equals(complete.hco[field], partial.hco[field]), `hco.${field} is preserved`);
+        t.ok(b4a.equals(decoded.hco[field], partial.hco[field]), `encoded hco.${field} is preserved`);
+    }
+    t.ok(requesterWallet.verify(complete.hco.is, complete.hco.tx, requesterWallet.publicKey), 'submitter signature remains valid');
+    t.ok(b4a.equals(complete.hco.va, addressToBuffer(validatorWallet.address, config.addressPrefix)));
+    const validatorHash = await tracCryptoApi.hash.blake3(createMessage(
+        config.networkId,
+        complete.hco.tx,
+        complete.hco.vn,
+        OperationType.HTLC_CLAIM
+    ));
+    t.ok(validatorWallet.verify(complete.hco.vs, validatorHash, validatorWallet.publicKey));
+    for (const field of ['va', 'vn', 'vs']) {
+        t.ok(b4a.equals(decoded.hco[field], complete.hco[field]), `encoded hco.${field} is preserved`);
+    }
+});
+
+test('ApplyStateMessageBuilder complete HTLC refund preserves the submission and adds a validator signature', async t => {
+    const requesterWallet = await createWallet(testKeyPair1.mnemonic);
+    const validatorWallet = await createWallet(testKeyPair2.mnemonic);
+    const { txv, li } = applyOperationFixtures.validPartialHtlcRefundOperation.hro;
+    const incomingNonce = b4a.alloc(32, 0x42);
+    const tx = await tracCryptoApi.hash.blake3(createMessage(
+        config.networkId, txv, li, incomingNonce, OperationType.HTLC_REFUND
+    ));
+    const submission = { tx, txv, li, in: incomingNonce, is: requesterWallet.sign(tx) };
+
+    for (const inputFormat of ['buffer', 'hex']) {
+        const input = value => inputFormat === 'hex' ? b4a.toString(value, 'hex') : value;
+        const builder = new ApplyStateMessageBuilder(validatorWallet, config);
+        await builder
+            .setPhase('complete')
+            .setOutput('buffer')
+            .setOperationType(OperationType.HTLC_REFUND)
+            .setAddress(requesterWallet.address)
+            .setTxHash(input(submission.tx))
+            .setTxValidity(input(submission.txv))
+            .setHtlcLockId(input(submission.li))
+            .setIncomingNonce(input(submission.in))
+            .setIncomingSignature(input(submission.is))
+            .build();
+
+        const complete = builder.getPayload();
+        const decoded = safeDecodeApplyOperation(safeEncodeApplyOperation(complete));
+        const validatorHash = await tracCryptoApi.hash.blake3(createMessage(
+            config.networkId, tx, complete.hro.vn, OperationType.HTLC_REFUND
+        ));
+
+        t.is(complete.type, OperationType.HTLC_REFUND);
+        t.ok(b4a.equals(complete.address, addressToBuffer(requesterWallet.address, config.addressPrefix)));
+        expectPayloadKeys(t, complete, 'hro');
+        expectKeys(t, complete.hro, ['tx', 'txv', 'li', 'in', 'is', 'va', 'vn', 'vs'], 'hro');
+        for (const field of Object.keys(submission)) {
+            t.ok(b4a.equals(complete.hro[field], submission[field]), `${inputFormat} hro.${field} is preserved`);
+        }
+        t.alike(decoded, complete, 'complete refund survives protobuf roundtrip');
+        t.ok(b4a.equals(complete.hro.va, addressToBuffer(validatorWallet.address, config.addressPrefix)));
+        expectBufferField(t, complete.hro.vn, 32, 'hro.vn');
+        expectBufferField(t, complete.hro.vs, 64, 'hro.vs');
+        t.absent(b4a.equals(complete.hro.vn, submission.in), 'validator has a fresh nonce');
+        t.ok(requesterWallet.verify(complete.hro.is, complete.hro.tx, requesterWallet.publicKey), 'submitter signature remains valid');
+        t.ok(validatorWallet.verify(complete.hro.vs, validatorHash, validatorWallet.publicKey), 'validator signs the confirmation hash');
+    }
+});
+
+test('ApplyStateMessageBuilder complete HTLC refund requires all submission fields', async t => {
+    const wallet = await createWallet(testKeyPair1.mnemonic);
+    const fields = [
+        ['setTxHash', b4a.alloc(32, 1), 'Transaction hash'],
+        ['setTxValidity', b4a.alloc(32, 2), 'Transaction validity'],
+        ['setHtlcLockId', b4a.alloc(32, 3), 'HTLC lock ID'],
+        ['setIncomingNonce', b4a.alloc(32, 4), 'Incoming nonce'],
+        ['setIncomingSignature', b4a.alloc(64, 5), 'Incoming signature']
+    ];
+    for (const [missingSetter, , label] of fields) {
+        const builder = new ApplyStateMessageBuilder(wallet, config)
+            .setPhase('complete')
+            .setOutput('buffer')
+            .setOperationType(OperationType.HTLC_REFUND)
+            .setAddress(wallet.address);
+        for (const [setter, value] of fields) {
+            if (setter !== missingSetter) builder[setter](value);
+        }
+        await t.exception(() => builder.build(), new RegExp(`${label} must be set before build`));
+    }
+});
+
+test('ApplyStateMessageBuilder complete set epoch operation (seo)', async t => {
+    const wallet = await createWallet(testKeyPair1.mnemonic);
+    const schemaVersion = b4a.from([0x01]);
+    const proofData = proofProposalData();
+    const approvals = [
+        approval(0x15, 0x16),
+        approval(0x17, 0x18)
+    ];
+    const epochData = encodeEpochProofV1({ pd: proofData, app: approvals });
+
+    const builder = new ApplyStateMessageBuilder(wallet, config);
+    await builder
+        .setPhase('complete')
+        .setOutput('buffer')
+        .setOperationType(OperationType.SET_EPOCH)
+        .setAddress(wallet.address)
+        .setEpochData(schemaVersion, epochData)
+        .build();
+
+    const payload = builder.getPayload();
+    t.is(payload.type, OperationType.SET_EPOCH);
+    expectAddressBuffer(t, payload.address, 'address');
+    t.ok(b4a.equals(payload.address, addressToBuffer(wallet.address, config.addressPrefix)));
+    expectPayloadKeys(t, payload, 'seo');
+    expectKeys(t, payload.seo, ['sv', 'data'], 'seo');
+    expectBufferField(t, payload.seo.sv, 1, 'seo.sv');
+    t.ok(b4a.isBuffer(payload.seo.data), 'seo.data type');
+    t.ok(b4a.equals(payload.seo.sv, schemaVersion));
+    t.ok(b4a.equals(payload.seo.data, epochData));
+});
+
+test('ApplyStateMessageBuilder complete set epoch operation codec roundtrip', async t => {
+    const wallet = await createWallet(testKeyPair1.mnemonic);
+    const schemaVersion = b4a.from([0x01]);
+    const proofData = proofProposalData();
+    const approvals = [
+        approval(0x35, 0x36),
+        approval(0x37, 0x38)
+    ];
+    const epochData = encodeEpochProofV1({ pd: proofData, app: approvals });
+
+    const builder = new ApplyStateMessageBuilder(wallet, config);
+    await builder
+        .setPhase('complete')
+        .setOutput('buffer')
+        .setOperationType(OperationType.SET_EPOCH)
+        .setAddress(wallet.address)
+        .setEpochData(schemaVersion, epochData)
+        .build();
+
+    const payload = builder.getPayload();
+    const encoded = safeEncodeApplyOperation(payload);
+    const decoded = safeDecodeApplyOperation(encoded);
+
+    t.ok(b4a.isBuffer(encoded));
+    t.ok(encoded.length > 0);
+    t.is(decoded.type, OperationType.SET_EPOCH);
+    t.ok(b4a.equals(decoded.address, addressToBuffer(wallet.address, config.addressPrefix)));
+    t.alike(Object.keys(decoded).sort(), ['address', 'seo', 'type']);
+    t.alike(Object.keys(decoded.seo).sort(), ['data', 'sv']);
+    t.ok(b4a.equals(decoded.seo.sv, schemaVersion));
+    t.ok(b4a.equals(decoded.seo.data, epochData));
+
+    const decodedEpochProof = decodeEpochProofV1(decoded.seo.data);
+    t.ok(b4a.equals(decodedEpochProof.pd, proofData));
+    t.is(decodedEpochProof.app.length, approvals.length);
+    t.ok(b4a.equals(decodedEpochProof.app[0], approvals[0]));
+    t.ok(b4a.equals(decodedEpochProof.app[1], approvals[1]));
+});
+
+test('ApplyStateMessageBuilder complete set genesis epoch operation (cco)', async t => {
+    const wallet = await createWallet(testKeyPair1.mnemonic);
+    const txValidity = toBuf(hex('11', 32));
+    const consensusConfig = {
+        sv: b4a.from([0x01]),
+        cd: toBuf(hex('22', 6))
+    };
+    const encodedConsensusConfig = encodeConsensusConfig(consensusConfig);
+
+    const builder = new ApplyStateMessageBuilder(wallet, config);
+    await builder
+        .setPhase('complete')
+        .setOutput('buffer')
+        .setOperationType(OperationType.SET_GENESIS_EPOCH)
+        .setAddress(wallet.address)
+        .setTxValidity(txValidity)
+        .setConsensusConfig(encodedConsensusConfig)
+        .build();
+
+    const payload = builder.getPayload();
+    const expectedTx = await tracCryptoApi.hash.blake3(createMessage(
+        config.networkId,
+        txValidity,
+        encodedConsensusConfig,
+        payload.cco.in,
+        OperationType.SET_GENESIS_EPOCH
+    ));
+
+    t.is(payload.type, OperationType.SET_GENESIS_EPOCH);
+    expectAddressBuffer(t, payload.address, 'address');
+    t.ok(b4a.equals(payload.address, addressToBuffer(wallet.address, config.addressPrefix)));
+    expectPayloadKeys(t, payload, 'cco');
+    expectKeys(t, payload.cco, ['tx', 'txv', 'cc', 'in', 'is'], 'cco');
+    expectKeys(t, payload.cco.cc, ['sv', 'cd'], 'cco.cc');
+    expectBufferField(t, payload.cco.tx, 32, 'cco.tx');
+    expectBufferField(t, payload.cco.txv, 32, 'cco.txv');
+    expectBufferField(t, payload.cco.cc.sv, 1, 'cco.cc.sv');
+    expectBufferField(t, payload.cco.in, 32, 'cco.in');
+    expectBufferField(t, payload.cco.is, 64, 'cco.is');
+    t.ok(b4a.equals(payload.cco.tx, expectedTx));
+    t.ok(b4a.equals(payload.cco.txv, txValidity));
+    t.ok(b4a.equals(payload.cco.cc.sv, consensusConfig.sv));
+    t.ok(b4a.equals(payload.cco.cc.cd, consensusConfig.cd));
+    t.ok(wallet.verify(payload.cco.is, payload.cco.tx, wallet.publicKey));
+});
+
+test('ApplyStateMessageBuilder complete set genesis epoch operation codec roundtrip', async t => {
+    const wallet = await createWallet(testKeyPair1.mnemonic);
+    const txValidity = toBuf(hex('44', 32));
+    const consensusConfig = {
+        sv: b4a.from([0x01]),
+        cd: toBuf(hex('55', 6))
+    };
+    const encodedConsensusConfig = encodeConsensusConfig(consensusConfig);
+
+    const builder = new ApplyStateMessageBuilder(wallet, config);
+    await builder
+        .setPhase('complete')
+        .setOutput('buffer')
+        .setOperationType(OperationType.SET_GENESIS_EPOCH)
+        .setAddress(wallet.address)
+        .setTxValidity(txValidity)
+        .setConsensusConfig(encodedConsensusConfig)
+        .build();
+
+    const payload = builder.getPayload();
+    const encoded = safeEncodeApplyOperation(payload);
+    const decoded = safeDecodeApplyOperation(encoded);
+
+    t.ok(b4a.isBuffer(encoded));
+    t.ok(encoded.length > 0);
+    t.is(decoded.type, OperationType.SET_GENESIS_EPOCH);
+    t.ok(b4a.equals(decoded.address, addressToBuffer(wallet.address, config.addressPrefix)));
+    t.alike(Object.keys(decoded).sort(), ['address', 'cco', 'type']);
+    t.alike(Object.keys(decoded.cco).sort(), ['cc', 'in', 'is', 'tx', 'txv']);
+    t.alike(Object.keys(decoded.cco.cc).sort(), ['cd', 'sv']);
+    t.ok(b4a.equals(decoded.cco.tx, payload.cco.tx));
+    t.ok(b4a.equals(decoded.cco.txv, txValidity));
+    t.ok(b4a.equals(decoded.cco.cc.sv, consensusConfig.sv));
+    t.ok(b4a.equals(decoded.cco.cc.cd, consensusConfig.cd));
+    t.ok(b4a.equals(decoded.cco.in, payload.cco.in));
+    t.ok(b4a.equals(decoded.cco.is, payload.cco.is));
+});
+
+test('ApplyStateMessageBuilder complete set consensus config operation (cco)', async t => {
+    const wallet = await createWallet(testKeyPair1.mnemonic);
+    const txValidity = toBuf(hex('77', 32));
+    const consensusConfig = {
+        sv: b4a.from([0x01]),
+        cd: b4a.from([0x02, 0x03, 0x04])
+    };
+    const encodedConsensusConfig = encodeConsensusConfig(consensusConfig);
+
+    const builder = new ApplyStateMessageBuilder(wallet, config);
+    await builder
+        .setPhase('complete')
+        .setOutput('buffer')
+        .setOperationType(OperationType.SET_CONSENSUS_CONFIG)
+        .setAddress(wallet.address)
+        .setTxValidity(txValidity)
+        .setConsensusConfig(encodedConsensusConfig)
+        .build();
+
+    const payload = builder.getPayload();
+    const expectedTx = await tracCryptoApi.hash.blake3(createMessage(
+        config.networkId,
+        txValidity,
+        encodedConsensusConfig,
+        payload.cco.in,
+        OperationType.SET_CONSENSUS_CONFIG
+    ));
+
+    t.is(payload.type, OperationType.SET_CONSENSUS_CONFIG);
+    expectAddressBuffer(t, payload.address, 'address');
+    t.ok(b4a.equals(payload.address, addressToBuffer(wallet.address, config.addressPrefix)));
+    expectPayloadKeys(t, payload, 'cco');
+    expectKeys(t, payload.cco, ['tx', 'txv', 'cc', 'in', 'is'], 'cco');
+    expectKeys(t, payload.cco.cc, ['sv', 'cd'], 'cco.cc');
+    expectBufferField(t, payload.cco.tx, 32, 'cco.tx');
+    expectBufferField(t, payload.cco.txv, 32, 'cco.txv');
+    expectBufferField(t, payload.cco.cc.sv, 1, 'cco.cc.sv');
+    expectBufferField(t, payload.cco.in, 32, 'cco.in');
+    expectBufferField(t, payload.cco.is, 64, 'cco.is');
+    t.ok(b4a.equals(payload.cco.tx, expectedTx));
+    t.ok(b4a.equals(payload.cco.txv, txValidity));
+    t.ok(b4a.equals(payload.cco.cc.sv, consensusConfig.sv));
+    t.ok(b4a.equals(payload.cco.cc.cd, consensusConfig.cd));
+    t.ok(wallet.verify(payload.cco.is, payload.cco.tx, wallet.publicKey));
+});
+
+test('ApplyStateMessageBuilder complete set consensus config operation codec roundtrip', async t => {
+    const wallet = await createWallet(testKeyPair1.mnemonic);
+    const txValidity = toBuf(hex('aa', 32));
+    const consensusConfig = {
+        sv: b4a.from([0xff]),
+        cd: b4a.from([0x00, 0xff, 0x7f, 0x80])
+    };
+    const encodedConsensusConfig = encodeConsensusConfig(consensusConfig);
+
+    const builder = new ApplyStateMessageBuilder(wallet, config);
+    await builder
+        .setPhase('complete')
+        .setOutput('buffer')
+        .setOperationType(OperationType.SET_CONSENSUS_CONFIG)
+        .setAddress(wallet.address)
+        .setTxValidity(txValidity)
+        .setConsensusConfig(encodedConsensusConfig)
+        .build();
+
+    const payload = builder.getPayload();
+    const encoded = safeEncodeApplyOperation(payload);
+    const decoded = safeDecodeApplyOperation(encoded);
+
+    t.ok(b4a.isBuffer(encoded));
+    t.ok(encoded.length > 0);
+    t.is(decoded.type, OperationType.SET_CONSENSUS_CONFIG);
+    t.ok(b4a.equals(decoded.address, addressToBuffer(wallet.address, config.addressPrefix)));
+    t.alike(Object.keys(decoded).sort(), ['address', 'cco', 'type']);
+    t.alike(Object.keys(decoded.cco).sort(), ['cc', 'in', 'is', 'tx', 'txv']);
+    t.alike(Object.keys(decoded.cco.cc).sort(), ['cd', 'sv']);
+    t.ok(b4a.equals(decoded.cco.tx, payload.cco.tx));
+    t.ok(b4a.equals(decoded.cco.txv, txValidity));
+    t.ok(b4a.equals(decoded.cco.cc.sv, consensusConfig.sv));
+    t.ok(b4a.equals(decoded.cco.cc.cd, consensusConfig.cd));
+    t.ok(b4a.equals(decoded.cco.in, payload.cco.in));
+    t.ok(b4a.equals(decoded.cco.is, payload.cco.is));
+});
+
+test('ApplyStateMessageBuilder rejects invalid encoded consensus config', async t => {
+    const wallet = await createWallet(testKeyPair1.mnemonic);
+    const builder = new ApplyStateMessageBuilder(wallet, config);
+
+    t.exception(
+        () => builder.setConsensusConfig(b4a.from([0x1a, 0x00])),
+        /Schema version must be a one-byte buffer/
+    );
+});
+
+test('ApplyStateMessageBuilder requires consensus config before build', async t => {
+    const wallet = await createWallet(testKeyPair1.mnemonic);
+    const txValidity = toBuf(hex('cc', 32));
+    const builder = new ApplyStateMessageBuilder(wallet, config);
+
+    await t.exception(
+        () => builder
+            .setPhase('complete')
+            .setOutput('buffer')
+            .setOperationType(OperationType.SET_CONSENSUS_CONFIG)
+            .setAddress(wallet.address)
+            .setTxValidity(txValidity)
+            .build(),
+        /Consensus config must be set before build/
+    );
 });

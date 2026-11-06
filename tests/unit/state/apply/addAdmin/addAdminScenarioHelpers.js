@@ -10,7 +10,7 @@ import { applyStateMessageFactory } from '../../../../../src/messages/state/appl
 import {
     safeDecodeApplyOperation,
     safeEncodeApplyOperation
-} from '../../../../../src/utils/protobuf/operationHelpers.js';
+} from '../../../../../src/codecs/apply/applyOperationCodec.js';
 import {
     AUTOBASE_VALUE_ENCODING,
     EntryType,
@@ -21,7 +21,7 @@ import adminEntryUtils from '../../../../../src/core/state/utils/adminEntry.js';
 import nodeEntryUtils from '../../../../../src/core/state/utils/nodeEntry.js';
 import lengthEntryUtils from '../../../../../src/core/state/utils/lengthEntry.js';
 import addressUtils from '../../../../../src/core/state/utils/address.js';
-import { safeWriteUInt32BE } from '../../../../../src/utils/buffer.js';
+import {uint32ToBuffer} from '../../../../../src/utils/buffer.js';
 import { config } from '../../../../helpers/config.js';
 
 export async function setupAddAdminScenario(t) {
@@ -167,7 +167,7 @@ export async function assertAdminState(t, base, wallet, writingKey, payload) {
     const initializationEntry = await base.view.get(EntryType.INITIALIZATION);
     t.ok(initializationEntry, 'initialization entry exists');
     t.ok(
-        b4a.equals(initializationEntry.value, safeWriteUInt32BE(1, 0)),
+        b4a.equals(initializationEntry.value, uint32ToBuffer(1)),
         'initialization flag set to 1'
     );
 

@@ -1,7 +1,7 @@
 import OperationValidationScenarioBase from './base/OperationValidationScenarioBase.js';
 import { eventFlush } from '../../../../helpers/autobaseTestHelpers.js';
 import b4a from 'b4a';
-import { safeDecodeApplyOperation, safeEncodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
+import { safeDecodeApplyOperation, safeEncodeApplyOperation } from '../../../../../src/codecs/apply/applyOperationCodec.js';
 
 export const MessageComponentStrategy = {
     TX_VALIDITY: 'TX_VALIDITY',
@@ -61,7 +61,7 @@ function mutateComponent(t, validPayload, componentKey) {
 }
 
 function findParentWithKey(payload, key) {
-    const parents = ['cao', 'bio', 'aco', 'tro', 'rao', 'bdo', 'txo'];
+    const parents = ['cao', 'bio', 'aco', 'tro', 'rao', 'bdo', 'txo', 'cco'];
     for (const parentKey of parents) {
         const parent = payload[parentKey];
         if (parent?.[key]) return parent;

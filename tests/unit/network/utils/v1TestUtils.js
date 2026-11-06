@@ -2,10 +2,10 @@ import b4a from 'b4a';
 import sinon from 'sinon';
 import { config } from '../../../helpers/config.js';
 import { NetworkOperationType, V1_PROTOCOL_PAYLOAD_MAX_SIZE } from '../../../../src/utils/constants.js';
-import { encodeV1networkOperation } from '../../../../src/utils/protobuf/operationHelpers.js';
-import NetworkMessageRouterV1 from '../../../../src/core/network/protocols/v1/NetworkMessageRouter.js';
-import V1LivenessOperationHandler from '../../../../src/core/network/protocols/v1/handlers/V1LivenessOperationHandler.js';
-import V1BroadcastTransactionOperationHandler from '../../../../src/core/network/protocols/v1/handlers/V1BroadcastTransactionOperationHandler.js';
+import { encodeV1networkOperation } from '../../../../src/codecs/network/v1/networkV1OperationCodec.js';
+import ValidatorV1MessageRouter from '../../../../src/core/network/protocols/validators/v1/ValidatorV1MessageRouter.js';
+import V1LivenessOperationHandler from '../../../../src/core/network/protocols/validators/v1/handlers/V1LivenessOperationHandler.js';
+import V1BroadcastTransactionOperationHandler from '../../../../src/core/network/protocols/validators/v1/handlers/V1BroadcastTransactionOperationHandler.js';
 
 const resolveStub = (stubSource) => {
     if (typeof stubSource === 'function') {
@@ -21,8 +21,10 @@ export const makeConnection = (stubSource) => {
     const stub = resolveStub(stubSource);
     return {
         remotePublicKey: b4a.alloc(32, 0x01),
-        protocolSession: {
-            setV1AsPreferredProtocol: stub()
+        protocolSessions: {
+            validator: {
+                setV1AsPreferredProtocol: stub()
+            }
         },
         end: stub()
     };
@@ -43,7 +45,7 @@ export const makeRouter = (t, { walletAddress = 'test-wallet' } = {}) => {
     sandbox.stub(console, 'error');
 
     const handlerStubs = makeHandlers(sandbox);
-    const router = new NetworkMessageRouterV1(
+    const router = new ValidatorV1MessageRouter(
         {},
         { address: walletAddress },
         {},
@@ -115,11 +117,11 @@ export const assertDisconnected = (t, connection, message = 'should end connecti
 };
 
 export const assertPreferredSet = (t, connection, message = 'should set preferred protocol') => {
-    t.ok(connection.protocolSession.setV1AsPreferredProtocol.calledOnce, message);
+    t.ok(connection.protocolSessions.validator.setV1AsPreferredProtocol.calledOnce, message);
 };
 
 export const assertPreferredNotSet = (t, connection, message = 'should not set preferred protocol') => {
-    t.ok(connection.protocolSession.setV1AsPreferredProtocol.notCalled, message);
+    t.ok(connection.protocolSessions.validator.setV1AsPreferredProtocol.notCalled, message);
 };
 
 export const assertNoHandlersCalled = (t, handlerStubs) => {

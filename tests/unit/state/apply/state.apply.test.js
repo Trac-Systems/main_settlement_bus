@@ -18,6 +18,18 @@ async function runStateTests() {
     await import('./txOperation/state.apply.txOperation.test.js');
     await import('./transfer/state.apply.transfer.test.js');
     await import('./adminRecovery/state.apply.adminRecovery.test.js');
+    await import('./setGenesisEpoch/state.apply.setGenesisEpoch.test.js');
+    await import('./setGenesisEpoch/state.apply.mockConsensusGenesis.test.js');
+    await import('./setConsensusConfig/state.apply.setConsensusConfig.test.js');
+    await import('./setConsensusConfig/state.apply.consensusConfigValidation.test.js');
+    await import('./setConsensusConfig/state.apply.consensusTransitions.test.js');
+    await import('./setEpoch/state.apply.setEpoch.test.js');
+    await import('./setEpoch/state.apply.setEpochApprovals.test.js');
+    await import('./setEpoch/state.apply.setEpoch.persistedState.test.js');
+    await import('./setEpoch/state.apply.setEpoch.handlerBranches.test.js');
+    await import('./htlcLock/state.apply.htlcLock.test.js');
+    await import('./htlcClaim/state.apply.htlcClaim.test.js');
+    await import('./htlcRefund/state.apply.htlcRefund.test.js');
     test.resume();
 }
 

@@ -6,7 +6,7 @@ import { EntryType } from '../../../../../src/utils/constants.js';
 import { decimalStringToBigInt, bigIntTo16ByteBuffer } from '../../../../../src/utils/amountSerialization.js';
 import { deriveIndexerSequenceState, eventFlush } from '../../../../helpers/autobaseTestHelpers.js';
 import { applyStateMessageFactory } from '../../../../../src/messages/state/applyStateMessageFactory.js';
-import { safeEncodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
+import { safeEncodeApplyOperation } from '../../../../../src/codecs/apply/applyOperationCodec.js';
 import {
     setupAdminNetwork,
     initializeBalances,
@@ -16,7 +16,7 @@ import { promotePeerToWriter } from '../addWriter/addWriterScenarioHelpers.js';
 import { buildAddIndexerPayload } from '../addIndexer/addIndexerScenarioHelpers.js';
 import { toBalance, BALANCE_FEE } from '../../../../../src/core/state/utils/balance.js';
 import lengthEntryUtils from '../../../../../src/core/state/utils/lengthEntry.js';
-import { safeDecodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
+import { safeDecodeApplyOperation } from '../../../../../src/codecs/apply/applyOperationCodec.js';
 import { config } from '../../../../helpers/config.js';
 
 export const DEFAULT_FUNDING = bigIntTo16ByteBuffer(decimalStringToBigInt('50'));
@@ -632,33 +632,33 @@ export async function assertAdminRecoveryFailureState(t, context, { skipSync } =
 export async function applyWithRoleAccessBypass(context, invalidPayload) {
     const { validatorPeer1 } = context.adminRecovery;
     const state = validatorPeer1.state;
-    const originalValidate = state.check.validateRoleAccessOperation;
-    state.check.validateRoleAccessOperation = () => true;
+    const originalValidate = state.stateValidationSchema.validateRoleAccessOperation;
+    state.stateValidationSchema.validateRoleAccessOperation = () => true;
     try {
         await validatorPeer1.base.append(invalidPayload);
         await validatorPeer1.base.update();
         await eventFlush();
     } finally {
-        state.check.validateRoleAccessOperation = originalValidate;
+        state.stateValidationSchema.validateRoleAccessOperation = originalValidate;
     }
 }
 
 export async function applyWithMissingComponentBypass(context, invalidPayload, { missingKey = 'vs' } = {}) {
     const { validatorPeer1 } = context.adminRecovery;
     const state = validatorPeer1.state;
-    const originalValidate = state.check.validateRoleAccessOperation;
+    const originalValidate = state.stateValidationSchema.validateRoleAccessOperation;
     const originalHasOwn = Object.hasOwn;
     Object.hasOwn = (obj, prop) => {
         if (prop === missingKey) return false;
         return originalHasOwn(obj, prop);
     };
-    state.check.validateRoleAccessOperation = () => true;
+    state.stateValidationSchema.validateRoleAccessOperation = () => true;
     try {
         await validatorPeer1.base.append(invalidPayload);
         await validatorPeer1.base.update();
         await eventFlush();
     } finally {
-        state.check.validateRoleAccessOperation = originalValidate;
+        state.stateValidationSchema.validateRoleAccessOperation = originalValidate;
         Object.hasOwn = originalHasOwn;
     }
 }

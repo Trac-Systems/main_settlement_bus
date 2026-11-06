@@ -4,13 +4,12 @@ import tracCryptoApi from 'trac-crypto-api';
 import NetworkMessageDirector from '../../../../src/messages/network/v1/NetworkMessageDirector.js';
 import NetworkMessageBuilder from '../../../../src/messages/network/v1/NetworkMessageBuilder.js';
 import { NetworkOperationType, ResultCode as NetworkResultCode } from '../../../../src/utils/constants.js';
-import { decodeV1networkOperation, encodeV1networkOperation } from '../../../../src/utils/protobuf/operationHelpers.js';
+import { decodeV1networkOperation, encodeV1networkOperation } from '../../../../src/codecs/network/v1/networkV1OperationCodec.js';
 import {
     createMessage,
     encodeCapabilities,
-    safeWriteUInt32BE,
     idToBuffer,
-    timestampToBuffer
+    timestampToBuffer, uint32ToBuffer
 } from '../../../../src/utils/buffer.js';
 import { config } from '../../../helpers/config.js';
 import { testKeyPair1 } from '../../../fixtures/apply.fixtures.js';
@@ -43,7 +42,7 @@ test('NetworkMessageDirector iterates liveness response ResultCode values', asyn
             idToBuffer(payload.id),
             timestampToBuffer(payload.timestamp),
             payload.liveness_response.nonce,
-            safeWriteUInt32BE(code, 0),
+            uint32ToBuffer(code),
             encodeCapabilities(caps)
         );
         const hash = await tracCryptoApi.hash.blake3(msg);
@@ -117,7 +116,7 @@ test('NetworkMessageDirector iterates broadcast transaction response ResultCode 
             payload.broadcast_transaction_response.nonce,
             responseProof,
             timestampToBuffer(responseTimestamp),
-            safeWriteUInt32BE(code, 0),
+            uint32ToBuffer(code),
             encodeCapabilities(caps)
         );
         const hash = await tracCryptoApi.hash.blake3(msg);
@@ -157,7 +156,7 @@ test('NetworkMessageDirector builds broadcast transaction response with proof an
         payload.broadcast_transaction_response.nonce,
         proof,
         timestampToBuffer(timestamp),
-        safeWriteUInt32BE(NetworkResultCode.OK, 0),
+        uint32ToBuffer(NetworkResultCode.OK),
         encodeCapabilities(caps)
     );
     const hash = await tracCryptoApi.hash.blake3(msg);
@@ -235,7 +234,7 @@ test('NetworkMessageDirector allows TX_ACCEPTED_PROOF_UNAVAILABLE response with 
         payload.broadcast_transaction_response.nonce,
         emptyProof,
         timestampToBuffer(timestamp),
-        safeWriteUInt32BE(NetworkResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE, 0),
+        uint32ToBuffer(NetworkResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE),
         encodeCapabilities(caps)
     );
     const hash = await tracCryptoApi.hash.blake3(msg);

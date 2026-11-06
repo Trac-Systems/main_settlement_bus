@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package apply.operations;
+
+// append_whitelist, add_indexer, remove_indexer, ban_writer (complete by default)
+message AdminControlOperation {
+    bytes tx     = 1; // Transaction hash (unique identifier for the transaction)
+    bytes txv    = 2; // Transaction expiration
+    bytes ia     = 3; // selected address to specific operation.
+    bytes in     = 4; // Nonce of the invoker (admin)
+    bytes is     = 5; // Signature of the invoker (admin)
+}

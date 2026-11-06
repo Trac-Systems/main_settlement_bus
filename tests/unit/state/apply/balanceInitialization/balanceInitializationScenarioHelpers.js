@@ -9,7 +9,7 @@ import {
 import { applyStateMessageFactory } from '../../../../../src/messages/state/applyStateMessageFactory.js';
 import { AUTOBASE_VALUE_ENCODING } from '../../../../../src/utils/constants.js';
 import { toTerm } from '../../../../../src/core/state/utils/balance.js';
-import { safeDecodeApplyOperation, safeEncodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
+import { safeDecodeApplyOperation, safeEncodeApplyOperation } from '../../../../../src/codecs/apply/applyOperationCodec.js';
 import { buildAddAdminRequesterPayload } from '../addAdmin/addAdminScenarioHelpers.js';
 import { config } from '../../../../helpers/config.js';
 

@@ -1,7 +1,7 @@
 import { eventFlush, deriveIndexerSequenceState } from '../../../../../helpers/autobaseTestHelpers.js';
 import OperationValidationScenarioBase from '../base/OperationValidationScenarioBase.js';
 import { applyStateMessageFactory } from '../../../../../../src/messages/state/applyStateMessageFactory.js';
-import { safeEncodeApplyOperation } from '../../../../../../src/utils/protobuf/operationHelpers.js';
+import { safeEncodeApplyOperation } from '../../../../../../src/codecs/apply/applyOperationCodec.js';
 import { config } from '../../../../../helpers/config.js';
 
 export default class InitializationDisabledScenario extends OperationValidationScenarioBase {

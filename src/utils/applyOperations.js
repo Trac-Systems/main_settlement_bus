@@ -48,6 +48,26 @@ const isBalanceInitialization = type => {
     ].includes(type);
 }
 
+const isHtlc = type => {
+    return [
+        OperationType.HTLC_LOCK,
+        OperationType.HTLC_CLAIM,
+        OperationType.HTLC_REFUND
+    ].includes(type);
+}
+const isSetEpoch = type => {
+    return [
+        OperationType.SET_EPOCH
+    ].includes(type);
+}
+
+const isConsensusControl = type => {
+    return [
+        OperationType.SET_GENESIS_EPOCH,
+        OperationType.SET_CONSENSUS_CONFIG
+    ].includes(type);
+}
+
 const operationToPayload = type => {
     const fromTo = [
         {
@@ -77,6 +97,26 @@ const operationToPayload = type => {
         {
             condition: isBalanceInitialization,
             jsonPath: 'bio'
+        },
+        {
+            condition: type => type === OperationType.HTLC_LOCK,
+            jsonPath: 'hlo'
+        },
+        {
+            condition: type => type === OperationType.HTLC_CLAIM,
+            jsonPath: 'hco'
+        },
+        {
+            condition: type => type === OperationType.HTLC_REFUND,
+            jsonPath: 'hro'
+        },
+        {
+            condition: isSetEpoch,
+            jsonPath: 'seo'
+        },
+        {
+            condition: isConsensusControl,
+            jsonPath: 'cco'
         }
     ]
     const match = fromTo.find(entry => !!entry.condition(type))
@@ -91,5 +131,8 @@ export {
     isBootstrapDeployment,
     operationToPayload,
     isTransfer,
-    isBalanceInitialization
+    isBalanceInitialization,
+    isHtlc,
+    isSetEpoch,
+    isConsensusControl
 }

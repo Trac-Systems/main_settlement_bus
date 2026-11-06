@@ -1,8 +1,20 @@
 import { test } from 'brittle';
 import sinon from 'sinon';
-import b4a from 'b4a';
 import EventEmitter from 'bare-events';
-import { CustomEventType } from '../../src/utils/constants.js';
+import b4a from 'b4a';
+import tracCryptoApi from 'trac-crypto-api';
+import { WalletProvider } from 'trac-wallet';
+import { OperationType } from '../../src/utils/constants.js';
+import {
+    encodeConsensusConfig,
+    safeDecodeApplyOperation
+} from '../../src/codecs/apply/applyOperationCodec.js';
+import { decodeVdfConfig } from '../../src/codecs/consensus/v1/vdfConfigCodec.js';
+import { addressToBuffer } from '../../src/core/state/utils/address.js';
+import { createMessage } from '../../src/utils/buffer.js';
+import { overrideConfig } from '../helpers/config.js';
+import { testKeyPair1 } from '../fixtures/apply.fixtures.js';
+import { errorMessageIncludes } from '../helpers/regexHelper.js';
 
 const isBareRuntime = typeof globalThis.Bare !== 'undefined';
 
@@ -24,9 +36,22 @@ async function loadMainSettlementBus() {
         constructor() {
             super();
             this.base = new EventEmitter();
+            this.writingKey = b4a.alloc(32, 1);
             this.ready = sinon.stub().resolves();
             this.close = sinon.stub().resolves();
             this.getAdminEntry = sinon.stub().resolves(null);
+            this.getNodeEntry = sinon.stub().resolves(null);
+            this.getSigned = sinon.stub().resolves(null);
+            this.getSignedConsensusConfig = sinon.stub().resolves(null);
+            this.requireSignedConsensusConfig = sinon.stub().resolves({
+                schemaVersion: 1,
+                configData: {
+                    difficulty: 55_000_000,
+                    discriminantBitSize: 2048,
+                }
+            });
+            this.getIndexerSequenceState = sinon.stub().resolves(b4a.from('11'.repeat(32), 'hex'));
+            this.append = sinon.stub().resolves();
             this.isWritable = sinon.stub().returns(false);
             this.isIndexer = sinon.stub().returns(false);
             this.getUnsignedLength = sinon.stub().returns(0);
@@ -45,13 +70,10 @@ async function loadMainSettlementBus() {
         }
     }
 
-    class CheckMock {}
-
     const { MainSettlementBus } = await esmock('../../src/index.js', {
         corestore: CorestoreMock,
         '../../src/core/state/State.js': StateMock,
         '../../src/core/network/Network.js': NetworkMock,
-        '../../src/utils/check.js': CheckMock,
         '../../src/utils/fileUtils.js': {
             default: {
                 ensureKeyPathDir: sinon.stub().resolves(),
@@ -87,12 +109,58 @@ function buildConfig() {
     };
 }
 
+function buildGenesisConfig(overrides = {}) {
+    return overrideConfig({
+        storesDirectory: '/tmp/msb-index-test',
+        enableInteractiveMode: false,
+        enableRoleRequester: false,
+        enableWallet: true,
+        ...overrides,
+    });
+}
+
+async function createWallet(config) {
+    return await new WalletProvider(config).fromMnemonic({
+        mnemonic: testKeyPair1.mnemonic,
+        derivationPath: config.derivationPath
+    });
+}
+
+function adminEntryFor(wallet, state, overrides = {}) {
+    return {
+        address: wallet.address,
+        wk: state.writingKey,
+        ...overrides,
+    };
+}
+
+function validConsensusConfig() {
+    return {
+        schemaVersion: 1,
+        configData: {
+            difficulty: 60_000_000,
+            discriminantBitSize: 2048,
+        },
+    };
+}
+
+function validGenesisConsensusConfig(configData = {}) {
+    return {
+        schemaVersion: 1,
+        configData: {
+            difficulty: 55_000_000,
+            discriminantBitSize: 2048,
+            ...configData,
+        },
+    };
+}
+
 if (isBareRuntime) {
-    test('MainSettlementBus state event listener coverage is Node-only', t => {
+    test('MainSettlementBus startup role log coverage is Node-only', t => {
         t.pass('skipped in Bare because esmock depends on node:module');
     });
 } else {
-    test('MainSettlementBus disconnects validator peers when state role events invalidate them', async t => {
+    test('MainSettlementBus logs local autobase role status', async t => {
         const consoleLog = sinon.stub(console, 'log');
         t.teardown(() => consoleLog.restore());
 
@@ -100,44 +168,524 @@ if (isBareRuntime) {
         const msb = new loaded.MainSettlementBus(buildConfig());
 
         await msb.ready();
-        t.teardown(async () => {
-            if (msb.opened) await msb.close();
-        });
 
-        const publicKey = b4a.alloc(32, 7);
-
-        loaded.state.emit(CustomEventType.UNWRITABLE, publicKey);
-        loaded.state.emit(CustomEventType.IS_INDEXER, publicKey);
-
-        t.is(loaded.network.disconnectValidatorPeer.callCount, 2, 'two state role events should disconnect validator peers');
-        t.alike(
-            loaded.network.disconnectValidatorPeer.firstCall.args,
-            [publicKey, 'peer became unwritable'],
-            'unwritable state event should disconnect with the expected reason'
-        );
-        t.alike(
-            loaded.network.disconnectValidatorPeer.secondCall.args,
-            [publicKey, 'peer promoted to indexer'],
-            'indexer state event should disconnect with the expected reason'
-        );
+        t.ok(consoleLog.calledWith("isIndexer: false"));
+        t.ok(consoleLog.calledWith("isWriter: false"));
 
         await msb.close();
     });
 
-    test('MainSettlementBus ignores validator invalidation events while closing', async t => {
+    test('MainSettlementBus rejects checksum-invalid transfer recipients before submission', async t => {
+        const config = buildGenesisConfig();
+        const wallet = await createWallet(config);
+        const loaded = await loadMainSettlementBus();
+        const msb = new loaded.MainSettlementBus(config, wallet);
+
+        for (const address of [
+            'trac1wyu9uw02wmefzt63c36wa0fgc2xn99x5hw46w4frl7jd6mqw2f5q57tt90',
+            'trac1jsmnrdn258ndcy2s06xntd43e80d79ly943qsa0pel45gk346ruggpxmzx'
+        ]) {
+            t.ok(tracCryptoApi.address.isValid(address), 'address passes the format-only check');
+            t.absent(tracCryptoApi.address.canDecode(address), 'address has an invalid checksum');
+            await t.exception(
+                () => msb.prepareTransferOperation(address, '1'),
+                errorMessageIncludes('Invalid recipient address')
+            );
+        }
+    });
+
+    test('MainSettlementBus rejects checksum-invalid addresses in admin operations', async t => {
+        const config = buildGenesisConfig();
+        const wallet = await createWallet(config);
+        const loaded = await loadMainSettlementBus();
+        const msb = new loaded.MainSettlementBus(config, wallet);
+        const invalid = 'trac1wyu9uw02wmefzt63c36wa0fgc2xn99x5hw46w4frl7jd6mqw2f5q57tt90';
+
+        await msb.ready();
+        loaded.state.getAdminEntry.resolves(adminEntryFor(wallet, loaded.state));
+        loaded.state.getNodeEntry.resetHistory();
+
+        await t.exception(
+            () => msb.updateWriterToIndexerRole(invalid, true),
+            errorMessageIncludes('invalid address')
+        );
+        await t.exception(
+            () => msb.banValidator(invalid),
+            errorMessageIncludes('invalid address')
+        );
+        t.ok(loaded.state.getNodeEntry.notCalled, 'invalid address is rejected before a state lookup');
+
+        await msb.close();
+    });
+
+    test('MainSettlementBus appends genesis epoch initialization with generic consensus config', async t => {
         const consoleLog = sinon.stub(console, 'log');
         t.teardown(() => consoleLog.restore());
 
         const loaded = await loadMainSettlementBus();
-        const msb = new loaded.MainSettlementBus(buildConfig());
+        const config = buildGenesisConfig();
+        const wallet = await createWallet(config);
+        const txValidity = b4a.from('aa'.repeat(32), 'hex');
+        const msb = new loaded.MainSettlementBus(config, wallet);
 
         await msb.ready();
+
+        loaded.state.getAdminEntry.resolves(adminEntryFor(wallet, loaded.state));
+        loaded.state.getSigned.resolves(null);
+        loaded.state.getIndexerSequenceState.resolves(txValidity);
+
+        await msb.handleEpochGenesisInitialization(validGenesisConsensusConfig());
+
+        t.ok(loaded.state.getSignedConsensusConfig.calledOnce);
+        t.ok(loaded.state.getIndexerSequenceState.calledOnce);
+        t.ok(loaded.state.append.calledOnce);
+
+        const encodedPayload = loaded.state.append.firstCall.args[0];
+        const decoded = safeDecodeApplyOperation(encodedPayload);
+
+        t.is(decoded.type, OperationType.SET_GENESIS_EPOCH);
+        t.ok(b4a.equals(decoded.address, addressToBuffer(wallet.address, config.addressPrefix)));
+        t.ok(b4a.equals(decoded.cco.txv, txValidity));
+        t.is(decoded.cco.cc.sv.readUInt8(0), 1);
+
+        const decodedVdfConfig = decodeVdfConfig(decoded.cco.cc.cd);
+        t.is(decodedVdfConfig.difficulty.readUInt32BE(0), 55_000_000);
+        t.is(decodedVdfConfig.discriminantBitSize.readUInt16BE(0), 2048);
+
+        const encodedConsensusConfig = encodeConsensusConfig(decoded.cco.cc);
+        const message = createMessage(
+            config.networkId,
+            decoded.cco.txv,
+            encodedConsensusConfig,
+            decoded.cco.in,
+            OperationType.SET_GENESIS_EPOCH
+        );
+        const expectedHash = await tracCryptoApi.hash.blake3(message);
+        t.ok(b4a.equals(decoded.cco.tx, expectedHash));
+
         await msb.close();
+    });
 
-        loaded.network.disconnectValidatorPeer.resetHistory();
-        loaded.state.emit(CustomEventType.UNWRITABLE, b4a.alloc(32, 8));
-        loaded.state.emit(CustomEventType.IS_INDEXER, b4a.alloc(32, 9));
+    test('MainSettlementBus rejects genesis epoch initialization when wallet is disabled', async t => {
+        const loaded = await loadMainSettlementBus();
+        const config = buildGenesisConfig({ enableWallet: false });
+        const msb = new loaded.MainSettlementBus(config);
 
-        t.is(loaded.network.disconnectValidatorPeer.callCount, 0, 'closing nodes should not mutate validator connections from late events');
+        await t.exception(
+            () => msb.handleEpochGenesisInitialization(validGenesisConsensusConfig()),
+            errorMessageIncludes('wallet is not enabled')
+        );
+    });
+
+    test('MainSettlementBus rejects genesis epoch initialization when admin is missing', async t => {
+        const consoleLog = sinon.stub(console, 'log');
+        t.teardown(() => consoleLog.restore());
+
+        const loaded = await loadMainSettlementBus();
+        const config = buildGenesisConfig();
+        const wallet = await createWallet(config);
+        const msb = new loaded.MainSettlementBus(config, wallet);
+
+        await msb.ready();
+
+        loaded.state.getAdminEntry.resolves(null);
+
+        await t.exception(
+            () => msb.handleEpochGenesisInitialization(validGenesisConsensusConfig()),
+            errorMessageIncludes('admin has not been initialized')
+        );
+
+        t.ok(loaded.state.getSignedConsensusConfig.notCalled);
+        t.ok(loaded.state.append.notCalled);
+
+        await msb.close();
+    });
+
+    test('MainSettlementBus rejects genesis epoch initialization when wallet is missing', async t => {
+        const consoleLog = sinon.stub(console, 'log');
+        t.teardown(() => consoleLog.restore());
+
+        const loaded = await loadMainSettlementBus();
+        const config = buildGenesisConfig();
+        const msb = new loaded.MainSettlementBus(config);
+
+        await msb.ready();
+
+        loaded.state.getAdminEntry.resolves({ address: 'admin-address' });
+
+        await t.exception(
+            () => msb.handleEpochGenesisInitialization(validGenesisConsensusConfig()),
+            errorMessageIncludes('wallet is not initialized')
+        );
+
+        t.ok(loaded.state.getSignedConsensusConfig.notCalled);
+        t.ok(loaded.state.append.notCalled);
+
+        await msb.close();
+    });
+
+    test('MainSettlementBus rejects genesis epoch initialization for non-admin wallet', async t => {
+        const consoleLog = sinon.stub(console, 'log');
+        t.teardown(() => consoleLog.restore());
+
+        const loaded = await loadMainSettlementBus();
+        const config = buildGenesisConfig();
+        const wallet = await createWallet(config);
+        const msb = new loaded.MainSettlementBus(config, wallet);
+
+        await msb.ready();
+
+        loaded.state.getAdminEntry.resolves(adminEntryFor(wallet, loaded.state, {
+            address: 'different-admin-address',
+        }));
+
+        await t.exception(
+            () => msb.handleEpochGenesisInitialization(validGenesisConsensusConfig()),
+            errorMessageIncludes('you are not the admin')
+        );
+
+        t.ok(loaded.state.getSignedConsensusConfig.notCalled);
+        t.ok(loaded.state.append.notCalled);
+
+        await msb.close();
+    });
+
+    test('MainSettlementBus rejects genesis epoch initialization when admin writing key mismatches', async t => {
+        const consoleLog = sinon.stub(console, 'log');
+        t.teardown(() => consoleLog.restore());
+
+        const loaded = await loadMainSettlementBus();
+        const config = buildGenesisConfig();
+        const wallet = await createWallet(config);
+        const msb = new loaded.MainSettlementBus(config, wallet);
+
+        await msb.ready();
+
+        loaded.state.getAdminEntry.resolves(adminEntryFor(wallet, loaded.state, {
+            wk: b4a.alloc(32, 2),
+        }));
+
+        await t.exception(
+            () => msb.handleEpochGenesisInitialization(validGenesisConsensusConfig()),
+            errorMessageIncludes('you are not the admin')
+        );
+
+        t.ok(loaded.state.getSignedConsensusConfig.notCalled);
+        t.ok(loaded.state.append.notCalled);
+
+        await msb.close();
+    });
+
+    test('MainSettlementBus rejects genesis epoch initialization when VDF difficulty is not positive', async t => {
+        const consoleLog = sinon.stub(console, 'log');
+        t.teardown(() => consoleLog.restore());
+
+        const loaded = await loadMainSettlementBus();
+        const config = buildGenesisConfig();
+        const wallet = await createWallet(config);
+        const msb = new loaded.MainSettlementBus(config, wallet);
+
+        await msb.ready();
+
+        loaded.state.getAdminEntry.resolves(adminEntryFor(wallet, loaded.state));
+        loaded.state.getSignedConsensusConfig.resolves(null);
+
+        await t.exception(
+            () => msb.handleEpochGenesisInitialization(validGenesisConsensusConfig({difficulty: 0})),
+            errorMessageIncludes('VDF difficulty must be a positive unsigned 32-bit integer.')
+        );
+
+        t.ok(loaded.state.getIndexerSequenceState.notCalled);
+        t.ok(loaded.state.append.notCalled);
+
+        await msb.close();
+    });
+
+    test('MainSettlementBus rejects genesis epoch initialization with an unsupported VDF discriminant bit size', async t => {
+        const consoleLog = sinon.stub(console, 'log');
+        t.teardown(() => consoleLog.restore());
+
+        const loaded = await loadMainSettlementBus();
+        const config = buildGenesisConfig();
+        const wallet = await createWallet(config);
+        const msb = new loaded.MainSettlementBus(config, wallet);
+
+        await msb.ready();
+
+        loaded.state.getAdminEntry.resolves(adminEntryFor(wallet, loaded.state));
+        loaded.state.getSignedConsensusConfig.resolves(null);
+
+        await t.exception(
+            () => msb.handleEpochGenesisInitialization(validGenesisConsensusConfig({discriminantBitSize: 0})),
+            errorMessageIncludes('VDF discriminant bit size must be one of: 1024, 2048, 4096.')
+        );
+
+        t.ok(loaded.state.getIndexerSequenceState.notCalled);
+        t.ok(loaded.state.append.notCalled);
+
+        await msb.close();
+    });
+
+    test('MainSettlementBus rejects invalid generic genesis config before submission', async t => {
+        const consoleLog = sinon.stub(console, 'log');
+        t.teardown(() => consoleLog.restore());
+
+        const loaded = await loadMainSettlementBus();
+        const config = buildGenesisConfig();
+        const wallet = await createWallet(config);
+        const msb = new loaded.MainSettlementBus(config, wallet);
+
+        await msb.ready();
+
+        loaded.state.getAdminEntry.resolves(adminEntryFor(wallet, loaded.state));
+        loaded.state.getSignedConsensusConfig.resolves(null);
+
+        const invalidConfigs = [
+            null,
+            [],
+            'config',
+            {},
+            { schemaVersion: 1 },
+            { configData: {} },
+            { schemaVersion: 1, configData: {}, extra: true },
+            { schemaVersion: '1', configData: {} },
+            { schemaVersion: 0, configData: {} },
+            { schemaVersion: 256, configData: {} },
+            { schemaVersion: 2, configData: {} },
+        ];
+
+        for (const invalidConfig of invalidConfigs) {
+            await t.exception(() => msb.handleEpochGenesisInitialization(invalidConfig));
+        }
+
+        t.ok(loaded.state.getIndexerSequenceState.notCalled);
+        t.ok(loaded.state.append.notCalled);
+
+        await msb.close();
+    });
+
+    test('MainSettlementBus rejects genesis epoch initialization when consensus config already exists', async t => {
+        const consoleLog = sinon.stub(console, 'log');
+        t.teardown(() => consoleLog.restore());
+
+        const loaded = await loadMainSettlementBus();
+        const config = buildGenesisConfig();
+        const wallet = await createWallet(config);
+        const msb = new loaded.MainSettlementBus(config, wallet);
+
+        await msb.ready();
+
+        loaded.state.getAdminEntry.resolves(adminEntryFor(wallet, loaded.state));
+        loaded.state.getSignedConsensusConfig.resolves({
+            schemaVersion: 1,
+            configData: {
+                difficulty: 16_843_009,
+                discriminantBitSize: 257,
+            }
+        });
+
+        await t.exception(
+            () => msb.handleEpochGenesisInitialization(validGenesisConsensusConfig()),
+            errorMessageIncludes('consensus config already exists')
+        );
+
+        t.ok(loaded.state.append.notCalled);
+        t.ok(loaded.state.getIndexerSequenceState.notCalled);
+
+        await msb.close();
+    });
+
+    test('MainSettlementBus appends a generic version-1 consensus config operation', async t => {
+        const consoleLog = sinon.stub(console, 'log');
+        t.teardown(() => consoleLog.restore());
+
+        const loaded = await loadMainSettlementBus();
+        const config = buildGenesisConfig();
+        const wallet = await createWallet(config);
+        const txValidity = b4a.from('bb'.repeat(32), 'hex');
+        const msb = new loaded.MainSettlementBus(config, wallet);
+
+        await msb.ready();
+
+        loaded.state.getAdminEntry.resolves(adminEntryFor(wallet, loaded.state));
+        loaded.state.getIndexerSequenceState.resolves(txValidity);
+
+        await msb.handleSetConsensusConfig(validConsensusConfig());
+
+        t.ok(loaded.state.requireSignedConsensusConfig.notCalled);
+        t.ok(loaded.state.getIndexerSequenceState.calledOnce);
+        t.ok(loaded.state.append.calledOnce);
+
+        const encodedPayload = loaded.state.append.firstCall.args[0];
+        const decoded = safeDecodeApplyOperation(encodedPayload);
+
+        t.is(decoded.type, OperationType.SET_CONSENSUS_CONFIG);
+        t.ok(b4a.equals(decoded.address, addressToBuffer(wallet.address, config.addressPrefix)));
+        t.ok(b4a.equals(decoded.cco.txv, txValidity));
+        t.is(decoded.cco.cc.sv.readUInt8(0), 1);
+
+        const decodedVdfConfig = decodeVdfConfig(decoded.cco.cc.cd);
+        t.is(decodedVdfConfig.difficulty.readUInt32BE(0), 60_000_000);
+        t.is(decodedVdfConfig.discriminantBitSize.readUInt16BE(0), 2048);
+
+        const encodedConsensusConfig = encodeConsensusConfig(decoded.cco.cc);
+        const message = createMessage(
+            config.networkId,
+            decoded.cco.txv,
+            encodedConsensusConfig,
+            decoded.cco.in,
+            OperationType.SET_CONSENSUS_CONFIG
+        );
+        const expectedHash = await tracCryptoApi.hash.blake3(message);
+        t.ok(b4a.equals(decoded.cco.tx, expectedHash));
+
+        await msb.close();
+    });
+
+    test('MainSettlementBus rejects setting consensus config when wallet is disabled', async t => {
+        const loaded = await loadMainSettlementBus();
+        const config = buildGenesisConfig({ enableWallet: false });
+        const msb = new loaded.MainSettlementBus(config);
+
+        await t.exception(
+            () => msb.handleSetConsensusConfig(validConsensusConfig()),
+            errorMessageIncludes('wallet is not enabled')
+        );
+    });
+
+    test('MainSettlementBus rejects setting consensus config when admin is missing', async t => {
+        const consoleLog = sinon.stub(console, 'log');
+        t.teardown(() => consoleLog.restore());
+
+        const loaded = await loadMainSettlementBus();
+        const config = buildGenesisConfig();
+        const wallet = await createWallet(config);
+        const msb = new loaded.MainSettlementBus(config, wallet);
+
+        await msb.ready();
+
+        loaded.state.getAdminEntry.resolves(null);
+
+        await t.exception(
+            () => msb.handleSetConsensusConfig(validConsensusConfig()),
+            errorMessageIncludes('admin has not been initialized')
+        );
+
+        t.ok(loaded.state.requireSignedConsensusConfig.notCalled);
+        t.ok(loaded.state.append.notCalled);
+
+        await msb.close();
+    });
+
+    test('MainSettlementBus rejects setting consensus config for non-admin wallet', async t => {
+        const consoleLog = sinon.stub(console, 'log');
+        t.teardown(() => consoleLog.restore());
+
+        const loaded = await loadMainSettlementBus();
+        const config = buildGenesisConfig();
+        const wallet = await createWallet(config);
+        const msb = new loaded.MainSettlementBus(config, wallet);
+
+        await msb.ready();
+
+        loaded.state.getAdminEntry.resolves(adminEntryFor(wallet, loaded.state, {
+            address: 'different-admin-address',
+        }));
+
+        await t.exception(
+            () => msb.handleSetConsensusConfig(validConsensusConfig()),
+            errorMessageIncludes('you are not the admin')
+        );
+
+        t.ok(loaded.state.requireSignedConsensusConfig.notCalled);
+        t.ok(loaded.state.append.notCalled);
+
+        await msb.close();
+    });
+
+    test('MainSettlementBus rejects invalid generic consensus config input before submission', async t => {
+        const consoleLog = sinon.stub(console, 'log');
+        t.teardown(() => consoleLog.restore());
+
+        const loaded = await loadMainSettlementBus();
+        const config = buildGenesisConfig();
+        const wallet = await createWallet(config);
+        const msb = new loaded.MainSettlementBus(config, wallet);
+
+        await msb.ready();
+
+        loaded.state.getAdminEntry.resolves(adminEntryFor(wallet, loaded.state));
+
+        const invalidConfigs = [
+            null,
+            [],
+            'config',
+            {},
+            { schemaVersion: 1 },
+            { configData: {} },
+            { schemaVersion: 1, configData: {}, extra: true },
+            { schemaVersion: '1', configData: {} },
+            { schemaVersion: 0, configData: {} },
+            { schemaVersion: 256, configData: {} },
+            { schemaVersion: 2, configData: {} },
+        ];
+
+        for (const invalidConfig of invalidConfigs) {
+            await t.exception(() => msb.handleSetConsensusConfig(invalidConfig));
+        }
+
+        t.ok(loaded.state.requireSignedConsensusConfig.notCalled);
+        t.ok(loaded.state.getIndexerSequenceState.notCalled);
+        t.ok(loaded.state.append.notCalled);
+
+        await msb.close();
+    });
+
+    test('MainSettlementBus rejects invalid schema-version-1 configData before submission', async t => {
+        const consoleLog = sinon.stub(console, 'log');
+        t.teardown(() => consoleLog.restore());
+
+        const loaded = await loadMainSettlementBus();
+        const config = buildGenesisConfig();
+        const wallet = await createWallet(config);
+        const msb = new loaded.MainSettlementBus(config, wallet);
+
+        await msb.ready();
+
+        loaded.state.getAdminEntry.resolves(adminEntryFor(wallet, loaded.state));
+
+        const invalidConfigData = [
+            null,
+            [],
+            'config',
+            {},
+            { difficulty: 60_000_000 },
+            { discriminantBitSize: 2048 },
+            { difficulty: 60_000_000, discriminantBitSize: 2048, extra: true },
+            { difficulty: '60000000', discriminantBitSize: 2048 },
+            { difficulty: 1.5, discriminantBitSize: 2048 },
+            { difficulty: 0, discriminantBitSize: 2048 },
+            { difficulty: -1, discriminantBitSize: 2048 },
+            { difficulty: 0x100000000, discriminantBitSize: 2048 },
+            { difficulty: 60_000_000, discriminantBitSize: '2048' },
+            { difficulty: 60_000_000, discriminantBitSize: 1.5 },
+            { difficulty: 60_000_000, discriminantBitSize: 0 },
+            { difficulty: 60_000_000, discriminantBitSize: -1 },
+            { difficulty: 60_000_000, discriminantBitSize: 1025 },
+            { difficulty: 60_000_000, discriminantBitSize: 0x10000 },
+        ];
+
+        for (const configData of invalidConfigData) {
+            await t.exception(() => msb.handleSetConsensusConfig({
+                schemaVersion: 1,
+                configData,
+            }));
+        }
+
+        t.ok(loaded.state.requireSignedConsensusConfig.notCalled);
+        t.ok(loaded.state.getIndexerSequenceState.notCalled);
+        t.ok(loaded.state.append.notCalled);
+
+        await msb.close();
     });
 }

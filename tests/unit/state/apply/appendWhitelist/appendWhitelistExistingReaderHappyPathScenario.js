@@ -3,7 +3,7 @@ import b4a from 'b4a';
 import { eventFlush } from '../../../../helpers/autobaseTestHelpers.js';
 import nodeEntryUtils, { ZERO_LICENSE } from '../../../../../src/core/state/utils/nodeEntry.js';
 import { toTerm } from '../../../../../src/core/state/utils/balance.js';
-import { safeDecodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
+import { safeDecodeApplyOperation } from '../../../../../src/codecs/apply/applyOperationCodec.js';
 import setupAppendWhitelistScenario, {
     buildAppendWhitelistPayload,
     selectReaderPeer,

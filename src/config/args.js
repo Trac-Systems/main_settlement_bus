@@ -88,6 +88,5 @@ export const resolveConfig = () => {
     };
 
     const options = runRpc ? rpc : { storesDirectory };
-
     return createConfig(selectedEnv, options);
 };

@@ -20,17 +20,19 @@ const configData = {
         channel: '1111trac1network1msb1testnet1111',
         dhtBootstrap: ['116.202.214.149:10001','157.180.12.214:10001','node1.hyperdht.org:49737','node2.hyperdht.org:49737','node3.hyperdht.org:49737'], // these are used to peer discovery
         derivationPath: address.TESNET_DERIVATION_PATH,
-        enableValidatorObserver: true,
         pollInterval: 500, // Validator observer poll interval
         adminCacheTTL: 10_000, // Admin cache TTL ms
         validatorConnectionAttemptDelay: 5, // Delay between validator connection attempts (ms)
+        connectTimeoutMs: 5_000,
         bootstrapTimeout: 60_000, // time used (ms) to connect to new validators at bootstrap
         writersShortCacheTTL: 10_000, // short TTL during bootstrap
         writersLongCacheTTL: 120_000, // long TTL after bootstrap
         maxValidators: 50,
+        maxPendingConnections: 50,
         maxWritersForAdminIndexerConnection: 10, // Connectivity constants
         disableRateLimit: false,
         enableErrorApplyLogs: true,
+        enableLogTimestamp: false,
         enableInteractiveMode: true,
         enableRoleRequester: false,
         enableTxApplyLogs: true,
@@ -53,11 +55,17 @@ const configData = {
         rateLimitMaxTransactionsPerSecond: 50, // Rate limiting constants
         maxPendingRequestsInPendingRequestsService: 50_000, // Maximum number of pending requests in PendingRequestService (This value should not exceed 256MB)
         pendingRequestTimeout: 10_000, // Deadline for a pending V1 response (ms), including health checks
+        indexerPendingRequestTimeout: 20000, // constant after which time the transaction will be considered invalid
         txCommitTimeout: 5_000, // Wait for local append and publication proof (ms); shorter than the response deadline
         txPoolSize: 1000, // size of transaction pool
         validatorHealthCheckInterval: 5 * 60 * 1000, // How often to check validator health (ms)
         validatorHealthCheckFailureThreshold: 3, // Consecutive failed health checks before a validator is removed
-        confirmationStallTimeout: 120_000, // Force a fast-forward when the confirmed length has not moved for this long while unconfirmed entries wait (ms, 0 = off)
+        confirmationStallTimeout: 120_000, // Force a fast-forward when confirmations stall with unconfirmed entries (ms, 0 = off)
+        epochInterval: 3 * 60 * 1000, // How often to trigger epoch proof proposal (ms)
+        epochBackoffDelay: 30_000, // Delay before retrying epoch coordination after a failed attempt (ms)
+        epochSignatureTimeout: 20_000, // Max time delay an indexer have to sign a proposal
+        epochAppendTimeout: 2_000, // Max time a proposer has to append the new epoch in the log
+        epochRemoteProposalTimeout: 20_000, // Max time to wait for a competing proposal to land before broadcasting our own
         storesDirectory: 'stores/',
         storeName: 'testnet',
     },
@@ -71,17 +79,19 @@ const configData = {
         channel: '0000trac0network0msb0mainnet0000',
         dhtBootstrap: ['116.202.214.149:10001','157.180.12.214:10001','node1.hyperdht.org:49737','node2.hyperdht.org:49737','node3.hyperdht.org:49737'],
         derivationPath: address.MAINNET_DERIVATION_PATH,
-        enableValidatorObserver: true,
         pollInterval: 500, // Validator observer poll interval
         adminCacheTTL: 3_600_000, // Admin cache TTL ms
         validatorConnectionAttemptDelay: 5, // Delay between validator connection attempts (ms)
+        connectTimeoutMs: 5_000,
         bootstrapTimeout: 120_000, // time used (ms) to connect to new validators at bootstrap
         writersShortCacheTTL: 2_000, // short TTL during bootstrap
         writersLongCacheTTL: 120_000, // long TTL after bootstrap
         maxValidators: 50,
+        maxPendingConnections: 50,
         maxWritersForAdminIndexerConnection: 10, // Connectivity constants
         disableRateLimit: false,
         enableErrorApplyLogs: false,
+        enableLogTimestamp: false,
         enableInteractiveMode: true,
         enableRoleRequester: false,
         enableTxApplyLogs: false,
@@ -104,11 +114,17 @@ const configData = {
         rateLimitMaxTransactionsPerSecond: 50, // Rate limiting constants
         maxPendingRequestsInPendingRequestsService: 50_000, // Maximum number of pending requests in PendingRequestService (This value should not exceed 256MB)
         pendingRequestTimeout: 10_000, // Deadline for a pending V1 response (ms), including health checks
+        indexerPendingRequestTimeout: 20000, // constant after which time the transaction will be considered invalid
         txCommitTimeout: 5_000, // Wait for local append and publication proof (ms); shorter than the response deadline
         txPoolSize: 1000, // size of transaction pool
         validatorHealthCheckInterval: 5 * 60 * 1000, // How often to check validator health (ms)
         validatorHealthCheckFailureThreshold: 3, // Consecutive failed health checks before a validator is removed
-        confirmationStallTimeout: 120_000, // Force a fast-forward when the confirmed length has not moved for this long while unconfirmed entries wait (ms, 0 = off)
+        confirmationStallTimeout: 120_000, // Force a fast-forward when confirmations stall with unconfirmed entries (ms, 0 = off)
+        epochInterval: 3 * 60 * 1000, // How often to trigger epoch proof proposal (ms)
+        epochBackoffDelay: 30_000, // Delay before retrying epoch coordination after a failed attempt (ms)
+        epochSignatureTimeout: 20_000, // Max time delay an indexer have to sign a proposal
+        epochAppendTimeout: 2_000, // Max time a proposer has to append the new epoch in the log
+        epochRemoteProposalTimeout: 20_000, // Max time to wait for a competing proposal to land before broadcasting our own
         storesDirectory: 'stores/',
         storeName: 'mainnet',
     },
@@ -118,21 +134,23 @@ const configData = {
         addressPrefix: TRAC_NETWORK_MSB_MAINNET_PREFIX,
         addressPrefixLength: TRAC_NETWORK_MSB_MAINNET_PREFIX.length,
         bech32mHrpLength: TRAC_NETWORK_MSB_MAINNET_PREFIX.length + 1, // len(addressPrefix + separator)
-        bootstrap: '12f7f1668eac2e691e17cbc6a53e509c5cee78cdcac562313091c64e5fd077d6',
-        channel: '12312313123123',
+        bootstrap: 'e81a23d67224e794a7df923843591880c24a4fd4de1795a80108035a7fcdfcbd',
+        channel: '123123131231233',
         dhtBootstrap: ['116.202.214.149:10001','157.180.12.214:10001','node1.hyperdht.org:49737','node2.hyperdht.org:49737','node3.hyperdht.org:49737'],
         derivationPath: address.MAINNET_DERIVATION_PATH,
-        enableValidatorObserver: true,
         pollInterval: 500, // Validator observer poll interval
         adminCacheTTL: 60_000, // Admin cache TTL ms
         validatorConnectionAttemptDelay: 5, // Delay between validator connection attempts (ms)
+        connectTimeoutMs: 5_000,
         bootstrapTimeout: 30_000,  // time used (ms) to connect to new validators at bootstrap
         writersShortCacheTTL: 1_000, // short TTL during bootstrap
         writersLongCacheTTL: 2_000, // long TTL after bootstrap
         maxValidators: 10,
+        maxPendingConnections: 50,
         maxWritersForAdminIndexerConnection: 10, // Connectivity constants
         disableRateLimit: false,
         enableErrorApplyLogs: true,
+        enableLogTimestamp: true,
         enableInteractiveMode: true,
         enableRoleRequester: false,
         enableTxApplyLogs: true,
@@ -155,11 +173,17 @@ const configData = {
         rateLimitMaxTransactionsPerSecond: 50, // Rate limiting constants
         maxPendingRequestsInPendingRequestsService: 50_000, // Maximum number of pending requests in PendingRequestService (This value should not exceed 256MB)
         pendingRequestTimeout: 10_000, // Deadline for a pending V1 response (ms), including health checks
+        indexerPendingRequestTimeout: 20000, // constant after which time the transaction will be considered invalid
         txCommitTimeout: 5_000, // Wait for local append and publication proof (ms); shorter than the response deadline
         txPoolSize: 1000, // size of transaction pool
         validatorHealthCheckInterval: 1_000, // How often to check validator health (ms)
         validatorHealthCheckFailureThreshold: 3, // Consecutive failed health checks before a validator is removed
-        confirmationStallTimeout: 120_000, // Force a fast-forward when the confirmed length has not moved for this long while unconfirmed entries wait (ms, 0 = off)
+        confirmationStallTimeout: 120_000, // Force a fast-forward when confirmations stall with unconfirmed entries (ms, 0 = off)
+        epochInterval: 30 * 1000, // How often to trigger epoch proof proposal (ms)
+        epochBackoffDelay: 30_000, // Delay before retrying epoch coordination after a failed attempt (ms)
+        epochSignatureTimeout: 40_000, // Max time delay an indexer have to sign a proposal
+        epochAppendTimeout: 10_000, // Max time a proposer has to append the new epoch in the log
+        epochRemoteProposalTimeout: 40_000, // Max time to wait for a competing proposal to land before broadcasting our own
         storesDirectory: 'stores/',
         storeName: 'development',
     }

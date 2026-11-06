@@ -3,7 +3,7 @@ import { eventFlush } from '../../../../../helpers/autobaseTestHelpers.js';
 import {
     safeDecodeApplyOperation,
     safeEncodeApplyOperation
-} from '../../../../../../src/utils/protobuf/operationHelpers.js';
+} from '../../../../../../src/codecs/apply/applyOperationCodec.js';
 import OperationValidationScenarioBase from '../base/OperationValidationScenarioBase.js';
 import { createSignature } from '../../../../../helpers/createTestSignature.js';
 
@@ -124,7 +124,7 @@ async function mutateAmountSignature(t, validPayload) {
 }
 
 function findSignatureParent(payload) {
-    const signatureParents = ['cao', 'bio', 'aco', 'tro', 'rao', 'bdo', 'txo'];
+    const signatureParents = ['cao', 'bio', 'aco', 'tro', 'rao', 'bdo', 'txo', 'cco'];
     for (const key of signatureParents) {
         const parent = payload[key];
         if (parent?.is) {

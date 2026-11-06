@@ -8,7 +8,7 @@ import {
 } from '../../../../helpers/autobaseTestHelpers.js';
 import { applyStateMessageFactory } from '../../../../../src/messages/state/applyStateMessageFactory.js';
 import { AUTOBASE_VALUE_ENCODING, EntryType } from '../../../../../src/utils/constants.js';
-import { safeDecodeApplyOperation, safeEncodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
+import { safeDecodeApplyOperation, safeEncodeApplyOperation } from '../../../../../src/codecs/apply/applyOperationCodec.js';
 import nodeEntryUtils, { ZERO_LICENSE } from '../../../../../src/core/state/utils/nodeEntry.js';
 import lengthEntryUtils from '../../../../../src/core/state/utils/lengthEntry.js';
 import addressUtils from '../../../../../src/core/state/utils/address.js';

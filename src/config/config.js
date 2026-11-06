@@ -1,6 +1,7 @@
 import b4a from 'b4a'
 import { isDefined } from '../utils/type.js'
 import _ from 'lodash'
+import { BOOTSTRAP_BYTE_LENGTH, CHANNEL_BYTE_LENGTH } from '../utils/constants.js'
 
 export class Config {
     #options
@@ -59,6 +60,11 @@ export class Config {
         return !!this.#config.enableErrorApplyLogs
     }
 
+    get enableLogTimestamp() {
+        if (this.#isOverriden('enableLogTimestamp')) return !!this.#options.enableLogTimestamp
+        return !!this.#config.enableLogTimestamp
+    }
+
     get enableInteractiveMode() {
         if (this.#isOverriden('enableInteractiveMode')) return this.#options.enableInteractiveMode !== false
         return !!this.#config.enableInteractiveMode
@@ -67,11 +73,6 @@ export class Config {
     get enableRoleRequester() {
         if (this.#isOverriden('enableRoleRequester')) return !!this.#options.enableRoleRequester
         return !!this.#config.enableRoleRequester
-    }
-
-    get enableValidatorObserver() {
-        if (this.#isOverriden('enableValidatorObserver')) return !!this.#options.enableValidatorObserver
-        return !!this.#config.enableValidatorObserver
     }
 
     get enableTxApplyLogs() {
@@ -201,6 +202,10 @@ export class Config {
         return this.#config.pendingRequestTimeout
     }
 
+    get indexerPendingRequestTimeout() {
+        return this.#config.indexerPendingRequestTimeout
+    }
+
     get txCommitTimeout() {
         return this.#config.txCommitTimeout
     }
@@ -212,6 +217,26 @@ export class Config {
     get validatorHealthCheckInterval() {
         if (this.#isOverriden('validatorHealthCheckInterval')) return this.#options.validatorHealthCheckInterval
         return this.#config.validatorHealthCheckInterval
+    }
+
+    get epochInterval() {
+        return this.#config.epochInterval
+    }
+
+    get epochBackoffDelay() {
+        return this.#config.epochBackoffDelay
+    }
+
+    get epochSignatureTimeout() {
+        return this.#config.epochSignatureTimeout
+    }
+
+    get epochRemoteProposalTimeout() {
+        return this.#config.epochRemoteProposalTimeout
+    }
+
+    get epochAppendTimeout() {
+        return this.#config.epochAppendTimeout
     }
 
     get validatorHealthCheckFailureThreshold() {
@@ -226,6 +251,10 @@ export class Config {
 
     get maxPendingRequestsInPendingRequestsService() {
         return this.#config.maxPendingRequestsInPendingRequestsService
+    }
+
+    get maxPendingConnections() {
+        return this.#config.maxPendingConnections
     }
 
     get debug() {
@@ -249,6 +278,10 @@ export class Config {
     get bootstrapTimeout() {
         if (this.#isOverriden('bootstrapTimeout')) return this.#options.bootstrapTimeout
         return this.#config.bootstrapTimeout
+    }
+
+    get connectTimeoutMs() {
+        return this.#config.connectTimeoutMs
     }
 
     get writersShortCacheTTL() {
@@ -279,7 +312,7 @@ export class Config {
     }
 
     #normalizeChannel(channel) {
-        return b4a.alloc(32).fill(channel)
+        return b4a.alloc(CHANNEL_BYTE_LENGTH).fill(channel)
     }
 
     #validateStringOverride(field, value) {
@@ -296,7 +329,7 @@ export class Config {
 
     #validateBootstrapOverride(bootstrap) {
         if (b4a.isBuffer(bootstrap)) {
-            if (bootstrap.length !== 32) {
+            if (bootstrap.length !== BOOTSTRAP_BYTE_LENGTH) {
                 throw new Error('MainSettlementBus Config: bootstrap must be a 32-byte hex string or Buffer.');
             }
             return;
@@ -370,4 +403,5 @@ export class Config {
             this.#validateDhtBootstrapOverride(options.dhtBootstrap);
         }
     }
+
 }

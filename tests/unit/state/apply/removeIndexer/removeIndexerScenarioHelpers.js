@@ -4,7 +4,7 @@ import { BALANCE_FEE, toBalance } from '../../../../../src/core/state/utils/bala
 import addressUtils from '../../../../../src/core/state/utils/address.js';
 import nodeRoleUtils from '../../../../../src/core/state/utils/roles.js';
 import { EntryType } from '../../../../../src/utils/constants.js';
-import { safeDecodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
+import { safeDecodeApplyOperation } from '../../../../../src/codecs/apply/applyOperationCodec.js';
 import { eventFlush } from '../../../../helpers/autobaseTestHelpers.js';
 import {
     setupAddIndexerScenario,

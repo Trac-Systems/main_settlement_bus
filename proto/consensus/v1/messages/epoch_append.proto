@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package consensus.v1;
+
+message EpochAppendIntent {
+  bytes network_id = 1;
+  bytes bootstrap = 2;
+  bytes epoch = 3;
+  bytes parent_hash = 4;
+  bytes membership_context = 5;
+  bytes config_hash = 6;
+  string request_id = 7;
+  bytes payload_hash = 8;
+  bytes logical_counter = 9; // election term, uint64 big endian; never converted to Number
+  bytes requester = 10; // authenticated wallet public key
+  uint32 selection_version = 11; // 2: durable majority voting; v1 RA messages are incompatible
+}
+
+message EpochAppendRequest {
+  EpochAppendIntent intent = 1;
+  bytes signature = 2;
+}
+
+message EpochAppendReply {
+  EpochAppendIntent intent = 1;
+  bytes responder = 2;
+  bytes signature = 3;
+  uint32 vote_status = 4; // 1 GRANTED, 2 BUSY, 3 STALE
+  bytes observed_counter = 5; // highest observed election term
+  EpochAppendIntent vote = 6; // last persisted vote; stale replies may refer to an older context
+}

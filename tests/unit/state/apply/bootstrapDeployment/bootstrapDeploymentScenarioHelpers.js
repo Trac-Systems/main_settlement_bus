@@ -17,7 +17,7 @@ import addressUtils from '../../../../../src/core/state/utils/address.js';
 import { toBalance } from '../../../../../src/core/state/utils/balance.js';
 import { EntryType } from '../../../../../src/utils/constants.js';
 import { decimalStringToBigInt, bigIntTo16ByteBuffer } from '../../../../../src/utils/amountSerialization.js';
-import { safeDecodeApplyOperation, safeEncodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
+import { safeDecodeApplyOperation, safeEncodeApplyOperation } from '../../../../../src/codecs/apply/applyOperationCodec.js';
 import { config } from '../../../../helpers/config.js';
 
 const DEFAULT_FUNDING = bigIntTo16ByteBuffer(decimalStringToBigInt('10'));

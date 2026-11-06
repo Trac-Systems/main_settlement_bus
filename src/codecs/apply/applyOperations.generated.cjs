@@ -1,0 +1,6380 @@
+/*eslint-disable block-scoped-var, id-length, no-control-regex, no-magic-numbers, no-prototype-builtins, no-redeclare, no-shadow, no-var, sort-vars*/
+"use strict";
+
+/** @typedef {ReturnType<typeof import("b4a").alloc>} B4aBuffer */
+
+var $protobuf = require("../protobufRuntime.cjs");
+
+// Common aliases
+var $Reader = $protobuf.Reader, $Writer = $protobuf.Writer, $util = $protobuf.util;
+
+// Exported root namespace
+var $root = $protobuf.roots["applyOperations"] || ($protobuf.roots["applyOperations"] = {});
+
+$root.apply = (function() {
+
+    /**
+     * Namespace apply.
+     * @exports apply
+     * @namespace
+     */
+    var apply = {};
+
+    apply.operations = (function() {
+
+        /**
+         * Namespace operations.
+         * @memberof apply
+         * @namespace
+         */
+        var operations = {};
+
+        operations.Operation = (function() {
+
+            /**
+             * Properties of an Operation.
+             * @memberof apply.operations
+             * @interface IOperation
+             * @property {apply.operations.OperationType|null} [type] Operation type
+             * @property {B4aBuffer|null} [address] Operation address
+             * @property {apply.operations.ICoreAdminOperation|null} [cao] Operation cao
+             * @property {apply.operations.IAdminControlOperation|null} [aco] Operation aco
+             * @property {apply.operations.IBalanceInitializationOperation|null} [bio] Operation bio
+             * @property {apply.operations.ITransferOperation|null} [tro] Operation tro
+             * @property {apply.operations.IRoleAccessOperation|null} [rao] Operation rao
+             * @property {apply.operations.IBootstrapDeploymentOperation|null} [bdo] Operation bdo
+             * @property {apply.operations.ITxOperation|null} [txo] Operation txo
+             * @property {apply.operations.ISetEpochOperation|null} [seo] Operation seo
+             * @property {apply.operations.IConsensusControlOperation|null} [cco] Operation cco
+             * @property {apply.operations.IHtlcLockOperation|null} [hlo] Operation hlo
+             * @property {apply.operations.IHtlcClaimOperation|null} [hco] Operation hco
+             * @property {apply.operations.IHtlcRefundOperation|null} [hro] Operation hro
+             */
+
+            /**
+             * Constructs a new Operation.
+             * @memberof apply.operations
+             * @classdesc Represents an Operation.
+             * @implements IOperation
+             * @constructor
+             * @param {apply.operations.IOperation=} [properties] Properties to set
+             */
+            function Operation(properties) {
+                if (properties)
+                    for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
+                        if (properties[keys[i]] != null && keys[i] !== "__proto__")
+                            this[keys[i]] = properties[keys[i]];
+            }
+
+            /**
+             * Operation type.
+             * @member {apply.operations.OperationType} type
+             * @memberof apply.operations.Operation
+             * @instance
+             */
+            Operation.prototype.type = 0;
+
+            /**
+             * Operation address.
+             * @member {B4aBuffer} address
+             * @memberof apply.operations.Operation
+             * @instance
+             */
+            Operation.prototype.address = $util.newBuffer([]);
+
+            /**
+             * Operation cao.
+             * @member {apply.operations.ICoreAdminOperation|null|undefined} cao
+             * @memberof apply.operations.Operation
+             * @instance
+             */
+            Operation.prototype.cao = null;
+
+            /**
+             * Operation aco.
+             * @member {apply.operations.IAdminControlOperation|null|undefined} aco
+             * @memberof apply.operations.Operation
+             * @instance
+             */
+            Operation.prototype.aco = null;
+
+            /**
+             * Operation bio.
+             * @member {apply.operations.IBalanceInitializationOperation|null|undefined} bio
+             * @memberof apply.operations.Operation
+             * @instance
+             */
+            Operation.prototype.bio = null;
+
+            /**
+             * Operation tro.
+             * @member {apply.operations.ITransferOperation|null|undefined} tro
+             * @memberof apply.operations.Operation
+             * @instance
+             */
+            Operation.prototype.tro = null;
+
+            /**
+             * Operation rao.
+             * @member {apply.operations.IRoleAccessOperation|null|undefined} rao
+             * @memberof apply.operations.Operation
+             * @instance
+             */
+            Operation.prototype.rao = null;
+
+            /**
+             * Operation bdo.
+             * @member {apply.operations.IBootstrapDeploymentOperation|null|undefined} bdo
+             * @memberof apply.operations.Operation
+             * @instance
+             */
+            Operation.prototype.bdo = null;
+
+            /**
+             * Operation txo.
+             * @member {apply.operations.ITxOperation|null|undefined} txo
+             * @memberof apply.operations.Operation
+             * @instance
+             */
+            Operation.prototype.txo = null;
+
+            /**
+             * Operation seo.
+             * @member {apply.operations.ISetEpochOperation|null|undefined} seo
+             * @memberof apply.operations.Operation
+             * @instance
+             */
+            Operation.prototype.seo = null;
+
+            /**
+             * Operation cco.
+             * @member {apply.operations.IConsensusControlOperation|null|undefined} cco
+             * @memberof apply.operations.Operation
+             * @instance
+             */
+            Operation.prototype.cco = null;
+
+            /**
+             * Operation hlo.
+             * @member {apply.operations.IHtlcLockOperation|null|undefined} hlo
+             * @memberof apply.operations.Operation
+             * @instance
+             */
+            Operation.prototype.hlo = null;
+
+            /**
+             * Operation hco.
+             * @member {apply.operations.IHtlcClaimOperation|null|undefined} hco
+             * @memberof apply.operations.Operation
+             * @instance
+             */
+            Operation.prototype.hco = null;
+
+            /**
+             * Operation hro.
+             * @member {apply.operations.IHtlcRefundOperation|null|undefined} hro
+             * @memberof apply.operations.Operation
+             * @instance
+             */
+            Operation.prototype.hro = null;
+
+            // OneOf field names bound to virtual getters and setters
+            var $oneOfFields;
+
+            /**
+             * Operation value.
+             * @member {"cao"|"aco"|"bio"|"tro"|"rao"|"bdo"|"txo"|"seo"|"cco"|"hlo"|"hco"|"hro"|undefined} value
+             * @memberof apply.operations.Operation
+             * @instance
+             */
+            Object.defineProperty(Operation.prototype, "value", {
+                get: $util.oneOfGetter($oneOfFields = ["cao", "aco", "bio", "tro", "rao", "bdo", "txo", "seo", "cco", "hlo", "hco", "hro"]),
+                set: $util.oneOfSetter($oneOfFields)
+            });
+
+            /**
+             * Creates a new Operation instance using the specified properties.
+             * @function create
+             * @memberof apply.operations.Operation
+             * @static
+             * @param {apply.operations.IOperation=} [properties] Properties to set
+             * @returns {apply.operations.Operation} Operation instance
+             */
+            Operation.create = function create(properties) {
+                return new Operation(properties);
+            };
+
+            /**
+             * Encodes the specified Operation message. Does not implicitly {@link apply.operations.Operation.verify|verify} messages.
+             * @function encode
+             * @memberof apply.operations.Operation
+             * @static
+             * @param {apply.operations.IOperation} message Operation message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            Operation.encode = function encode(message, writer, q) {
+                writer = $Writer.create(writer);
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
+                if (message.type != null && Object.hasOwnProperty.call(message, "type"))
+                    writer.uint32(/* id 1, wireType 0 =*/8).int32(message.type);
+                if (message.address != null && Object.hasOwnProperty.call(message, "address"))
+                    writer.uint32(/* id 2, wireType 2 =*/18).bytes(message.address);
+                if (message.cao != null && Object.hasOwnProperty.call(message, "cao"))
+                    $root.apply.operations.CoreAdminOperation.encode(message.cao, writer.uint32(/* id 3, wireType 2 =*/26).fork(), q + 1).ldelim();
+                if (message.aco != null && Object.hasOwnProperty.call(message, "aco"))
+                    $root.apply.operations.AdminControlOperation.encode(message.aco, writer.uint32(/* id 4, wireType 2 =*/34).fork(), q + 1).ldelim();
+                if (message.bio != null && Object.hasOwnProperty.call(message, "bio"))
+                    $root.apply.operations.BalanceInitializationOperation.encode(message.bio, writer.uint32(/* id 5, wireType 2 =*/42).fork(), q + 1).ldelim();
+                if (message.tro != null && Object.hasOwnProperty.call(message, "tro"))
+                    $root.apply.operations.TransferOperation.encode(message.tro, writer.uint32(/* id 6, wireType 2 =*/50).fork(), q + 1).ldelim();
+                if (message.rao != null && Object.hasOwnProperty.call(message, "rao"))
+                    $root.apply.operations.RoleAccessOperation.encode(message.rao, writer.uint32(/* id 7, wireType 2 =*/58).fork(), q + 1).ldelim();
+                if (message.bdo != null && Object.hasOwnProperty.call(message, "bdo"))
+                    $root.apply.operations.BootstrapDeploymentOperation.encode(message.bdo, writer.uint32(/* id 8, wireType 2 =*/66).fork(), q + 1).ldelim();
+                if (message.txo != null && Object.hasOwnProperty.call(message, "txo"))
+                    $root.apply.operations.TxOperation.encode(message.txo, writer.uint32(/* id 9, wireType 2 =*/74).fork(), q + 1).ldelim();
+                if (message.seo != null && Object.hasOwnProperty.call(message, "seo"))
+                    $root.apply.operations.SetEpochOperation.encode(message.seo, writer.uint32(/* id 10, wireType 2 =*/82).fork(), q + 1).ldelim();
+                if (message.cco != null && Object.hasOwnProperty.call(message, "cco"))
+                    $root.apply.operations.ConsensusControlOperation.encode(message.cco, writer.uint32(/* id 11, wireType 2 =*/90).fork(), q + 1).ldelim();
+                if (message.hlo != null && Object.hasOwnProperty.call(message, "hlo"))
+                    $root.apply.operations.HtlcLockOperation.encode(message.hlo, writer.uint32(/* id 12, wireType 2 =*/98).fork(), q + 1).ldelim();
+                if (message.hco != null && Object.hasOwnProperty.call(message, "hco"))
+                    $root.apply.operations.HtlcClaimOperation.encode(message.hco, writer.uint32(/* id 13, wireType 2 =*/106).fork(), q + 1).ldelim();
+                if (message.hro != null && Object.hasOwnProperty.call(message, "hro"))
+                    $root.apply.operations.HtlcRefundOperation.encode(message.hro, writer.uint32(/* id 14, wireType 2 =*/114).fork(), q + 1).ldelim();
+                return writer;
+            };
+
+            /**
+             * Encodes the specified Operation message, length delimited. Does not implicitly {@link apply.operations.Operation.verify|verify} messages.
+             * @function encodeDelimited
+             * @memberof apply.operations.Operation
+             * @static
+             * @param {apply.operations.IOperation} message Operation message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            Operation.encodeDelimited = function encodeDelimited(message, writer) {
+                return this.encode(message, writer && writer.len ? writer.fork() : writer).ldelim();
+            };
+
+            /**
+             * Decodes an Operation message from the specified reader or buffer.
+             * @function decode
+             * @memberof apply.operations.Operation
+             * @static
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
+             * @param {number} [length] Message length if known beforehand
+             * @returns {apply.operations.Operation} Operation
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            Operation.decode = function decode(reader, length, error, long) {
+                reader = $Reader.create(reader);
+                if (long === undefined)
+                    long = 0;
+                if (long > $Reader.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
+                var end = length === undefined ? reader.len : reader.pos + length, message = new $root.apply.operations.Operation();
+                while (reader.pos < end) {
+                    var tag = reader.uint32();
+                    if (tag === error)
+                        break;
+                    switch (tag >>> 3) {
+                    case 1: {
+                            message.type = reader.int32();
+                            break;
+                        }
+                    case 2: {
+                            message.address = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 3: {
+                            message.cao = $root.apply.operations.CoreAdminOperation.decode(reader, reader.uint32(), undefined, long + 1);
+                            break;
+                        }
+                    case 4: {
+                            message.aco = $root.apply.operations.AdminControlOperation.decode(reader, reader.uint32(), undefined, long + 1);
+                            break;
+                        }
+                    case 5: {
+                            message.bio = $root.apply.operations.BalanceInitializationOperation.decode(reader, reader.uint32(), undefined, long + 1);
+                            break;
+                        }
+                    case 6: {
+                            message.tro = $root.apply.operations.TransferOperation.decode(reader, reader.uint32(), undefined, long + 1);
+                            break;
+                        }
+                    case 7: {
+                            message.rao = $root.apply.operations.RoleAccessOperation.decode(reader, reader.uint32(), undefined, long + 1);
+                            break;
+                        }
+                    case 8: {
+                            message.bdo = $root.apply.operations.BootstrapDeploymentOperation.decode(reader, reader.uint32(), undefined, long + 1);
+                            break;
+                        }
+                    case 9: {
+                            message.txo = $root.apply.operations.TxOperation.decode(reader, reader.uint32(), undefined, long + 1);
+                            break;
+                        }
+                    case 10: {
+                            message.seo = $root.apply.operations.SetEpochOperation.decode(reader, reader.uint32(), undefined, long + 1);
+                            break;
+                        }
+                    case 11: {
+                            message.cco = $root.apply.operations.ConsensusControlOperation.decode(reader, reader.uint32(), undefined, long + 1);
+                            break;
+                        }
+                    case 12: {
+                            message.hlo = $root.apply.operations.HtlcLockOperation.decode(reader, reader.uint32(), undefined, long + 1);
+                            break;
+                        }
+                    case 13: {
+                            message.hco = $root.apply.operations.HtlcClaimOperation.decode(reader, reader.uint32(), undefined, long + 1);
+                            break;
+                        }
+                    case 14: {
+                            message.hro = $root.apply.operations.HtlcRefundOperation.decode(reader, reader.uint32(), undefined, long + 1);
+                            break;
+                        }
+                    default:
+                        reader.skipType(tag & 7, long);
+                        break;
+                    }
+                }
+                return message;
+            };
+
+            /**
+             * Decodes an Operation message from the specified reader or buffer, length delimited.
+             * @function decodeDelimited
+             * @memberof apply.operations.Operation
+             * @static
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
+             * @returns {apply.operations.Operation} Operation
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            Operation.decodeDelimited = function decodeDelimited(reader) {
+                reader = $Reader.create(reader);
+                return this.decode(reader, reader.uint32());
+            };
+
+            /**
+             * Verifies an Operation message.
+             * @function verify
+             * @memberof apply.operations.Operation
+             * @static
+             * @param {Object.<string,*>} message Plain object to verify
+             * @returns {string|null} `null` if valid, otherwise the reason why it is not
+             */
+            Operation.verify = function verify(message, long) {
+                if (typeof message !== "object" || message === null)
+                    return "object expected";
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    return "maximum nesting depth exceeded";
+                var properties = {};
+                if (message.type != null && Object.hasOwnProperty.call(message, "type"))
+                    switch (message.type) {
+                    default:
+                        return "type: enum value expected";
+                    case 0:
+                    case 1:
+                    case 2:
+                    case 3:
+                    case 4:
+                    case 5:
+                    case 6:
+                    case 7:
+                    case 8:
+                    case 9:
+                    case 10:
+                    case 11:
+                    case 12:
+                    case 13:
+                    case 14:
+                    case 15:
+                    case 16:
+                    case 17:
+                    case 18:
+                    case 19:
+                        break;
+                    }
+                if (message.address != null && Object.hasOwnProperty.call(message, "address"))
+                    if (!$util.isBytes(message.address))
+                        return "address: buffer expected";
+                if (message.cao != null && Object.hasOwnProperty.call(message, "cao")) {
+                    properties.value = 1;
+                    {
+                        var error = $root.apply.operations.CoreAdminOperation.verify(message.cao, long + 1);
+                        if (error)
+                            return "cao." + error;
+                    }
+                }
+                if (message.aco != null && Object.hasOwnProperty.call(message, "aco")) {
+                    if (properties.value === 1)
+                        return "value: multiple values";
+                    properties.value = 1;
+                    {
+                        var error = $root.apply.operations.AdminControlOperation.verify(message.aco, long + 1);
+                        if (error)
+                            return "aco." + error;
+                    }
+                }
+                if (message.bio != null && Object.hasOwnProperty.call(message, "bio")) {
+                    if (properties.value === 1)
+                        return "value: multiple values";
+                    properties.value = 1;
+                    {
+                        var error = $root.apply.operations.BalanceInitializationOperation.verify(message.bio, long + 1);
+                        if (error)
+                            return "bio." + error;
+                    }
+                }
+                if (message.tro != null && Object.hasOwnProperty.call(message, "tro")) {
+                    if (properties.value === 1)
+                        return "value: multiple values";
+                    properties.value = 1;
+                    {
+                        var error = $root.apply.operations.TransferOperation.verify(message.tro, long + 1);
+                        if (error)
+                            return "tro." + error;
+                    }
+                }
+                if (message.rao != null && Object.hasOwnProperty.call(message, "rao")) {
+                    if (properties.value === 1)
+                        return "value: multiple values";
+                    properties.value = 1;
+                    {
+                        var error = $root.apply.operations.RoleAccessOperation.verify(message.rao, long + 1);
+                        if (error)
+                            return "rao." + error;
+                    }
+                }
+                if (message.bdo != null && Object.hasOwnProperty.call(message, "bdo")) {
+                    if (properties.value === 1)
+                        return "value: multiple values";
+                    properties.value = 1;
+                    {
+                        var error = $root.apply.operations.BootstrapDeploymentOperation.verify(message.bdo, long + 1);
+                        if (error)
+                            return "bdo." + error;
+                    }
+                }
+                if (message.txo != null && Object.hasOwnProperty.call(message, "txo")) {
+                    if (properties.value === 1)
+                        return "value: multiple values";
+                    properties.value = 1;
+                    {
+                        var error = $root.apply.operations.TxOperation.verify(message.txo, long + 1);
+                        if (error)
+                            return "txo." + error;
+                    }
+                }
+                if (message.seo != null && Object.hasOwnProperty.call(message, "seo")) {
+                    if (properties.value === 1)
+                        return "value: multiple values";
+                    properties.value = 1;
+                    {
+                        var error = $root.apply.operations.SetEpochOperation.verify(message.seo, long + 1);
+                        if (error)
+                            return "seo." + error;
+                    }
+                }
+                if (message.cco != null && Object.hasOwnProperty.call(message, "cco")) {
+                    if (properties.value === 1)
+                        return "value: multiple values";
+                    properties.value = 1;
+                    {
+                        var error = $root.apply.operations.ConsensusControlOperation.verify(message.cco, long + 1);
+                        if (error)
+                            return "cco." + error;
+                    }
+                }
+                if (message.hlo != null && Object.hasOwnProperty.call(message, "hlo")) {
+                    if (properties.value === 1)
+                        return "value: multiple values";
+                    properties.value = 1;
+                    {
+                        var error = $root.apply.operations.HtlcLockOperation.verify(message.hlo, long + 1);
+                        if (error)
+                            return "hlo." + error;
+                    }
+                }
+                if (message.hco != null && Object.hasOwnProperty.call(message, "hco")) {
+                    if (properties.value === 1)
+                        return "value: multiple values";
+                    properties.value = 1;
+                    {
+                        var error = $root.apply.operations.HtlcClaimOperation.verify(message.hco, long + 1);
+                        if (error)
+                            return "hco." + error;
+                    }
+                }
+                if (message.hro != null && Object.hasOwnProperty.call(message, "hro")) {
+                    if (properties.value === 1)
+                        return "value: multiple values";
+                    properties.value = 1;
+                    {
+                        var error = $root.apply.operations.HtlcRefundOperation.verify(message.hro, long + 1);
+                        if (error)
+                            return "hro." + error;
+                    }
+                }
+                return null;
+            };
+
+            /**
+             * Creates an Operation message from a plain object. Also converts values to their respective internal types.
+             * @function fromObject
+             * @memberof apply.operations.Operation
+             * @static
+             * @param {Object.<string,*>} object Plain object
+             * @returns {apply.operations.Operation} Operation
+             */
+            Operation.fromObject = function fromObject(object, long) {
+                if (object instanceof $root.apply.operations.Operation)
+                    object = Object.assign({}, object);
+                if (!$util.isObject(object))
+                    throw TypeError(".apply.operations.Operation: object expected");
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
+                var message = new $root.apply.operations.Operation();
+                switch (object.type) {
+                default:
+                    if (typeof object.type === "number") {
+                        message.type = object.type;
+                        break;
+                    }
+                    break;
+                case "UNKNOWN":
+                case 0:
+                    message.type = 0;
+                    break;
+                case "ADD_ADMIN":
+                case 1:
+                    message.type = 1;
+                    break;
+                case "DISABLE_INITIALIZATION":
+                case 2:
+                    message.type = 2;
+                    break;
+                case "BALANCE_INITIALIZATION":
+                case 3:
+                    message.type = 3;
+                    break;
+                case "APPEND_WHITELIST":
+                case 4:
+                    message.type = 4;
+                    break;
+                case "ADD_WRITER":
+                case 5:
+                    message.type = 5;
+                    break;
+                case "REMOVE_WRITER":
+                case 6:
+                    message.type = 6;
+                    break;
+                case "ADMIN_RECOVERY":
+                case 7:
+                    message.type = 7;
+                    break;
+                case "ADD_INDEXER":
+                case 8:
+                    message.type = 8;
+                    break;
+                case "REMOVE_INDEXER":
+                case 9:
+                    message.type = 9;
+                    break;
+                case "BAN_VALIDATOR":
+                case 10:
+                    message.type = 10;
+                    break;
+                case "BOOTSTRAP_DEPLOYMENT":
+                case 11:
+                    message.type = 11;
+                    break;
+                case "TX":
+                case 12:
+                    message.type = 12;
+                    break;
+                case "TRANSFER":
+                case 13:
+                    message.type = 13;
+                    break;
+                case "SET_EPOCH":
+                case 14:
+                    message.type = 14;
+                    break;
+                case "SET_GENESIS_EPOCH":
+                case 15:
+                    message.type = 15;
+                    break;
+                case "SET_CONSENSUS_CONFIG":
+                case 16:
+                    message.type = 16;
+                    break;
+                case "HTLC_LOCK":
+                case 17:
+                    message.type = 17;
+                    break;
+                case "HTLC_CLAIM":
+                case 18:
+                    message.type = 18;
+                    break;
+                case "HTLC_REFUND":
+                case 19:
+                    message.type = 19;
+                    break;
+                }
+                if (object.address != null)
+                    message.address = $util.bytesFrom(object.address);
+                if (object.cao != null) {
+                    if (!$util.isObject(object.cao))
+                        throw TypeError(".apply.operations.Operation.cao: object expected");
+                    message.cao = $root.apply.operations.CoreAdminOperation.fromObject(object.cao, long + 1);
+                }
+                if (object.aco != null) {
+                    if (!$util.isObject(object.aco))
+                        throw TypeError(".apply.operations.Operation.aco: object expected");
+                    message.aco = $root.apply.operations.AdminControlOperation.fromObject(object.aco, long + 1);
+                }
+                if (object.bio != null) {
+                    if (!$util.isObject(object.bio))
+                        throw TypeError(".apply.operations.Operation.bio: object expected");
+                    message.bio = $root.apply.operations.BalanceInitializationOperation.fromObject(object.bio, long + 1);
+                }
+                if (object.tro != null) {
+                    if (!$util.isObject(object.tro))
+                        throw TypeError(".apply.operations.Operation.tro: object expected");
+                    message.tro = $root.apply.operations.TransferOperation.fromObject(object.tro, long + 1);
+                }
+                if (object.rao != null) {
+                    if (!$util.isObject(object.rao))
+                        throw TypeError(".apply.operations.Operation.rao: object expected");
+                    message.rao = $root.apply.operations.RoleAccessOperation.fromObject(object.rao, long + 1);
+                }
+                if (object.bdo != null) {
+                    if (!$util.isObject(object.bdo))
+                        throw TypeError(".apply.operations.Operation.bdo: object expected");
+                    message.bdo = $root.apply.operations.BootstrapDeploymentOperation.fromObject(object.bdo, long + 1);
+                }
+                if (object.txo != null) {
+                    if (!$util.isObject(object.txo))
+                        throw TypeError(".apply.operations.Operation.txo: object expected");
+                    message.txo = $root.apply.operations.TxOperation.fromObject(object.txo, long + 1);
+                }
+                if (object.seo != null) {
+                    if (!$util.isObject(object.seo))
+                        throw TypeError(".apply.operations.Operation.seo: object expected");
+                    message.seo = $root.apply.operations.SetEpochOperation.fromObject(object.seo, long + 1);
+                }
+                if (object.cco != null) {
+                    if (!$util.isObject(object.cco))
+                        throw TypeError(".apply.operations.Operation.cco: object expected");
+                    message.cco = $root.apply.operations.ConsensusControlOperation.fromObject(object.cco, long + 1);
+                }
+                if (object.hlo != null) {
+                    if (!$util.isObject(object.hlo))
+                        throw TypeError(".apply.operations.Operation.hlo: object expected");
+                    message.hlo = $root.apply.operations.HtlcLockOperation.fromObject(object.hlo, long + 1);
+                }
+                if (object.hco != null) {
+                    if (!$util.isObject(object.hco))
+                        throw TypeError(".apply.operations.Operation.hco: object expected");
+                    message.hco = $root.apply.operations.HtlcClaimOperation.fromObject(object.hco, long + 1);
+                }
+                if (object.hro != null) {
+                    if (!$util.isObject(object.hro))
+                        throw TypeError(".apply.operations.Operation.hro: object expected");
+                    message.hro = $root.apply.operations.HtlcRefundOperation.fromObject(object.hro, long + 1);
+                }
+                return message;
+            };
+
+            /**
+             * Creates a plain object from an Operation message. Also converts values to other types if specified.
+             * @function toObject
+             * @memberof apply.operations.Operation
+             * @static
+             * @param {apply.operations.Operation} message Operation
+             * @param {$protobuf.IConversionOptions} [options] Conversion options
+             * @returns {Object.<string,*>} Plain object
+             */
+            Operation.toObject = function toObject(message, options, q) {
+                if (!options)
+                    options = {};
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
+                var object = {};
+                if (options.defaults) {
+                    object.type = options.enums === String ? "UNKNOWN" : 0;
+                    if (options.bytes === String)
+                        object.address = "";
+                    else {
+                        object.address = [];
+                        if (options.bytes !== Array)
+                            object.address = $util.newBuffer(object.address);
+                    }
+                }
+                if (message.type != null && Object.hasOwnProperty.call(message, "type"))
+                    object.type = options.enums === String ? $root.apply.operations.OperationType[message.type] === undefined ? message.type : $root.apply.operations.OperationType[message.type] : message.type;
+                if (message.address != null && Object.hasOwnProperty.call(message, "address"))
+                    object.address = $util.bytesTo(message.address, options);
+                if (message.cao != null && Object.hasOwnProperty.call(message, "cao")) {
+                    object.cao = $root.apply.operations.CoreAdminOperation.toObject(message.cao, options, q + 1);
+                    if (options.oneofs)
+                        object.value = "cao";
+                }
+                if (message.aco != null && Object.hasOwnProperty.call(message, "aco")) {
+                    object.aco = $root.apply.operations.AdminControlOperation.toObject(message.aco, options, q + 1);
+                    if (options.oneofs)
+                        object.value = "aco";
+                }
+                if (message.bio != null && Object.hasOwnProperty.call(message, "bio")) {
+                    object.bio = $root.apply.operations.BalanceInitializationOperation.toObject(message.bio, options, q + 1);
+                    if (options.oneofs)
+                        object.value = "bio";
+                }
+                if (message.tro != null && Object.hasOwnProperty.call(message, "tro")) {
+                    object.tro = $root.apply.operations.TransferOperation.toObject(message.tro, options, q + 1);
+                    if (options.oneofs)
+                        object.value = "tro";
+                }
+                if (message.rao != null && Object.hasOwnProperty.call(message, "rao")) {
+                    object.rao = $root.apply.operations.RoleAccessOperation.toObject(message.rao, options, q + 1);
+                    if (options.oneofs)
+                        object.value = "rao";
+                }
+                if (message.bdo != null && Object.hasOwnProperty.call(message, "bdo")) {
+                    object.bdo = $root.apply.operations.BootstrapDeploymentOperation.toObject(message.bdo, options, q + 1);
+                    if (options.oneofs)
+                        object.value = "bdo";
+                }
+                if (message.txo != null && Object.hasOwnProperty.call(message, "txo")) {
+                    object.txo = $root.apply.operations.TxOperation.toObject(message.txo, options, q + 1);
+                    if (options.oneofs)
+                        object.value = "txo";
+                }
+                if (message.seo != null && Object.hasOwnProperty.call(message, "seo")) {
+                    object.seo = $root.apply.operations.SetEpochOperation.toObject(message.seo, options, q + 1);
+                    if (options.oneofs)
+                        object.value = "seo";
+                }
+                if (message.cco != null && Object.hasOwnProperty.call(message, "cco")) {
+                    object.cco = $root.apply.operations.ConsensusControlOperation.toObject(message.cco, options, q + 1);
+                    if (options.oneofs)
+                        object.value = "cco";
+                }
+                if (message.hlo != null && Object.hasOwnProperty.call(message, "hlo")) {
+                    object.hlo = $root.apply.operations.HtlcLockOperation.toObject(message.hlo, options, q + 1);
+                    if (options.oneofs)
+                        object.value = "hlo";
+                }
+                if (message.hco != null && Object.hasOwnProperty.call(message, "hco")) {
+                    object.hco = $root.apply.operations.HtlcClaimOperation.toObject(message.hco, options, q + 1);
+                    if (options.oneofs)
+                        object.value = "hco";
+                }
+                if (message.hro != null && Object.hasOwnProperty.call(message, "hro")) {
+                    object.hro = $root.apply.operations.HtlcRefundOperation.toObject(message.hro, options, q + 1);
+                    if (options.oneofs)
+                        object.value = "hro";
+                }
+                return object;
+            };
+
+            /**
+             * Converts this Operation to JSON.
+             * @function toJSON
+             * @memberof apply.operations.Operation
+             * @instance
+             * @returns {Object.<string,*>} JSON object
+             */
+            Operation.prototype.toJSON = function toJSON() {
+                return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
+            };
+
+            /**
+             * Gets the default type url for Operation
+             * @function getTypeUrl
+             * @memberof apply.operations.Operation
+             * @static
+             * @param {string} [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
+             * @returns {string} The default type url
+             */
+            Operation.getTypeUrl = function getTypeUrl(typeUrlPrefix) {
+                if (typeUrlPrefix === undefined) {
+                    typeUrlPrefix = "type.googleapis.com";
+                }
+                return typeUrlPrefix + "/apply.operations.Operation";
+            };
+
+            return Operation;
+        })();
+
+        /**
+         * OperationType enum.
+         * @name apply.operations.OperationType
+         * @enum {number}
+         * @property {number} UNKNOWN=0 UNKNOWN value
+         * @property {number} ADD_ADMIN=1 ADD_ADMIN value
+         * @property {number} DISABLE_INITIALIZATION=2 DISABLE_INITIALIZATION value
+         * @property {number} BALANCE_INITIALIZATION=3 BALANCE_INITIALIZATION value
+         * @property {number} APPEND_WHITELIST=4 APPEND_WHITELIST value
+         * @property {number} ADD_WRITER=5 ADD_WRITER value
+         * @property {number} REMOVE_WRITER=6 REMOVE_WRITER value
+         * @property {number} ADMIN_RECOVERY=7 ADMIN_RECOVERY value
+         * @property {number} ADD_INDEXER=8 ADD_INDEXER value
+         * @property {number} REMOVE_INDEXER=9 REMOVE_INDEXER value
+         * @property {number} BAN_VALIDATOR=10 BAN_VALIDATOR value
+         * @property {number} BOOTSTRAP_DEPLOYMENT=11 BOOTSTRAP_DEPLOYMENT value
+         * @property {number} TX=12 TX value
+         * @property {number} TRANSFER=13 TRANSFER value
+         * @property {number} SET_EPOCH=14 SET_EPOCH value
+         * @property {number} SET_GENESIS_EPOCH=15 SET_GENESIS_EPOCH value
+         * @property {number} SET_CONSENSUS_CONFIG=16 SET_CONSENSUS_CONFIG value
+         * @property {number} HTLC_LOCK=17 HTLC_LOCK value
+         * @property {number} HTLC_CLAIM=18 HTLC_CLAIM value
+         * @property {number} HTLC_REFUND=19 HTLC_REFUND value
+         */
+        operations.OperationType = (function() {
+            var valuesById = {}, values = Object.create(valuesById);
+            values[valuesById[0] = "UNKNOWN"] = 0;
+            values[valuesById[1] = "ADD_ADMIN"] = 1;
+            values[valuesById[2] = "DISABLE_INITIALIZATION"] = 2;
+            values[valuesById[3] = "BALANCE_INITIALIZATION"] = 3;
+            values[valuesById[4] = "APPEND_WHITELIST"] = 4;
+            values[valuesById[5] = "ADD_WRITER"] = 5;
+            values[valuesById[6] = "REMOVE_WRITER"] = 6;
+            values[valuesById[7] = "ADMIN_RECOVERY"] = 7;
+            values[valuesById[8] = "ADD_INDEXER"] = 8;
+            values[valuesById[9] = "REMOVE_INDEXER"] = 9;
+            values[valuesById[10] = "BAN_VALIDATOR"] = 10;
+            values[valuesById[11] = "BOOTSTRAP_DEPLOYMENT"] = 11;
+            values[valuesById[12] = "TX"] = 12;
+            values[valuesById[13] = "TRANSFER"] = 13;
+            values[valuesById[14] = "SET_EPOCH"] = 14;
+            values[valuesById[15] = "SET_GENESIS_EPOCH"] = 15;
+            values[valuesById[16] = "SET_CONSENSUS_CONFIG"] = 16;
+            values[valuesById[17] = "HTLC_LOCK"] = 17;
+            values[valuesById[18] = "HTLC_CLAIM"] = 18;
+            values[valuesById[19] = "HTLC_REFUND"] = 19;
+            return values;
+        })();
+
+        operations.CoreAdminOperation = (function() {
+
+            /**
+             * Properties of a CoreAdminOperation.
+             * @memberof apply.operations
+             * @interface ICoreAdminOperation
+             * @property {B4aBuffer|null} [tx] CoreAdminOperation tx
+             * @property {B4aBuffer|null} [txv] CoreAdminOperation txv
+             * @property {B4aBuffer|null} [iw] CoreAdminOperation iw
+             * @property {B4aBuffer|null} ["in"] CoreAdminOperation in
+             * @property {B4aBuffer|null} [is] CoreAdminOperation is
+             */
+
+            /**
+             * Constructs a new CoreAdminOperation.
+             * @memberof apply.operations
+             * @classdesc Represents a CoreAdminOperation.
+             * @implements ICoreAdminOperation
+             * @constructor
+             * @param {apply.operations.ICoreAdminOperation=} [properties] Properties to set
+             */
+            function CoreAdminOperation(properties) {
+                if (properties)
+                    for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
+                        if (properties[keys[i]] != null && keys[i] !== "__proto__")
+                            this[keys[i]] = properties[keys[i]];
+            }
+
+            /**
+             * CoreAdminOperation tx.
+             * @member {B4aBuffer} tx
+             * @memberof apply.operations.CoreAdminOperation
+             * @instance
+             */
+            CoreAdminOperation.prototype.tx = $util.newBuffer([]);
+
+            /**
+             * CoreAdminOperation txv.
+             * @member {B4aBuffer} txv
+             * @memberof apply.operations.CoreAdminOperation
+             * @instance
+             */
+            CoreAdminOperation.prototype.txv = $util.newBuffer([]);
+
+            /**
+             * CoreAdminOperation iw.
+             * @member {B4aBuffer} iw
+             * @memberof apply.operations.CoreAdminOperation
+             * @instance
+             */
+            CoreAdminOperation.prototype.iw = $util.newBuffer([]);
+
+            /**
+             * CoreAdminOperation in.
+             * @member {B4aBuffer} in
+             * @memberof apply.operations.CoreAdminOperation
+             * @instance
+             */
+            CoreAdminOperation.prototype["in"] = $util.newBuffer([]);
+
+            /**
+             * CoreAdminOperation is.
+             * @member {B4aBuffer} is
+             * @memberof apply.operations.CoreAdminOperation
+             * @instance
+             */
+            CoreAdminOperation.prototype.is = $util.newBuffer([]);
+
+            /**
+             * Creates a new CoreAdminOperation instance using the specified properties.
+             * @function create
+             * @memberof apply.operations.CoreAdminOperation
+             * @static
+             * @param {apply.operations.ICoreAdminOperation=} [properties] Properties to set
+             * @returns {apply.operations.CoreAdminOperation} CoreAdminOperation instance
+             */
+            CoreAdminOperation.create = function create(properties) {
+                return new CoreAdminOperation(properties);
+            };
+
+            /**
+             * Encodes the specified CoreAdminOperation message. Does not implicitly {@link apply.operations.CoreAdminOperation.verify|verify} messages.
+             * @function encode
+             * @memberof apply.operations.CoreAdminOperation
+             * @static
+             * @param {apply.operations.ICoreAdminOperation} message CoreAdminOperation message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            CoreAdminOperation.encode = function encode(message, writer, q) {
+                writer = $Writer.create(writer);
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
+                    writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.tx);
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
+                    writer.uint32(/* id 2, wireType 2 =*/18).bytes(message.txv);
+                if (message.iw != null && Object.hasOwnProperty.call(message, "iw"))
+                    writer.uint32(/* id 3, wireType 2 =*/26).bytes(message.iw);
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
+                    writer.uint32(/* id 4, wireType 2 =*/34).bytes(message["in"]);
+                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
+                    writer.uint32(/* id 5, wireType 2 =*/42).bytes(message.is);
+                return writer;
+            };
+
+            /**
+             * Encodes the specified CoreAdminOperation message, length delimited. Does not implicitly {@link apply.operations.CoreAdminOperation.verify|verify} messages.
+             * @function encodeDelimited
+             * @memberof apply.operations.CoreAdminOperation
+             * @static
+             * @param {apply.operations.ICoreAdminOperation} message CoreAdminOperation message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            CoreAdminOperation.encodeDelimited = function encodeDelimited(message, writer) {
+                return this.encode(message, writer && writer.len ? writer.fork() : writer).ldelim();
+            };
+
+            /**
+             * Decodes a CoreAdminOperation message from the specified reader or buffer.
+             * @function decode
+             * @memberof apply.operations.CoreAdminOperation
+             * @static
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
+             * @param {number} [length] Message length if known beforehand
+             * @returns {apply.operations.CoreAdminOperation} CoreAdminOperation
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            CoreAdminOperation.decode = function decode(reader, length, error, long) {
+                reader = $Reader.create(reader);
+                if (long === undefined)
+                    long = 0;
+                if (long > $Reader.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
+                var end = length === undefined ? reader.len : reader.pos + length, message = new $root.apply.operations.CoreAdminOperation();
+                while (reader.pos < end) {
+                    var tag = reader.uint32();
+                    if (tag === error)
+                        break;
+                    switch (tag >>> 3) {
+                    case 1: {
+                            message.tx = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 2: {
+                            message.txv = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 3: {
+                            message.iw = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 4: {
+                            message["in"] = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 5: {
+                            message.is = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    default:
+                        reader.skipType(tag & 7, long);
+                        break;
+                    }
+                }
+                return message;
+            };
+
+            /**
+             * Decodes a CoreAdminOperation message from the specified reader or buffer, length delimited.
+             * @function decodeDelimited
+             * @memberof apply.operations.CoreAdminOperation
+             * @static
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
+             * @returns {apply.operations.CoreAdminOperation} CoreAdminOperation
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            CoreAdminOperation.decodeDelimited = function decodeDelimited(reader) {
+                reader = $Reader.create(reader);
+                return this.decode(reader, reader.uint32());
+            };
+
+            /**
+             * Verifies a CoreAdminOperation message.
+             * @function verify
+             * @memberof apply.operations.CoreAdminOperation
+             * @static
+             * @param {Object.<string,*>} message Plain object to verify
+             * @returns {string|null} `null` if valid, otherwise the reason why it is not
+             */
+            CoreAdminOperation.verify = function verify(message, long) {
+                if (typeof message !== "object" || message === null)
+                    return "object expected";
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    return "maximum nesting depth exceeded";
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
+                    if (!$util.isBytes(message.tx))
+                        return "tx: buffer expected";
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
+                    if (!$util.isBytes(message.txv))
+                        return "txv: buffer expected";
+                if (message.iw != null && Object.hasOwnProperty.call(message, "iw"))
+                    if (!$util.isBytes(message.iw))
+                        return "iw: buffer expected";
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
+                    if (!$util.isBytes(message["in"]))
+                        return "in: buffer expected";
+                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
+                    if (!$util.isBytes(message.is))
+                        return "is: buffer expected";
+                return null;
+            };
+
+            /**
+             * Creates a CoreAdminOperation message from a plain object. Also converts values to their respective internal types.
+             * @function fromObject
+             * @memberof apply.operations.CoreAdminOperation
+             * @static
+             * @param {Object.<string,*>} object Plain object
+             * @returns {apply.operations.CoreAdminOperation} CoreAdminOperation
+             */
+            CoreAdminOperation.fromObject = function fromObject(object, long) {
+                if (object instanceof $root.apply.operations.CoreAdminOperation)
+                    object = Object.assign({}, object);
+                if (!$util.isObject(object))
+                    throw TypeError(".apply.operations.CoreAdminOperation: object expected");
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
+                var message = new $root.apply.operations.CoreAdminOperation();
+                if (object.tx != null)
+                    message.tx = $util.bytesFrom(object.tx);
+                if (object.txv != null)
+                    message.txv = $util.bytesFrom(object.txv);
+                if (object.iw != null)
+                    message.iw = $util.bytesFrom(object.iw);
+                if (object["in"] != null)
+                    message["in"] = $util.bytesFrom(object["in"]);
+                if (object.is != null)
+                    message.is = $util.bytesFrom(object.is);
+                return message;
+            };
+
+            /**
+             * Creates a plain object from a CoreAdminOperation message. Also converts values to other types if specified.
+             * @function toObject
+             * @memberof apply.operations.CoreAdminOperation
+             * @static
+             * @param {apply.operations.CoreAdminOperation} message CoreAdminOperation
+             * @param {$protobuf.IConversionOptions} [options] Conversion options
+             * @returns {Object.<string,*>} Plain object
+             */
+            CoreAdminOperation.toObject = function toObject(message, options, q) {
+                if (!options)
+                    options = {};
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
+                var object = {};
+                if (options.defaults) {
+                    if (options.bytes === String)
+                        object.tx = "";
+                    else {
+                        object.tx = [];
+                        if (options.bytes !== Array)
+                            object.tx = $util.newBuffer(object.tx);
+                    }
+                    if (options.bytes === String)
+                        object.txv = "";
+                    else {
+                        object.txv = [];
+                        if (options.bytes !== Array)
+                            object.txv = $util.newBuffer(object.txv);
+                    }
+                    if (options.bytes === String)
+                        object.iw = "";
+                    else {
+                        object.iw = [];
+                        if (options.bytes !== Array)
+                            object.iw = $util.newBuffer(object.iw);
+                    }
+                    if (options.bytes === String)
+                        object["in"] = "";
+                    else {
+                        object["in"] = [];
+                        if (options.bytes !== Array)
+                            object["in"] = $util.newBuffer(object["in"]);
+                    }
+                    if (options.bytes === String)
+                        object.is = "";
+                    else {
+                        object.is = [];
+                        if (options.bytes !== Array)
+                            object.is = $util.newBuffer(object.is);
+                    }
+                }
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
+                    object.tx = $util.bytesTo(message.tx, options);
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
+                    object.txv = $util.bytesTo(message.txv, options);
+                if (message.iw != null && Object.hasOwnProperty.call(message, "iw"))
+                    object.iw = $util.bytesTo(message.iw, options);
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
+                    object["in"] = $util.bytesTo(message["in"], options);
+                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
+                    object.is = $util.bytesTo(message.is, options);
+                return object;
+            };
+
+            /**
+             * Converts this CoreAdminOperation to JSON.
+             * @function toJSON
+             * @memberof apply.operations.CoreAdminOperation
+             * @instance
+             * @returns {Object.<string,*>} JSON object
+             */
+            CoreAdminOperation.prototype.toJSON = function toJSON() {
+                return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
+            };
+
+            /**
+             * Gets the default type url for CoreAdminOperation
+             * @function getTypeUrl
+             * @memberof apply.operations.CoreAdminOperation
+             * @static
+             * @param {string} [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
+             * @returns {string} The default type url
+             */
+            CoreAdminOperation.getTypeUrl = function getTypeUrl(typeUrlPrefix) {
+                if (typeUrlPrefix === undefined) {
+                    typeUrlPrefix = "type.googleapis.com";
+                }
+                return typeUrlPrefix + "/apply.operations.CoreAdminOperation";
+            };
+
+            return CoreAdminOperation;
+        })();
+
+        operations.AdminControlOperation = (function() {
+
+            /**
+             * Properties of an AdminControlOperation.
+             * @memberof apply.operations
+             * @interface IAdminControlOperation
+             * @property {B4aBuffer|null} [tx] AdminControlOperation tx
+             * @property {B4aBuffer|null} [txv] AdminControlOperation txv
+             * @property {B4aBuffer|null} [ia] AdminControlOperation ia
+             * @property {B4aBuffer|null} ["in"] AdminControlOperation in
+             * @property {B4aBuffer|null} [is] AdminControlOperation is
+             */
+
+            /**
+             * Constructs a new AdminControlOperation.
+             * @memberof apply.operations
+             * @classdesc Represents an AdminControlOperation.
+             * @implements IAdminControlOperation
+             * @constructor
+             * @param {apply.operations.IAdminControlOperation=} [properties] Properties to set
+             */
+            function AdminControlOperation(properties) {
+                if (properties)
+                    for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
+                        if (properties[keys[i]] != null && keys[i] !== "__proto__")
+                            this[keys[i]] = properties[keys[i]];
+            }
+
+            /**
+             * AdminControlOperation tx.
+             * @member {B4aBuffer} tx
+             * @memberof apply.operations.AdminControlOperation
+             * @instance
+             */
+            AdminControlOperation.prototype.tx = $util.newBuffer([]);
+
+            /**
+             * AdminControlOperation txv.
+             * @member {B4aBuffer} txv
+             * @memberof apply.operations.AdminControlOperation
+             * @instance
+             */
+            AdminControlOperation.prototype.txv = $util.newBuffer([]);
+
+            /**
+             * AdminControlOperation ia.
+             * @member {B4aBuffer} ia
+             * @memberof apply.operations.AdminControlOperation
+             * @instance
+             */
+            AdminControlOperation.prototype.ia = $util.newBuffer([]);
+
+            /**
+             * AdminControlOperation in.
+             * @member {B4aBuffer} in
+             * @memberof apply.operations.AdminControlOperation
+             * @instance
+             */
+            AdminControlOperation.prototype["in"] = $util.newBuffer([]);
+
+            /**
+             * AdminControlOperation is.
+             * @member {B4aBuffer} is
+             * @memberof apply.operations.AdminControlOperation
+             * @instance
+             */
+            AdminControlOperation.prototype.is = $util.newBuffer([]);
+
+            /**
+             * Creates a new AdminControlOperation instance using the specified properties.
+             * @function create
+             * @memberof apply.operations.AdminControlOperation
+             * @static
+             * @param {apply.operations.IAdminControlOperation=} [properties] Properties to set
+             * @returns {apply.operations.AdminControlOperation} AdminControlOperation instance
+             */
+            AdminControlOperation.create = function create(properties) {
+                return new AdminControlOperation(properties);
+            };
+
+            /**
+             * Encodes the specified AdminControlOperation message. Does not implicitly {@link apply.operations.AdminControlOperation.verify|verify} messages.
+             * @function encode
+             * @memberof apply.operations.AdminControlOperation
+             * @static
+             * @param {apply.operations.IAdminControlOperation} message AdminControlOperation message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            AdminControlOperation.encode = function encode(message, writer, q) {
+                writer = $Writer.create(writer);
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
+                    writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.tx);
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
+                    writer.uint32(/* id 2, wireType 2 =*/18).bytes(message.txv);
+                if (message.ia != null && Object.hasOwnProperty.call(message, "ia"))
+                    writer.uint32(/* id 3, wireType 2 =*/26).bytes(message.ia);
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
+                    writer.uint32(/* id 4, wireType 2 =*/34).bytes(message["in"]);
+                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
+                    writer.uint32(/* id 5, wireType 2 =*/42).bytes(message.is);
+                return writer;
+            };
+
+            /**
+             * Encodes the specified AdminControlOperation message, length delimited. Does not implicitly {@link apply.operations.AdminControlOperation.verify|verify} messages.
+             * @function encodeDelimited
+             * @memberof apply.operations.AdminControlOperation
+             * @static
+             * @param {apply.operations.IAdminControlOperation} message AdminControlOperation message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            AdminControlOperation.encodeDelimited = function encodeDelimited(message, writer) {
+                return this.encode(message, writer && writer.len ? writer.fork() : writer).ldelim();
+            };
+
+            /**
+             * Decodes an AdminControlOperation message from the specified reader or buffer.
+             * @function decode
+             * @memberof apply.operations.AdminControlOperation
+             * @static
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
+             * @param {number} [length] Message length if known beforehand
+             * @returns {apply.operations.AdminControlOperation} AdminControlOperation
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            AdminControlOperation.decode = function decode(reader, length, error, long) {
+                reader = $Reader.create(reader);
+                if (long === undefined)
+                    long = 0;
+                if (long > $Reader.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
+                var end = length === undefined ? reader.len : reader.pos + length, message = new $root.apply.operations.AdminControlOperation();
+                while (reader.pos < end) {
+                    var tag = reader.uint32();
+                    if (tag === error)
+                        break;
+                    switch (tag >>> 3) {
+                    case 1: {
+                            message.tx = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 2: {
+                            message.txv = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 3: {
+                            message.ia = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 4: {
+                            message["in"] = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 5: {
+                            message.is = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    default:
+                        reader.skipType(tag & 7, long);
+                        break;
+                    }
+                }
+                return message;
+            };
+
+            /**
+             * Decodes an AdminControlOperation message from the specified reader or buffer, length delimited.
+             * @function decodeDelimited
+             * @memberof apply.operations.AdminControlOperation
+             * @static
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
+             * @returns {apply.operations.AdminControlOperation} AdminControlOperation
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            AdminControlOperation.decodeDelimited = function decodeDelimited(reader) {
+                reader = $Reader.create(reader);
+                return this.decode(reader, reader.uint32());
+            };
+
+            /**
+             * Verifies an AdminControlOperation message.
+             * @function verify
+             * @memberof apply.operations.AdminControlOperation
+             * @static
+             * @param {Object.<string,*>} message Plain object to verify
+             * @returns {string|null} `null` if valid, otherwise the reason why it is not
+             */
+            AdminControlOperation.verify = function verify(message, long) {
+                if (typeof message !== "object" || message === null)
+                    return "object expected";
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    return "maximum nesting depth exceeded";
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
+                    if (!$util.isBytes(message.tx))
+                        return "tx: buffer expected";
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
+                    if (!$util.isBytes(message.txv))
+                        return "txv: buffer expected";
+                if (message.ia != null && Object.hasOwnProperty.call(message, "ia"))
+                    if (!$util.isBytes(message.ia))
+                        return "ia: buffer expected";
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
+                    if (!$util.isBytes(message["in"]))
+                        return "in: buffer expected";
+                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
+                    if (!$util.isBytes(message.is))
+                        return "is: buffer expected";
+                return null;
+            };
+
+            /**
+             * Creates an AdminControlOperation message from a plain object. Also converts values to their respective internal types.
+             * @function fromObject
+             * @memberof apply.operations.AdminControlOperation
+             * @static
+             * @param {Object.<string,*>} object Plain object
+             * @returns {apply.operations.AdminControlOperation} AdminControlOperation
+             */
+            AdminControlOperation.fromObject = function fromObject(object, long) {
+                if (object instanceof $root.apply.operations.AdminControlOperation)
+                    object = Object.assign({}, object);
+                if (!$util.isObject(object))
+                    throw TypeError(".apply.operations.AdminControlOperation: object expected");
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
+                var message = new $root.apply.operations.AdminControlOperation();
+                if (object.tx != null)
+                    message.tx = $util.bytesFrom(object.tx);
+                if (object.txv != null)
+                    message.txv = $util.bytesFrom(object.txv);
+                if (object.ia != null)
+                    message.ia = $util.bytesFrom(object.ia);
+                if (object["in"] != null)
+                    message["in"] = $util.bytesFrom(object["in"]);
+                if (object.is != null)
+                    message.is = $util.bytesFrom(object.is);
+                return message;
+            };
+
+            /**
+             * Creates a plain object from an AdminControlOperation message. Also converts values to other types if specified.
+             * @function toObject
+             * @memberof apply.operations.AdminControlOperation
+             * @static
+             * @param {apply.operations.AdminControlOperation} message AdminControlOperation
+             * @param {$protobuf.IConversionOptions} [options] Conversion options
+             * @returns {Object.<string,*>} Plain object
+             */
+            AdminControlOperation.toObject = function toObject(message, options, q) {
+                if (!options)
+                    options = {};
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
+                var object = {};
+                if (options.defaults) {
+                    if (options.bytes === String)
+                        object.tx = "";
+                    else {
+                        object.tx = [];
+                        if (options.bytes !== Array)
+                            object.tx = $util.newBuffer(object.tx);
+                    }
+                    if (options.bytes === String)
+                        object.txv = "";
+                    else {
+                        object.txv = [];
+                        if (options.bytes !== Array)
+                            object.txv = $util.newBuffer(object.txv);
+                    }
+                    if (options.bytes === String)
+                        object.ia = "";
+                    else {
+                        object.ia = [];
+                        if (options.bytes !== Array)
+                            object.ia = $util.newBuffer(object.ia);
+                    }
+                    if (options.bytes === String)
+                        object["in"] = "";
+                    else {
+                        object["in"] = [];
+                        if (options.bytes !== Array)
+                            object["in"] = $util.newBuffer(object["in"]);
+                    }
+                    if (options.bytes === String)
+                        object.is = "";
+                    else {
+                        object.is = [];
+                        if (options.bytes !== Array)
+                            object.is = $util.newBuffer(object.is);
+                    }
+                }
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
+                    object.tx = $util.bytesTo(message.tx, options);
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
+                    object.txv = $util.bytesTo(message.txv, options);
+                if (message.ia != null && Object.hasOwnProperty.call(message, "ia"))
+                    object.ia = $util.bytesTo(message.ia, options);
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
+                    object["in"] = $util.bytesTo(message["in"], options);
+                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
+                    object.is = $util.bytesTo(message.is, options);
+                return object;
+            };
+
+            /**
+             * Converts this AdminControlOperation to JSON.
+             * @function toJSON
+             * @memberof apply.operations.AdminControlOperation
+             * @instance
+             * @returns {Object.<string,*>} JSON object
+             */
+            AdminControlOperation.prototype.toJSON = function toJSON() {
+                return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
+            };
+
+            /**
+             * Gets the default type url for AdminControlOperation
+             * @function getTypeUrl
+             * @memberof apply.operations.AdminControlOperation
+             * @static
+             * @param {string} [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
+             * @returns {string} The default type url
+             */
+            AdminControlOperation.getTypeUrl = function getTypeUrl(typeUrlPrefix) {
+                if (typeUrlPrefix === undefined) {
+                    typeUrlPrefix = "type.googleapis.com";
+                }
+                return typeUrlPrefix + "/apply.operations.AdminControlOperation";
+            };
+
+            return AdminControlOperation;
+        })();
+
+        operations.BalanceInitializationOperation = (function() {
+
+            /**
+             * Properties of a BalanceInitializationOperation.
+             * @memberof apply.operations
+             * @interface IBalanceInitializationOperation
+             * @property {B4aBuffer|null} [tx] BalanceInitializationOperation tx
+             * @property {B4aBuffer|null} [txv] BalanceInitializationOperation txv
+             * @property {B4aBuffer|null} [ia] BalanceInitializationOperation ia
+             * @property {B4aBuffer|null} [am] BalanceInitializationOperation am
+             * @property {B4aBuffer|null} ["in"] BalanceInitializationOperation in
+             * @property {B4aBuffer|null} [is] BalanceInitializationOperation is
+             */
+
+            /**
+             * Constructs a new BalanceInitializationOperation.
+             * @memberof apply.operations
+             * @classdesc Represents a BalanceInitializationOperation.
+             * @implements IBalanceInitializationOperation
+             * @constructor
+             * @param {apply.operations.IBalanceInitializationOperation=} [properties] Properties to set
+             */
+            function BalanceInitializationOperation(properties) {
+                if (properties)
+                    for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
+                        if (properties[keys[i]] != null && keys[i] !== "__proto__")
+                            this[keys[i]] = properties[keys[i]];
+            }
+
+            /**
+             * BalanceInitializationOperation tx.
+             * @member {B4aBuffer} tx
+             * @memberof apply.operations.BalanceInitializationOperation
+             * @instance
+             */
+            BalanceInitializationOperation.prototype.tx = $util.newBuffer([]);
+
+            /**
+             * BalanceInitializationOperation txv.
+             * @member {B4aBuffer} txv
+             * @memberof apply.operations.BalanceInitializationOperation
+             * @instance
+             */
+            BalanceInitializationOperation.prototype.txv = $util.newBuffer([]);
+
+            /**
+             * BalanceInitializationOperation ia.
+             * @member {B4aBuffer} ia
+             * @memberof apply.operations.BalanceInitializationOperation
+             * @instance
+             */
+            BalanceInitializationOperation.prototype.ia = $util.newBuffer([]);
+
+            /**
+             * BalanceInitializationOperation am.
+             * @member {B4aBuffer} am
+             * @memberof apply.operations.BalanceInitializationOperation
+             * @instance
+             */
+            BalanceInitializationOperation.prototype.am = $util.newBuffer([]);
+
+            /**
+             * BalanceInitializationOperation in.
+             * @member {B4aBuffer} in
+             * @memberof apply.operations.BalanceInitializationOperation
+             * @instance
+             */
+            BalanceInitializationOperation.prototype["in"] = $util.newBuffer([]);
+
+            /**
+             * BalanceInitializationOperation is.
+             * @member {B4aBuffer} is
+             * @memberof apply.operations.BalanceInitializationOperation
+             * @instance
+             */
+            BalanceInitializationOperation.prototype.is = $util.newBuffer([]);
+
+            /**
+             * Creates a new BalanceInitializationOperation instance using the specified properties.
+             * @function create
+             * @memberof apply.operations.BalanceInitializationOperation
+             * @static
+             * @param {apply.operations.IBalanceInitializationOperation=} [properties] Properties to set
+             * @returns {apply.operations.BalanceInitializationOperation} BalanceInitializationOperation instance
+             */
+            BalanceInitializationOperation.create = function create(properties) {
+                return new BalanceInitializationOperation(properties);
+            };
+
+            /**
+             * Encodes the specified BalanceInitializationOperation message. Does not implicitly {@link apply.operations.BalanceInitializationOperation.verify|verify} messages.
+             * @function encode
+             * @memberof apply.operations.BalanceInitializationOperation
+             * @static
+             * @param {apply.operations.IBalanceInitializationOperation} message BalanceInitializationOperation message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            BalanceInitializationOperation.encode = function encode(message, writer, q) {
+                writer = $Writer.create(writer);
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
+                    writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.tx);
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
+                    writer.uint32(/* id 2, wireType 2 =*/18).bytes(message.txv);
+                if (message.ia != null && Object.hasOwnProperty.call(message, "ia"))
+                    writer.uint32(/* id 3, wireType 2 =*/26).bytes(message.ia);
+                if (message.am != null && Object.hasOwnProperty.call(message, "am"))
+                    writer.uint32(/* id 4, wireType 2 =*/34).bytes(message.am);
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
+                    writer.uint32(/* id 5, wireType 2 =*/42).bytes(message["in"]);
+                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
+                    writer.uint32(/* id 6, wireType 2 =*/50).bytes(message.is);
+                return writer;
+            };
+
+            /**
+             * Encodes the specified BalanceInitializationOperation message, length delimited. Does not implicitly {@link apply.operations.BalanceInitializationOperation.verify|verify} messages.
+             * @function encodeDelimited
+             * @memberof apply.operations.BalanceInitializationOperation
+             * @static
+             * @param {apply.operations.IBalanceInitializationOperation} message BalanceInitializationOperation message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            BalanceInitializationOperation.encodeDelimited = function encodeDelimited(message, writer) {
+                return this.encode(message, writer && writer.len ? writer.fork() : writer).ldelim();
+            };
+
+            /**
+             * Decodes a BalanceInitializationOperation message from the specified reader or buffer.
+             * @function decode
+             * @memberof apply.operations.BalanceInitializationOperation
+             * @static
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
+             * @param {number} [length] Message length if known beforehand
+             * @returns {apply.operations.BalanceInitializationOperation} BalanceInitializationOperation
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            BalanceInitializationOperation.decode = function decode(reader, length, error, long) {
+                reader = $Reader.create(reader);
+                if (long === undefined)
+                    long = 0;
+                if (long > $Reader.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
+                var end = length === undefined ? reader.len : reader.pos + length, message = new $root.apply.operations.BalanceInitializationOperation();
+                while (reader.pos < end) {
+                    var tag = reader.uint32();
+                    if (tag === error)
+                        break;
+                    switch (tag >>> 3) {
+                    case 1: {
+                            message.tx = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 2: {
+                            message.txv = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 3: {
+                            message.ia = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 4: {
+                            message.am = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 5: {
+                            message["in"] = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 6: {
+                            message.is = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    default:
+                        reader.skipType(tag & 7, long);
+                        break;
+                    }
+                }
+                return message;
+            };
+
+            /**
+             * Decodes a BalanceInitializationOperation message from the specified reader or buffer, length delimited.
+             * @function decodeDelimited
+             * @memberof apply.operations.BalanceInitializationOperation
+             * @static
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
+             * @returns {apply.operations.BalanceInitializationOperation} BalanceInitializationOperation
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            BalanceInitializationOperation.decodeDelimited = function decodeDelimited(reader) {
+                reader = $Reader.create(reader);
+                return this.decode(reader, reader.uint32());
+            };
+
+            /**
+             * Verifies a BalanceInitializationOperation message.
+             * @function verify
+             * @memberof apply.operations.BalanceInitializationOperation
+             * @static
+             * @param {Object.<string,*>} message Plain object to verify
+             * @returns {string|null} `null` if valid, otherwise the reason why it is not
+             */
+            BalanceInitializationOperation.verify = function verify(message, long) {
+                if (typeof message !== "object" || message === null)
+                    return "object expected";
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    return "maximum nesting depth exceeded";
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
+                    if (!$util.isBytes(message.tx))
+                        return "tx: buffer expected";
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
+                    if (!$util.isBytes(message.txv))
+                        return "txv: buffer expected";
+                if (message.ia != null && Object.hasOwnProperty.call(message, "ia"))
+                    if (!$util.isBytes(message.ia))
+                        return "ia: buffer expected";
+                if (message.am != null && Object.hasOwnProperty.call(message, "am"))
+                    if (!$util.isBytes(message.am))
+                        return "am: buffer expected";
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
+                    if (!$util.isBytes(message["in"]))
+                        return "in: buffer expected";
+                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
+                    if (!$util.isBytes(message.is))
+                        return "is: buffer expected";
+                return null;
+            };
+
+            /**
+             * Creates a BalanceInitializationOperation message from a plain object. Also converts values to their respective internal types.
+             * @function fromObject
+             * @memberof apply.operations.BalanceInitializationOperation
+             * @static
+             * @param {Object.<string,*>} object Plain object
+             * @returns {apply.operations.BalanceInitializationOperation} BalanceInitializationOperation
+             */
+            BalanceInitializationOperation.fromObject = function fromObject(object, long) {
+                if (object instanceof $root.apply.operations.BalanceInitializationOperation)
+                    object = Object.assign({}, object);
+                if (!$util.isObject(object))
+                    throw TypeError(".apply.operations.BalanceInitializationOperation: object expected");
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
+                var message = new $root.apply.operations.BalanceInitializationOperation();
+                if (object.tx != null)
+                    message.tx = $util.bytesFrom(object.tx);
+                if (object.txv != null)
+                    message.txv = $util.bytesFrom(object.txv);
+                if (object.ia != null)
+                    message.ia = $util.bytesFrom(object.ia);
+                if (object.am != null)
+                    message.am = $util.bytesFrom(object.am);
+                if (object["in"] != null)
+                    message["in"] = $util.bytesFrom(object["in"]);
+                if (object.is != null)
+                    message.is = $util.bytesFrom(object.is);
+                return message;
+            };
+
+            /**
+             * Creates a plain object from a BalanceInitializationOperation message. Also converts values to other types if specified.
+             * @function toObject
+             * @memberof apply.operations.BalanceInitializationOperation
+             * @static
+             * @param {apply.operations.BalanceInitializationOperation} message BalanceInitializationOperation
+             * @param {$protobuf.IConversionOptions} [options] Conversion options
+             * @returns {Object.<string,*>} Plain object
+             */
+            BalanceInitializationOperation.toObject = function toObject(message, options, q) {
+                if (!options)
+                    options = {};
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
+                var object = {};
+                if (options.defaults) {
+                    if (options.bytes === String)
+                        object.tx = "";
+                    else {
+                        object.tx = [];
+                        if (options.bytes !== Array)
+                            object.tx = $util.newBuffer(object.tx);
+                    }
+                    if (options.bytes === String)
+                        object.txv = "";
+                    else {
+                        object.txv = [];
+                        if (options.bytes !== Array)
+                            object.txv = $util.newBuffer(object.txv);
+                    }
+                    if (options.bytes === String)
+                        object.ia = "";
+                    else {
+                        object.ia = [];
+                        if (options.bytes !== Array)
+                            object.ia = $util.newBuffer(object.ia);
+                    }
+                    if (options.bytes === String)
+                        object.am = "";
+                    else {
+                        object.am = [];
+                        if (options.bytes !== Array)
+                            object.am = $util.newBuffer(object.am);
+                    }
+                    if (options.bytes === String)
+                        object["in"] = "";
+                    else {
+                        object["in"] = [];
+                        if (options.bytes !== Array)
+                            object["in"] = $util.newBuffer(object["in"]);
+                    }
+                    if (options.bytes === String)
+                        object.is = "";
+                    else {
+                        object.is = [];
+                        if (options.bytes !== Array)
+                            object.is = $util.newBuffer(object.is);
+                    }
+                }
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
+                    object.tx = $util.bytesTo(message.tx, options);
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
+                    object.txv = $util.bytesTo(message.txv, options);
+                if (message.ia != null && Object.hasOwnProperty.call(message, "ia"))
+                    object.ia = $util.bytesTo(message.ia, options);
+                if (message.am != null && Object.hasOwnProperty.call(message, "am"))
+                    object.am = $util.bytesTo(message.am, options);
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
+                    object["in"] = $util.bytesTo(message["in"], options);
+                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
+                    object.is = $util.bytesTo(message.is, options);
+                return object;
+            };
+
+            /**
+             * Converts this BalanceInitializationOperation to JSON.
+             * @function toJSON
+             * @memberof apply.operations.BalanceInitializationOperation
+             * @instance
+             * @returns {Object.<string,*>} JSON object
+             */
+            BalanceInitializationOperation.prototype.toJSON = function toJSON() {
+                return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
+            };
+
+            /**
+             * Gets the default type url for BalanceInitializationOperation
+             * @function getTypeUrl
+             * @memberof apply.operations.BalanceInitializationOperation
+             * @static
+             * @param {string} [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
+             * @returns {string} The default type url
+             */
+            BalanceInitializationOperation.getTypeUrl = function getTypeUrl(typeUrlPrefix) {
+                if (typeUrlPrefix === undefined) {
+                    typeUrlPrefix = "type.googleapis.com";
+                }
+                return typeUrlPrefix + "/apply.operations.BalanceInitializationOperation";
+            };
+
+            return BalanceInitializationOperation;
+        })();
+
+        operations.TransferOperation = (function() {
+
+            /**
+             * Properties of a TransferOperation.
+             * @memberof apply.operations
+             * @interface ITransferOperation
+             * @property {B4aBuffer|null} [tx] TransferOperation tx
+             * @property {B4aBuffer|null} [txv] TransferOperation txv
+             * @property {B4aBuffer|null} [to] TransferOperation to
+             * @property {B4aBuffer|null} [am] TransferOperation am
+             * @property {B4aBuffer|null} ["in"] TransferOperation in
+             * @property {B4aBuffer|null} [is] TransferOperation is
+             * @property {B4aBuffer|null} [va] TransferOperation va
+             * @property {B4aBuffer|null} [vn] TransferOperation vn
+             * @property {B4aBuffer|null} [vs] TransferOperation vs
+             */
+
+            /**
+             * Constructs a new TransferOperation.
+             * @memberof apply.operations
+             * @classdesc Represents a TransferOperation.
+             * @implements ITransferOperation
+             * @constructor
+             * @param {apply.operations.ITransferOperation=} [properties] Properties to set
+             */
+            function TransferOperation(properties) {
+                if (properties)
+                    for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
+                        if (properties[keys[i]] != null && keys[i] !== "__proto__")
+                            this[keys[i]] = properties[keys[i]];
+            }
+
+            /**
+             * TransferOperation tx.
+             * @member {B4aBuffer} tx
+             * @memberof apply.operations.TransferOperation
+             * @instance
+             */
+            TransferOperation.prototype.tx = $util.newBuffer([]);
+
+            /**
+             * TransferOperation txv.
+             * @member {B4aBuffer} txv
+             * @memberof apply.operations.TransferOperation
+             * @instance
+             */
+            TransferOperation.prototype.txv = $util.newBuffer([]);
+
+            /**
+             * TransferOperation to.
+             * @member {B4aBuffer} to
+             * @memberof apply.operations.TransferOperation
+             * @instance
+             */
+            TransferOperation.prototype.to = $util.newBuffer([]);
+
+            /**
+             * TransferOperation am.
+             * @member {B4aBuffer} am
+             * @memberof apply.operations.TransferOperation
+             * @instance
+             */
+            TransferOperation.prototype.am = $util.newBuffer([]);
+
+            /**
+             * TransferOperation in.
+             * @member {B4aBuffer} in
+             * @memberof apply.operations.TransferOperation
+             * @instance
+             */
+            TransferOperation.prototype["in"] = $util.newBuffer([]);
+
+            /**
+             * TransferOperation is.
+             * @member {B4aBuffer} is
+             * @memberof apply.operations.TransferOperation
+             * @instance
+             */
+            TransferOperation.prototype.is = $util.newBuffer([]);
+
+            /**
+             * TransferOperation va.
+             * @member {B4aBuffer} va
+             * @memberof apply.operations.TransferOperation
+             * @instance
+             */
+            TransferOperation.prototype.va = $util.newBuffer([]);
+
+            /**
+             * TransferOperation vn.
+             * @member {B4aBuffer} vn
+             * @memberof apply.operations.TransferOperation
+             * @instance
+             */
+            TransferOperation.prototype.vn = $util.newBuffer([]);
+
+            /**
+             * TransferOperation vs.
+             * @member {B4aBuffer} vs
+             * @memberof apply.operations.TransferOperation
+             * @instance
+             */
+            TransferOperation.prototype.vs = $util.newBuffer([]);
+
+            /**
+             * Creates a new TransferOperation instance using the specified properties.
+             * @function create
+             * @memberof apply.operations.TransferOperation
+             * @static
+             * @param {apply.operations.ITransferOperation=} [properties] Properties to set
+             * @returns {apply.operations.TransferOperation} TransferOperation instance
+             */
+            TransferOperation.create = function create(properties) {
+                return new TransferOperation(properties);
+            };
+
+            /**
+             * Encodes the specified TransferOperation message. Does not implicitly {@link apply.operations.TransferOperation.verify|verify} messages.
+             * @function encode
+             * @memberof apply.operations.TransferOperation
+             * @static
+             * @param {apply.operations.ITransferOperation} message TransferOperation message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            TransferOperation.encode = function encode(message, writer, q) {
+                writer = $Writer.create(writer);
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
+                    writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.tx);
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
+                    writer.uint32(/* id 2, wireType 2 =*/18).bytes(message.txv);
+                if (message.to != null && Object.hasOwnProperty.call(message, "to"))
+                    writer.uint32(/* id 3, wireType 2 =*/26).bytes(message.to);
+                if (message.am != null && Object.hasOwnProperty.call(message, "am"))
+                    writer.uint32(/* id 4, wireType 2 =*/34).bytes(message.am);
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
+                    writer.uint32(/* id 5, wireType 2 =*/42).bytes(message["in"]);
+                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
+                    writer.uint32(/* id 6, wireType 2 =*/50).bytes(message.is);
+                if (message.va != null && Object.hasOwnProperty.call(message, "va"))
+                    writer.uint32(/* id 7, wireType 2 =*/58).bytes(message.va);
+                if (message.vn != null && Object.hasOwnProperty.call(message, "vn"))
+                    writer.uint32(/* id 8, wireType 2 =*/66).bytes(message.vn);
+                if (message.vs != null && Object.hasOwnProperty.call(message, "vs"))
+                    writer.uint32(/* id 9, wireType 2 =*/74).bytes(message.vs);
+                return writer;
+            };
+
+            /**
+             * Encodes the specified TransferOperation message, length delimited. Does not implicitly {@link apply.operations.TransferOperation.verify|verify} messages.
+             * @function encodeDelimited
+             * @memberof apply.operations.TransferOperation
+             * @static
+             * @param {apply.operations.ITransferOperation} message TransferOperation message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            TransferOperation.encodeDelimited = function encodeDelimited(message, writer) {
+                return this.encode(message, writer && writer.len ? writer.fork() : writer).ldelim();
+            };
+
+            /**
+             * Decodes a TransferOperation message from the specified reader or buffer.
+             * @function decode
+             * @memberof apply.operations.TransferOperation
+             * @static
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
+             * @param {number} [length] Message length if known beforehand
+             * @returns {apply.operations.TransferOperation} TransferOperation
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            TransferOperation.decode = function decode(reader, length, error, long) {
+                reader = $Reader.create(reader);
+                if (long === undefined)
+                    long = 0;
+                if (long > $Reader.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
+                var end = length === undefined ? reader.len : reader.pos + length, message = new $root.apply.operations.TransferOperation();
+                while (reader.pos < end) {
+                    var tag = reader.uint32();
+                    if (tag === error)
+                        break;
+                    switch (tag >>> 3) {
+                    case 1: {
+                            message.tx = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 2: {
+                            message.txv = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 3: {
+                            message.to = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 4: {
+                            message.am = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 5: {
+                            message["in"] = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 6: {
+                            message.is = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 7: {
+                            message.va = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 8: {
+                            message.vn = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 9: {
+                            message.vs = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    default:
+                        reader.skipType(tag & 7, long);
+                        break;
+                    }
+                }
+                return message;
+            };
+
+            /**
+             * Decodes a TransferOperation message from the specified reader or buffer, length delimited.
+             * @function decodeDelimited
+             * @memberof apply.operations.TransferOperation
+             * @static
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
+             * @returns {apply.operations.TransferOperation} TransferOperation
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            TransferOperation.decodeDelimited = function decodeDelimited(reader) {
+                reader = $Reader.create(reader);
+                return this.decode(reader, reader.uint32());
+            };
+
+            /**
+             * Verifies a TransferOperation message.
+             * @function verify
+             * @memberof apply.operations.TransferOperation
+             * @static
+             * @param {Object.<string,*>} message Plain object to verify
+             * @returns {string|null} `null` if valid, otherwise the reason why it is not
+             */
+            TransferOperation.verify = function verify(message, long) {
+                if (typeof message !== "object" || message === null)
+                    return "object expected";
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    return "maximum nesting depth exceeded";
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
+                    if (!$util.isBytes(message.tx))
+                        return "tx: buffer expected";
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
+                    if (!$util.isBytes(message.txv))
+                        return "txv: buffer expected";
+                if (message.to != null && Object.hasOwnProperty.call(message, "to"))
+                    if (!$util.isBytes(message.to))
+                        return "to: buffer expected";
+                if (message.am != null && Object.hasOwnProperty.call(message, "am"))
+                    if (!$util.isBytes(message.am))
+                        return "am: buffer expected";
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
+                    if (!$util.isBytes(message["in"]))
+                        return "in: buffer expected";
+                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
+                    if (!$util.isBytes(message.is))
+                        return "is: buffer expected";
+                if (message.va != null && Object.hasOwnProperty.call(message, "va"))
+                    if (!$util.isBytes(message.va))
+                        return "va: buffer expected";
+                if (message.vn != null && Object.hasOwnProperty.call(message, "vn"))
+                    if (!$util.isBytes(message.vn))
+                        return "vn: buffer expected";
+                if (message.vs != null && Object.hasOwnProperty.call(message, "vs"))
+                    if (!$util.isBytes(message.vs))
+                        return "vs: buffer expected";
+                return null;
+            };
+
+            /**
+             * Creates a TransferOperation message from a plain object. Also converts values to their respective internal types.
+             * @function fromObject
+             * @memberof apply.operations.TransferOperation
+             * @static
+             * @param {Object.<string,*>} object Plain object
+             * @returns {apply.operations.TransferOperation} TransferOperation
+             */
+            TransferOperation.fromObject = function fromObject(object, long) {
+                if (object instanceof $root.apply.operations.TransferOperation)
+                    object = Object.assign({}, object);
+                if (!$util.isObject(object))
+                    throw TypeError(".apply.operations.TransferOperation: object expected");
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
+                var message = new $root.apply.operations.TransferOperation();
+                if (object.tx != null)
+                    message.tx = $util.bytesFrom(object.tx);
+                if (object.txv != null)
+                    message.txv = $util.bytesFrom(object.txv);
+                if (object.to != null)
+                    message.to = $util.bytesFrom(object.to);
+                if (object.am != null)
+                    message.am = $util.bytesFrom(object.am);
+                if (object["in"] != null)
+                    message["in"] = $util.bytesFrom(object["in"]);
+                if (object.is != null)
+                    message.is = $util.bytesFrom(object.is);
+                if (object.va != null)
+                    message.va = $util.bytesFrom(object.va);
+                if (object.vn != null)
+                    message.vn = $util.bytesFrom(object.vn);
+                if (object.vs != null)
+                    message.vs = $util.bytesFrom(object.vs);
+                return message;
+            };
+
+            /**
+             * Creates a plain object from a TransferOperation message. Also converts values to other types if specified.
+             * @function toObject
+             * @memberof apply.operations.TransferOperation
+             * @static
+             * @param {apply.operations.TransferOperation} message TransferOperation
+             * @param {$protobuf.IConversionOptions} [options] Conversion options
+             * @returns {Object.<string,*>} Plain object
+             */
+            TransferOperation.toObject = function toObject(message, options, q) {
+                if (!options)
+                    options = {};
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
+                var object = {};
+                if (options.defaults) {
+                    if (options.bytes === String)
+                        object.tx = "";
+                    else {
+                        object.tx = [];
+                        if (options.bytes !== Array)
+                            object.tx = $util.newBuffer(object.tx);
+                    }
+                    if (options.bytes === String)
+                        object.txv = "";
+                    else {
+                        object.txv = [];
+                        if (options.bytes !== Array)
+                            object.txv = $util.newBuffer(object.txv);
+                    }
+                    if (options.bytes === String)
+                        object.to = "";
+                    else {
+                        object.to = [];
+                        if (options.bytes !== Array)
+                            object.to = $util.newBuffer(object.to);
+                    }
+                    if (options.bytes === String)
+                        object.am = "";
+                    else {
+                        object.am = [];
+                        if (options.bytes !== Array)
+                            object.am = $util.newBuffer(object.am);
+                    }
+                    if (options.bytes === String)
+                        object["in"] = "";
+                    else {
+                        object["in"] = [];
+                        if (options.bytes !== Array)
+                            object["in"] = $util.newBuffer(object["in"]);
+                    }
+                    if (options.bytes === String)
+                        object.is = "";
+                    else {
+                        object.is = [];
+                        if (options.bytes !== Array)
+                            object.is = $util.newBuffer(object.is);
+                    }
+                    if (options.bytes === String)
+                        object.va = "";
+                    else {
+                        object.va = [];
+                        if (options.bytes !== Array)
+                            object.va = $util.newBuffer(object.va);
+                    }
+                    if (options.bytes === String)
+                        object.vn = "";
+                    else {
+                        object.vn = [];
+                        if (options.bytes !== Array)
+                            object.vn = $util.newBuffer(object.vn);
+                    }
+                    if (options.bytes === String)
+                        object.vs = "";
+                    else {
+                        object.vs = [];
+                        if (options.bytes !== Array)
+                            object.vs = $util.newBuffer(object.vs);
+                    }
+                }
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
+                    object.tx = $util.bytesTo(message.tx, options);
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
+                    object.txv = $util.bytesTo(message.txv, options);
+                if (message.to != null && Object.hasOwnProperty.call(message, "to"))
+                    object.to = $util.bytesTo(message.to, options);
+                if (message.am != null && Object.hasOwnProperty.call(message, "am"))
+                    object.am = $util.bytesTo(message.am, options);
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
+                    object["in"] = $util.bytesTo(message["in"], options);
+                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
+                    object.is = $util.bytesTo(message.is, options);
+                if (message.va != null && Object.hasOwnProperty.call(message, "va"))
+                    object.va = $util.bytesTo(message.va, options);
+                if (message.vn != null && Object.hasOwnProperty.call(message, "vn"))
+                    object.vn = $util.bytesTo(message.vn, options);
+                if (message.vs != null && Object.hasOwnProperty.call(message, "vs"))
+                    object.vs = $util.bytesTo(message.vs, options);
+                return object;
+            };
+
+            /**
+             * Converts this TransferOperation to JSON.
+             * @function toJSON
+             * @memberof apply.operations.TransferOperation
+             * @instance
+             * @returns {Object.<string,*>} JSON object
+             */
+            TransferOperation.prototype.toJSON = function toJSON() {
+                return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
+            };
+
+            /**
+             * Gets the default type url for TransferOperation
+             * @function getTypeUrl
+             * @memberof apply.operations.TransferOperation
+             * @static
+             * @param {string} [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
+             * @returns {string} The default type url
+             */
+            TransferOperation.getTypeUrl = function getTypeUrl(typeUrlPrefix) {
+                if (typeUrlPrefix === undefined) {
+                    typeUrlPrefix = "type.googleapis.com";
+                }
+                return typeUrlPrefix + "/apply.operations.TransferOperation";
+            };
+
+            return TransferOperation;
+        })();
+
+        operations.RoleAccessOperation = (function() {
+
+            /**
+             * Properties of a RoleAccessOperation.
+             * @memberof apply.operations
+             * @interface IRoleAccessOperation
+             * @property {B4aBuffer|null} [tx] RoleAccessOperation tx
+             * @property {B4aBuffer|null} [txv] RoleAccessOperation txv
+             * @property {B4aBuffer|null} [iw] RoleAccessOperation iw
+             * @property {B4aBuffer|null} ["in"] RoleAccessOperation in
+             * @property {B4aBuffer|null} [is] RoleAccessOperation is
+             * @property {B4aBuffer|null} [va] RoleAccessOperation va
+             * @property {B4aBuffer|null} [vn] RoleAccessOperation vn
+             * @property {B4aBuffer|null} [vs] RoleAccessOperation vs
+             */
+
+            /**
+             * Constructs a new RoleAccessOperation.
+             * @memberof apply.operations
+             * @classdesc Represents a RoleAccessOperation.
+             * @implements IRoleAccessOperation
+             * @constructor
+             * @param {apply.operations.IRoleAccessOperation=} [properties] Properties to set
+             */
+            function RoleAccessOperation(properties) {
+                if (properties)
+                    for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
+                        if (properties[keys[i]] != null && keys[i] !== "__proto__")
+                            this[keys[i]] = properties[keys[i]];
+            }
+
+            /**
+             * RoleAccessOperation tx.
+             * @member {B4aBuffer} tx
+             * @memberof apply.operations.RoleAccessOperation
+             * @instance
+             */
+            RoleAccessOperation.prototype.tx = $util.newBuffer([]);
+
+            /**
+             * RoleAccessOperation txv.
+             * @member {B4aBuffer} txv
+             * @memberof apply.operations.RoleAccessOperation
+             * @instance
+             */
+            RoleAccessOperation.prototype.txv = $util.newBuffer([]);
+
+            /**
+             * RoleAccessOperation iw.
+             * @member {B4aBuffer} iw
+             * @memberof apply.operations.RoleAccessOperation
+             * @instance
+             */
+            RoleAccessOperation.prototype.iw = $util.newBuffer([]);
+
+            /**
+             * RoleAccessOperation in.
+             * @member {B4aBuffer} in
+             * @memberof apply.operations.RoleAccessOperation
+             * @instance
+             */
+            RoleAccessOperation.prototype["in"] = $util.newBuffer([]);
+
+            /**
+             * RoleAccessOperation is.
+             * @member {B4aBuffer} is
+             * @memberof apply.operations.RoleAccessOperation
+             * @instance
+             */
+            RoleAccessOperation.prototype.is = $util.newBuffer([]);
+
+            /**
+             * RoleAccessOperation va.
+             * @member {B4aBuffer} va
+             * @memberof apply.operations.RoleAccessOperation
+             * @instance
+             */
+            RoleAccessOperation.prototype.va = $util.newBuffer([]);
+
+            /**
+             * RoleAccessOperation vn.
+             * @member {B4aBuffer} vn
+             * @memberof apply.operations.RoleAccessOperation
+             * @instance
+             */
+            RoleAccessOperation.prototype.vn = $util.newBuffer([]);
+
+            /**
+             * RoleAccessOperation vs.
+             * @member {B4aBuffer} vs
+             * @memberof apply.operations.RoleAccessOperation
+             * @instance
+             */
+            RoleAccessOperation.prototype.vs = $util.newBuffer([]);
+
+            /**
+             * Creates a new RoleAccessOperation instance using the specified properties.
+             * @function create
+             * @memberof apply.operations.RoleAccessOperation
+             * @static
+             * @param {apply.operations.IRoleAccessOperation=} [properties] Properties to set
+             * @returns {apply.operations.RoleAccessOperation} RoleAccessOperation instance
+             */
+            RoleAccessOperation.create = function create(properties) {
+                return new RoleAccessOperation(properties);
+            };
+
+            /**
+             * Encodes the specified RoleAccessOperation message. Does not implicitly {@link apply.operations.RoleAccessOperation.verify|verify} messages.
+             * @function encode
+             * @memberof apply.operations.RoleAccessOperation
+             * @static
+             * @param {apply.operations.IRoleAccessOperation} message RoleAccessOperation message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            RoleAccessOperation.encode = function encode(message, writer, q) {
+                writer = $Writer.create(writer);
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
+                    writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.tx);
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
+                    writer.uint32(/* id 2, wireType 2 =*/18).bytes(message.txv);
+                if (message.iw != null && Object.hasOwnProperty.call(message, "iw"))
+                    writer.uint32(/* id 3, wireType 2 =*/26).bytes(message.iw);
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
+                    writer.uint32(/* id 4, wireType 2 =*/34).bytes(message["in"]);
+                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
+                    writer.uint32(/* id 5, wireType 2 =*/42).bytes(message.is);
+                if (message.va != null && Object.hasOwnProperty.call(message, "va"))
+                    writer.uint32(/* id 6, wireType 2 =*/50).bytes(message.va);
+                if (message.vn != null && Object.hasOwnProperty.call(message, "vn"))
+                    writer.uint32(/* id 7, wireType 2 =*/58).bytes(message.vn);
+                if (message.vs != null && Object.hasOwnProperty.call(message, "vs"))
+                    writer.uint32(/* id 8, wireType 2 =*/66).bytes(message.vs);
+                return writer;
+            };
+
+            /**
+             * Encodes the specified RoleAccessOperation message, length delimited. Does not implicitly {@link apply.operations.RoleAccessOperation.verify|verify} messages.
+             * @function encodeDelimited
+             * @memberof apply.operations.RoleAccessOperation
+             * @static
+             * @param {apply.operations.IRoleAccessOperation} message RoleAccessOperation message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            RoleAccessOperation.encodeDelimited = function encodeDelimited(message, writer) {
+                return this.encode(message, writer && writer.len ? writer.fork() : writer).ldelim();
+            };
+
+            /**
+             * Decodes a RoleAccessOperation message from the specified reader or buffer.
+             * @function decode
+             * @memberof apply.operations.RoleAccessOperation
+             * @static
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
+             * @param {number} [length] Message length if known beforehand
+             * @returns {apply.operations.RoleAccessOperation} RoleAccessOperation
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            RoleAccessOperation.decode = function decode(reader, length, error, long) {
+                reader = $Reader.create(reader);
+                if (long === undefined)
+                    long = 0;
+                if (long > $Reader.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
+                var end = length === undefined ? reader.len : reader.pos + length, message = new $root.apply.operations.RoleAccessOperation();
+                while (reader.pos < end) {
+                    var tag = reader.uint32();
+                    if (tag === error)
+                        break;
+                    switch (tag >>> 3) {
+                    case 1: {
+                            message.tx = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 2: {
+                            message.txv = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 3: {
+                            message.iw = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 4: {
+                            message["in"] = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 5: {
+                            message.is = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 6: {
+                            message.va = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 7: {
+                            message.vn = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 8: {
+                            message.vs = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    default:
+                        reader.skipType(tag & 7, long);
+                        break;
+                    }
+                }
+                return message;
+            };
+
+            /**
+             * Decodes a RoleAccessOperation message from the specified reader or buffer, length delimited.
+             * @function decodeDelimited
+             * @memberof apply.operations.RoleAccessOperation
+             * @static
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
+             * @returns {apply.operations.RoleAccessOperation} RoleAccessOperation
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            RoleAccessOperation.decodeDelimited = function decodeDelimited(reader) {
+                reader = $Reader.create(reader);
+                return this.decode(reader, reader.uint32());
+            };
+
+            /**
+             * Verifies a RoleAccessOperation message.
+             * @function verify
+             * @memberof apply.operations.RoleAccessOperation
+             * @static
+             * @param {Object.<string,*>} message Plain object to verify
+             * @returns {string|null} `null` if valid, otherwise the reason why it is not
+             */
+            RoleAccessOperation.verify = function verify(message, long) {
+                if (typeof message !== "object" || message === null)
+                    return "object expected";
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    return "maximum nesting depth exceeded";
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
+                    if (!$util.isBytes(message.tx))
+                        return "tx: buffer expected";
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
+                    if (!$util.isBytes(message.txv))
+                        return "txv: buffer expected";
+                if (message.iw != null && Object.hasOwnProperty.call(message, "iw"))
+                    if (!$util.isBytes(message.iw))
+                        return "iw: buffer expected";
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
+                    if (!$util.isBytes(message["in"]))
+                        return "in: buffer expected";
+                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
+                    if (!$util.isBytes(message.is))
+                        return "is: buffer expected";
+                if (message.va != null && Object.hasOwnProperty.call(message, "va"))
+                    if (!$util.isBytes(message.va))
+                        return "va: buffer expected";
+                if (message.vn != null && Object.hasOwnProperty.call(message, "vn"))
+                    if (!$util.isBytes(message.vn))
+                        return "vn: buffer expected";
+                if (message.vs != null && Object.hasOwnProperty.call(message, "vs"))
+                    if (!$util.isBytes(message.vs))
+                        return "vs: buffer expected";
+                return null;
+            };
+
+            /**
+             * Creates a RoleAccessOperation message from a plain object. Also converts values to their respective internal types.
+             * @function fromObject
+             * @memberof apply.operations.RoleAccessOperation
+             * @static
+             * @param {Object.<string,*>} object Plain object
+             * @returns {apply.operations.RoleAccessOperation} RoleAccessOperation
+             */
+            RoleAccessOperation.fromObject = function fromObject(object, long) {
+                if (object instanceof $root.apply.operations.RoleAccessOperation)
+                    object = Object.assign({}, object);
+                if (!$util.isObject(object))
+                    throw TypeError(".apply.operations.RoleAccessOperation: object expected");
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
+                var message = new $root.apply.operations.RoleAccessOperation();
+                if (object.tx != null)
+                    message.tx = $util.bytesFrom(object.tx);
+                if (object.txv != null)
+                    message.txv = $util.bytesFrom(object.txv);
+                if (object.iw != null)
+                    message.iw = $util.bytesFrom(object.iw);
+                if (object["in"] != null)
+                    message["in"] = $util.bytesFrom(object["in"]);
+                if (object.is != null)
+                    message.is = $util.bytesFrom(object.is);
+                if (object.va != null)
+                    message.va = $util.bytesFrom(object.va);
+                if (object.vn != null)
+                    message.vn = $util.bytesFrom(object.vn);
+                if (object.vs != null)
+                    message.vs = $util.bytesFrom(object.vs);
+                return message;
+            };
+
+            /**
+             * Creates a plain object from a RoleAccessOperation message. Also converts values to other types if specified.
+             * @function toObject
+             * @memberof apply.operations.RoleAccessOperation
+             * @static
+             * @param {apply.operations.RoleAccessOperation} message RoleAccessOperation
+             * @param {$protobuf.IConversionOptions} [options] Conversion options
+             * @returns {Object.<string,*>} Plain object
+             */
+            RoleAccessOperation.toObject = function toObject(message, options, q) {
+                if (!options)
+                    options = {};
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
+                var object = {};
+                if (options.defaults) {
+                    if (options.bytes === String)
+                        object.tx = "";
+                    else {
+                        object.tx = [];
+                        if (options.bytes !== Array)
+                            object.tx = $util.newBuffer(object.tx);
+                    }
+                    if (options.bytes === String)
+                        object.txv = "";
+                    else {
+                        object.txv = [];
+                        if (options.bytes !== Array)
+                            object.txv = $util.newBuffer(object.txv);
+                    }
+                    if (options.bytes === String)
+                        object.iw = "";
+                    else {
+                        object.iw = [];
+                        if (options.bytes !== Array)
+                            object.iw = $util.newBuffer(object.iw);
+                    }
+                    if (options.bytes === String)
+                        object["in"] = "";
+                    else {
+                        object["in"] = [];
+                        if (options.bytes !== Array)
+                            object["in"] = $util.newBuffer(object["in"]);
+                    }
+                    if (options.bytes === String)
+                        object.is = "";
+                    else {
+                        object.is = [];
+                        if (options.bytes !== Array)
+                            object.is = $util.newBuffer(object.is);
+                    }
+                    if (options.bytes === String)
+                        object.va = "";
+                    else {
+                        object.va = [];
+                        if (options.bytes !== Array)
+                            object.va = $util.newBuffer(object.va);
+                    }
+                    if (options.bytes === String)
+                        object.vn = "";
+                    else {
+                        object.vn = [];
+                        if (options.bytes !== Array)
+                            object.vn = $util.newBuffer(object.vn);
+                    }
+                    if (options.bytes === String)
+                        object.vs = "";
+                    else {
+                        object.vs = [];
+                        if (options.bytes !== Array)
+                            object.vs = $util.newBuffer(object.vs);
+                    }
+                }
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
+                    object.tx = $util.bytesTo(message.tx, options);
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
+                    object.txv = $util.bytesTo(message.txv, options);
+                if (message.iw != null && Object.hasOwnProperty.call(message, "iw"))
+                    object.iw = $util.bytesTo(message.iw, options);
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
+                    object["in"] = $util.bytesTo(message["in"], options);
+                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
+                    object.is = $util.bytesTo(message.is, options);
+                if (message.va != null && Object.hasOwnProperty.call(message, "va"))
+                    object.va = $util.bytesTo(message.va, options);
+                if (message.vn != null && Object.hasOwnProperty.call(message, "vn"))
+                    object.vn = $util.bytesTo(message.vn, options);
+                if (message.vs != null && Object.hasOwnProperty.call(message, "vs"))
+                    object.vs = $util.bytesTo(message.vs, options);
+                return object;
+            };
+
+            /**
+             * Converts this RoleAccessOperation to JSON.
+             * @function toJSON
+             * @memberof apply.operations.RoleAccessOperation
+             * @instance
+             * @returns {Object.<string,*>} JSON object
+             */
+            RoleAccessOperation.prototype.toJSON = function toJSON() {
+                return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
+            };
+
+            /**
+             * Gets the default type url for RoleAccessOperation
+             * @function getTypeUrl
+             * @memberof apply.operations.RoleAccessOperation
+             * @static
+             * @param {string} [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
+             * @returns {string} The default type url
+             */
+            RoleAccessOperation.getTypeUrl = function getTypeUrl(typeUrlPrefix) {
+                if (typeUrlPrefix === undefined) {
+                    typeUrlPrefix = "type.googleapis.com";
+                }
+                return typeUrlPrefix + "/apply.operations.RoleAccessOperation";
+            };
+
+            return RoleAccessOperation;
+        })();
+
+        operations.BootstrapDeploymentOperation = (function() {
+
+            /**
+             * Properties of a BootstrapDeploymentOperation.
+             * @memberof apply.operations
+             * @interface IBootstrapDeploymentOperation
+             * @property {B4aBuffer|null} [tx] BootstrapDeploymentOperation tx
+             * @property {B4aBuffer|null} [txv] BootstrapDeploymentOperation txv
+             * @property {B4aBuffer|null} [bs] BootstrapDeploymentOperation bs
+             * @property {B4aBuffer|null} [ic] BootstrapDeploymentOperation ic
+             * @property {B4aBuffer|null} ["in"] BootstrapDeploymentOperation in
+             * @property {B4aBuffer|null} [is] BootstrapDeploymentOperation is
+             * @property {B4aBuffer|null} [va] BootstrapDeploymentOperation va
+             * @property {B4aBuffer|null} [vn] BootstrapDeploymentOperation vn
+             * @property {B4aBuffer|null} [vs] BootstrapDeploymentOperation vs
+             */
+
+            /**
+             * Constructs a new BootstrapDeploymentOperation.
+             * @memberof apply.operations
+             * @classdesc Represents a BootstrapDeploymentOperation.
+             * @implements IBootstrapDeploymentOperation
+             * @constructor
+             * @param {apply.operations.IBootstrapDeploymentOperation=} [properties] Properties to set
+             */
+            function BootstrapDeploymentOperation(properties) {
+                if (properties)
+                    for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
+                        if (properties[keys[i]] != null && keys[i] !== "__proto__")
+                            this[keys[i]] = properties[keys[i]];
+            }
+
+            /**
+             * BootstrapDeploymentOperation tx.
+             * @member {B4aBuffer} tx
+             * @memberof apply.operations.BootstrapDeploymentOperation
+             * @instance
+             */
+            BootstrapDeploymentOperation.prototype.tx = $util.newBuffer([]);
+
+            /**
+             * BootstrapDeploymentOperation txv.
+             * @member {B4aBuffer} txv
+             * @memberof apply.operations.BootstrapDeploymentOperation
+             * @instance
+             */
+            BootstrapDeploymentOperation.prototype.txv = $util.newBuffer([]);
+
+            /**
+             * BootstrapDeploymentOperation bs.
+             * @member {B4aBuffer} bs
+             * @memberof apply.operations.BootstrapDeploymentOperation
+             * @instance
+             */
+            BootstrapDeploymentOperation.prototype.bs = $util.newBuffer([]);
+
+            /**
+             * BootstrapDeploymentOperation ic.
+             * @member {B4aBuffer} ic
+             * @memberof apply.operations.BootstrapDeploymentOperation
+             * @instance
+             */
+            BootstrapDeploymentOperation.prototype.ic = $util.newBuffer([]);
+
+            /**
+             * BootstrapDeploymentOperation in.
+             * @member {B4aBuffer} in
+             * @memberof apply.operations.BootstrapDeploymentOperation
+             * @instance
+             */
+            BootstrapDeploymentOperation.prototype["in"] = $util.newBuffer([]);
+
+            /**
+             * BootstrapDeploymentOperation is.
+             * @member {B4aBuffer} is
+             * @memberof apply.operations.BootstrapDeploymentOperation
+             * @instance
+             */
+            BootstrapDeploymentOperation.prototype.is = $util.newBuffer([]);
+
+            /**
+             * BootstrapDeploymentOperation va.
+             * @member {B4aBuffer} va
+             * @memberof apply.operations.BootstrapDeploymentOperation
+             * @instance
+             */
+            BootstrapDeploymentOperation.prototype.va = $util.newBuffer([]);
+
+            /**
+             * BootstrapDeploymentOperation vn.
+             * @member {B4aBuffer} vn
+             * @memberof apply.operations.BootstrapDeploymentOperation
+             * @instance
+             */
+            BootstrapDeploymentOperation.prototype.vn = $util.newBuffer([]);
+
+            /**
+             * BootstrapDeploymentOperation vs.
+             * @member {B4aBuffer} vs
+             * @memberof apply.operations.BootstrapDeploymentOperation
+             * @instance
+             */
+            BootstrapDeploymentOperation.prototype.vs = $util.newBuffer([]);
+
+            /**
+             * Creates a new BootstrapDeploymentOperation instance using the specified properties.
+             * @function create
+             * @memberof apply.operations.BootstrapDeploymentOperation
+             * @static
+             * @param {apply.operations.IBootstrapDeploymentOperation=} [properties] Properties to set
+             * @returns {apply.operations.BootstrapDeploymentOperation} BootstrapDeploymentOperation instance
+             */
+            BootstrapDeploymentOperation.create = function create(properties) {
+                return new BootstrapDeploymentOperation(properties);
+            };
+
+            /**
+             * Encodes the specified BootstrapDeploymentOperation message. Does not implicitly {@link apply.operations.BootstrapDeploymentOperation.verify|verify} messages.
+             * @function encode
+             * @memberof apply.operations.BootstrapDeploymentOperation
+             * @static
+             * @param {apply.operations.IBootstrapDeploymentOperation} message BootstrapDeploymentOperation message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            BootstrapDeploymentOperation.encode = function encode(message, writer, q) {
+                writer = $Writer.create(writer);
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
+                    writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.tx);
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
+                    writer.uint32(/* id 2, wireType 2 =*/18).bytes(message.txv);
+                if (message.bs != null && Object.hasOwnProperty.call(message, "bs"))
+                    writer.uint32(/* id 3, wireType 2 =*/26).bytes(message.bs);
+                if (message.ic != null && Object.hasOwnProperty.call(message, "ic"))
+                    writer.uint32(/* id 4, wireType 2 =*/34).bytes(message.ic);
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
+                    writer.uint32(/* id 5, wireType 2 =*/42).bytes(message["in"]);
+                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
+                    writer.uint32(/* id 6, wireType 2 =*/50).bytes(message.is);
+                if (message.va != null && Object.hasOwnProperty.call(message, "va"))
+                    writer.uint32(/* id 7, wireType 2 =*/58).bytes(message.va);
+                if (message.vn != null && Object.hasOwnProperty.call(message, "vn"))
+                    writer.uint32(/* id 8, wireType 2 =*/66).bytes(message.vn);
+                if (message.vs != null && Object.hasOwnProperty.call(message, "vs"))
+                    writer.uint32(/* id 9, wireType 2 =*/74).bytes(message.vs);
+                return writer;
+            };
+
+            /**
+             * Encodes the specified BootstrapDeploymentOperation message, length delimited. Does not implicitly {@link apply.operations.BootstrapDeploymentOperation.verify|verify} messages.
+             * @function encodeDelimited
+             * @memberof apply.operations.BootstrapDeploymentOperation
+             * @static
+             * @param {apply.operations.IBootstrapDeploymentOperation} message BootstrapDeploymentOperation message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            BootstrapDeploymentOperation.encodeDelimited = function encodeDelimited(message, writer) {
+                return this.encode(message, writer && writer.len ? writer.fork() : writer).ldelim();
+            };
+
+            /**
+             * Decodes a BootstrapDeploymentOperation message from the specified reader or buffer.
+             * @function decode
+             * @memberof apply.operations.BootstrapDeploymentOperation
+             * @static
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
+             * @param {number} [length] Message length if known beforehand
+             * @returns {apply.operations.BootstrapDeploymentOperation} BootstrapDeploymentOperation
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            BootstrapDeploymentOperation.decode = function decode(reader, length, error, long) {
+                reader = $Reader.create(reader);
+                if (long === undefined)
+                    long = 0;
+                if (long > $Reader.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
+                var end = length === undefined ? reader.len : reader.pos + length, message = new $root.apply.operations.BootstrapDeploymentOperation();
+                while (reader.pos < end) {
+                    var tag = reader.uint32();
+                    if (tag === error)
+                        break;
+                    switch (tag >>> 3) {
+                    case 1: {
+                            message.tx = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 2: {
+                            message.txv = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 3: {
+                            message.bs = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 4: {
+                            message.ic = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 5: {
+                            message["in"] = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 6: {
+                            message.is = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 7: {
+                            message.va = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 8: {
+                            message.vn = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 9: {
+                            message.vs = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    default:
+                        reader.skipType(tag & 7, long);
+                        break;
+                    }
+                }
+                return message;
+            };
+
+            /**
+             * Decodes a BootstrapDeploymentOperation message from the specified reader or buffer, length delimited.
+             * @function decodeDelimited
+             * @memberof apply.operations.BootstrapDeploymentOperation
+             * @static
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
+             * @returns {apply.operations.BootstrapDeploymentOperation} BootstrapDeploymentOperation
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            BootstrapDeploymentOperation.decodeDelimited = function decodeDelimited(reader) {
+                reader = $Reader.create(reader);
+                return this.decode(reader, reader.uint32());
+            };
+
+            /**
+             * Verifies a BootstrapDeploymentOperation message.
+             * @function verify
+             * @memberof apply.operations.BootstrapDeploymentOperation
+             * @static
+             * @param {Object.<string,*>} message Plain object to verify
+             * @returns {string|null} `null` if valid, otherwise the reason why it is not
+             */
+            BootstrapDeploymentOperation.verify = function verify(message, long) {
+                if (typeof message !== "object" || message === null)
+                    return "object expected";
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    return "maximum nesting depth exceeded";
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
+                    if (!$util.isBytes(message.tx))
+                        return "tx: buffer expected";
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
+                    if (!$util.isBytes(message.txv))
+                        return "txv: buffer expected";
+                if (message.bs != null && Object.hasOwnProperty.call(message, "bs"))
+                    if (!$util.isBytes(message.bs))
+                        return "bs: buffer expected";
+                if (message.ic != null && Object.hasOwnProperty.call(message, "ic"))
+                    if (!$util.isBytes(message.ic))
+                        return "ic: buffer expected";
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
+                    if (!$util.isBytes(message["in"]))
+                        return "in: buffer expected";
+                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
+                    if (!$util.isBytes(message.is))
+                        return "is: buffer expected";
+                if (message.va != null && Object.hasOwnProperty.call(message, "va"))
+                    if (!$util.isBytes(message.va))
+                        return "va: buffer expected";
+                if (message.vn != null && Object.hasOwnProperty.call(message, "vn"))
+                    if (!$util.isBytes(message.vn))
+                        return "vn: buffer expected";
+                if (message.vs != null && Object.hasOwnProperty.call(message, "vs"))
+                    if (!$util.isBytes(message.vs))
+                        return "vs: buffer expected";
+                return null;
+            };
+
+            /**
+             * Creates a BootstrapDeploymentOperation message from a plain object. Also converts values to their respective internal types.
+             * @function fromObject
+             * @memberof apply.operations.BootstrapDeploymentOperation
+             * @static
+             * @param {Object.<string,*>} object Plain object
+             * @returns {apply.operations.BootstrapDeploymentOperation} BootstrapDeploymentOperation
+             */
+            BootstrapDeploymentOperation.fromObject = function fromObject(object, long) {
+                if (object instanceof $root.apply.operations.BootstrapDeploymentOperation)
+                    object = Object.assign({}, object);
+                if (!$util.isObject(object))
+                    throw TypeError(".apply.operations.BootstrapDeploymentOperation: object expected");
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
+                var message = new $root.apply.operations.BootstrapDeploymentOperation();
+                if (object.tx != null)
+                    message.tx = $util.bytesFrom(object.tx);
+                if (object.txv != null)
+                    message.txv = $util.bytesFrom(object.txv);
+                if (object.bs != null)
+                    message.bs = $util.bytesFrom(object.bs);
+                if (object.ic != null)
+                    message.ic = $util.bytesFrom(object.ic);
+                if (object["in"] != null)
+                    message["in"] = $util.bytesFrom(object["in"]);
+                if (object.is != null)
+                    message.is = $util.bytesFrom(object.is);
+                if (object.va != null)
+                    message.va = $util.bytesFrom(object.va);
+                if (object.vn != null)
+                    message.vn = $util.bytesFrom(object.vn);
+                if (object.vs != null)
+                    message.vs = $util.bytesFrom(object.vs);
+                return message;
+            };
+
+            /**
+             * Creates a plain object from a BootstrapDeploymentOperation message. Also converts values to other types if specified.
+             * @function toObject
+             * @memberof apply.operations.BootstrapDeploymentOperation
+             * @static
+             * @param {apply.operations.BootstrapDeploymentOperation} message BootstrapDeploymentOperation
+             * @param {$protobuf.IConversionOptions} [options] Conversion options
+             * @returns {Object.<string,*>} Plain object
+             */
+            BootstrapDeploymentOperation.toObject = function toObject(message, options, q) {
+                if (!options)
+                    options = {};
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
+                var object = {};
+                if (options.defaults) {
+                    if (options.bytes === String)
+                        object.tx = "";
+                    else {
+                        object.tx = [];
+                        if (options.bytes !== Array)
+                            object.tx = $util.newBuffer(object.tx);
+                    }
+                    if (options.bytes === String)
+                        object.txv = "";
+                    else {
+                        object.txv = [];
+                        if (options.bytes !== Array)
+                            object.txv = $util.newBuffer(object.txv);
+                    }
+                    if (options.bytes === String)
+                        object.bs = "";
+                    else {
+                        object.bs = [];
+                        if (options.bytes !== Array)
+                            object.bs = $util.newBuffer(object.bs);
+                    }
+                    if (options.bytes === String)
+                        object.ic = "";
+                    else {
+                        object.ic = [];
+                        if (options.bytes !== Array)
+                            object.ic = $util.newBuffer(object.ic);
+                    }
+                    if (options.bytes === String)
+                        object["in"] = "";
+                    else {
+                        object["in"] = [];
+                        if (options.bytes !== Array)
+                            object["in"] = $util.newBuffer(object["in"]);
+                    }
+                    if (options.bytes === String)
+                        object.is = "";
+                    else {
+                        object.is = [];
+                        if (options.bytes !== Array)
+                            object.is = $util.newBuffer(object.is);
+                    }
+                    if (options.bytes === String)
+                        object.va = "";
+                    else {
+                        object.va = [];
+                        if (options.bytes !== Array)
+                            object.va = $util.newBuffer(object.va);
+                    }
+                    if (options.bytes === String)
+                        object.vn = "";
+                    else {
+                        object.vn = [];
+                        if (options.bytes !== Array)
+                            object.vn = $util.newBuffer(object.vn);
+                    }
+                    if (options.bytes === String)
+                        object.vs = "";
+                    else {
+                        object.vs = [];
+                        if (options.bytes !== Array)
+                            object.vs = $util.newBuffer(object.vs);
+                    }
+                }
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
+                    object.tx = $util.bytesTo(message.tx, options);
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
+                    object.txv = $util.bytesTo(message.txv, options);
+                if (message.bs != null && Object.hasOwnProperty.call(message, "bs"))
+                    object.bs = $util.bytesTo(message.bs, options);
+                if (message.ic != null && Object.hasOwnProperty.call(message, "ic"))
+                    object.ic = $util.bytesTo(message.ic, options);
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
+                    object["in"] = $util.bytesTo(message["in"], options);
+                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
+                    object.is = $util.bytesTo(message.is, options);
+                if (message.va != null && Object.hasOwnProperty.call(message, "va"))
+                    object.va = $util.bytesTo(message.va, options);
+                if (message.vn != null && Object.hasOwnProperty.call(message, "vn"))
+                    object.vn = $util.bytesTo(message.vn, options);
+                if (message.vs != null && Object.hasOwnProperty.call(message, "vs"))
+                    object.vs = $util.bytesTo(message.vs, options);
+                return object;
+            };
+
+            /**
+             * Converts this BootstrapDeploymentOperation to JSON.
+             * @function toJSON
+             * @memberof apply.operations.BootstrapDeploymentOperation
+             * @instance
+             * @returns {Object.<string,*>} JSON object
+             */
+            BootstrapDeploymentOperation.prototype.toJSON = function toJSON() {
+                return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
+            };
+
+            /**
+             * Gets the default type url for BootstrapDeploymentOperation
+             * @function getTypeUrl
+             * @memberof apply.operations.BootstrapDeploymentOperation
+             * @static
+             * @param {string} [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
+             * @returns {string} The default type url
+             */
+            BootstrapDeploymentOperation.getTypeUrl = function getTypeUrl(typeUrlPrefix) {
+                if (typeUrlPrefix === undefined) {
+                    typeUrlPrefix = "type.googleapis.com";
+                }
+                return typeUrlPrefix + "/apply.operations.BootstrapDeploymentOperation";
+            };
+
+            return BootstrapDeploymentOperation;
+        })();
+
+        operations.TxOperation = (function() {
+
+            /**
+             * Properties of a TxOperation.
+             * @memberof apply.operations
+             * @interface ITxOperation
+             * @property {B4aBuffer|null} [tx] TxOperation tx
+             * @property {B4aBuffer|null} [txv] TxOperation txv
+             * @property {B4aBuffer|null} [iw] TxOperation iw
+             * @property {B4aBuffer|null} [ch] TxOperation ch
+             * @property {B4aBuffer|null} [bs] TxOperation bs
+             * @property {B4aBuffer|null} [mbs] TxOperation mbs
+             * @property {B4aBuffer|null} ["in"] TxOperation in
+             * @property {B4aBuffer|null} [is] TxOperation is
+             * @property {B4aBuffer|null} [va] TxOperation va
+             * @property {B4aBuffer|null} [vn] TxOperation vn
+             * @property {B4aBuffer|null} [vs] TxOperation vs
+             */
+
+            /**
+             * Constructs a new TxOperation.
+             * @memberof apply.operations
+             * @classdesc Represents a TxOperation.
+             * @implements ITxOperation
+             * @constructor
+             * @param {apply.operations.ITxOperation=} [properties] Properties to set
+             */
+            function TxOperation(properties) {
+                if (properties)
+                    for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
+                        if (properties[keys[i]] != null && keys[i] !== "__proto__")
+                            this[keys[i]] = properties[keys[i]];
+            }
+
+            /**
+             * TxOperation tx.
+             * @member {B4aBuffer} tx
+             * @memberof apply.operations.TxOperation
+             * @instance
+             */
+            TxOperation.prototype.tx = $util.newBuffer([]);
+
+            /**
+             * TxOperation txv.
+             * @member {B4aBuffer} txv
+             * @memberof apply.operations.TxOperation
+             * @instance
+             */
+            TxOperation.prototype.txv = $util.newBuffer([]);
+
+            /**
+             * TxOperation iw.
+             * @member {B4aBuffer} iw
+             * @memberof apply.operations.TxOperation
+             * @instance
+             */
+            TxOperation.prototype.iw = $util.newBuffer([]);
+
+            /**
+             * TxOperation ch.
+             * @member {B4aBuffer} ch
+             * @memberof apply.operations.TxOperation
+             * @instance
+             */
+            TxOperation.prototype.ch = $util.newBuffer([]);
+
+            /**
+             * TxOperation bs.
+             * @member {B4aBuffer} bs
+             * @memberof apply.operations.TxOperation
+             * @instance
+             */
+            TxOperation.prototype.bs = $util.newBuffer([]);
+
+            /**
+             * TxOperation mbs.
+             * @member {B4aBuffer} mbs
+             * @memberof apply.operations.TxOperation
+             * @instance
+             */
+            TxOperation.prototype.mbs = $util.newBuffer([]);
+
+            /**
+             * TxOperation in.
+             * @member {B4aBuffer} in
+             * @memberof apply.operations.TxOperation
+             * @instance
+             */
+            TxOperation.prototype["in"] = $util.newBuffer([]);
+
+            /**
+             * TxOperation is.
+             * @member {B4aBuffer} is
+             * @memberof apply.operations.TxOperation
+             * @instance
+             */
+            TxOperation.prototype.is = $util.newBuffer([]);
+
+            /**
+             * TxOperation va.
+             * @member {B4aBuffer} va
+             * @memberof apply.operations.TxOperation
+             * @instance
+             */
+            TxOperation.prototype.va = $util.newBuffer([]);
+
+            /**
+             * TxOperation vn.
+             * @member {B4aBuffer} vn
+             * @memberof apply.operations.TxOperation
+             * @instance
+             */
+            TxOperation.prototype.vn = $util.newBuffer([]);
+
+            /**
+             * TxOperation vs.
+             * @member {B4aBuffer} vs
+             * @memberof apply.operations.TxOperation
+             * @instance
+             */
+            TxOperation.prototype.vs = $util.newBuffer([]);
+
+            /**
+             * Creates a new TxOperation instance using the specified properties.
+             * @function create
+             * @memberof apply.operations.TxOperation
+             * @static
+             * @param {apply.operations.ITxOperation=} [properties] Properties to set
+             * @returns {apply.operations.TxOperation} TxOperation instance
+             */
+            TxOperation.create = function create(properties) {
+                return new TxOperation(properties);
+            };
+
+            /**
+             * Encodes the specified TxOperation message. Does not implicitly {@link apply.operations.TxOperation.verify|verify} messages.
+             * @function encode
+             * @memberof apply.operations.TxOperation
+             * @static
+             * @param {apply.operations.ITxOperation} message TxOperation message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            TxOperation.encode = function encode(message, writer, q) {
+                writer = $Writer.create(writer);
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
+                    writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.tx);
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
+                    writer.uint32(/* id 2, wireType 2 =*/18).bytes(message.txv);
+                if (message.iw != null && Object.hasOwnProperty.call(message, "iw"))
+                    writer.uint32(/* id 3, wireType 2 =*/26).bytes(message.iw);
+                if (message.ch != null && Object.hasOwnProperty.call(message, "ch"))
+                    writer.uint32(/* id 4, wireType 2 =*/34).bytes(message.ch);
+                if (message.bs != null && Object.hasOwnProperty.call(message, "bs"))
+                    writer.uint32(/* id 5, wireType 2 =*/42).bytes(message.bs);
+                if (message.mbs != null && Object.hasOwnProperty.call(message, "mbs"))
+                    writer.uint32(/* id 6, wireType 2 =*/50).bytes(message.mbs);
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
+                    writer.uint32(/* id 7, wireType 2 =*/58).bytes(message["in"]);
+                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
+                    writer.uint32(/* id 8, wireType 2 =*/66).bytes(message.is);
+                if (message.va != null && Object.hasOwnProperty.call(message, "va"))
+                    writer.uint32(/* id 9, wireType 2 =*/74).bytes(message.va);
+                if (message.vn != null && Object.hasOwnProperty.call(message, "vn"))
+                    writer.uint32(/* id 10, wireType 2 =*/82).bytes(message.vn);
+                if (message.vs != null && Object.hasOwnProperty.call(message, "vs"))
+                    writer.uint32(/* id 11, wireType 2 =*/90).bytes(message.vs);
+                return writer;
+            };
+
+            /**
+             * Encodes the specified TxOperation message, length delimited. Does not implicitly {@link apply.operations.TxOperation.verify|verify} messages.
+             * @function encodeDelimited
+             * @memberof apply.operations.TxOperation
+             * @static
+             * @param {apply.operations.ITxOperation} message TxOperation message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            TxOperation.encodeDelimited = function encodeDelimited(message, writer) {
+                return this.encode(message, writer && writer.len ? writer.fork() : writer).ldelim();
+            };
+
+            /**
+             * Decodes a TxOperation message from the specified reader or buffer.
+             * @function decode
+             * @memberof apply.operations.TxOperation
+             * @static
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
+             * @param {number} [length] Message length if known beforehand
+             * @returns {apply.operations.TxOperation} TxOperation
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            TxOperation.decode = function decode(reader, length, error, long) {
+                reader = $Reader.create(reader);
+                if (long === undefined)
+                    long = 0;
+                if (long > $Reader.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
+                var end = length === undefined ? reader.len : reader.pos + length, message = new $root.apply.operations.TxOperation();
+                while (reader.pos < end) {
+                    var tag = reader.uint32();
+                    if (tag === error)
+                        break;
+                    switch (tag >>> 3) {
+                    case 1: {
+                            message.tx = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 2: {
+                            message.txv = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 3: {
+                            message.iw = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 4: {
+                            message.ch = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 5: {
+                            message.bs = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 6: {
+                            message.mbs = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 7: {
+                            message["in"] = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 8: {
+                            message.is = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 9: {
+                            message.va = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 10: {
+                            message.vn = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 11: {
+                            message.vs = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    default:
+                        reader.skipType(tag & 7, long);
+                        break;
+                    }
+                }
+                return message;
+            };
+
+            /**
+             * Decodes a TxOperation message from the specified reader or buffer, length delimited.
+             * @function decodeDelimited
+             * @memberof apply.operations.TxOperation
+             * @static
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
+             * @returns {apply.operations.TxOperation} TxOperation
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            TxOperation.decodeDelimited = function decodeDelimited(reader) {
+                reader = $Reader.create(reader);
+                return this.decode(reader, reader.uint32());
+            };
+
+            /**
+             * Verifies a TxOperation message.
+             * @function verify
+             * @memberof apply.operations.TxOperation
+             * @static
+             * @param {Object.<string,*>} message Plain object to verify
+             * @returns {string|null} `null` if valid, otherwise the reason why it is not
+             */
+            TxOperation.verify = function verify(message, long) {
+                if (typeof message !== "object" || message === null)
+                    return "object expected";
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    return "maximum nesting depth exceeded";
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
+                    if (!$util.isBytes(message.tx))
+                        return "tx: buffer expected";
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
+                    if (!$util.isBytes(message.txv))
+                        return "txv: buffer expected";
+                if (message.iw != null && Object.hasOwnProperty.call(message, "iw"))
+                    if (!$util.isBytes(message.iw))
+                        return "iw: buffer expected";
+                if (message.ch != null && Object.hasOwnProperty.call(message, "ch"))
+                    if (!$util.isBytes(message.ch))
+                        return "ch: buffer expected";
+                if (message.bs != null && Object.hasOwnProperty.call(message, "bs"))
+                    if (!$util.isBytes(message.bs))
+                        return "bs: buffer expected";
+                if (message.mbs != null && Object.hasOwnProperty.call(message, "mbs"))
+                    if (!$util.isBytes(message.mbs))
+                        return "mbs: buffer expected";
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
+                    if (!$util.isBytes(message["in"]))
+                        return "in: buffer expected";
+                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
+                    if (!$util.isBytes(message.is))
+                        return "is: buffer expected";
+                if (message.va != null && Object.hasOwnProperty.call(message, "va"))
+                    if (!$util.isBytes(message.va))
+                        return "va: buffer expected";
+                if (message.vn != null && Object.hasOwnProperty.call(message, "vn"))
+                    if (!$util.isBytes(message.vn))
+                        return "vn: buffer expected";
+                if (message.vs != null && Object.hasOwnProperty.call(message, "vs"))
+                    if (!$util.isBytes(message.vs))
+                        return "vs: buffer expected";
+                return null;
+            };
+
+            /**
+             * Creates a TxOperation message from a plain object. Also converts values to their respective internal types.
+             * @function fromObject
+             * @memberof apply.operations.TxOperation
+             * @static
+             * @param {Object.<string,*>} object Plain object
+             * @returns {apply.operations.TxOperation} TxOperation
+             */
+            TxOperation.fromObject = function fromObject(object, long) {
+                if (object instanceof $root.apply.operations.TxOperation)
+                    object = Object.assign({}, object);
+                if (!$util.isObject(object))
+                    throw TypeError(".apply.operations.TxOperation: object expected");
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
+                var message = new $root.apply.operations.TxOperation();
+                if (object.tx != null)
+                    message.tx = $util.bytesFrom(object.tx);
+                if (object.txv != null)
+                    message.txv = $util.bytesFrom(object.txv);
+                if (object.iw != null)
+                    message.iw = $util.bytesFrom(object.iw);
+                if (object.ch != null)
+                    message.ch = $util.bytesFrom(object.ch);
+                if (object.bs != null)
+                    message.bs = $util.bytesFrom(object.bs);
+                if (object.mbs != null)
+                    message.mbs = $util.bytesFrom(object.mbs);
+                if (object["in"] != null)
+                    message["in"] = $util.bytesFrom(object["in"]);
+                if (object.is != null)
+                    message.is = $util.bytesFrom(object.is);
+                if (object.va != null)
+                    message.va = $util.bytesFrom(object.va);
+                if (object.vn != null)
+                    message.vn = $util.bytesFrom(object.vn);
+                if (object.vs != null)
+                    message.vs = $util.bytesFrom(object.vs);
+                return message;
+            };
+
+            /**
+             * Creates a plain object from a TxOperation message. Also converts values to other types if specified.
+             * @function toObject
+             * @memberof apply.operations.TxOperation
+             * @static
+             * @param {apply.operations.TxOperation} message TxOperation
+             * @param {$protobuf.IConversionOptions} [options] Conversion options
+             * @returns {Object.<string,*>} Plain object
+             */
+            TxOperation.toObject = function toObject(message, options, q) {
+                if (!options)
+                    options = {};
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
+                var object = {};
+                if (options.defaults) {
+                    if (options.bytes === String)
+                        object.tx = "";
+                    else {
+                        object.tx = [];
+                        if (options.bytes !== Array)
+                            object.tx = $util.newBuffer(object.tx);
+                    }
+                    if (options.bytes === String)
+                        object.txv = "";
+                    else {
+                        object.txv = [];
+                        if (options.bytes !== Array)
+                            object.txv = $util.newBuffer(object.txv);
+                    }
+                    if (options.bytes === String)
+                        object.iw = "";
+                    else {
+                        object.iw = [];
+                        if (options.bytes !== Array)
+                            object.iw = $util.newBuffer(object.iw);
+                    }
+                    if (options.bytes === String)
+                        object.ch = "";
+                    else {
+                        object.ch = [];
+                        if (options.bytes !== Array)
+                            object.ch = $util.newBuffer(object.ch);
+                    }
+                    if (options.bytes === String)
+                        object.bs = "";
+                    else {
+                        object.bs = [];
+                        if (options.bytes !== Array)
+                            object.bs = $util.newBuffer(object.bs);
+                    }
+                    if (options.bytes === String)
+                        object.mbs = "";
+                    else {
+                        object.mbs = [];
+                        if (options.bytes !== Array)
+                            object.mbs = $util.newBuffer(object.mbs);
+                    }
+                    if (options.bytes === String)
+                        object["in"] = "";
+                    else {
+                        object["in"] = [];
+                        if (options.bytes !== Array)
+                            object["in"] = $util.newBuffer(object["in"]);
+                    }
+                    if (options.bytes === String)
+                        object.is = "";
+                    else {
+                        object.is = [];
+                        if (options.bytes !== Array)
+                            object.is = $util.newBuffer(object.is);
+                    }
+                    if (options.bytes === String)
+                        object.va = "";
+                    else {
+                        object.va = [];
+                        if (options.bytes !== Array)
+                            object.va = $util.newBuffer(object.va);
+                    }
+                    if (options.bytes === String)
+                        object.vn = "";
+                    else {
+                        object.vn = [];
+                        if (options.bytes !== Array)
+                            object.vn = $util.newBuffer(object.vn);
+                    }
+                    if (options.bytes === String)
+                        object.vs = "";
+                    else {
+                        object.vs = [];
+                        if (options.bytes !== Array)
+                            object.vs = $util.newBuffer(object.vs);
+                    }
+                }
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
+                    object.tx = $util.bytesTo(message.tx, options);
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
+                    object.txv = $util.bytesTo(message.txv, options);
+                if (message.iw != null && Object.hasOwnProperty.call(message, "iw"))
+                    object.iw = $util.bytesTo(message.iw, options);
+                if (message.ch != null && Object.hasOwnProperty.call(message, "ch"))
+                    object.ch = $util.bytesTo(message.ch, options);
+                if (message.bs != null && Object.hasOwnProperty.call(message, "bs"))
+                    object.bs = $util.bytesTo(message.bs, options);
+                if (message.mbs != null && Object.hasOwnProperty.call(message, "mbs"))
+                    object.mbs = $util.bytesTo(message.mbs, options);
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
+                    object["in"] = $util.bytesTo(message["in"], options);
+                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
+                    object.is = $util.bytesTo(message.is, options);
+                if (message.va != null && Object.hasOwnProperty.call(message, "va"))
+                    object.va = $util.bytesTo(message.va, options);
+                if (message.vn != null && Object.hasOwnProperty.call(message, "vn"))
+                    object.vn = $util.bytesTo(message.vn, options);
+                if (message.vs != null && Object.hasOwnProperty.call(message, "vs"))
+                    object.vs = $util.bytesTo(message.vs, options);
+                return object;
+            };
+
+            /**
+             * Converts this TxOperation to JSON.
+             * @function toJSON
+             * @memberof apply.operations.TxOperation
+             * @instance
+             * @returns {Object.<string,*>} JSON object
+             */
+            TxOperation.prototype.toJSON = function toJSON() {
+                return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
+            };
+
+            /**
+             * Gets the default type url for TxOperation
+             * @function getTypeUrl
+             * @memberof apply.operations.TxOperation
+             * @static
+             * @param {string} [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
+             * @returns {string} The default type url
+             */
+            TxOperation.getTypeUrl = function getTypeUrl(typeUrlPrefix) {
+                if (typeUrlPrefix === undefined) {
+                    typeUrlPrefix = "type.googleapis.com";
+                }
+                return typeUrlPrefix + "/apply.operations.TxOperation";
+            };
+
+            return TxOperation;
+        })();
+
+        operations.SetEpochOperation = (function() {
+
+            /**
+             * Properties of a SetEpochOperation.
+             * @memberof apply.operations
+             * @interface ISetEpochOperation
+             * @property {B4aBuffer|null} [sv] SetEpochOperation sv
+             * @property {B4aBuffer|null} [data] SetEpochOperation data
+             */
+
+            /**
+             * Constructs a new SetEpochOperation.
+             * @memberof apply.operations
+             * @classdesc Represents a SetEpochOperation.
+             * @implements ISetEpochOperation
+             * @constructor
+             * @param {apply.operations.ISetEpochOperation=} [properties] Properties to set
+             */
+            function SetEpochOperation(properties) {
+                if (properties)
+                    for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
+                        if (properties[keys[i]] != null && keys[i] !== "__proto__")
+                            this[keys[i]] = properties[keys[i]];
+            }
+
+            /**
+             * SetEpochOperation sv.
+             * @member {B4aBuffer} sv
+             * @memberof apply.operations.SetEpochOperation
+             * @instance
+             */
+            SetEpochOperation.prototype.sv = $util.newBuffer([]);
+
+            /**
+             * SetEpochOperation data.
+             * @member {B4aBuffer} data
+             * @memberof apply.operations.SetEpochOperation
+             * @instance
+             */
+            SetEpochOperation.prototype.data = $util.newBuffer([]);
+
+            /**
+             * Creates a new SetEpochOperation instance using the specified properties.
+             * @function create
+             * @memberof apply.operations.SetEpochOperation
+             * @static
+             * @param {apply.operations.ISetEpochOperation=} [properties] Properties to set
+             * @returns {apply.operations.SetEpochOperation} SetEpochOperation instance
+             */
+            SetEpochOperation.create = function create(properties) {
+                return new SetEpochOperation(properties);
+            };
+
+            /**
+             * Encodes the specified SetEpochOperation message. Does not implicitly {@link apply.operations.SetEpochOperation.verify|verify} messages.
+             * @function encode
+             * @memberof apply.operations.SetEpochOperation
+             * @static
+             * @param {apply.operations.ISetEpochOperation} message SetEpochOperation message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            SetEpochOperation.encode = function encode(message, writer, q) {
+                writer = $Writer.create(writer);
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
+                if (message.sv != null && Object.hasOwnProperty.call(message, "sv"))
+                    writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.sv);
+                if (message.data != null && Object.hasOwnProperty.call(message, "data"))
+                    writer.uint32(/* id 2, wireType 2 =*/18).bytes(message.data);
+                return writer;
+            };
+
+            /**
+             * Encodes the specified SetEpochOperation message, length delimited. Does not implicitly {@link apply.operations.SetEpochOperation.verify|verify} messages.
+             * @function encodeDelimited
+             * @memberof apply.operations.SetEpochOperation
+             * @static
+             * @param {apply.operations.ISetEpochOperation} message SetEpochOperation message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            SetEpochOperation.encodeDelimited = function encodeDelimited(message, writer) {
+                return this.encode(message, writer && writer.len ? writer.fork() : writer).ldelim();
+            };
+
+            /**
+             * Decodes a SetEpochOperation message from the specified reader or buffer.
+             * @function decode
+             * @memberof apply.operations.SetEpochOperation
+             * @static
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
+             * @param {number} [length] Message length if known beforehand
+             * @returns {apply.operations.SetEpochOperation} SetEpochOperation
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            SetEpochOperation.decode = function decode(reader, length, error, long) {
+                reader = $Reader.create(reader);
+                if (long === undefined)
+                    long = 0;
+                if (long > $Reader.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
+                var end = length === undefined ? reader.len : reader.pos + length, message = new $root.apply.operations.SetEpochOperation();
+                while (reader.pos < end) {
+                    var tag = reader.uint32();
+                    if (tag === error)
+                        break;
+                    switch (tag >>> 3) {
+                    case 1: {
+                            message.sv = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 2: {
+                            message.data = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    default:
+                        reader.skipType(tag & 7, long);
+                        break;
+                    }
+                }
+                return message;
+            };
+
+            /**
+             * Decodes a SetEpochOperation message from the specified reader or buffer, length delimited.
+             * @function decodeDelimited
+             * @memberof apply.operations.SetEpochOperation
+             * @static
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
+             * @returns {apply.operations.SetEpochOperation} SetEpochOperation
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            SetEpochOperation.decodeDelimited = function decodeDelimited(reader) {
+                reader = $Reader.create(reader);
+                return this.decode(reader, reader.uint32());
+            };
+
+            /**
+             * Verifies a SetEpochOperation message.
+             * @function verify
+             * @memberof apply.operations.SetEpochOperation
+             * @static
+             * @param {Object.<string,*>} message Plain object to verify
+             * @returns {string|null} `null` if valid, otherwise the reason why it is not
+             */
+            SetEpochOperation.verify = function verify(message, long) {
+                if (typeof message !== "object" || message === null)
+                    return "object expected";
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    return "maximum nesting depth exceeded";
+                if (message.sv != null && Object.hasOwnProperty.call(message, "sv"))
+                    if (!$util.isBytes(message.sv))
+                        return "sv: buffer expected";
+                if (message.data != null && Object.hasOwnProperty.call(message, "data"))
+                    if (!$util.isBytes(message.data))
+                        return "data: buffer expected";
+                return null;
+            };
+
+            /**
+             * Creates a SetEpochOperation message from a plain object. Also converts values to their respective internal types.
+             * @function fromObject
+             * @memberof apply.operations.SetEpochOperation
+             * @static
+             * @param {Object.<string,*>} object Plain object
+             * @returns {apply.operations.SetEpochOperation} SetEpochOperation
+             */
+            SetEpochOperation.fromObject = function fromObject(object, long) {
+                if (object instanceof $root.apply.operations.SetEpochOperation)
+                    object = Object.assign({}, object);
+                if (!$util.isObject(object))
+                    throw TypeError(".apply.operations.SetEpochOperation: object expected");
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
+                var message = new $root.apply.operations.SetEpochOperation();
+                if (object.sv != null)
+                    message.sv = $util.bytesFrom(object.sv);
+                if (object.data != null)
+                    message.data = $util.bytesFrom(object.data);
+                return message;
+            };
+
+            /**
+             * Creates a plain object from a SetEpochOperation message. Also converts values to other types if specified.
+             * @function toObject
+             * @memberof apply.operations.SetEpochOperation
+             * @static
+             * @param {apply.operations.SetEpochOperation} message SetEpochOperation
+             * @param {$protobuf.IConversionOptions} [options] Conversion options
+             * @returns {Object.<string,*>} Plain object
+             */
+            SetEpochOperation.toObject = function toObject(message, options, q) {
+                if (!options)
+                    options = {};
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
+                var object = {};
+                if (options.defaults) {
+                    if (options.bytes === String)
+                        object.sv = "";
+                    else {
+                        object.sv = [];
+                        if (options.bytes !== Array)
+                            object.sv = $util.newBuffer(object.sv);
+                    }
+                    if (options.bytes === String)
+                        object.data = "";
+                    else {
+                        object.data = [];
+                        if (options.bytes !== Array)
+                            object.data = $util.newBuffer(object.data);
+                    }
+                }
+                if (message.sv != null && Object.hasOwnProperty.call(message, "sv"))
+                    object.sv = $util.bytesTo(message.sv, options);
+                if (message.data != null && Object.hasOwnProperty.call(message, "data"))
+                    object.data = $util.bytesTo(message.data, options);
+                return object;
+            };
+
+            /**
+             * Converts this SetEpochOperation to JSON.
+             * @function toJSON
+             * @memberof apply.operations.SetEpochOperation
+             * @instance
+             * @returns {Object.<string,*>} JSON object
+             */
+            SetEpochOperation.prototype.toJSON = function toJSON() {
+                return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
+            };
+
+            /**
+             * Gets the default type url for SetEpochOperation
+             * @function getTypeUrl
+             * @memberof apply.operations.SetEpochOperation
+             * @static
+             * @param {string} [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
+             * @returns {string} The default type url
+             */
+            SetEpochOperation.getTypeUrl = function getTypeUrl(typeUrlPrefix) {
+                if (typeUrlPrefix === undefined) {
+                    typeUrlPrefix = "type.googleapis.com";
+                }
+                return typeUrlPrefix + "/apply.operations.SetEpochOperation";
+            };
+
+            return SetEpochOperation;
+        })();
+
+        operations.ConsensusControlOperation = (function() {
+
+            /**
+             * Properties of a ConsensusControlOperation.
+             * @memberof apply.operations
+             * @interface IConsensusControlOperation
+             * @property {B4aBuffer|null} [tx] ConsensusControlOperation tx
+             * @property {B4aBuffer|null} [txv] ConsensusControlOperation txv
+             * @property {common.consensus.IConsensusConfig|null} [cc] ConsensusControlOperation cc
+             * @property {B4aBuffer|null} ["in"] ConsensusControlOperation in
+             * @property {B4aBuffer|null} [is] ConsensusControlOperation is
+             */
+
+            /**
+             * Constructs a new ConsensusControlOperation.
+             * @memberof apply.operations
+             * @classdesc Represents a ConsensusControlOperation.
+             * @implements IConsensusControlOperation
+             * @constructor
+             * @param {apply.operations.IConsensusControlOperation=} [properties] Properties to set
+             */
+            function ConsensusControlOperation(properties) {
+                if (properties)
+                    for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
+                        if (properties[keys[i]] != null && keys[i] !== "__proto__")
+                            this[keys[i]] = properties[keys[i]];
+            }
+
+            /**
+             * ConsensusControlOperation tx.
+             * @member {B4aBuffer} tx
+             * @memberof apply.operations.ConsensusControlOperation
+             * @instance
+             */
+            ConsensusControlOperation.prototype.tx = $util.newBuffer([]);
+
+            /**
+             * ConsensusControlOperation txv.
+             * @member {B4aBuffer} txv
+             * @memberof apply.operations.ConsensusControlOperation
+             * @instance
+             */
+            ConsensusControlOperation.prototype.txv = $util.newBuffer([]);
+
+            /**
+             * ConsensusControlOperation cc.
+             * @member {common.consensus.IConsensusConfig|null|undefined} cc
+             * @memberof apply.operations.ConsensusControlOperation
+             * @instance
+             */
+            ConsensusControlOperation.prototype.cc = null;
+
+            /**
+             * ConsensusControlOperation in.
+             * @member {B4aBuffer} in
+             * @memberof apply.operations.ConsensusControlOperation
+             * @instance
+             */
+            ConsensusControlOperation.prototype["in"] = $util.newBuffer([]);
+
+            /**
+             * ConsensusControlOperation is.
+             * @member {B4aBuffer} is
+             * @memberof apply.operations.ConsensusControlOperation
+             * @instance
+             */
+            ConsensusControlOperation.prototype.is = $util.newBuffer([]);
+
+            /**
+             * Creates a new ConsensusControlOperation instance using the specified properties.
+             * @function create
+             * @memberof apply.operations.ConsensusControlOperation
+             * @static
+             * @param {apply.operations.IConsensusControlOperation=} [properties] Properties to set
+             * @returns {apply.operations.ConsensusControlOperation} ConsensusControlOperation instance
+             */
+            ConsensusControlOperation.create = function create(properties) {
+                return new ConsensusControlOperation(properties);
+            };
+
+            /**
+             * Encodes the specified ConsensusControlOperation message. Does not implicitly {@link apply.operations.ConsensusControlOperation.verify|verify} messages.
+             * @function encode
+             * @memberof apply.operations.ConsensusControlOperation
+             * @static
+             * @param {apply.operations.IConsensusControlOperation} message ConsensusControlOperation message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            ConsensusControlOperation.encode = function encode(message, writer, q) {
+                writer = $Writer.create(writer);
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
+                    writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.tx);
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
+                    writer.uint32(/* id 2, wireType 2 =*/18).bytes(message.txv);
+                if (message.cc != null && Object.hasOwnProperty.call(message, "cc"))
+                    $root.common.consensus.ConsensusConfig.encode(message.cc, writer.uint32(/* id 3, wireType 2 =*/26).fork(), q + 1).ldelim();
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
+                    writer.uint32(/* id 4, wireType 2 =*/34).bytes(message["in"]);
+                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
+                    writer.uint32(/* id 5, wireType 2 =*/42).bytes(message.is);
+                return writer;
+            };
+
+            /**
+             * Encodes the specified ConsensusControlOperation message, length delimited. Does not implicitly {@link apply.operations.ConsensusControlOperation.verify|verify} messages.
+             * @function encodeDelimited
+             * @memberof apply.operations.ConsensusControlOperation
+             * @static
+             * @param {apply.operations.IConsensusControlOperation} message ConsensusControlOperation message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            ConsensusControlOperation.encodeDelimited = function encodeDelimited(message, writer) {
+                return this.encode(message, writer && writer.len ? writer.fork() : writer).ldelim();
+            };
+
+            /**
+             * Decodes a ConsensusControlOperation message from the specified reader or buffer.
+             * @function decode
+             * @memberof apply.operations.ConsensusControlOperation
+             * @static
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
+             * @param {number} [length] Message length if known beforehand
+             * @returns {apply.operations.ConsensusControlOperation} ConsensusControlOperation
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            ConsensusControlOperation.decode = function decode(reader, length, error, long) {
+                reader = $Reader.create(reader);
+                if (long === undefined)
+                    long = 0;
+                if (long > $Reader.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
+                var end = length === undefined ? reader.len : reader.pos + length, message = new $root.apply.operations.ConsensusControlOperation();
+                while (reader.pos < end) {
+                    var tag = reader.uint32();
+                    if (tag === error)
+                        break;
+                    switch (tag >>> 3) {
+                    case 1: {
+                            message.tx = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 2: {
+                            message.txv = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 3: {
+                            message.cc = $root.common.consensus.ConsensusConfig.decode(reader, reader.uint32(), undefined, long + 1);
+                            break;
+                        }
+                    case 4: {
+                            message["in"] = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 5: {
+                            message.is = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    default:
+                        reader.skipType(tag & 7, long);
+                        break;
+                    }
+                }
+                return message;
+            };
+
+            /**
+             * Decodes a ConsensusControlOperation message from the specified reader or buffer, length delimited.
+             * @function decodeDelimited
+             * @memberof apply.operations.ConsensusControlOperation
+             * @static
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
+             * @returns {apply.operations.ConsensusControlOperation} ConsensusControlOperation
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            ConsensusControlOperation.decodeDelimited = function decodeDelimited(reader) {
+                reader = $Reader.create(reader);
+                return this.decode(reader, reader.uint32());
+            };
+
+            /**
+             * Verifies a ConsensusControlOperation message.
+             * @function verify
+             * @memberof apply.operations.ConsensusControlOperation
+             * @static
+             * @param {Object.<string,*>} message Plain object to verify
+             * @returns {string|null} `null` if valid, otherwise the reason why it is not
+             */
+            ConsensusControlOperation.verify = function verify(message, long) {
+                if (typeof message !== "object" || message === null)
+                    return "object expected";
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    return "maximum nesting depth exceeded";
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
+                    if (!$util.isBytes(message.tx))
+                        return "tx: buffer expected";
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
+                    if (!$util.isBytes(message.txv))
+                        return "txv: buffer expected";
+                if (message.cc != null && Object.hasOwnProperty.call(message, "cc")) {
+                    var error = $root.common.consensus.ConsensusConfig.verify(message.cc, long + 1);
+                    if (error)
+                        return "cc." + error;
+                }
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
+                    if (!$util.isBytes(message["in"]))
+                        return "in: buffer expected";
+                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
+                    if (!$util.isBytes(message.is))
+                        return "is: buffer expected";
+                return null;
+            };
+
+            /**
+             * Creates a ConsensusControlOperation message from a plain object. Also converts values to their respective internal types.
+             * @function fromObject
+             * @memberof apply.operations.ConsensusControlOperation
+             * @static
+             * @param {Object.<string,*>} object Plain object
+             * @returns {apply.operations.ConsensusControlOperation} ConsensusControlOperation
+             */
+            ConsensusControlOperation.fromObject = function fromObject(object, long) {
+                if (object instanceof $root.apply.operations.ConsensusControlOperation)
+                    object = Object.assign({}, object);
+                if (!$util.isObject(object))
+                    throw TypeError(".apply.operations.ConsensusControlOperation: object expected");
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
+                var message = new $root.apply.operations.ConsensusControlOperation();
+                if (object.tx != null)
+                    message.tx = $util.bytesFrom(object.tx);
+                if (object.txv != null)
+                    message.txv = $util.bytesFrom(object.txv);
+                if (object.cc != null) {
+                    if (!$util.isObject(object.cc))
+                        throw TypeError(".apply.operations.ConsensusControlOperation.cc: object expected");
+                    message.cc = $root.common.consensus.ConsensusConfig.fromObject(object.cc, long + 1);
+                }
+                if (object["in"] != null)
+                    message["in"] = $util.bytesFrom(object["in"]);
+                if (object.is != null)
+                    message.is = $util.bytesFrom(object.is);
+                return message;
+            };
+
+            /**
+             * Creates a plain object from a ConsensusControlOperation message. Also converts values to other types if specified.
+             * @function toObject
+             * @memberof apply.operations.ConsensusControlOperation
+             * @static
+             * @param {apply.operations.ConsensusControlOperation} message ConsensusControlOperation
+             * @param {$protobuf.IConversionOptions} [options] Conversion options
+             * @returns {Object.<string,*>} Plain object
+             */
+            ConsensusControlOperation.toObject = function toObject(message, options, q) {
+                if (!options)
+                    options = {};
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
+                var object = {};
+                if (options.defaults) {
+                    if (options.bytes === String)
+                        object.tx = "";
+                    else {
+                        object.tx = [];
+                        if (options.bytes !== Array)
+                            object.tx = $util.newBuffer(object.tx);
+                    }
+                    if (options.bytes === String)
+                        object.txv = "";
+                    else {
+                        object.txv = [];
+                        if (options.bytes !== Array)
+                            object.txv = $util.newBuffer(object.txv);
+                    }
+                    object.cc = null;
+                    if (options.bytes === String)
+                        object["in"] = "";
+                    else {
+                        object["in"] = [];
+                        if (options.bytes !== Array)
+                            object["in"] = $util.newBuffer(object["in"]);
+                    }
+                    if (options.bytes === String)
+                        object.is = "";
+                    else {
+                        object.is = [];
+                        if (options.bytes !== Array)
+                            object.is = $util.newBuffer(object.is);
+                    }
+                }
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
+                    object.tx = $util.bytesTo(message.tx, options);
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
+                    object.txv = $util.bytesTo(message.txv, options);
+                if (message.cc != null && Object.hasOwnProperty.call(message, "cc"))
+                    object.cc = $root.common.consensus.ConsensusConfig.toObject(message.cc, options, q + 1);
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
+                    object["in"] = $util.bytesTo(message["in"], options);
+                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
+                    object.is = $util.bytesTo(message.is, options);
+                return object;
+            };
+
+            /**
+             * Converts this ConsensusControlOperation to JSON.
+             * @function toJSON
+             * @memberof apply.operations.ConsensusControlOperation
+             * @instance
+             * @returns {Object.<string,*>} JSON object
+             */
+            ConsensusControlOperation.prototype.toJSON = function toJSON() {
+                return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
+            };
+
+            /**
+             * Gets the default type url for ConsensusControlOperation
+             * @function getTypeUrl
+             * @memberof apply.operations.ConsensusControlOperation
+             * @static
+             * @param {string} [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
+             * @returns {string} The default type url
+             */
+            ConsensusControlOperation.getTypeUrl = function getTypeUrl(typeUrlPrefix) {
+                if (typeUrlPrefix === undefined) {
+                    typeUrlPrefix = "type.googleapis.com";
+                }
+                return typeUrlPrefix + "/apply.operations.ConsensusControlOperation";
+            };
+
+            return ConsensusControlOperation;
+        })();
+
+        operations.HtlcLockOperation = (function() {
+
+            /**
+             * Properties of a HtlcLockOperation.
+             * @memberof apply.operations
+             * @interface IHtlcLockOperation
+             * @property {B4aBuffer|null} [tx] HtlcLockOperation tx
+             * @property {B4aBuffer|null} [txv] HtlcLockOperation txv
+             * @property {B4aBuffer|null} [ca] HtlcLockOperation ca
+             * @property {B4aBuffer|null} [ra] HtlcLockOperation ra
+             * @property {B4aBuffer|null} [am] HtlcLockOperation am
+             * @property {B4aBuffer|null} [fa] HtlcLockOperation fa
+             * @property {B4aBuffer|null} [fr] HtlcLockOperation fr
+             * @property {B4aBuffer|null} [hl] HtlcLockOperation hl
+             * @property {B4aBuffer|null} [re] HtlcLockOperation re
+             * @property {B4aBuffer|null} [md] HtlcLockOperation md
+             * @property {Array.<B4aBuffer>|null} [ss] HtlcLockOperation ss
+             * @property {B4aBuffer|null} [th] HtlcLockOperation th
+             * @property {Array.<B4aBuffer>|null} [cs] HtlcLockOperation cs
+             * @property {B4aBuffer|null} ["in"] HtlcLockOperation in
+             * @property {B4aBuffer|null} [is] HtlcLockOperation is
+             * @property {B4aBuffer|null} [va] HtlcLockOperation va
+             * @property {B4aBuffer|null} [vn] HtlcLockOperation vn
+             * @property {B4aBuffer|null} [vs] HtlcLockOperation vs
+             */
+
+            /**
+             * Constructs a new HtlcLockOperation.
+             * @memberof apply.operations
+             * @classdesc Represents a HtlcLockOperation.
+             * @implements IHtlcLockOperation
+             * @constructor
+             * @param {apply.operations.IHtlcLockOperation=} [properties] Properties to set
+             */
+            function HtlcLockOperation(properties) {
+                this.ss = [];
+                this.cs = [];
+                if (properties)
+                    for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
+                        if (properties[keys[i]] != null && keys[i] !== "__proto__")
+                            this[keys[i]] = properties[keys[i]];
+            }
+
+            /**
+             * HtlcLockOperation tx.
+             * @member {B4aBuffer} tx
+             * @memberof apply.operations.HtlcLockOperation
+             * @instance
+             */
+            HtlcLockOperation.prototype.tx = $util.newBuffer([]);
+
+            /**
+             * HtlcLockOperation txv.
+             * @member {B4aBuffer} txv
+             * @memberof apply.operations.HtlcLockOperation
+             * @instance
+             */
+            HtlcLockOperation.prototype.txv = $util.newBuffer([]);
+
+            /**
+             * HtlcLockOperation ca.
+             * @member {B4aBuffer} ca
+             * @memberof apply.operations.HtlcLockOperation
+             * @instance
+             */
+            HtlcLockOperation.prototype.ca = $util.newBuffer([]);
+
+            /**
+             * HtlcLockOperation ra.
+             * @member {B4aBuffer} ra
+             * @memberof apply.operations.HtlcLockOperation
+             * @instance
+             */
+            HtlcLockOperation.prototype.ra = $util.newBuffer([]);
+
+            /**
+             * HtlcLockOperation am.
+             * @member {B4aBuffer} am
+             * @memberof apply.operations.HtlcLockOperation
+             * @instance
+             */
+            HtlcLockOperation.prototype.am = $util.newBuffer([]);
+
+            /**
+             * HtlcLockOperation fa.
+             * @member {B4aBuffer} fa
+             * @memberof apply.operations.HtlcLockOperation
+             * @instance
+             */
+            HtlcLockOperation.prototype.fa = $util.newBuffer([]);
+
+            /**
+             * HtlcLockOperation fr.
+             * @member {B4aBuffer|null|undefined} fr
+             * @memberof apply.operations.HtlcLockOperation
+             * @instance
+             */
+            HtlcLockOperation.prototype.fr = null;
+
+            /**
+             * HtlcLockOperation hl.
+             * @member {B4aBuffer} hl
+             * @memberof apply.operations.HtlcLockOperation
+             * @instance
+             */
+            HtlcLockOperation.prototype.hl = $util.newBuffer([]);
+
+            /**
+             * HtlcLockOperation re.
+             * @member {B4aBuffer} re
+             * @memberof apply.operations.HtlcLockOperation
+             * @instance
+             */
+            HtlcLockOperation.prototype.re = $util.newBuffer([]);
+
+            /**
+             * HtlcLockOperation md.
+             * @member {B4aBuffer|null|undefined} md
+             * @memberof apply.operations.HtlcLockOperation
+             * @instance
+             */
+            HtlcLockOperation.prototype.md = null;
+
+            /**
+             * HtlcLockOperation ss.
+             * @member {Array.<B4aBuffer>} ss
+             * @memberof apply.operations.HtlcLockOperation
+             * @instance
+             */
+            HtlcLockOperation.prototype.ss = $util.emptyArray;
+
+            /**
+             * HtlcLockOperation th.
+             * @member {B4aBuffer} th
+             * @memberof apply.operations.HtlcLockOperation
+             * @instance
+             */
+            HtlcLockOperation.prototype.th = $util.newBuffer([]);
+
+            /**
+             * HtlcLockOperation cs.
+             * @member {Array.<B4aBuffer>} cs
+             * @memberof apply.operations.HtlcLockOperation
+             * @instance
+             */
+            HtlcLockOperation.prototype.cs = $util.emptyArray;
+
+            /**
+             * HtlcLockOperation in.
+             * @member {B4aBuffer} in
+             * @memberof apply.operations.HtlcLockOperation
+             * @instance
+             */
+            HtlcLockOperation.prototype["in"] = $util.newBuffer([]);
+
+            /**
+             * HtlcLockOperation is.
+             * @member {B4aBuffer} is
+             * @memberof apply.operations.HtlcLockOperation
+             * @instance
+             */
+            HtlcLockOperation.prototype.is = $util.newBuffer([]);
+
+            /**
+             * HtlcLockOperation va.
+             * @member {B4aBuffer} va
+             * @memberof apply.operations.HtlcLockOperation
+             * @instance
+             */
+            HtlcLockOperation.prototype.va = $util.newBuffer([]);
+
+            /**
+             * HtlcLockOperation vn.
+             * @member {B4aBuffer} vn
+             * @memberof apply.operations.HtlcLockOperation
+             * @instance
+             */
+            HtlcLockOperation.prototype.vn = $util.newBuffer([]);
+
+            /**
+             * HtlcLockOperation vs.
+             * @member {B4aBuffer} vs
+             * @memberof apply.operations.HtlcLockOperation
+             * @instance
+             */
+            HtlcLockOperation.prototype.vs = $util.newBuffer([]);
+
+            // OneOf field names bound to virtual getters and setters
+            var $oneOfFields;
+
+            // Virtual OneOf for proto3 optional field
+            Object.defineProperty(HtlcLockOperation.prototype, "_fr", {
+                get: $util.oneOfGetter($oneOfFields = ["fr"]),
+                set: $util.oneOfSetter($oneOfFields)
+            });
+
+            // Virtual OneOf for proto3 optional field
+            Object.defineProperty(HtlcLockOperation.prototype, "_md", {
+                get: $util.oneOfGetter($oneOfFields = ["md"]),
+                set: $util.oneOfSetter($oneOfFields)
+            });
+
+            /**
+             * Creates a new HtlcLockOperation instance using the specified properties.
+             * @function create
+             * @memberof apply.operations.HtlcLockOperation
+             * @static
+             * @param {apply.operations.IHtlcLockOperation=} [properties] Properties to set
+             * @returns {apply.operations.HtlcLockOperation} HtlcLockOperation instance
+             */
+            HtlcLockOperation.create = function create(properties) {
+                return new HtlcLockOperation(properties);
+            };
+
+            /**
+             * Encodes the specified HtlcLockOperation message. Does not implicitly {@link apply.operations.HtlcLockOperation.verify|verify} messages.
+             * @function encode
+             * @memberof apply.operations.HtlcLockOperation
+             * @static
+             * @param {apply.operations.IHtlcLockOperation} message HtlcLockOperation message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            HtlcLockOperation.encode = function encode(message, writer, q) {
+                writer = $Writer.create(writer);
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
+                    writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.tx);
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
+                    writer.uint32(/* id 2, wireType 2 =*/18).bytes(message.txv);
+                if (message.ca != null && Object.hasOwnProperty.call(message, "ca"))
+                    writer.uint32(/* id 3, wireType 2 =*/26).bytes(message.ca);
+                if (message.ra != null && Object.hasOwnProperty.call(message, "ra"))
+                    writer.uint32(/* id 4, wireType 2 =*/34).bytes(message.ra);
+                if (message.am != null && Object.hasOwnProperty.call(message, "am"))
+                    writer.uint32(/* id 5, wireType 2 =*/42).bytes(message.am);
+                if (message.fa != null && Object.hasOwnProperty.call(message, "fa"))
+                    writer.uint32(/* id 6, wireType 2 =*/50).bytes(message.fa);
+                if (message.fr != null && Object.hasOwnProperty.call(message, "fr"))
+                    writer.uint32(/* id 7, wireType 2 =*/58).bytes(message.fr);
+                if (message.hl != null && Object.hasOwnProperty.call(message, "hl"))
+                    writer.uint32(/* id 8, wireType 2 =*/66).bytes(message.hl);
+                if (message.re != null && Object.hasOwnProperty.call(message, "re"))
+                    writer.uint32(/* id 9, wireType 2 =*/74).bytes(message.re);
+                if (message.md != null && Object.hasOwnProperty.call(message, "md"))
+                    writer.uint32(/* id 10, wireType 2 =*/82).bytes(message.md);
+                if (message.ss != null && message.ss.length)
+                    for (var i = 0; i < message.ss.length; ++i)
+                        writer.uint32(/* id 11, wireType 2 =*/90).bytes(message.ss[i]);
+                if (message.th != null && Object.hasOwnProperty.call(message, "th"))
+                    writer.uint32(/* id 12, wireType 2 =*/98).bytes(message.th);
+                if (message.cs != null && message.cs.length)
+                    for (var i = 0; i < message.cs.length; ++i)
+                        writer.uint32(/* id 13, wireType 2 =*/106).bytes(message.cs[i]);
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
+                    writer.uint32(/* id 14, wireType 2 =*/114).bytes(message["in"]);
+                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
+                    writer.uint32(/* id 15, wireType 2 =*/122).bytes(message.is);
+                if (message.va != null && Object.hasOwnProperty.call(message, "va"))
+                    writer.uint32(/* id 16, wireType 2 =*/130).bytes(message.va);
+                if (message.vn != null && Object.hasOwnProperty.call(message, "vn"))
+                    writer.uint32(/* id 17, wireType 2 =*/138).bytes(message.vn);
+                if (message.vs != null && Object.hasOwnProperty.call(message, "vs"))
+                    writer.uint32(/* id 18, wireType 2 =*/146).bytes(message.vs);
+                return writer;
+            };
+
+            /**
+             * Encodes the specified HtlcLockOperation message, length delimited. Does not implicitly {@link apply.operations.HtlcLockOperation.verify|verify} messages.
+             * @function encodeDelimited
+             * @memberof apply.operations.HtlcLockOperation
+             * @static
+             * @param {apply.operations.IHtlcLockOperation} message HtlcLockOperation message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            HtlcLockOperation.encodeDelimited = function encodeDelimited(message, writer) {
+                return this.encode(message, writer && writer.len ? writer.fork() : writer).ldelim();
+            };
+
+            /**
+             * Decodes a HtlcLockOperation message from the specified reader or buffer.
+             * @function decode
+             * @memberof apply.operations.HtlcLockOperation
+             * @static
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
+             * @param {number} [length] Message length if known beforehand
+             * @returns {apply.operations.HtlcLockOperation} HtlcLockOperation
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            HtlcLockOperation.decode = function decode(reader, length, error, long) {
+                reader = $Reader.create(reader);
+                if (long === undefined)
+                    long = 0;
+                if (long > $Reader.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
+                var end = length === undefined ? reader.len : reader.pos + length, message = new $root.apply.operations.HtlcLockOperation();
+                while (reader.pos < end) {
+                    var tag = reader.uint32();
+                    if (tag === error)
+                        break;
+                    switch (tag >>> 3) {
+                    case 1: {
+                            message.tx = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 2: {
+                            message.txv = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 3: {
+                            message.ca = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 4: {
+                            message.ra = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 5: {
+                            message.am = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 6: {
+                            message.fa = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 7: {
+                            message.fr = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 8: {
+                            message.hl = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 9: {
+                            message.re = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 10: {
+                            message.md = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 11: {
+                            if (!(message.ss && message.ss.length))
+                                message.ss = [];
+                            message.ss.push($util.bytesFrom(reader.bytes()));
+                            break;
+                        }
+                    case 12: {
+                            message.th = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 13: {
+                            if (!(message.cs && message.cs.length))
+                                message.cs = [];
+                            message.cs.push($util.bytesFrom(reader.bytes()));
+                            break;
+                        }
+                    case 14: {
+                            message["in"] = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 15: {
+                            message.is = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 16: {
+                            message.va = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 17: {
+                            message.vn = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 18: {
+                            message.vs = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    default:
+                        reader.skipType(tag & 7, long);
+                        break;
+                    }
+                }
+                return message;
+            };
+
+            /**
+             * Decodes a HtlcLockOperation message from the specified reader or buffer, length delimited.
+             * @function decodeDelimited
+             * @memberof apply.operations.HtlcLockOperation
+             * @static
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
+             * @returns {apply.operations.HtlcLockOperation} HtlcLockOperation
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            HtlcLockOperation.decodeDelimited = function decodeDelimited(reader) {
+                reader = $Reader.create(reader);
+                return this.decode(reader, reader.uint32());
+            };
+
+            /**
+             * Verifies a HtlcLockOperation message.
+             * @function verify
+             * @memberof apply.operations.HtlcLockOperation
+             * @static
+             * @param {Object.<string,*>} message Plain object to verify
+             * @returns {string|null} `null` if valid, otherwise the reason why it is not
+             */
+            HtlcLockOperation.verify = function verify(message, long) {
+                if (typeof message !== "object" || message === null)
+                    return "object expected";
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    return "maximum nesting depth exceeded";
+                var properties = {};
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
+                    if (!$util.isBytes(message.tx))
+                        return "tx: buffer expected";
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
+                    if (!$util.isBytes(message.txv))
+                        return "txv: buffer expected";
+                if (message.ca != null && Object.hasOwnProperty.call(message, "ca"))
+                    if (!$util.isBytes(message.ca))
+                        return "ca: buffer expected";
+                if (message.ra != null && Object.hasOwnProperty.call(message, "ra"))
+                    if (!$util.isBytes(message.ra))
+                        return "ra: buffer expected";
+                if (message.am != null && Object.hasOwnProperty.call(message, "am"))
+                    if (!$util.isBytes(message.am))
+                        return "am: buffer expected";
+                if (message.fa != null && Object.hasOwnProperty.call(message, "fa"))
+                    if (!$util.isBytes(message.fa))
+                        return "fa: buffer expected";
+                if (message.fr != null && Object.hasOwnProperty.call(message, "fr")) {
+                    properties._fr = 1;
+                    if (!$util.isBytes(message.fr))
+                        return "fr: buffer expected";
+                }
+                if (message.hl != null && Object.hasOwnProperty.call(message, "hl"))
+                    if (!$util.isBytes(message.hl))
+                        return "hl: buffer expected";
+                if (message.re != null && Object.hasOwnProperty.call(message, "re"))
+                    if (!$util.isBytes(message.re))
+                        return "re: buffer expected";
+                if (message.md != null && Object.hasOwnProperty.call(message, "md")) {
+                    properties._md = 1;
+                    if (!$util.isBytes(message.md))
+                        return "md: buffer expected";
+                }
+                if (message.ss != null && Object.hasOwnProperty.call(message, "ss")) {
+                    if (!Array.isArray(message.ss))
+                        return "ss: array expected";
+                    for (var i = 0; i < message.ss.length; ++i)
+                        if (!$util.isBytes(message.ss[i]))
+                            return "ss: buffer[] expected";
+                }
+                if (message.th != null && Object.hasOwnProperty.call(message, "th"))
+                    if (!$util.isBytes(message.th))
+                        return "th: buffer expected";
+                if (message.cs != null && Object.hasOwnProperty.call(message, "cs")) {
+                    if (!Array.isArray(message.cs))
+                        return "cs: array expected";
+                    for (var i = 0; i < message.cs.length; ++i)
+                        if (!$util.isBytes(message.cs[i]))
+                            return "cs: buffer[] expected";
+                }
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
+                    if (!$util.isBytes(message["in"]))
+                        return "in: buffer expected";
+                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
+                    if (!$util.isBytes(message.is))
+                        return "is: buffer expected";
+                if (message.va != null && Object.hasOwnProperty.call(message, "va"))
+                    if (!$util.isBytes(message.va))
+                        return "va: buffer expected";
+                if (message.vn != null && Object.hasOwnProperty.call(message, "vn"))
+                    if (!$util.isBytes(message.vn))
+                        return "vn: buffer expected";
+                if (message.vs != null && Object.hasOwnProperty.call(message, "vs"))
+                    if (!$util.isBytes(message.vs))
+                        return "vs: buffer expected";
+                return null;
+            };
+
+            /**
+             * Creates a HtlcLockOperation message from a plain object. Also converts values to their respective internal types.
+             * @function fromObject
+             * @memberof apply.operations.HtlcLockOperation
+             * @static
+             * @param {Object.<string,*>} object Plain object
+             * @returns {apply.operations.HtlcLockOperation} HtlcLockOperation
+             */
+            HtlcLockOperation.fromObject = function fromObject(object, long) {
+                if (object instanceof $root.apply.operations.HtlcLockOperation)
+                    object = Object.assign({}, object);
+                if (!$util.isObject(object))
+                    throw TypeError(".apply.operations.HtlcLockOperation: object expected");
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
+                var message = new $root.apply.operations.HtlcLockOperation();
+                if (object.tx != null)
+                    message.tx = $util.bytesFrom(object.tx);
+                if (object.txv != null)
+                    message.txv = $util.bytesFrom(object.txv);
+                if (object.ca != null)
+                    message.ca = $util.bytesFrom(object.ca);
+                if (object.ra != null)
+                    message.ra = $util.bytesFrom(object.ra);
+                if (object.am != null)
+                    message.am = $util.bytesFrom(object.am);
+                if (object.fa != null)
+                    message.fa = $util.bytesFrom(object.fa);
+                if (object.fr != null)
+                    message.fr = $util.bytesFrom(object.fr);
+                if (object.hl != null)
+                    message.hl = $util.bytesFrom(object.hl);
+                if (object.re != null)
+                    message.re = $util.bytesFrom(object.re);
+                if (object.md != null)
+                    message.md = $util.bytesFrom(object.md);
+                if (object.ss) {
+                    if (!Array.isArray(object.ss))
+                        throw TypeError(".apply.operations.HtlcLockOperation.ss: array expected");
+                    message.ss = [];
+                    for (var i = 0; i < object.ss.length; ++i)
+                        message.ss[i] = $util.bytesFrom(object.ss[i]);
+                }
+                if (object.th != null)
+                    message.th = $util.bytesFrom(object.th);
+                if (object.cs) {
+                    if (!Array.isArray(object.cs))
+                        throw TypeError(".apply.operations.HtlcLockOperation.cs: array expected");
+                    message.cs = [];
+                    for (var i = 0; i < object.cs.length; ++i)
+                        message.cs[i] = $util.bytesFrom(object.cs[i]);
+                }
+                if (object["in"] != null)
+                    message["in"] = $util.bytesFrom(object["in"]);
+                if (object.is != null)
+                    message.is = $util.bytesFrom(object.is);
+                if (object.va != null)
+                    message.va = $util.bytesFrom(object.va);
+                if (object.vn != null)
+                    message.vn = $util.bytesFrom(object.vn);
+                if (object.vs != null)
+                    message.vs = $util.bytesFrom(object.vs);
+                return message;
+            };
+
+            /**
+             * Creates a plain object from a HtlcLockOperation message. Also converts values to other types if specified.
+             * @function toObject
+             * @memberof apply.operations.HtlcLockOperation
+             * @static
+             * @param {apply.operations.HtlcLockOperation} message HtlcLockOperation
+             * @param {$protobuf.IConversionOptions} [options] Conversion options
+             * @returns {Object.<string,*>} Plain object
+             */
+            HtlcLockOperation.toObject = function toObject(message, options, q) {
+                if (!options)
+                    options = {};
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
+                var object = {};
+                if (options.arrays || options.defaults) {
+                    object.ss = [];
+                    object.cs = [];
+                }
+                if (options.defaults) {
+                    if (options.bytes === String)
+                        object.tx = "";
+                    else {
+                        object.tx = [];
+                        if (options.bytes !== Array)
+                            object.tx = $util.newBuffer(object.tx);
+                    }
+                    if (options.bytes === String)
+                        object.txv = "";
+                    else {
+                        object.txv = [];
+                        if (options.bytes !== Array)
+                            object.txv = $util.newBuffer(object.txv);
+                    }
+                    if (options.bytes === String)
+                        object.ca = "";
+                    else {
+                        object.ca = [];
+                        if (options.bytes !== Array)
+                            object.ca = $util.newBuffer(object.ca);
+                    }
+                    if (options.bytes === String)
+                        object.ra = "";
+                    else {
+                        object.ra = [];
+                        if (options.bytes !== Array)
+                            object.ra = $util.newBuffer(object.ra);
+                    }
+                    if (options.bytes === String)
+                        object.am = "";
+                    else {
+                        object.am = [];
+                        if (options.bytes !== Array)
+                            object.am = $util.newBuffer(object.am);
+                    }
+                    if (options.bytes === String)
+                        object.fa = "";
+                    else {
+                        object.fa = [];
+                        if (options.bytes !== Array)
+                            object.fa = $util.newBuffer(object.fa);
+                    }
+                    if (options.bytes === String)
+                        object.hl = "";
+                    else {
+                        object.hl = [];
+                        if (options.bytes !== Array)
+                            object.hl = $util.newBuffer(object.hl);
+                    }
+                    if (options.bytes === String)
+                        object.re = "";
+                    else {
+                        object.re = [];
+                        if (options.bytes !== Array)
+                            object.re = $util.newBuffer(object.re);
+                    }
+                    if (options.bytes === String)
+                        object.th = "";
+                    else {
+                        object.th = [];
+                        if (options.bytes !== Array)
+                            object.th = $util.newBuffer(object.th);
+                    }
+                    if (options.bytes === String)
+                        object["in"] = "";
+                    else {
+                        object["in"] = [];
+                        if (options.bytes !== Array)
+                            object["in"] = $util.newBuffer(object["in"]);
+                    }
+                    if (options.bytes === String)
+                        object.is = "";
+                    else {
+                        object.is = [];
+                        if (options.bytes !== Array)
+                            object.is = $util.newBuffer(object.is);
+                    }
+                    if (options.bytes === String)
+                        object.va = "";
+                    else {
+                        object.va = [];
+                        if (options.bytes !== Array)
+                            object.va = $util.newBuffer(object.va);
+                    }
+                    if (options.bytes === String)
+                        object.vn = "";
+                    else {
+                        object.vn = [];
+                        if (options.bytes !== Array)
+                            object.vn = $util.newBuffer(object.vn);
+                    }
+                    if (options.bytes === String)
+                        object.vs = "";
+                    else {
+                        object.vs = [];
+                        if (options.bytes !== Array)
+                            object.vs = $util.newBuffer(object.vs);
+                    }
+                }
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
+                    object.tx = $util.bytesTo(message.tx, options);
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
+                    object.txv = $util.bytesTo(message.txv, options);
+                if (message.ca != null && Object.hasOwnProperty.call(message, "ca"))
+                    object.ca = $util.bytesTo(message.ca, options);
+                if (message.ra != null && Object.hasOwnProperty.call(message, "ra"))
+                    object.ra = $util.bytesTo(message.ra, options);
+                if (message.am != null && Object.hasOwnProperty.call(message, "am"))
+                    object.am = $util.bytesTo(message.am, options);
+                if (message.fa != null && Object.hasOwnProperty.call(message, "fa"))
+                    object.fa = $util.bytesTo(message.fa, options);
+                if (message.fr != null && Object.hasOwnProperty.call(message, "fr")) {
+                    object.fr = $util.bytesTo(message.fr, options);
+                    if (options.oneofs)
+                        object._fr = "fr";
+                }
+                if (message.hl != null && Object.hasOwnProperty.call(message, "hl"))
+                    object.hl = $util.bytesTo(message.hl, options);
+                if (message.re != null && Object.hasOwnProperty.call(message, "re"))
+                    object.re = $util.bytesTo(message.re, options);
+                if (message.md != null && Object.hasOwnProperty.call(message, "md")) {
+                    object.md = $util.bytesTo(message.md, options);
+                    if (options.oneofs)
+                        object._md = "md";
+                }
+                if (message.ss && message.ss.length) {
+                    object.ss = [];
+                    for (var j = 0; j < message.ss.length; ++j)
+                        object.ss[j] = $util.bytesTo(message.ss[j], options);
+                }
+                if (message.th != null && Object.hasOwnProperty.call(message, "th"))
+                    object.th = $util.bytesTo(message.th, options);
+                if (message.cs && message.cs.length) {
+                    object.cs = [];
+                    for (var j = 0; j < message.cs.length; ++j)
+                        object.cs[j] = $util.bytesTo(message.cs[j], options);
+                }
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
+                    object["in"] = $util.bytesTo(message["in"], options);
+                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
+                    object.is = $util.bytesTo(message.is, options);
+                if (message.va != null && Object.hasOwnProperty.call(message, "va"))
+                    object.va = $util.bytesTo(message.va, options);
+                if (message.vn != null && Object.hasOwnProperty.call(message, "vn"))
+                    object.vn = $util.bytesTo(message.vn, options);
+                if (message.vs != null && Object.hasOwnProperty.call(message, "vs"))
+                    object.vs = $util.bytesTo(message.vs, options);
+                return object;
+            };
+
+            /**
+             * Converts this HtlcLockOperation to JSON.
+             * @function toJSON
+             * @memberof apply.operations.HtlcLockOperation
+             * @instance
+             * @returns {Object.<string,*>} JSON object
+             */
+            HtlcLockOperation.prototype.toJSON = function toJSON() {
+                return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
+            };
+
+            /**
+             * Gets the default type url for HtlcLockOperation
+             * @function getTypeUrl
+             * @memberof apply.operations.HtlcLockOperation
+             * @static
+             * @param {string} [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
+             * @returns {string} The default type url
+             */
+            HtlcLockOperation.getTypeUrl = function getTypeUrl(typeUrlPrefix) {
+                if (typeUrlPrefix === undefined) {
+                    typeUrlPrefix = "type.googleapis.com";
+                }
+                return typeUrlPrefix + "/apply.operations.HtlcLockOperation";
+            };
+
+            return HtlcLockOperation;
+        })();
+
+        operations.HtlcClaimOperation = (function() {
+
+            /**
+             * Properties of a HtlcClaimOperation.
+             * @memberof apply.operations
+             * @interface IHtlcClaimOperation
+             * @property {B4aBuffer|null} [tx] HtlcClaimOperation tx
+             * @property {B4aBuffer|null} [txv] HtlcClaimOperation txv
+             * @property {B4aBuffer|null} [li] HtlcClaimOperation li
+             * @property {B4aBuffer|null} [pi] HtlcClaimOperation pi
+             * @property {B4aBuffer|null} ["in"] HtlcClaimOperation in
+             * @property {B4aBuffer|null} [is] HtlcClaimOperation is
+             * @property {B4aBuffer|null} [va] HtlcClaimOperation va
+             * @property {B4aBuffer|null} [vn] HtlcClaimOperation vn
+             * @property {B4aBuffer|null} [vs] HtlcClaimOperation vs
+             */
+
+            /**
+             * Constructs a new HtlcClaimOperation.
+             * @memberof apply.operations
+             * @classdesc Represents a HtlcClaimOperation.
+             * @implements IHtlcClaimOperation
+             * @constructor
+             * @param {apply.operations.IHtlcClaimOperation=} [properties] Properties to set
+             */
+            function HtlcClaimOperation(properties) {
+                if (properties)
+                    for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
+                        if (properties[keys[i]] != null && keys[i] !== "__proto__")
+                            this[keys[i]] = properties[keys[i]];
+            }
+
+            /**
+             * HtlcClaimOperation tx.
+             * @member {B4aBuffer} tx
+             * @memberof apply.operations.HtlcClaimOperation
+             * @instance
+             */
+            HtlcClaimOperation.prototype.tx = $util.newBuffer([]);
+
+            /**
+             * HtlcClaimOperation txv.
+             * @member {B4aBuffer} txv
+             * @memberof apply.operations.HtlcClaimOperation
+             * @instance
+             */
+            HtlcClaimOperation.prototype.txv = $util.newBuffer([]);
+
+            /**
+             * HtlcClaimOperation li.
+             * @member {B4aBuffer} li
+             * @memberof apply.operations.HtlcClaimOperation
+             * @instance
+             */
+            HtlcClaimOperation.prototype.li = $util.newBuffer([]);
+
+            /**
+             * HtlcClaimOperation pi.
+             * @member {B4aBuffer} pi
+             * @memberof apply.operations.HtlcClaimOperation
+             * @instance
+             */
+            HtlcClaimOperation.prototype.pi = $util.newBuffer([]);
+
+            /**
+             * HtlcClaimOperation in.
+             * @member {B4aBuffer} in
+             * @memberof apply.operations.HtlcClaimOperation
+             * @instance
+             */
+            HtlcClaimOperation.prototype["in"] = $util.newBuffer([]);
+
+            /**
+             * HtlcClaimOperation is.
+             * @member {B4aBuffer} is
+             * @memberof apply.operations.HtlcClaimOperation
+             * @instance
+             */
+            HtlcClaimOperation.prototype.is = $util.newBuffer([]);
+
+            /**
+             * HtlcClaimOperation va.
+             * @member {B4aBuffer} va
+             * @memberof apply.operations.HtlcClaimOperation
+             * @instance
+             */
+            HtlcClaimOperation.prototype.va = $util.newBuffer([]);
+
+            /**
+             * HtlcClaimOperation vn.
+             * @member {B4aBuffer} vn
+             * @memberof apply.operations.HtlcClaimOperation
+             * @instance
+             */
+            HtlcClaimOperation.prototype.vn = $util.newBuffer([]);
+
+            /**
+             * HtlcClaimOperation vs.
+             * @member {B4aBuffer} vs
+             * @memberof apply.operations.HtlcClaimOperation
+             * @instance
+             */
+            HtlcClaimOperation.prototype.vs = $util.newBuffer([]);
+
+            /**
+             * Creates a new HtlcClaimOperation instance using the specified properties.
+             * @function create
+             * @memberof apply.operations.HtlcClaimOperation
+             * @static
+             * @param {apply.operations.IHtlcClaimOperation=} [properties] Properties to set
+             * @returns {apply.operations.HtlcClaimOperation} HtlcClaimOperation instance
+             */
+            HtlcClaimOperation.create = function create(properties) {
+                return new HtlcClaimOperation(properties);
+            };
+
+            /**
+             * Encodes the specified HtlcClaimOperation message. Does not implicitly {@link apply.operations.HtlcClaimOperation.verify|verify} messages.
+             * @function encode
+             * @memberof apply.operations.HtlcClaimOperation
+             * @static
+             * @param {apply.operations.IHtlcClaimOperation} message HtlcClaimOperation message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            HtlcClaimOperation.encode = function encode(message, writer, q) {
+                writer = $Writer.create(writer);
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
+                    writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.tx);
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
+                    writer.uint32(/* id 2, wireType 2 =*/18).bytes(message.txv);
+                if (message.li != null && Object.hasOwnProperty.call(message, "li"))
+                    writer.uint32(/* id 3, wireType 2 =*/26).bytes(message.li);
+                if (message.pi != null && Object.hasOwnProperty.call(message, "pi"))
+                    writer.uint32(/* id 4, wireType 2 =*/34).bytes(message.pi);
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
+                    writer.uint32(/* id 5, wireType 2 =*/42).bytes(message["in"]);
+                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
+                    writer.uint32(/* id 6, wireType 2 =*/50).bytes(message.is);
+                if (message.va != null && Object.hasOwnProperty.call(message, "va"))
+                    writer.uint32(/* id 7, wireType 2 =*/58).bytes(message.va);
+                if (message.vn != null && Object.hasOwnProperty.call(message, "vn"))
+                    writer.uint32(/* id 8, wireType 2 =*/66).bytes(message.vn);
+                if (message.vs != null && Object.hasOwnProperty.call(message, "vs"))
+                    writer.uint32(/* id 9, wireType 2 =*/74).bytes(message.vs);
+                return writer;
+            };
+
+            /**
+             * Encodes the specified HtlcClaimOperation message, length delimited. Does not implicitly {@link apply.operations.HtlcClaimOperation.verify|verify} messages.
+             * @function encodeDelimited
+             * @memberof apply.operations.HtlcClaimOperation
+             * @static
+             * @param {apply.operations.IHtlcClaimOperation} message HtlcClaimOperation message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            HtlcClaimOperation.encodeDelimited = function encodeDelimited(message, writer) {
+                return this.encode(message, writer && writer.len ? writer.fork() : writer).ldelim();
+            };
+
+            /**
+             * Decodes a HtlcClaimOperation message from the specified reader or buffer.
+             * @function decode
+             * @memberof apply.operations.HtlcClaimOperation
+             * @static
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
+             * @param {number} [length] Message length if known beforehand
+             * @returns {apply.operations.HtlcClaimOperation} HtlcClaimOperation
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            HtlcClaimOperation.decode = function decode(reader, length, error, long) {
+                reader = $Reader.create(reader);
+                if (long === undefined)
+                    long = 0;
+                if (long > $Reader.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
+                var end = length === undefined ? reader.len : reader.pos + length, message = new $root.apply.operations.HtlcClaimOperation();
+                while (reader.pos < end) {
+                    var tag = reader.uint32();
+                    if (tag === error)
+                        break;
+                    switch (tag >>> 3) {
+                    case 1: {
+                            message.tx = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 2: {
+                            message.txv = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 3: {
+                            message.li = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 4: {
+                            message.pi = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 5: {
+                            message["in"] = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 6: {
+                            message.is = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 7: {
+                            message.va = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 8: {
+                            message.vn = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 9: {
+                            message.vs = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    default:
+                        reader.skipType(tag & 7, long);
+                        break;
+                    }
+                }
+                return message;
+            };
+
+            /**
+             * Decodes a HtlcClaimOperation message from the specified reader or buffer, length delimited.
+             * @function decodeDelimited
+             * @memberof apply.operations.HtlcClaimOperation
+             * @static
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
+             * @returns {apply.operations.HtlcClaimOperation} HtlcClaimOperation
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            HtlcClaimOperation.decodeDelimited = function decodeDelimited(reader) {
+                reader = $Reader.create(reader);
+                return this.decode(reader, reader.uint32());
+            };
+
+            /**
+             * Verifies a HtlcClaimOperation message.
+             * @function verify
+             * @memberof apply.operations.HtlcClaimOperation
+             * @static
+             * @param {Object.<string,*>} message Plain object to verify
+             * @returns {string|null} `null` if valid, otherwise the reason why it is not
+             */
+            HtlcClaimOperation.verify = function verify(message, long) {
+                if (typeof message !== "object" || message === null)
+                    return "object expected";
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    return "maximum nesting depth exceeded";
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
+                    if (!$util.isBytes(message.tx))
+                        return "tx: buffer expected";
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
+                    if (!$util.isBytes(message.txv))
+                        return "txv: buffer expected";
+                if (message.li != null && Object.hasOwnProperty.call(message, "li"))
+                    if (!$util.isBytes(message.li))
+                        return "li: buffer expected";
+                if (message.pi != null && Object.hasOwnProperty.call(message, "pi"))
+                    if (!$util.isBytes(message.pi))
+                        return "pi: buffer expected";
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
+                    if (!$util.isBytes(message["in"]))
+                        return "in: buffer expected";
+                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
+                    if (!$util.isBytes(message.is))
+                        return "is: buffer expected";
+                if (message.va != null && Object.hasOwnProperty.call(message, "va"))
+                    if (!$util.isBytes(message.va))
+                        return "va: buffer expected";
+                if (message.vn != null && Object.hasOwnProperty.call(message, "vn"))
+                    if (!$util.isBytes(message.vn))
+                        return "vn: buffer expected";
+                if (message.vs != null && Object.hasOwnProperty.call(message, "vs"))
+                    if (!$util.isBytes(message.vs))
+                        return "vs: buffer expected";
+                return null;
+            };
+
+            /**
+             * Creates a HtlcClaimOperation message from a plain object. Also converts values to their respective internal types.
+             * @function fromObject
+             * @memberof apply.operations.HtlcClaimOperation
+             * @static
+             * @param {Object.<string,*>} object Plain object
+             * @returns {apply.operations.HtlcClaimOperation} HtlcClaimOperation
+             */
+            HtlcClaimOperation.fromObject = function fromObject(object, long) {
+                if (object instanceof $root.apply.operations.HtlcClaimOperation)
+                    object = Object.assign({}, object);
+                if (!$util.isObject(object))
+                    throw TypeError(".apply.operations.HtlcClaimOperation: object expected");
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
+                var message = new $root.apply.operations.HtlcClaimOperation();
+                if (object.tx != null)
+                    message.tx = $util.bytesFrom(object.tx);
+                if (object.txv != null)
+                    message.txv = $util.bytesFrom(object.txv);
+                if (object.li != null)
+                    message.li = $util.bytesFrom(object.li);
+                if (object.pi != null)
+                    message.pi = $util.bytesFrom(object.pi);
+                if (object["in"] != null)
+                    message["in"] = $util.bytesFrom(object["in"]);
+                if (object.is != null)
+                    message.is = $util.bytesFrom(object.is);
+                if (object.va != null)
+                    message.va = $util.bytesFrom(object.va);
+                if (object.vn != null)
+                    message.vn = $util.bytesFrom(object.vn);
+                if (object.vs != null)
+                    message.vs = $util.bytesFrom(object.vs);
+                return message;
+            };
+
+            /**
+             * Creates a plain object from a HtlcClaimOperation message. Also converts values to other types if specified.
+             * @function toObject
+             * @memberof apply.operations.HtlcClaimOperation
+             * @static
+             * @param {apply.operations.HtlcClaimOperation} message HtlcClaimOperation
+             * @param {$protobuf.IConversionOptions} [options] Conversion options
+             * @returns {Object.<string,*>} Plain object
+             */
+            HtlcClaimOperation.toObject = function toObject(message, options, q) {
+                if (!options)
+                    options = {};
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
+                var object = {};
+                if (options.defaults) {
+                    if (options.bytes === String)
+                        object.tx = "";
+                    else {
+                        object.tx = [];
+                        if (options.bytes !== Array)
+                            object.tx = $util.newBuffer(object.tx);
+                    }
+                    if (options.bytes === String)
+                        object.txv = "";
+                    else {
+                        object.txv = [];
+                        if (options.bytes !== Array)
+                            object.txv = $util.newBuffer(object.txv);
+                    }
+                    if (options.bytes === String)
+                        object.li = "";
+                    else {
+                        object.li = [];
+                        if (options.bytes !== Array)
+                            object.li = $util.newBuffer(object.li);
+                    }
+                    if (options.bytes === String)
+                        object.pi = "";
+                    else {
+                        object.pi = [];
+                        if (options.bytes !== Array)
+                            object.pi = $util.newBuffer(object.pi);
+                    }
+                    if (options.bytes === String)
+                        object["in"] = "";
+                    else {
+                        object["in"] = [];
+                        if (options.bytes !== Array)
+                            object["in"] = $util.newBuffer(object["in"]);
+                    }
+                    if (options.bytes === String)
+                        object.is = "";
+                    else {
+                        object.is = [];
+                        if (options.bytes !== Array)
+                            object.is = $util.newBuffer(object.is);
+                    }
+                    if (options.bytes === String)
+                        object.va = "";
+                    else {
+                        object.va = [];
+                        if (options.bytes !== Array)
+                            object.va = $util.newBuffer(object.va);
+                    }
+                    if (options.bytes === String)
+                        object.vn = "";
+                    else {
+                        object.vn = [];
+                        if (options.bytes !== Array)
+                            object.vn = $util.newBuffer(object.vn);
+                    }
+                    if (options.bytes === String)
+                        object.vs = "";
+                    else {
+                        object.vs = [];
+                        if (options.bytes !== Array)
+                            object.vs = $util.newBuffer(object.vs);
+                    }
+                }
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
+                    object.tx = $util.bytesTo(message.tx, options);
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
+                    object.txv = $util.bytesTo(message.txv, options);
+                if (message.li != null && Object.hasOwnProperty.call(message, "li"))
+                    object.li = $util.bytesTo(message.li, options);
+                if (message.pi != null && Object.hasOwnProperty.call(message, "pi"))
+                    object.pi = $util.bytesTo(message.pi, options);
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
+                    object["in"] = $util.bytesTo(message["in"], options);
+                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
+                    object.is = $util.bytesTo(message.is, options);
+                if (message.va != null && Object.hasOwnProperty.call(message, "va"))
+                    object.va = $util.bytesTo(message.va, options);
+                if (message.vn != null && Object.hasOwnProperty.call(message, "vn"))
+                    object.vn = $util.bytesTo(message.vn, options);
+                if (message.vs != null && Object.hasOwnProperty.call(message, "vs"))
+                    object.vs = $util.bytesTo(message.vs, options);
+                return object;
+            };
+
+            /**
+             * Converts this HtlcClaimOperation to JSON.
+             * @function toJSON
+             * @memberof apply.operations.HtlcClaimOperation
+             * @instance
+             * @returns {Object.<string,*>} JSON object
+             */
+            HtlcClaimOperation.prototype.toJSON = function toJSON() {
+                return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
+            };
+
+            /**
+             * Gets the default type url for HtlcClaimOperation
+             * @function getTypeUrl
+             * @memberof apply.operations.HtlcClaimOperation
+             * @static
+             * @param {string} [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
+             * @returns {string} The default type url
+             */
+            HtlcClaimOperation.getTypeUrl = function getTypeUrl(typeUrlPrefix) {
+                if (typeUrlPrefix === undefined) {
+                    typeUrlPrefix = "type.googleapis.com";
+                }
+                return typeUrlPrefix + "/apply.operations.HtlcClaimOperation";
+            };
+
+            return HtlcClaimOperation;
+        })();
+
+        operations.HtlcRefundOperation = (function() {
+
+            /**
+             * Properties of a HtlcRefundOperation.
+             * @memberof apply.operations
+             * @interface IHtlcRefundOperation
+             * @property {B4aBuffer|null} [tx] HtlcRefundOperation tx
+             * @property {B4aBuffer|null} [txv] HtlcRefundOperation txv
+             * @property {B4aBuffer|null} [li] HtlcRefundOperation li
+             * @property {B4aBuffer|null} ["in"] HtlcRefundOperation in
+             * @property {B4aBuffer|null} [is] HtlcRefundOperation is
+             * @property {B4aBuffer|null} [va] HtlcRefundOperation va
+             * @property {B4aBuffer|null} [vn] HtlcRefundOperation vn
+             * @property {B4aBuffer|null} [vs] HtlcRefundOperation vs
+             */
+
+            /**
+             * Constructs a new HtlcRefundOperation.
+             * @memberof apply.operations
+             * @classdesc Represents a HtlcRefundOperation.
+             * @implements IHtlcRefundOperation
+             * @constructor
+             * @param {apply.operations.IHtlcRefundOperation=} [properties] Properties to set
+             */
+            function HtlcRefundOperation(properties) {
+                if (properties)
+                    for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
+                        if (properties[keys[i]] != null && keys[i] !== "__proto__")
+                            this[keys[i]] = properties[keys[i]];
+            }
+
+            /**
+             * HtlcRefundOperation tx.
+             * @member {B4aBuffer} tx
+             * @memberof apply.operations.HtlcRefundOperation
+             * @instance
+             */
+            HtlcRefundOperation.prototype.tx = $util.newBuffer([]);
+
+            /**
+             * HtlcRefundOperation txv.
+             * @member {B4aBuffer} txv
+             * @memberof apply.operations.HtlcRefundOperation
+             * @instance
+             */
+            HtlcRefundOperation.prototype.txv = $util.newBuffer([]);
+
+            /**
+             * HtlcRefundOperation li.
+             * @member {B4aBuffer} li
+             * @memberof apply.operations.HtlcRefundOperation
+             * @instance
+             */
+            HtlcRefundOperation.prototype.li = $util.newBuffer([]);
+
+            /**
+             * HtlcRefundOperation in.
+             * @member {B4aBuffer} in
+             * @memberof apply.operations.HtlcRefundOperation
+             * @instance
+             */
+            HtlcRefundOperation.prototype["in"] = $util.newBuffer([]);
+
+            /**
+             * HtlcRefundOperation is.
+             * @member {B4aBuffer} is
+             * @memberof apply.operations.HtlcRefundOperation
+             * @instance
+             */
+            HtlcRefundOperation.prototype.is = $util.newBuffer([]);
+
+            /**
+             * HtlcRefundOperation va.
+             * @member {B4aBuffer} va
+             * @memberof apply.operations.HtlcRefundOperation
+             * @instance
+             */
+            HtlcRefundOperation.prototype.va = $util.newBuffer([]);
+
+            /**
+             * HtlcRefundOperation vn.
+             * @member {B4aBuffer} vn
+             * @memberof apply.operations.HtlcRefundOperation
+             * @instance
+             */
+            HtlcRefundOperation.prototype.vn = $util.newBuffer([]);
+
+            /**
+             * HtlcRefundOperation vs.
+             * @member {B4aBuffer} vs
+             * @memberof apply.operations.HtlcRefundOperation
+             * @instance
+             */
+            HtlcRefundOperation.prototype.vs = $util.newBuffer([]);
+
+            /**
+             * Creates a new HtlcRefundOperation instance using the specified properties.
+             * @function create
+             * @memberof apply.operations.HtlcRefundOperation
+             * @static
+             * @param {apply.operations.IHtlcRefundOperation=} [properties] Properties to set
+             * @returns {apply.operations.HtlcRefundOperation} HtlcRefundOperation instance
+             */
+            HtlcRefundOperation.create = function create(properties) {
+                return new HtlcRefundOperation(properties);
+            };
+
+            /**
+             * Encodes the specified HtlcRefundOperation message. Does not implicitly {@link apply.operations.HtlcRefundOperation.verify|verify} messages.
+             * @function encode
+             * @memberof apply.operations.HtlcRefundOperation
+             * @static
+             * @param {apply.operations.IHtlcRefundOperation} message HtlcRefundOperation message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            HtlcRefundOperation.encode = function encode(message, writer, q) {
+                writer = $Writer.create(writer);
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
+                    writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.tx);
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
+                    writer.uint32(/* id 2, wireType 2 =*/18).bytes(message.txv);
+                if (message.li != null && Object.hasOwnProperty.call(message, "li"))
+                    writer.uint32(/* id 3, wireType 2 =*/26).bytes(message.li);
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
+                    writer.uint32(/* id 4, wireType 2 =*/34).bytes(message["in"]);
+                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
+                    writer.uint32(/* id 5, wireType 2 =*/42).bytes(message.is);
+                if (message.va != null && Object.hasOwnProperty.call(message, "va"))
+                    writer.uint32(/* id 6, wireType 2 =*/50).bytes(message.va);
+                if (message.vn != null && Object.hasOwnProperty.call(message, "vn"))
+                    writer.uint32(/* id 7, wireType 2 =*/58).bytes(message.vn);
+                if (message.vs != null && Object.hasOwnProperty.call(message, "vs"))
+                    writer.uint32(/* id 8, wireType 2 =*/66).bytes(message.vs);
+                return writer;
+            };
+
+            /**
+             * Encodes the specified HtlcRefundOperation message, length delimited. Does not implicitly {@link apply.operations.HtlcRefundOperation.verify|verify} messages.
+             * @function encodeDelimited
+             * @memberof apply.operations.HtlcRefundOperation
+             * @static
+             * @param {apply.operations.IHtlcRefundOperation} message HtlcRefundOperation message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            HtlcRefundOperation.encodeDelimited = function encodeDelimited(message, writer) {
+                return this.encode(message, writer && writer.len ? writer.fork() : writer).ldelim();
+            };
+
+            /**
+             * Decodes a HtlcRefundOperation message from the specified reader or buffer.
+             * @function decode
+             * @memberof apply.operations.HtlcRefundOperation
+             * @static
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
+             * @param {number} [length] Message length if known beforehand
+             * @returns {apply.operations.HtlcRefundOperation} HtlcRefundOperation
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            HtlcRefundOperation.decode = function decode(reader, length, error, long) {
+                reader = $Reader.create(reader);
+                if (long === undefined)
+                    long = 0;
+                if (long > $Reader.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
+                var end = length === undefined ? reader.len : reader.pos + length, message = new $root.apply.operations.HtlcRefundOperation();
+                while (reader.pos < end) {
+                    var tag = reader.uint32();
+                    if (tag === error)
+                        break;
+                    switch (tag >>> 3) {
+                    case 1: {
+                            message.tx = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 2: {
+                            message.txv = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 3: {
+                            message.li = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 4: {
+                            message["in"] = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 5: {
+                            message.is = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 6: {
+                            message.va = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 7: {
+                            message.vn = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 8: {
+                            message.vs = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    default:
+                        reader.skipType(tag & 7, long);
+                        break;
+                    }
+                }
+                return message;
+            };
+
+            /**
+             * Decodes a HtlcRefundOperation message from the specified reader or buffer, length delimited.
+             * @function decodeDelimited
+             * @memberof apply.operations.HtlcRefundOperation
+             * @static
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
+             * @returns {apply.operations.HtlcRefundOperation} HtlcRefundOperation
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            HtlcRefundOperation.decodeDelimited = function decodeDelimited(reader) {
+                reader = $Reader.create(reader);
+                return this.decode(reader, reader.uint32());
+            };
+
+            /**
+             * Verifies a HtlcRefundOperation message.
+             * @function verify
+             * @memberof apply.operations.HtlcRefundOperation
+             * @static
+             * @param {Object.<string,*>} message Plain object to verify
+             * @returns {string|null} `null` if valid, otherwise the reason why it is not
+             */
+            HtlcRefundOperation.verify = function verify(message, long) {
+                if (typeof message !== "object" || message === null)
+                    return "object expected";
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    return "maximum nesting depth exceeded";
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
+                    if (!$util.isBytes(message.tx))
+                        return "tx: buffer expected";
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
+                    if (!$util.isBytes(message.txv))
+                        return "txv: buffer expected";
+                if (message.li != null && Object.hasOwnProperty.call(message, "li"))
+                    if (!$util.isBytes(message.li))
+                        return "li: buffer expected";
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
+                    if (!$util.isBytes(message["in"]))
+                        return "in: buffer expected";
+                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
+                    if (!$util.isBytes(message.is))
+                        return "is: buffer expected";
+                if (message.va != null && Object.hasOwnProperty.call(message, "va"))
+                    if (!$util.isBytes(message.va))
+                        return "va: buffer expected";
+                if (message.vn != null && Object.hasOwnProperty.call(message, "vn"))
+                    if (!$util.isBytes(message.vn))
+                        return "vn: buffer expected";
+                if (message.vs != null && Object.hasOwnProperty.call(message, "vs"))
+                    if (!$util.isBytes(message.vs))
+                        return "vs: buffer expected";
+                return null;
+            };
+
+            /**
+             * Creates a HtlcRefundOperation message from a plain object. Also converts values to their respective internal types.
+             * @function fromObject
+             * @memberof apply.operations.HtlcRefundOperation
+             * @static
+             * @param {Object.<string,*>} object Plain object
+             * @returns {apply.operations.HtlcRefundOperation} HtlcRefundOperation
+             */
+            HtlcRefundOperation.fromObject = function fromObject(object, long) {
+                if (object instanceof $root.apply.operations.HtlcRefundOperation)
+                    object = Object.assign({}, object);
+                if (!$util.isObject(object))
+                    throw TypeError(".apply.operations.HtlcRefundOperation: object expected");
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
+                var message = new $root.apply.operations.HtlcRefundOperation();
+                if (object.tx != null)
+                    message.tx = $util.bytesFrom(object.tx);
+                if (object.txv != null)
+                    message.txv = $util.bytesFrom(object.txv);
+                if (object.li != null)
+                    message.li = $util.bytesFrom(object.li);
+                if (object["in"] != null)
+                    message["in"] = $util.bytesFrom(object["in"]);
+                if (object.is != null)
+                    message.is = $util.bytesFrom(object.is);
+                if (object.va != null)
+                    message.va = $util.bytesFrom(object.va);
+                if (object.vn != null)
+                    message.vn = $util.bytesFrom(object.vn);
+                if (object.vs != null)
+                    message.vs = $util.bytesFrom(object.vs);
+                return message;
+            };
+
+            /**
+             * Creates a plain object from a HtlcRefundOperation message. Also converts values to other types if specified.
+             * @function toObject
+             * @memberof apply.operations.HtlcRefundOperation
+             * @static
+             * @param {apply.operations.HtlcRefundOperation} message HtlcRefundOperation
+             * @param {$protobuf.IConversionOptions} [options] Conversion options
+             * @returns {Object.<string,*>} Plain object
+             */
+            HtlcRefundOperation.toObject = function toObject(message, options, q) {
+                if (!options)
+                    options = {};
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
+                var object = {};
+                if (options.defaults) {
+                    if (options.bytes === String)
+                        object.tx = "";
+                    else {
+                        object.tx = [];
+                        if (options.bytes !== Array)
+                            object.tx = $util.newBuffer(object.tx);
+                    }
+                    if (options.bytes === String)
+                        object.txv = "";
+                    else {
+                        object.txv = [];
+                        if (options.bytes !== Array)
+                            object.txv = $util.newBuffer(object.txv);
+                    }
+                    if (options.bytes === String)
+                        object.li = "";
+                    else {
+                        object.li = [];
+                        if (options.bytes !== Array)
+                            object.li = $util.newBuffer(object.li);
+                    }
+                    if (options.bytes === String)
+                        object["in"] = "";
+                    else {
+                        object["in"] = [];
+                        if (options.bytes !== Array)
+                            object["in"] = $util.newBuffer(object["in"]);
+                    }
+                    if (options.bytes === String)
+                        object.is = "";
+                    else {
+                        object.is = [];
+                        if (options.bytes !== Array)
+                            object.is = $util.newBuffer(object.is);
+                    }
+                    if (options.bytes === String)
+                        object.va = "";
+                    else {
+                        object.va = [];
+                        if (options.bytes !== Array)
+                            object.va = $util.newBuffer(object.va);
+                    }
+                    if (options.bytes === String)
+                        object.vn = "";
+                    else {
+                        object.vn = [];
+                        if (options.bytes !== Array)
+                            object.vn = $util.newBuffer(object.vn);
+                    }
+                    if (options.bytes === String)
+                        object.vs = "";
+                    else {
+                        object.vs = [];
+                        if (options.bytes !== Array)
+                            object.vs = $util.newBuffer(object.vs);
+                    }
+                }
+                if (message.tx != null && Object.hasOwnProperty.call(message, "tx"))
+                    object.tx = $util.bytesTo(message.tx, options);
+                if (message.txv != null && Object.hasOwnProperty.call(message, "txv"))
+                    object.txv = $util.bytesTo(message.txv, options);
+                if (message.li != null && Object.hasOwnProperty.call(message, "li"))
+                    object.li = $util.bytesTo(message.li, options);
+                if (message["in"] != null && Object.hasOwnProperty.call(message, "in"))
+                    object["in"] = $util.bytesTo(message["in"], options);
+                if (message.is != null && Object.hasOwnProperty.call(message, "is"))
+                    object.is = $util.bytesTo(message.is, options);
+                if (message.va != null && Object.hasOwnProperty.call(message, "va"))
+                    object.va = $util.bytesTo(message.va, options);
+                if (message.vn != null && Object.hasOwnProperty.call(message, "vn"))
+                    object.vn = $util.bytesTo(message.vn, options);
+                if (message.vs != null && Object.hasOwnProperty.call(message, "vs"))
+                    object.vs = $util.bytesTo(message.vs, options);
+                return object;
+            };
+
+            /**
+             * Converts this HtlcRefundOperation to JSON.
+             * @function toJSON
+             * @memberof apply.operations.HtlcRefundOperation
+             * @instance
+             * @returns {Object.<string,*>} JSON object
+             */
+            HtlcRefundOperation.prototype.toJSON = function toJSON() {
+                return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
+            };
+
+            /**
+             * Gets the default type url for HtlcRefundOperation
+             * @function getTypeUrl
+             * @memberof apply.operations.HtlcRefundOperation
+             * @static
+             * @param {string} [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
+             * @returns {string} The default type url
+             */
+            HtlcRefundOperation.getTypeUrl = function getTypeUrl(typeUrlPrefix) {
+                if (typeUrlPrefix === undefined) {
+                    typeUrlPrefix = "type.googleapis.com";
+                }
+                return typeUrlPrefix + "/apply.operations.HtlcRefundOperation";
+            };
+
+            return HtlcRefundOperation;
+        })();
+
+        return operations;
+    })();
+
+    return apply;
+})();
+
+$root.common = (function() {
+
+    /**
+     * Namespace common.
+     * @exports common
+     * @namespace
+     */
+    var common = {};
+
+    common.consensus = (function() {
+
+        /**
+         * Namespace consensus.
+         * @memberof common
+         * @namespace
+         */
+        var consensus = {};
+
+        consensus.ConsensusConfig = (function() {
+
+            /**
+             * Properties of a ConsensusConfig.
+             * @memberof common.consensus
+             * @interface IConsensusConfig
+             * @property {B4aBuffer|null} [sv] ConsensusConfig sv
+             * @property {B4aBuffer|null} [cd] ConsensusConfig cd
+             */
+
+            /**
+             * Constructs a new ConsensusConfig.
+             * @memberof common.consensus
+             * @classdesc Represents a ConsensusConfig.
+             * @implements IConsensusConfig
+             * @constructor
+             * @param {common.consensus.IConsensusConfig=} [properties] Properties to set
+             */
+            function ConsensusConfig(properties) {
+                if (properties)
+                    for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
+                        if (properties[keys[i]] != null && keys[i] !== "__proto__")
+                            this[keys[i]] = properties[keys[i]];
+            }
+
+            /**
+             * ConsensusConfig sv.
+             * @member {B4aBuffer} sv
+             * @memberof common.consensus.ConsensusConfig
+             * @instance
+             */
+            ConsensusConfig.prototype.sv = $util.newBuffer([]);
+
+            /**
+             * ConsensusConfig cd.
+             * @member {B4aBuffer} cd
+             * @memberof common.consensus.ConsensusConfig
+             * @instance
+             */
+            ConsensusConfig.prototype.cd = $util.newBuffer([]);
+
+            /**
+             * Creates a new ConsensusConfig instance using the specified properties.
+             * @function create
+             * @memberof common.consensus.ConsensusConfig
+             * @static
+             * @param {common.consensus.IConsensusConfig=} [properties] Properties to set
+             * @returns {common.consensus.ConsensusConfig} ConsensusConfig instance
+             */
+            ConsensusConfig.create = function create(properties) {
+                return new ConsensusConfig(properties);
+            };
+
+            /**
+             * Encodes the specified ConsensusConfig message. Does not implicitly {@link common.consensus.ConsensusConfig.verify|verify} messages.
+             * @function encode
+             * @memberof common.consensus.ConsensusConfig
+             * @static
+             * @param {common.consensus.IConsensusConfig} message ConsensusConfig message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            ConsensusConfig.encode = function encode(message, writer, q) {
+                writer = $Writer.create(writer);
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
+                if (message.sv != null && Object.hasOwnProperty.call(message, "sv"))
+                    writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.sv);
+                if (message.cd != null && Object.hasOwnProperty.call(message, "cd"))
+                    writer.uint32(/* id 2, wireType 2 =*/18).bytes(message.cd);
+                return writer;
+            };
+
+            /**
+             * Encodes the specified ConsensusConfig message, length delimited. Does not implicitly {@link common.consensus.ConsensusConfig.verify|verify} messages.
+             * @function encodeDelimited
+             * @memberof common.consensus.ConsensusConfig
+             * @static
+             * @param {common.consensus.IConsensusConfig} message ConsensusConfig message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            ConsensusConfig.encodeDelimited = function encodeDelimited(message, writer) {
+                return this.encode(message, writer && writer.len ? writer.fork() : writer).ldelim();
+            };
+
+            /**
+             * Decodes a ConsensusConfig message from the specified reader or buffer.
+             * @function decode
+             * @memberof common.consensus.ConsensusConfig
+             * @static
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
+             * @param {number} [length] Message length if known beforehand
+             * @returns {common.consensus.ConsensusConfig} ConsensusConfig
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            ConsensusConfig.decode = function decode(reader, length, error, long) {
+                reader = $Reader.create(reader);
+                if (long === undefined)
+                    long = 0;
+                if (long > $Reader.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
+                var end = length === undefined ? reader.len : reader.pos + length, message = new $root.common.consensus.ConsensusConfig();
+                while (reader.pos < end) {
+                    var tag = reader.uint32();
+                    if (tag === error)
+                        break;
+                    switch (tag >>> 3) {
+                    case 1: {
+                            message.sv = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    case 2: {
+                            message.cd = $util.bytesFrom(reader.bytes());
+                            break;
+                        }
+                    default:
+                        reader.skipType(tag & 7, long);
+                        break;
+                    }
+                }
+                return message;
+            };
+
+            /**
+             * Decodes a ConsensusConfig message from the specified reader or buffer, length delimited.
+             * @function decodeDelimited
+             * @memberof common.consensus.ConsensusConfig
+             * @static
+             * @param {$protobuf.Reader|B4aBuffer} reader Reader or buffer to decode from
+             * @returns {common.consensus.ConsensusConfig} ConsensusConfig
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            ConsensusConfig.decodeDelimited = function decodeDelimited(reader) {
+                reader = $Reader.create(reader);
+                return this.decode(reader, reader.uint32());
+            };
+
+            /**
+             * Verifies a ConsensusConfig message.
+             * @function verify
+             * @memberof common.consensus.ConsensusConfig
+             * @static
+             * @param {Object.<string,*>} message Plain object to verify
+             * @returns {string|null} `null` if valid, otherwise the reason why it is not
+             */
+            ConsensusConfig.verify = function verify(message, long) {
+                if (typeof message !== "object" || message === null)
+                    return "object expected";
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    return "maximum nesting depth exceeded";
+                if (message.sv != null && Object.hasOwnProperty.call(message, "sv"))
+                    if (!$util.isBytes(message.sv))
+                        return "sv: buffer expected";
+                if (message.cd != null && Object.hasOwnProperty.call(message, "cd"))
+                    if (!$util.isBytes(message.cd))
+                        return "cd: buffer expected";
+                return null;
+            };
+
+            /**
+             * Creates a ConsensusConfig message from a plain object. Also converts values to their respective internal types.
+             * @function fromObject
+             * @memberof common.consensus.ConsensusConfig
+             * @static
+             * @param {Object.<string,*>} object Plain object
+             * @returns {common.consensus.ConsensusConfig} ConsensusConfig
+             */
+            ConsensusConfig.fromObject = function fromObject(object, long) {
+                if (object instanceof $root.common.consensus.ConsensusConfig)
+                    object = Object.assign({}, object);
+                if (!$util.isObject(object))
+                    throw TypeError(".common.consensus.ConsensusConfig: object expected");
+                if (long === undefined)
+                    long = 0;
+                if (long > $util.recursionLimit)
+                    throw Error("maximum nesting depth exceeded");
+                var message = new $root.common.consensus.ConsensusConfig();
+                if (object.sv != null)
+                    message.sv = $util.bytesFrom(object.sv);
+                if (object.cd != null)
+                    message.cd = $util.bytesFrom(object.cd);
+                return message;
+            };
+
+            /**
+             * Creates a plain object from a ConsensusConfig message. Also converts values to other types if specified.
+             * @function toObject
+             * @memberof common.consensus.ConsensusConfig
+             * @static
+             * @param {common.consensus.ConsensusConfig} message ConsensusConfig
+             * @param {$protobuf.IConversionOptions} [options] Conversion options
+             * @returns {Object.<string,*>} Plain object
+             */
+            ConsensusConfig.toObject = function toObject(message, options, q) {
+                if (!options)
+                    options = {};
+                if (q === undefined)
+                    q = 0;
+                if (q > $util.recursionLimit)
+                    throw Error("max depth exceeded");
+                var object = {};
+                if (options.defaults) {
+                    if (options.bytes === String)
+                        object.sv = "";
+                    else {
+                        object.sv = [];
+                        if (options.bytes !== Array)
+                            object.sv = $util.newBuffer(object.sv);
+                    }
+                    if (options.bytes === String)
+                        object.cd = "";
+                    else {
+                        object.cd = [];
+                        if (options.bytes !== Array)
+                            object.cd = $util.newBuffer(object.cd);
+                    }
+                }
+                if (message.sv != null && Object.hasOwnProperty.call(message, "sv"))
+                    object.sv = $util.bytesTo(message.sv, options);
+                if (message.cd != null && Object.hasOwnProperty.call(message, "cd"))
+                    object.cd = $util.bytesTo(message.cd, options);
+                return object;
+            };
+
+            /**
+             * Converts this ConsensusConfig to JSON.
+             * @function toJSON
+             * @memberof common.consensus.ConsensusConfig
+             * @instance
+             * @returns {Object.<string,*>} JSON object
+             */
+            ConsensusConfig.prototype.toJSON = function toJSON() {
+                return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
+            };
+
+            /**
+             * Gets the default type url for ConsensusConfig
+             * @function getTypeUrl
+             * @memberof common.consensus.ConsensusConfig
+             * @static
+             * @param {string} [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
+             * @returns {string} The default type url
+             */
+            ConsensusConfig.getTypeUrl = function getTypeUrl(typeUrlPrefix) {
+                if (typeUrlPrefix === undefined) {
+                    typeUrlPrefix = "type.googleapis.com";
+                }
+                return typeUrlPrefix + "/common.consensus.ConsensusConfig";
+            };
+
+            return ConsensusConfig;
+        })();
+
+        return consensus;
+    })();
+
+    return common;
+})();
+
+module.exports = $root;

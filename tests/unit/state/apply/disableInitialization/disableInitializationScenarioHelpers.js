@@ -8,8 +8,8 @@ import {
 } from '../../../../helpers/autobaseTestHelpers.js';
 import { applyStateMessageFactory } from '../../../../../src/messages/state/applyStateMessageFactory.js';
 import { AUTOBASE_VALUE_ENCODING, EntryType } from '../../../../../src/utils/constants.js';
-import { safeDecodeApplyOperation, safeEncodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
-import { safeWriteUInt32BE } from '../../../../../src/utils/buffer.js';
+import { safeDecodeApplyOperation, safeEncodeApplyOperation } from '../../../../../src/codecs/apply/applyOperationCodec.js';
+import {safeWriteUInt32BE, uint32ToBuffer} from '../../../../../src/utils/buffer.js';
 import { buildAddAdminRequesterPayload } from '../addAdmin/addAdminScenarioHelpers.js';
 import { config } from '../../../../helpers/config.js';
 
@@ -81,7 +81,7 @@ export async function assertInitializationDisabledState(t, base, payload) {
     const initializationEntry = await base.view.get(EntryType.INITIALIZATION);
     t.ok(initializationEntry, 'initialization entry exists');
     t.ok(
-        b4a.equals(initializationEntry.value, safeWriteUInt32BE(0, 0)),
+        b4a.equals(initializationEntry.value, uint32ToBuffer(0)),
         'initialization flag cleared'
     );
 
@@ -127,7 +127,7 @@ async function assertInitializationEnabled(t, base) {
     const initializationEntry = await base.view.get(EntryType.INITIALIZATION);
     t.ok(initializationEntry, 'initialization entry exists');
     t.ok(
-        b4a.equals(initializationEntry.value, safeWriteUInt32BE(1, 0)),
+        b4a.equals(initializationEntry.value, uint32ToBuffer(1)),
         'initialization flag remains enabled'
     );
 }
@@ -170,7 +170,7 @@ export function bypassDisableInitializationAlreadyDisabledGuardOnce(context) {
                     if (isInitializationEntryKey(key) && entry?.value) {
                         return {
                             ...entry,
-                            value: safeWriteUInt32BE(1, 0)
+                            value: safeWriteUInt32BE(1)
                         };
                     }
                     return entry;

@@ -2,7 +2,21 @@ import { test } from 'brittle';
 import sinon from 'sinon';
 import b4a from 'b4a';
 import EventEmitter from 'bare-events';
-import { CONNECTION_STATUS } from '../../../src/utils/constants.js';
+import tracCryptoApi from 'trac-crypto-api';
+import { WalletProvider } from 'trac-wallet';
+import { CONNECTION_STATUS, CustomEventType, ConsensusResultCode, ConsensusVersion } from '../../../src/utils/constants.js';
+import { V1ConsensusProtocolError } from '../../../src/core/network/protocols/consensus/v1/V1ConsensusProtocolError.js';
+import ConsensusV1ConnectionPolicy from '../../../src/core/network/protocols/consensus/v1/ConsensusV1ConnectionPolicy.js';
+import ConsensusV1MessageRouter from '../../../src/core/network/protocols/consensus/v1/ConsensusV1MessageRouter.js';
+import V1EpochProofProposalOperationHandler from '../../../src/core/network/protocols/consensus/v1/handlers/V1EpochProofProposalOperationHandler.js';
+import { encodeConsensusMessage, encodeProofProposalApproval } from '../../../src/codecs/consensus/v1/consensusV1OperationCodec.js';
+import { consensusMessageFactory } from '../../../src/messages/consensus/v1/consensusMessageFactory.js';
+import { createMessage, uint16ToBuffer, uint32ToBuffer } from '../../../src/utils/buffer.js';
+import { bufferToAddress } from '../../../src/core/state/utils/address.js';
+import consensusFixtures from '../../fixtures/consensusV1Operation.fixtures.js';
+import { config as consensusConfig } from '../../helpers/config.js';
+import { testKeyPair2 } from '../../fixtures/apply.fixtures.js';
+import { createSelectionContext } from '../../helpers/epochAppenderSelection.js';
 
 const isBareRuntime = typeof globalThis.Bare !== 'undefined';
 
@@ -12,34 +26,71 @@ function normalizePublicKey(publicKey) {
     return null;
 }
 
-async function loadNetwork(options = {}) {
+function createPeerInfo(publicKey) {
+    const peerInfo = { publicKey, banned: false, explicit: true };
+    peerInfo.ban = sinon.stub().callsFake(value => { peerInfo.banned = !!value; });
+    return peerInfo;
+}
+
+async function signedConsensusResponse(wallet, result, approval) {
+    const resultCode = uint32ToBuffer(result);
+    const data = approval ? createMessage(resultCode, encodeProofProposalApproval(approval)) : resultCode;
+    const response = { result, response_sig: wallet.sign(await tracCryptoApi.hash.blake3(data)) };
+    if (approval) response.approval = approval;
+    return { ...consensusFixtures.proofProposalResponseHeader, proof_proposal_response: response };
+}
+
+function createMockConnection(publicKeyHex, { withProtocolSession = true, withConsensusSession = false } = {}) {
+    const remotePublicKey = b4a.from(publicKeyHex, 'hex');
+    return {
+        remotePublicKey,
+        protocolSessions: {
+            validator: withProtocolSession ? {
+                isProbed: () => true,
+                probe: sinon.stub().resolves(),
+                isHealthCheckSupported: () => false,
+                close: sinon.stub(),
+            } : null,
+            indexers: withConsensusSession ? { close: sinon.stub() } : null,
+        },
+        on: sinon.stub(),
+        destroy: sinon.stub(),
+    };
+}
+
+async function loadNetwork({ isIndexer = false, currentEpoch = null, indexerCount = 0, walletAddress = 'trac_test' } = {}) {
     const { default: esmock } = await import('esmock');
     let swarmInstance = null;
-    let connectionManagerInstance = null;
-    let pendingRequestServiceInstance = null;
+    let validatorConnectionManagerInstance = null;
+    let indexerConnectionManagerInstance = null;
+    let epochCoordinatorServiceInstance = null;
+    const epochAppenderSelector = { open: sinon.stub().resolves(), close: sinon.stub().resolves() };
+    let validatorPendingRequestServiceInstance = null;
+    let indexerPendingRequestServiceInstance = null;
+    let consensusMessagesInstance = null;
 
     class HyperswarmMock extends EventEmitter {
         constructor() {
             super();
             swarmInstance = this;
             this.peers = new Map();
+            this.connections = new Set();
             this._allConnections = new Map();
             this.joinPeer = sinon.stub().callsFake((target) => {
                 const publicKeyHex = b4a.toString(target, 'hex');
-                this.peers.set(publicKeyHex, { publicKey: target, explicit: true });
+                if (!this.peers.has(publicKeyHex)) this.peers.set(publicKeyHex, createPeerInfo(target));
+                this.peers.get(publicKeyHex).explicit = true;
             });
             this.leavePeer = sinon.stub();
             this.join = sinon.stub();
             this.flush = sinon.stub();
-            this.destroy = sinon.stub().callsFake(async () => {
-                this.removeAllListeners();
-            });
+            this.destroy = sinon.stub();
         }
     }
 
-    class ConnectionManagerMock {
+    class ValidatorConnectionManagerMock {
         constructor() {
-            connectionManagerInstance = this;
+            validatorConnectionManagerInstance = this;
             this.validators = new Map();
             this.removed = [];
         }
@@ -48,27 +99,23 @@ async function loadNetwork(options = {}) {
             return this.validators.has(normalizePublicKey(publicKey));
         }
 
-        remove(publicKey, options = {}) {
+        remove(publicKey, connection = null) {
             const publicKeyHex = normalizePublicKey(publicKey);
-            this.removed.push({ publicKey: publicKeyHex, options });
+            if (connection && this.validators.get(publicKeyHex) !== connection) return;
+            this.removed.push({ publicKey: publicKeyHex });
             this.validators.delete(publicKeyHex);
         }
 
-        addValidator(publicKey, connection = null) {
+        add(publicKey, connection = null) {
             this.validators.set(normalizePublicKey(publicKey), connection);
             return true;
-        }
-
-        isCurrent(publicKey, connection) {
-            const publicKeyHex = normalizePublicKey(publicKey);
-            return this.validators.has(publicKeyHex) && this.validators.get(publicKeyHex) === connection;
         }
 
         connected(publicKey) {
             return this.exists(publicKey);
         }
 
-        connectedValidators() {
+        connectedPeers() {
             return Array.from(this.validators.keys());
         }
 
@@ -81,34 +128,34 @@ async function loadNetwork(options = {}) {
         }
 
         subscribeToHealthChecks() {}
+
+        ready() {
+            return true
+        }
+
+        async close() {}
     }
 
     class TransactionPoolServiceMock {
         start() {}
-        async stopPool() {}
+        async stop() {}
     }
 
     class ValidatorObserverServiceMock {
         start() {}
-        async stopValidatorObserver() {}
+        async stop() {}
     }
 
-    class MessageOrchestratorMock {
+    class ValidatorMessageOrchestratorMock {
         setWallet() {}
     }
 
     class PendingRequestServiceMock {
         constructor() {
-            pendingRequestServiceInstance = this;
-            this.rejected = [];
+            validatorPendingRequestServiceInstance = this;
+            this.rejectPendingRequestsForPeer = sinon.stub();
         }
-
         isProbePending() { return false; }
-
-        rejectPendingRequestsForPeer(publicKey) {
-            this.rejected.push(normalizePublicKey(publicKey));
-        }
-
         close() {}
     }
 
@@ -124,41 +171,118 @@ async function loadNetwork(options = {}) {
         close() {}
     }
 
+    class EpochCoordinatorServiceMock {
+        constructor() {
+            epochCoordinatorServiceInstance = this;
+            this.start = sinon.stub();
+            this.stop = sinon.stub();
+        }
+
+        async ready() {}
+        async close() {}
+    }
+
+    class IndexerConnectionManagerMock {
+        constructor() {
+            indexerConnectionManagerInstance = this;
+            this.indexers = new Set();
+            this.add = sinon.stub().callsFake(publicKey => {
+                this.indexers.add(normalizePublicKey(publicKey));
+            });
+            this.remove = sinon.stub();
+            this.setMax = sinon.stub();
+        }
+
+        exists(publicKey) {
+            return this.indexers.has(normalizePublicKey(publicKey));
+        }
+
+        connected(publicKey) {
+            return this.exists(publicKey);
+        }
+
+        async ready() {}
+        async close() {}
+    }
+
     class LoggerMock {
         info() {}
         debug() {}
         error() {}
     }
 
-    class NetworkMessagesMock {
-        async setupProtomuxMessages(connection) {
-            if (options.setupProtomuxMessages) {
-                return options.setupProtomuxMessages(connection);
-            }
+    class ValidatorMessagesMock {
+        createProtocolSession(connection) {
+            return connection.protocolSessions?.validator ?? {
+                isProbed: () => true,
+                probe: sinon.stub().resolves(),
+                isHealthCheckSupported: () => false,
+                close: sinon.stub(),
+            };
         }
+
+        attachChannel(connection) {
+            connection.protocolSessions ??= {};
+            connection.protocolSessions.validator = this.createProtocolSession(connection);
+        }
+
+        prepareConnection(connection) {
+            this.attachChannel(connection);
+        }
+    }
+
+    class IndexerMessagesMock {
+        constructor(_state, _wallet, _config, pendingRequests) {
+            consensusMessagesInstance = this;
+            indexerPendingRequestServiceInstance = pendingRequests;
+        }
+        async setupProtomuxMessages() {}
+        prepareConnection() {}
+        attachChannel() {}
+    }
+
+    class WakeupMock {
+        addStream() {}
     }
 
     class TransactionRateLimiterServiceMock {}
 
-    const NetworkModule = await esmock('../../../src/core/network/Network.js', {
+    class CorestoreMock {
+        constructor() {
+            this.replicate = sinon.stub();
+            this.createKeyPair = sinon.stub();
+        }
+    }
+
+    const NetworkModule = await esmock.strict('../../../src/core/network/Network.js', {
         hyperswarm: HyperswarmMock,
         '../../../src/core/network/services/TransactionPoolService.js': { default: TransactionPoolServiceMock },
         '../../../src/core/network/services/ValidatorObserverService.js': { default: ValidatorObserverServiceMock },
-        '../../../src/core/network/services/ConnectionManager.js': { default: ConnectionManagerMock },
-        '../../../src/core/network/services/MessageOrchestrator.js': { default: MessageOrchestratorMock },
+        '../../../src/core/network/services/ValidatorConnectionManager.js': { default: ValidatorConnectionManagerMock },
+        '../../../src/core/network/services/ValidatorMessageOrchestrator.js': { default: ValidatorMessageOrchestratorMock },
         '../../../src/core/network/services/TransactionRateLimiterService.js': { default: TransactionRateLimiterServiceMock },
-        '../../../src/core/network/services/PendingRequestService.js': { default: PendingRequestServiceMock },
+        '../../../src/core/network/protocols/validators/v1/ValidatorPendingRequestService.js': { default: PendingRequestServiceMock },
         '../../../src/core/network/services/TransactionCommitService.js': { default: TransactionCommitServiceMock },
         '../../../src/core/network/services/ValidatorHealthCheckService.js': { default: ValidatorHealthCheckServiceMock },
-        '../../../src/core/network/protocols/NetworkMessages.js': { default: NetworkMessagesMock },
+        '../../../src/core/consensus/services/EpochCoordinatorService.js': { default: EpochCoordinatorServiceMock },
+        '../../../src/core/consensus/epochAppenderSelection/createEpochAppenderSelector.js': {
+            createEpochAppenderSelector: () => epochAppenderSelector,
+        },
+        '../../../src/core/network/services/IndexerConnectionManager.js': { default: IndexerConnectionManagerMock },
+        '../../../src/core/network/protocols/validators/ValidatorMessages.js': { default: ValidatorMessagesMock },
+        '../../../src/core/network/protocols/consensus/IndexerMessages.js': { default: IndexerMessagesMock },
+        'protomux-wakeup': { default: WakeupMock },
         '../../../src/utils/logger.js': { Logger: LoggerMock },
     });
 
     const Network = NetworkModule.default;
     const config = {
         enableWallet: true,
+        addressPrefix: 'trac',
         connectTimeoutMs: 1_000,
         maxPendingConnections: 10,
+        maxPendingRequestsInPendingRequestsService: 10,
+        indexerPendingRequestTimeout: 5_000,
         maxValidators: 5,
         maxPeers: 5,
         maxParallel: 1,
@@ -171,24 +295,34 @@ async function loadNetwork(options = {}) {
     const wallet = {
         publicKey: b4a.alloc(32, 2),
         secretKey: b4a.alloc(64, 3),
-        address: 'trac_test',
+        address: walletAddress,
     };
 
-    const network = new Network({}, config, wallet.address);
-    const store = options.store ?? {
-        replicate: sinon.stub().returns(new EventEmitter()),
+    const store = new CorestoreMock();
+    const state = new EventEmitter();
+    const connectionPolicy = new ConsensusV1ConnectionPolicy(state, new LoggerMock(), config);
+    state.isAdmin = async () => false;
+    state.isIndexer = () => isIndexer;
+    state.indexerCount = async () => indexerCount;
+    state.getCurrentEpoch = async () => currentEpoch;
+    state.isAdminAddress = async () => false;
+    const network = new Network(state, store, config, wallet);
+    await network.ready()
+
+    return {
+        network,
+        store,
+        swarmInstance,
+        validatorConnectionManagerInstance,
+        indexerConnectionManagerInstance,
+        epochCoordinatorServiceInstance,
+        epochAppenderSelector,
+        validatorPendingRequestServiceInstance,
+        indexerPendingRequestServiceInstance,
+        consensusMessagesInstance,
+        connectionPolicy,
+        state
     };
-    await network.replicate({}, store, wallet);
-
-    return { network, swarmInstance, connectionManagerInstance, pendingRequestServiceInstance, store, wallet };
-}
-
-function deferred() {
-    let resolve;
-    const promise = new Promise((done) => {
-        resolve = done;
-    });
-    return { promise, resolve };
 }
 
 if (isBareRuntime) {
@@ -196,30 +330,203 @@ if (isBareRuntime) {
         t.pass('skipped in Bare because esmock depends on node:module');
     });
 } else {
-    test('Network#tryConnect rejoins a retained peer without explicit retries', async t => {
+    test('Network rejoins a retained peer without explicit retries', async t => {
         const { network, swarmInstance } = await loadNetwork();
-        t.teardown(() => network.cleanupPendingConnections());
-        const publicKey = 'd'.repeat(64);
+        t.teardown(() => network.close());
+        const publicKey = 'dd'.repeat(32);
         const target = b4a.from(publicKey, 'hex');
-        swarmInstance.peers.set(publicKey, { publicKey: target, explicit: false, waiting: false });
-
+        swarmInstance.peers.set(publicKey, { publicKey: target, explicit: false });
         t.is(await network.tryConnect(publicKey, 'validator'), CONNECTION_STATUS.PENDING);
-        t.is(swarmInstance.joinPeer.callCount, 1, 'retained peer is explicitly joined again');
-        t.alike(swarmInstance.joinPeer.firstCall?.args, [target]);
+        t.ok(swarmInstance.joinPeer.calledOnceWithExactly(target));
         t.is(await network.tryConnect(publicKey, 'validator'), CONNECTION_STATUS.IGNORED);
-        t.is(swarmInstance.joinPeer.callCount, 1, 'pending attempts remain deduplicated');
+        t.is(swarmInstance.joinPeer.callCount, 1, 'pending attempts stay deduplicated');
     });
 
-    test('Network#tryConnect preserves backoff for an already explicit peer', async t => {
+    test('Network preserves backoff for an already explicit peer', async t => {
         const { network, swarmInstance } = await loadNetwork();
-        t.teardown(() => network.cleanupPendingConnections());
-        const publicKey = 'd'.repeat(64);
+        t.teardown(() => network.close());
+        const publicKey = 'dd'.repeat(32);
         swarmInstance.peers.set(publicKey, {
             publicKey: b4a.from(publicKey, 'hex'), explicit: true, waiting: true,
         });
-
         t.is(await network.tryConnect(publicKey, 'validator'), CONNECTION_STATUS.PENDING);
-        t.is(swarmInstance.joinPeer.callCount, 0, 'existing retry timer is left to Hyperswarm');
+        t.absent(swarmInstance.joinPeer.called);
+    });
+
+    test('Network keeps a replacement validator when an older connection closes', async t => {
+        const { network, swarmInstance, validatorConnectionManagerInstance: manager,
+            validatorPendingRequestServiceInstance, indexerPendingRequestServiceInstance } = await loadNetwork();
+        t.teardown(() => network.close());
+        const rejectIndexer = sinon.spy(indexerPendingRequestServiceInstance, 'rejectPendingRequestsForPeer');
+        const publicKey = 'dd'.repeat(32);
+        const handler = swarmInstance.rawListeners('connection')[0];
+        const old = new EventEmitter();
+        const replacement = new EventEmitter();
+        for (const connection of [old, replacement]) {
+            connection.remotePublicKey = b4a.from(publicKey, 'hex');
+            connection.destroy = sinon.stub();
+            await handler(connection);
+        }
+        manager.add(publicKey, replacement);
+        old.emit('close');
+        t.is(manager.validators.get(publicKey), replacement);
+        t.alike(manager.removed, []);
+        t.ok(old.protocolSessions.validator.close.calledOnce);
+        t.ok(validatorPendingRequestServiceInstance.rejectPendingRequestsForPeer.calledOnce);
+        t.ok(rejectIndexer.calledOnce);
+        replacement.emit('close');
+        t.absent(manager.exists(publicKey), 'closing the tracked connection removes the validator');
+    });
+
+    test('Network rejects late connections during and after shutdown without replicating', async t => {
+        const { network, swarmInstance, store, epochCoordinatorServiceInstance } = await loadNetwork();
+        let closeEntered, resumeClose;
+        const entered = new Promise(resolve => { closeEntered = resolve; });
+        const paused = new Promise(resolve => { resumeClose = resolve; });
+        epochCoordinatorServiceInstance.close = async () => {
+            closeEntered();
+            await paused;
+        };
+        const handler = swarmInstance.rawListeners('connection')[0];
+        const closing = network.close();
+        await entered;
+        try {
+            const late = createMockConnection('dd'.repeat(32));
+            await handler(late);
+            t.absent(store.replicate.called);
+            t.ok(late.destroy.calledOnce);
+            t.ok(late.protocolSessions.validator.close.calledOnce);
+            await t.exception(() => network.tryConnect('ee'.repeat(32), 'validator'), /closing or already closed/);
+        } finally {
+            resumeClose();
+            await closing;
+        }
+        const afterClose = createMockConnection('ee'.repeat(32));
+        await handler(afterClose);
+        t.absent(store.replicate.called);
+        t.ok(afterClose.destroy.calledOnce);
+        t.is(network.swarm, null);
+        t.is(swarmInstance.listenerCount('connection'), 0);
+    });
+
+    test('Network cleans up both protocol sessions when connection setup fails', async t => {
+        const { network, swarmInstance, consensusMessagesInstance,
+            validatorPendingRequestServiceInstance, indexerPendingRequestServiceInstance } = await loadNetwork();
+        t.teardown(() => network.close());
+        const rejectIndexer = sinon.spy(indexerPendingRequestServiceInstance, 'rejectPendingRequestsForPeer');
+        const error = new Error('consensus setup failed');
+        const closeIndexer = sinon.stub();
+        consensusMessagesInstance.prepareConnection = connection => {
+            connection.protocolSessions.indexer = { close: closeIndexer };
+            throw error;
+        };
+        const connection = createMockConnection('dd'.repeat(32));
+        await swarmInstance.rawListeners('connection')[0](connection);
+        t.ok(connection.destroy.calledOnce);
+        t.ok(connection.protocolSessions.validator.close.calledOnce);
+        t.ok(closeIndexer.calledOnce);
+        t.ok(validatorPendingRequestServiceInstance.rejectPendingRequestsForPeer.calledWith('dd'.repeat(32), error));
+        t.ok(rejectIndexer.calledWith('dd'.repeat(32), error));
+    });
+
+    test('Network handles a replication failure without leaving an unhandled connection', async t => {
+        const { network, swarmInstance, store } = await loadNetwork();
+        t.teardown(() => network.close());
+        store.replicate.throws(new Error('Corestore is closed'));
+        const connection = createMockConnection('dd'.repeat(32));
+        await swarmInstance.rawListeners('connection')[0](connection);
+        t.ok(connection.destroy.calledOnce);
+    });
+
+    test('Network does not start the epoch coordinator before genesis initialization', async t => {
+        const { network, epochCoordinatorServiceInstance, epochAppenderSelector } = await loadNetwork({
+            isIndexer: true,
+            currentEpoch: null
+        });
+
+        t.absent(epochCoordinatorServiceInstance.start.called);
+        t.is(epochAppenderSelector.open.callCount, 1, 'the shared append coordinator is opened with the network');
+        await network.close();
+        t.is(epochAppenderSelector.close.callCount, 1, 'the shared append coordinator closes with the network');
+    });
+
+    test('Network starts the epoch coordinator for an initialized indexer', async t => {
+        const { network, epochCoordinatorServiceInstance } = await loadNetwork({
+            isIndexer: true,
+            currentEpoch: 0n
+        });
+
+        t.is(epochCoordinatorServiceInstance.start.callCount, 1);
+        await network.close();
+    });
+
+    test('Network starts the epoch coordinator when the genesis-epoch event is emitted on an indexer', async t => {
+        const { network, epochCoordinatorServiceInstance, state } = await loadNetwork({
+            isIndexer: true,
+            currentEpoch: null
+        });
+
+        state.emit(CustomEventType.GENESIS_EPOCH_CREATED, { epoch: 0n });
+
+        t.is(epochCoordinatorServiceInstance.start.callCount, 1);
+        await network.close();
+    });
+
+    test('Network ignores genesis-epoch events when this node is not an indexer', async t => {
+        const { network, epochCoordinatorServiceInstance, state } = await loadNetwork({
+            isIndexer: false,
+            currentEpoch: null
+        });
+
+        state.emit(CustomEventType.GENESIS_EPOCH_CREATED, { epoch: 0n });
+
+        t.absent(epochCoordinatorServiceInstance.start.called);
+        await network.close();
+    });
+
+    test('Network does not start the epoch coordinator for a non-indexer with an existing genesis epoch', async t => {
+        const { network, epochCoordinatorServiceInstance } = await loadNetwork({
+            isIndexer: false,
+            currentEpoch: 0n
+        });
+
+        t.absent(epochCoordinatorServiceInstance.start.called);
+        await network.close();
+    });
+
+    test('Network starts the epoch coordinator when the local node is promoted to indexer with an existing genesis epoch', async t => {
+        const publicKey = b4a.alloc(32, 2);
+        const walletAddress = tracCryptoApi.address.encode('trac', publicKey);
+        const { network, epochCoordinatorServiceInstance, state } = await loadNetwork({
+            isIndexer: false,
+            currentEpoch: 0n,
+            indexerCount: 1,
+            walletAddress
+        });
+
+        state.emit(CustomEventType.IS_INDEXER, publicKey);
+        await Promise.resolve(); // IS_INDEXER handlers await indexerCount / getCurrentEpoch.
+
+        t.is(epochCoordinatorServiceInstance.start.callCount, 1, 'local indexer promotion starts the coordinator');
+        await network.close();
+    });
+
+    test('Network stops the epoch coordinator without refreshing indexer capacity when the local node is demoted', async t => {
+        const publicKey = b4a.alloc(32, 2);
+        const walletAddress = tracCryptoApi.address.encode('trac', publicKey);
+        const { network, epochCoordinatorServiceInstance, indexerConnectionManagerInstance, state } = await loadNetwork({
+            isIndexer: true,
+            currentEpoch: 0n,
+            indexerCount: 3,
+            walletAddress
+        });
+
+        state.emit(CustomEventType.IS_NON_INDEXER, publicKey);
+        await Promise.resolve();
+
+        t.is(epochCoordinatorServiceInstance.stop.callCount, 1, 'local indexer demotion stops the coordinator');
+        t.absent(indexerConnectionManagerInstance.setMax.called, 'local indexer demotion does not refresh connection capacity');
+        await network.close();
     });
 
     test('Network#disconnectValidatorPeer clears pending validator attempts', async t => {
@@ -235,21 +542,23 @@ if (isBareRuntime) {
         t.ok(disconnected, 'disconnect should report work done');
         t.absent(network.isConnectionPending(publicKey), 'pending connection should be cleared');
         t.is(swarmInstance.leavePeer.callCount, 1, 'peer discovery should be cancelled');
+        t.teardown(async () => await network.close());
     });
 
     test('Network#disconnectValidatorPeer removes tracked validators from the pool', async t => {
         const publicKey = 'b'.repeat(64);
-        const { network, swarmInstance, connectionManagerInstance } = await loadNetwork();
+        const { network, swarmInstance, validatorConnectionManagerInstance } = await loadNetwork();
 
-        connectionManagerInstance.addValidator(publicKey);
+        validatorConnectionManagerInstance.add(publicKey);
         swarmInstance.peers.set(publicKey, { publicKey: b4a.from(publicKey, 'hex') });
-
+        
         const disconnected = network.disconnectValidatorPeer(publicKey, 'peer no longer valid validator');
-
+        
         t.ok(disconnected, 'disconnect should report tracked validator removal');
-        t.absent(connectionManagerInstance.exists(publicKey), 'validator should be removed from connection manager');
-        t.alike(connectionManagerInstance.removed, [{ publicKey, options: { endConnection: false } }], 'tracked validator should be detached without ending the socket');
+        t.absent(validatorConnectionManagerInstance.exists(publicKey), 'validator should be removed from connection manager');
+        t.alike(validatorConnectionManagerInstance.removed, [{ publicKey }], 'tracked validator should be detached without ending the socket');
         t.is(swarmInstance.leavePeer.callCount, 1, 'leavePeer should be called to clear explicit peer tracking without closing the socket');
+        t.teardown(async () => await network.close());
     });
 
     test('Network#disconnectValidatorPeer ignores non-validator pending peers', async t => {
@@ -265,97 +574,494 @@ if (isBareRuntime) {
         t.absent(disconnected, 'non-validator peer should be ignored by validator disconnect helper');
         t.ok(network.isConnectionPending(publicKey), 'non-validator pending connection should remain tracked');
         t.is(swarmInstance.leavePeer.callCount, 0, 'generic peer should not be left');
+        t.teardown(async () => await network.close());
     });
 
-    test('Network removes a validator when its tracked connection closes', async t => {
-        const publicKey = 'd'.repeat(64);
-        const { swarmInstance, connectionManagerInstance, pendingRequestServiceInstance } = await loadNetwork();
-        const connection = new EventEmitter();
-        connection.remotePublicKey = b4a.from(publicKey, 'hex');
-        connection.destroy = sinon.stub();
-
-        swarmInstance.emit('connection', connection);
-        await new Promise(resolve => setTimeout(resolve, 0));
-
-        connectionManagerInstance.addValidator(publicKey, connection);
-        connection.emit('close');
-
-        t.absent(connectionManagerInstance.exists(publicKey), 'tracked validator should be removed');
-        t.alike(
-            connectionManagerInstance.removed,
-            [{ publicKey, options: {} }],
-            'removal should be requested once for the tracked validator'
-        );
-        t.alike(pendingRequestServiceInstance.rejected, [publicKey], 'pending requests for the peer should be rejected');
-        t.is(swarmInstance.leavePeer.callCount, 1, 'peer discovery should be cancelled');
-    });
-
-    test('Network keeps a validator when a connection other than the tracked one closes', async t => {
+    test('Network#tryConnect returns CONNECTED and tracks already-connected validator', async t => {
         const publicKey = 'e'.repeat(64);
-        const { swarmInstance, connectionManagerInstance, pendingRequestServiceInstance } = await loadNetwork();
-        const first = new EventEmitter();
-        first.remotePublicKey = b4a.from(publicKey, 'hex');
-        first.destroy = sinon.stub();
-        const second = new EventEmitter();
-        second.remotePublicKey = b4a.from(publicKey, 'hex');
-        second.destroy = sinon.stub();
+        const { network, swarmInstance, validatorConnectionManagerInstance } = await loadNetwork();
 
-        swarmInstance.emit('connection', first);
-        await new Promise(resolve => setTimeout(resolve, 0));
-        swarmInstance.emit('connection', second);
-        await new Promise(resolve => setTimeout(resolve, 0));
+        const publicKeyBuffer = b4a.from(publicKey, 'hex');
+        const connection = createMockConnection(publicKey);
+        swarmInstance.peers.set(publicKey, { publicKey: publicKeyBuffer });
+        swarmInstance._allConnections.set(publicKeyBuffer, connection);
+        swarmInstance.connections.add(connection);
 
-        connectionManagerInstance.addValidator(publicKey, second);
-        first.emit('close');
-
-        t.ok(connectionManagerInstance.exists(publicKey), 'tracked validator should stay in the pool');
-        t.alike(connectionManagerInstance.removed, [], 'no removal should be requested');
-        t.ok(connectionManagerInstance.isCurrent(publicKey, second), 'the tracked connection should stay unchanged');
-        t.alike(pendingRequestServiceInstance.rejected, [publicKey], 'pending requests for the peer should be rejected');
-        t.is(swarmInstance.leavePeer.callCount, 1, 'peer discovery should be cancelled');
-
-        second.emit('close');
-        t.alike(
-            connectionManagerInstance.removed,
-            [{ publicKey, options: {} }],
-            'the tracked connection closing should remove the validator'
-        );
+        const status = await network.tryConnect(publicKey, 'validator');
+        t.is(status, CONNECTION_STATUS.CONNECTED, 'returns CONNECTED for ready validator peer');
+        t.ok(validatorConnectionManagerInstance.exists(publicKey), 'validator was added to connection manager');
+        t.absent(network.isConnectionPending(publicKey), 'pending validator connection was cleared');
+        t.teardown(async () => await network.close());
     });
 
-    test('Network#close prevents late connection setup from replicating a closed Corestore', async t => {
-        const setupEntered = deferred();
-        const resumeSetup = deferred();
-        const store = {
-            replicate: sinon.stub().throws(new Error('Corestore is closed')),
-        };
-        const setupProtomuxMessages = sinon.stub().callsFake(async (connection) => {
-            connection.protocolSession = {
-                close: sinon.stub(),
-            };
-            setupEntered.resolve();
-            await resumeSetup.promise;
-        });
-        const { network, swarmInstance, wallet } = await loadNetwork({ store, setupProtomuxMessages });
-        const connection = new EventEmitter();
-        connection.remotePublicKey = b4a.alloc(32, 4);
-        connection.destroy = sinon.stub();
+    test('Network#tryConnect returns CONNECTED and promotes into the network-owned indexer manager', async t => {
+        const publicKey = 'f'.repeat(64);
+        const { network, swarmInstance, indexerConnectionManagerInstance } = await loadNetwork();
 
+        const publicKeyBuffer = b4a.from(publicKey, 'hex');
+        const connection = createMockConnection(publicKey);
+        swarmInstance.peers.set(publicKey, { publicKey: publicKeyBuffer });
+        swarmInstance._allConnections.set(publicKeyBuffer, connection);
+        swarmInstance.connections.add(connection);
+
+        // Indexer connections are promoted into the single indexer manager Network
+        // owns for its lifetime (network.indexerConnectionManager), not a per-call one.
+        const status = await network.tryConnect(publicKey, 'indexer');
+        t.is(status, CONNECTION_STATUS.CONNECTED, 'returns CONNECTED for ready indexer peer');
+        t.ok(indexerConnectionManagerInstance.add.calledWith(publicKeyBuffer, connection), 'connection was promoted into the network-owned indexer manager');
+        t.absent(network.isConnectionPending(publicKey), 'pending indexer connection was cleared');
+        t.teardown(async () => await network.close());
+    });
+
+    test('Network tryConnect timeout clears pending connection', async t => {
+        const publicKey = 'g'.repeat(64);
+        const { network } = await loadNetwork();
+
+        const status = await network.tryConnect(publicKey, 'validator');
+        t.is(status, CONNECTION_STATUS.PENDING, 'connection is initially pending');
+        t.ok(network.isConnectionPending(publicKey), 'pending is tracked');
+
+        await new Promise(resolve => setTimeout(resolve, 1_100));
+
+        t.absent(network.isConnectionPending(publicKey), 'pending is cleared after timeout elapses');
+        t.teardown(async () => await network.close());
+    });
+
+    test('Network keeps a handshake pending until Hyperswarm delivers the connection', async t => {
+        const { network, swarmInstance, indexerConnectionManagerInstance, consensusMessagesInstance } = await loadNetwork();
+        t.teardown(() => network.close());
+        const publicKey = 'ce'.repeat(32);
+        const connection = createMockConnection(publicKey);
+        swarmInstance.peers.set(publicKey, createPeerInfo(connection.remotePublicKey));
+        swarmInstance._allConnections.set(connection.remotePublicKey, connection);
+        const prepare = sinon.spy(consensusMessagesInstance, 'prepareConnection');
+
+        t.is(await network.tryConnect(publicKey, 'indexer'), CONNECTION_STATUS.PENDING);
+        t.ok(network.isConnectionPending(publicKey));
+        t.absent(indexerConnectionManagerInstance.add.called, 'no consensus session before the connection event');
+        t.absent(prepare.called);
+
+        swarmInstance.connections.add(connection);
         swarmInstance.emit('connection', connection);
-        await setupEntered.promise;
+        await Promise.resolve();
+        t.ok(prepare.calledOnceWithExactly(connection));
+        t.ok(indexerConnectionManagerInstance.add.calledOnceWithExactly(connection.remotePublicKey, connection));
+        t.absent(network.isConnectionPending(publicKey));
+    });
 
-        const closePromise = network.close();
-        resumeSetup.resolve();
-        await closePromise;
-        await new Promise(resolve => setTimeout(resolve, 0));
+    test('Network reports an admission refusal without closing transport and allows a later attempt', async t => {
+        const { network, swarmInstance, indexerConnectionManagerInstance } = await loadNetwork();
+        t.teardown(() => network.close());
+        const publicKey = 'cf'.repeat(32);
+        const connection = createMockConnection(publicKey);
+        const peerInfo = createPeerInfo(connection.remotePublicKey);
+        swarmInstance.peers.set(publicKey, peerInfo);
+        swarmInstance._allConnections.set(connection.remotePublicKey, connection);
+        swarmInstance.connections.add(connection);
+        indexerConnectionManagerInstance.add.onFirstCall().callsFake(async () => {});
 
-        t.is(store.replicate.callCount, 0, 'late connection should not replicate after network close begins');
-        t.is(connection.destroy.callCount, 1, 'late connection should be destroyed');
-        await t.exception(
-            () => network.replicate({}, store, wallet),
-            /Network is closing or already closed/,
-            'replication should reject after network close'
-        );
-        t.is(network.swarm, null, 'closed network should not create a new swarm');
-        t.is(swarmInstance.destroy.callCount, 1, 'only the original swarm should be destroyed');
+        t.is(await network.tryConnect(publicKey, 'indexer'), CONNECTION_STATUS.IGNORED);
+        t.absent(network.isConnectionPending(publicKey), 'refusal does not prevent a later attempt');
+        t.absent(indexerConnectionManagerInstance.connected(publicKey));
+        t.absent(connection.destroy.called);
+        t.absent(peerInfo.ban.called);
+        t.is(await network.tryConnect(publicKey, 'indexer'), CONNECTION_STATUS.CONNECTED);
+        t.ok(indexerConnectionManagerInstance.connected(publicKey));
+    });
+
+    test('Network does not report consensus ready while admission is still running', async t => {
+        const { network, swarmInstance, indexerConnectionManagerInstance } = await loadNetwork();
+        t.teardown(() => network.close());
+        const publicKey = 'cd'.repeat(32);
+        const connection = createMockConnection(publicKey);
+        swarmInstance.peers.set(publicKey, createPeerInfo(connection.remotePublicKey));
+        swarmInstance._allConnections.set(connection.remotePublicKey, connection);
+        swarmInstance.connections.add(connection);
+        let finish;
+        const admission = new Promise(resolve => { finish = resolve; });
+        indexerConnectionManagerInstance.add.callsFake(async () => {
+            await admission;
+            indexerConnectionManagerInstance.indexers.add(publicKey);
+        });
+        let settled = false;
+        const connecting = network.tryConnect(publicKey, 'indexer').then(status => { settled = true; return status; });
+        await Promise.resolve();
+        t.absent(settled);
+        finish();
+        t.is(await connecting, CONNECTION_STATUS.CONNECTED);
+    });
+
+    test('Network keeps a known peer pending when its transport is not available yet', async t => {
+        const { network, swarmInstance, indexerConnectionManagerInstance } = await loadNetwork();
+        t.teardown(() => network.close());
+        const publicKey = 'cc'.repeat(32);
+        swarmInstance.peers.set(publicKey, createPeerInfo(b4a.from(publicKey, 'hex')));
+        t.is(await network.tryConnect(publicKey, 'indexer'), CONNECTION_STATUS.PENDING);
+        t.ok(network.isConnectionPending(publicKey));
+        t.absent(indexerConnectionManagerInstance.add.called);
+    });
+
+    test('Network does not duplicate a pending connection attempt', async t => {
+        const { network, swarmInstance } = await loadNetwork();
+        t.teardown(() => network.close());
+        const publicKey = 'cb'.repeat(32);
+        t.is(await network.tryConnect(publicKey, 'indexer'), CONNECTION_STATUS.PENDING);
+        t.is(await network.tryConnect(publicKey, 'indexer'), CONNECTION_STATUS.IGNORED);
+        t.ok(swarmInstance.joinPeer.calledOnce);
+        t.is(network.pendingConnectionsCount(), 1);
+    });
+
+    test('Network leaves an active validator transport pending while its probe is running', async t => {
+        const { network, swarmInstance, validatorPendingRequestServiceInstance, validatorConnectionManagerInstance } = await loadNetwork();
+        t.teardown(() => network.close());
+        const publicKey = 'ca'.repeat(32);
+        const connection = createMockConnection(publicKey);
+        swarmInstance.peers.set(publicKey, createPeerInfo(connection.remotePublicKey));
+        swarmInstance._allConnections.set(connection.remotePublicKey, connection);
+        swarmInstance.connections.add(connection);
+        validatorPendingRequestServiceInstance.isProbePending = () => true;
+        t.is(await network.tryConnect(publicKey, 'validator'), CONNECTION_STATUS.PENDING);
+        t.ok(network.isConnectionPending(publicKey));
+        t.absent(validatorConnectionManagerInstance.connected(publicKey));
+        t.absent(connection.destroy.called);
+    });
+
+    test('Network swarm connection event promotes pending connection', async t => {
+        const publicKey = '12'.repeat(32);
+        const { network, swarmInstance, validatorConnectionManagerInstance } = await loadNetwork();
+
+        const status = await network.tryConnect(publicKey, 'validator');
+        t.is(status, CONNECTION_STATUS.PENDING, 'connection is pending after joinPeer');
+
+        const connection = createMockConnection(publicKey);
+        await swarmInstance.emit('connection', connection);
+
+        t.ok(validatorConnectionManagerInstance.exists(publicKey), 'validator was added after swarm connection');
+        t.absent(network.isConnectionPending(publicKey), 'pending validator connection was cleared');
+        t.teardown(async () => await network.close());
+    });
+
+    test('Network disconnects validator peers when state role events invalidate them', async t => {
+        const publicKey = 'd'.repeat(64);
+        const publicKeyBuffer = b4a.from(publicKey, 'hex');
+        const {
+            network,
+            swarmInstance,
+            validatorConnectionManagerInstance,
+            indexerConnectionManagerInstance,
+            state
+        } = await loadNetwork({ indexerCount: 3 });
+
+        validatorConnectionManagerInstance.add(publicKey);
+        swarmInstance.peers.set(publicKey, { publicKey: publicKeyBuffer });
+
+        state.emit(CustomEventType.UNWRITABLE, publicKeyBuffer);
+        t.absent(validatorConnectionManagerInstance.exists(publicKey), 'unwritable peer should be removed from validator pool');
+        t.is(swarmInstance.leavePeer.callCount, 1, 'unwritable peer should be removed from explicit peer tracking');
+
+        validatorConnectionManagerInstance.add(publicKey);
+        swarmInstance.peers.set(publicKey, { publicKey: publicKeyBuffer });
+
+        state.emit(CustomEventType.IS_INDEXER, publicKeyBuffer);
+        await Promise.resolve(); // IS_INDEXER handler awaits indexerCount.
+        t.absent(validatorConnectionManagerInstance.exists(publicKey), 'promoted indexer should be removed from validator pool');
+        t.ok(indexerConnectionManagerInstance.setMax.calledWith(2), 'promoted indexer excludes itself from the indexer connection limit');
+        // Promotion keeps the underlying connection alive (endConnection: false) so it can be
+        // reused for the indexer role, so it must NOT leave the peer - unlike a hard disconnect.
+        t.is(swarmInstance.leavePeer.callCount, 1, 'promoted indexer should not leave the peer, connection is reused');
+
+        state.emit(CustomEventType.IS_NON_INDEXER, publicKeyBuffer);
+        await Promise.resolve(); // IS_NON_INDEXER handler awaits indexerCount for remote peers.
+        t.ok(indexerConnectionManagerInstance.remove.calledWith(publicKeyBuffer), 'demoted remote indexer is removed before connection capacity is refreshed');
+        t.is(indexerConnectionManagerInstance.setMax.callCount, 2, 'demoted remote indexer refreshes the indexer connection limit');
+        t.teardown(async () => await network.close());
+    });
+
+    for (const kind of ['proposal', 'approval', 'REQUEST', 'REPLY']) {
+        test(`Network bans the transport peer after a real ${kind} identity mismatch`, async t => {
+            const context = await loadNetwork();
+            const {
+                network, state, swarmInstance, indexerPendingRequestServiceInstance,
+                validatorPendingRequestServiceInstance, validatorConnectionManagerInstance,
+                indexerConnectionManagerInstance, connectionPolicy,
+            } = context;
+            t.teardown(() => network.close());
+            const wallet = await new WalletProvider(consensusConfig).fromSecretKey(testKeyPair2.secretKey);
+            const publicKey = wallet.publicKey.toString('hex');
+            const connection = createMockConnection(publicKey);
+            await network.tryConnect(publicKey, 'indexer');
+            const peerInfo = swarmInstance.peers.get(publicKey);
+            validatorConnectionManagerInstance.add(publicKey);
+            indexerConnectionManagerInstance.add(publicKey, connection);
+
+            const claimedAddress = consensusFixtures.proofProposal.proposer;
+            const claimedKey = tracCryptoApi.address.decode(bufferToAddress(claimedAddress, consensusConfig.addressPrefix));
+            const innocentPeer = createPeerInfo(claimedKey);
+            swarmInstance.peers.set(claimedKey.toString('hex'), innocentPeer);
+            const innocentConnection = createMockConnection(claimedKey.toString('hex'));
+            swarmInstance.connections.add(innocentConnection);
+
+            let request = { ...consensusFixtures.proofProposalHeader, session_id: 'banned-peer-request' };
+            let forgedMessage;
+            if (kind === 'REQUEST' || kind === 'REPLY') {
+                const intent = {
+                    ...createSelectionContext(3), networkId: consensusConfig.networkId,
+                    requester: claimedKey.toString('hex'), requestId: 'impersonating-request',
+                    logicalCounter: 1n, payloadHash: '07'.repeat(32), selectionVersion: 2,
+                };
+                const factory = consensusMessageFactory(wallet, consensusConfig);
+                request = await factory.buildRequest(request.session_id, intent);
+                forgedMessage = request;
+                if (kind === 'REPLY') {
+                    forgedMessage = await factory.buildReply(request.session_id, {
+                        ...intent, voteStatus: 1, observedCounter: intent.logicalCounter, vote: intent,
+                    });
+                    forgedMessage.reply.responder = claimedKey;
+                }
+            }
+            const session = { closed: false, sendAndForget: sinon.stub() };
+            const pendingResult = indexerPendingRequestServiceInstance.registerPendingRequest(publicKey, request, session)
+                .catch(error => error);
+            const otherRequest = { ...request, session_id: 'other-peer-request' };
+            indexerPendingRequestServiceInstance.registerPendingRequest(claimedKey.toString('hex'), otherRequest)
+                .catch(() => {});
+            const handler = new V1EpochProofProposalOperationHandler(state, {}, consensusConfig, connectionPolicy);
+
+            if (kind === 'proposal') {
+                await handler.handleRequest({
+                    ...request,
+                    proof_proposal: {
+                        ...consensusFixtures.proofProposal,
+                        network_id: uint16ToBuffer(consensusConfig.networkId),
+                    },
+                }, connection, session);
+            } else if (kind === 'approval') {
+                state.requireSignedConsensusConfig = async () => ({
+                    schemaVersion: ConsensusVersion.VDF_V1,
+                    configData: {
+                        difficulty: request.proof_proposal.difficulty.readUInt32BE(0),
+                        discriminantBitSize: request.proof_proposal.discriminant_bit_size.readUInt16BE(0),
+                    },
+                });
+                const response = await signedConsensusResponse(wallet, ConsensusResultCode.OK, {
+                    approver: claimedAddress,
+                    approval_sig: b4a.alloc(64, 1),
+                });
+                const result = await handler.handleApproval(response, connection, session, request.proof_proposal);
+                t.is(result.resultCode, ConsensusResultCode.PUBLIC_KEY_MISMATCH);
+            } else {
+                const router = new ConsensusV1MessageRouter(
+                    state, wallet, consensusConfig, indexerPendingRequestServiceInstance,
+                    connectionPolicy, context.epochAppenderSelector
+                );
+                await router.route(encodeConsensusMessage(forgedMessage), connection, session);
+            }
+
+            t.ok(peerInfo.ban.calledOnceWithExactly(true), 'Hyperswarm receives an explicit ban');
+            t.ok(connection.destroy.calledOnce, 'active transport is destroyed');
+            t.absent(innocentPeer.ban.called, 'the identity claimed in the payload is not banned');
+            t.absent(innocentConnection.destroy.called, 'the other peer keeps its transport for replication');
+            t.absent(session.sendAndForget.called, 'no response is written after the ban');
+            t.absent(network.isConnectionPending(publicKey), 'pending connection attempt is cleared');
+            const error = await pendingResult;
+            t.ok(error instanceof V1ConsensusProtocolError, 'pending consensus request rejects with a protocol error');
+            t.is(error.resultCode, ConsensusResultCode.PUBLIC_KEY_MISMATCH);
+            t.ok(validatorPendingRequestServiceInstance.rejectPendingRequestsForPeer.calledOnceWithExactly(publicKey, error));
+            t.ok(indexerPendingRequestServiceInstance.has(otherRequest.session_id), 'requests to other peers remain pending');
+            t.absent(validatorConnectionManagerInstance.exists(publicKey), 'validator connection is removed');
+            t.ok(indexerConnectionManagerInstance.remove.calledWith(publicKey), 'indexer connection is removed');
+            t.absent(indexerConnectionManagerInstance.setMax.called, 'ban does not change membership capacity');
+
+            for (const role of ['indexer', 'validator']) {
+                t.is(await network.tryConnect(publicKey, role), CONNECTION_STATUS.IGNORED, 'banned peer is not reconnected');
+            }
+            t.is(swarmInstance.joinPeer.callCount, 1, 'no new join attempt is scheduled');
+            t.is(network.pendingConnectionsCount(), 0);
+
+            peerInfo.ban(false);
+            t.is(await network.tryConnect(publicKey, 'indexer'), CONNECTION_STATUS.PENDING, 'Hyperswarm unban allows a new connection attempt');
+        });
+    }
+
+    test('Network does not ban a peer for a signed PUBLIC_KEY_MISMATCH rejection', async t => {
+        const { network, state, swarmInstance, connectionPolicy } = await loadNetwork();
+        t.teardown(() => network.close());
+        const wallet = await new WalletProvider(consensusConfig).fromSecretKey(testKeyPair2.secretKey);
+        const connection = createMockConnection(wallet.publicKey.toString('hex'));
+        const peerInfo = createPeerInfo(connection.remotePublicKey);
+        swarmInstance.peers.set(wallet.publicKey.toString('hex'), peerInfo);
+        const handler = new V1EpochProofProposalOperationHandler(state, {}, consensusConfig, connectionPolicy);
+        const response = await signedConsensusResponse(wallet, ConsensusResultCode.PUBLIC_KEY_MISMATCH);
+        let failureContext;
+        state.once(CustomEventType.EPOCH_PROPOSAL_APPROVAL_FAILURE, context => { failureContext = context; });
+
+        const result = await handler.handleApproval(response, connection, {}, consensusFixtures.proofProposal);
+
+        t.is(result.resultCode, ConsensusResultCode.PUBLIC_KEY_MISMATCH);
+        t.is(failureContext.resultCode, ConsensusResultCode.PUBLIC_KEY_MISMATCH);
+        t.absent(failureContext.error, 'a signed peer rejection is a result, not a local validation error');
+        t.absent(peerInfo.ban.called, 'a remote rejection cannot trigger the local ban policy');
+        t.absent(connection.destroy.called);
+    });
+
+    test('Network does not retain a ban when validation finishes without PeerInfo', async t => {
+        const { network, state, swarmInstance, store, indexerConnectionManagerInstance } = await loadNetwork();
+        t.teardown(() => network.close());
+        const publicKey = 'ac'.repeat(32);
+        const connection = createMockConnection(publicKey);
+        state.emit(CustomEventType.CONSENSUS_PEER_BAN_REQUESTED, {
+            connection,
+            error: new V1ConsensusProtocolError(ConsensusResultCode.PUBLIC_KEY_MISMATCH, 'Address does not match remote public key.'),
+        });
+
+        t.ok(connection.destroy.calledOnce);
+        t.absent(swarmInstance.peers.has(publicKey), 'failure handling does not create a peer entry');
+        t.is(await network.tryConnect(publicKey, 'indexer'), CONNECTION_STATUS.PENDING);
+        t.ok(swarmInstance.joinPeer.calledOnce, 'a new connection attempt is allowed without a stored ban');
+        t.is(network.pendingConnectionsCount(), 1);
+
+        const newConnection = createMockConnection(publicKey);
+        swarmInstance.emit('connection', newConnection);
+        await Promise.resolve();
+        t.absent(newConnection.destroy.called, 'a new connection is accepted without a stored ban');
+        t.ok(store.replicate.calledWith(newConnection));
+        t.ok(indexerConnectionManagerInstance.add.calledWith(newConnection.remotePublicKey, newConnection));
+    });
+
+    test('Network destroys a replacement connection when old validation detects an identity mismatch', async t => {
+        const { network, state, swarmInstance } = await loadNetwork();
+        t.teardown(() => network.close());
+        const publicKey = 'ad'.repeat(32);
+        const oldConnection = createMockConnection(publicKey);
+        const replacementConnection = createMockConnection(publicKey);
+        const otherConnection = createMockConnection('ae'.repeat(32));
+        const peerInfo = createPeerInfo(replacementConnection.remotePublicKey);
+        swarmInstance.peers.set(publicKey, peerInfo);
+        swarmInstance.connections.add(replacementConnection);
+        swarmInstance.connections.add(otherConnection);
+
+        state.emit(CustomEventType.CONSENSUS_PEER_BAN_REQUESTED, {
+            connection: oldConnection,
+            error: new V1ConsensusProtocolError(ConsensusResultCode.PUBLIC_KEY_MISMATCH, 'Address does not match remote public key.'),
+        });
+
+        t.ok(peerInfo.banned);
+        t.ok(oldConnection.destroy.calledOnce);
+        t.ok(replacementConnection.destroy.calledOnce, 'ban closes the current transport for the same key');
+        t.absent(otherConnection.destroy.called, 'other peers are unaffected');
+    });
+
+    test('Network rejects a connection delivered after its peer was banned without affecting other peers', async t => {
+        const {
+            network, store, swarmInstance, connectionPolicy,
+            validatorConnectionManagerInstance, indexerConnectionManagerInstance, consensusMessagesInstance,
+        } = await loadNetwork();
+        t.teardown(() => network.close());
+        const publicKey = 'ba'.repeat(32);
+        const existingConnection = createMockConnection(publicKey);
+        const delayedConnection = createMockConnection(publicKey);
+        const prepareConsensus = sinon.spy(consensusMessagesInstance, 'prepareConnection');
+        const addValidator = sinon.spy(validatorConnectionManagerInstance, 'add');
+
+        await network.tryConnect(publicKey, 'indexer');
+        connectionPolicy.requestPeerBan(existingConnection, new V1ConsensusProtocolError(
+            ConsensusResultCode.PUBLIC_KEY_MISMATCH,
+            'Address does not match remote public key.'
+        ));
+        t.ok(swarmInstance.peers.get(publicKey).banned);
+        t.absent(network.isConnectionPending(publicKey));
+
+        // A handshake accepted before the ban finishes after the ban has been applied.
+        swarmInstance.emit('connection', delayedConnection);
+        await Promise.resolve();
+
+        t.ok(delayedConnection.destroy.calledOnce, 'late transport is destroyed');
+        t.absent(store.replicate.called, 'replication is never started for the banned peer');
+        t.absent(prepareConsensus.called, 'consensus channels are not prepared');
+        t.absent(indexerConnectionManagerInstance.add.called, 'peer is not promoted to indexer manager');
+        t.absent(addValidator.called, 'peer is not promoted to validator manager');
+        t.absent(delayedConnection.on.called, 'the second connection listener also skips the banned peer');
+
+        const otherPublicKey = 'bb'.repeat(32);
+        const otherConnection = createMockConnection(otherPublicKey);
+        await network.tryConnect(otherPublicKey, 'indexer');
+        swarmInstance.emit('connection', otherConnection);
+        await Promise.resolve();
+
+        t.absent(otherConnection.destroy.called, 'another peer keeps its transport');
+        t.ok(store.replicate.calledOnceWithExactly(otherConnection), 'another peer starts replication');
+        t.ok(prepareConsensus.calledOnceWithExactly(otherConnection));
+        t.ok(indexerConnectionManagerInstance.add.calledOnceWithExactly(otherConnection.remotePublicKey, otherConnection));
+    });
+
+    test('Network does not retain a validator promoted after its pending probe was banned', async t => {
+        const { network, state, swarmInstance, validatorConnectionManagerInstance } = await loadNetwork();
+        t.teardown(() => network.close());
+        const publicKey = 'af'.repeat(32);
+        const connection = createMockConnection(publicKey);
+        swarmInstance.peers.set(publicKey, createPeerInfo(connection.remotePublicKey));
+        swarmInstance._allConnections.set(connection.remotePublicKey, connection);
+        swarmInstance.connections.add(connection);
+        let finishProbe;
+        const probe = new Promise(resolve => { finishProbe = resolve; });
+        validatorConnectionManagerInstance.add = async key => {
+            await probe;
+            validatorConnectionManagerInstance.validators.set(normalizePublicKey(key), connection);
+        };
+        const connecting = network.tryConnect(publicKey, 'validator');
+        state.emit(CustomEventType.CONSENSUS_PEER_BAN_REQUESTED, {
+            connection,
+            error: new V1ConsensusProtocolError(ConsensusResultCode.PUBLIC_KEY_MISMATCH, 'Address does not match remote public key.'),
+        });
+        finishProbe();
+
+        t.is(await connecting, CONNECTION_STATUS.IGNORED);
+        t.absent(validatorConnectionManagerInstance.exists(publicKey));
+        t.ok(connection.destroy.calledOnce);
+    });
+
+    test('Network consumes only ban requests and removes its listener on close', async t => {
+        const { network, state, swarmInstance, connectionPolicy } = await loadNetwork();
+        t.teardown(() => network.close());
+        const publicKey = 'ab'.repeat(32);
+        const connection = createMockConnection(publicKey);
+        const peerInfo = createPeerInfo(connection.remotePublicKey);
+        swarmInstance.peers.set(publicKey, peerInfo);
+        const events = [CustomEventType.EPOCH_PROPOSAL_VALIDATION_FAILURE, CustomEventType.EPOCH_PROPOSAL_APPROVAL_FAILURE];
+
+        for (const event of events) {
+            t.is(state.listenerCount(event), 0, 'Network no longer interprets validation events');
+            state.emit(event, { connection, error: new V1ConsensusProtocolError(ConsensusResultCode.PUBLIC_KEY_MISMATCH, 'validation failure') });
+        }
+        for (const code of [ConsensusResultCode.INDEXER_ROLE_INVALID, ConsensusResultCode.ADDRESS_INVALID,
+            ConsensusResultCode.EPOCH_INVALID, ConsensusResultCode.UNEXPECTED_ERROR]) {
+            t.absent(connectionPolicy.requestPeerBan(connection, new V1ConsensusProtocolError(code, 'ordinary failure')));
+        }
+        const unexpectedError = Object.assign(new Error('unexpected failure'), { resultCode: ConsensusResultCode.PUBLIC_KEY_MISMATCH });
+        t.absent(connectionPolicy.requestPeerBan(connection, unexpectedError));
+        t.absent(connectionPolicy.requestPeerBan(connection, undefined));
+        t.absent(peerInfo.ban.called);
+        t.absent(connection.destroy.called);
+
+        t.is(state.listenerCount(CustomEventType.CONSENSUS_PEER_BAN_REQUESTED), 1);
+        await network.close();
+        t.is(state.listenerCount(CustomEventType.CONSENSUS_PEER_BAN_REQUESTED), 0, 'network removes its ban listener');
+        connectionPolicy.requestPeerBan(connection, new V1ConsensusProtocolError(ConsensusResultCode.PUBLIC_KEY_MISMATCH, 'Address does not match remote public key.'));
+        t.absent(peerInfo.ban.called, 'late ban requests cannot act on a closed network');
+        t.absent(connection.destroy.called);
+    });
+
+    test('Network#pendingConnectionsCount reflects active pending connections', async t => {
+        const { network } = await loadNetwork();
+
+        t.is(network.pendingConnectionsCount(), 0, 'starts at 0');
+
+        await network.tryConnect('a'.repeat(64), 'validator');
+        t.is(network.pendingConnectionsCount(), 1, 'increments after tryConnect');
+
+        await network.tryConnect('b'.repeat(64), 'validator');
+        t.is(network.pendingConnectionsCount(), 2, 'increments for each pending');
+
+        t.teardown(async () => await network.close());
     });
 }

@@ -5,9 +5,9 @@ import removeIndexerTargetNotIndexerScenario from './removeIndexerTargetNotIndex
 import removeIndexerWriterKeyMissingScenario from './removeIndexerWriterKeyMissingScenario.js';
 import AdminControlOperationValidationScenario from '../common/adminControlOperationValidationScenario.js';
 import RequesterAddressValidationScenario from '../common/requesterAddressValidationScenario.js';
-import createRequesterPublicKeyValidationScenario from '../common/requesterPublicKeyValidationScenario.js';
+import createRequesterInvalidChecksumScenario from '../common/requesterInvalidChecksumScenario.js';
 import InvalidAddressValidationScenario from '../common/payload-structure/invalidAddressValidationScenario.js';
-import createAddressWithInvalidPublicKeyScenario from '../common/payload-structure/addressWithInvalidPublicKeyScenario.js';
+import createAddressWithInvalidChecksumScenario from '../common/payload-structure/addressWithInvalidChecksumScenario.js';
 import AdminEntryMissingScenario from '../common/access-control/adminEntryMissingScenario.js';
 import AdminEntryDecodeFailureScenario from '../common/access-control/adminEntryDecodeFailureScenario.js';
 import AdminOnlyGuardScenario from '../common/access-control/adminOnlyGuardScenario.js';
@@ -62,12 +62,12 @@ new RequesterAddressValidationScenario({
     expectedLogs: ['Requester address is invalid.']
 }).performScenario();
 
-createRequesterPublicKeyValidationScenario({
-    title: 'State.apply removeIndexer rejects payloads when requester public key is invalid',
+createRequesterInvalidChecksumScenario({
+    title: 'State.apply removeIndexer rejects an invalid requester address checksum',
     setupScenario: setupRemoveIndexerScenario,
     buildValidPayload: context => buildRemoveIndexerPayload(context),
     assertStateUnchanged: (t, context) => assertRemoveIndexerGuardFailureState(t, context, { skipSync: true }),
-    expectedLogs: ['Error while decoding requester public key.']
+    expectedLogs: ['Requester address is invalid.']
 }).performScenario();
 
 new InvalidAddressValidationScenario({
@@ -79,13 +79,13 @@ new InvalidAddressValidationScenario({
     expectedLogs: ['Target indexer address is invalid.']
 }).performScenario();
 
-createAddressWithInvalidPublicKeyScenario({
-    title: 'State.apply removeIndexer rejects payloads when target indexer public key is invalid',
+createAddressWithInvalidChecksumScenario({
+    title: 'State.apply removeIndexer rejects an invalid target indexer address checksum',
     setupScenario: setupRemoveIndexerScenario,
     buildValidPayload: context => buildRemoveIndexerPayload(context),
     assertStateUnchanged: (t, context) => assertRemoveIndexerGuardFailureState(t, context, { skipSync: true }),
     addressPath: ['aco', 'ia'],
-    expectedLogs: ['Failed to decode target indexer public key.']
+    expectedLogs: ['Target indexer address is invalid.']
 }).performScenario();
 
 new AdminEntryMissingScenario({

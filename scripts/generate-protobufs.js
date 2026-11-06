@@ -3,65 +3,79 @@ import path from 'path';
 
 import { fileURLToPath } from 'url';
 import { execFileSync } from 'child_process';
+import { transformProtobufs } from './lib/transform-protobufs.js';
 
-function generateCJSFromProto(inputPath, outputPath) {
-    execFileSync('protocol-buffers', [inputPath, '-o', outputPath]);
-    console.log(`${outputPath} has been generated.`);
-}
-
-function transformToUseB4a(outputPath) {
-    let content = fs.readFileSync(outputPath, 'utf-8');
-    content = content.replace(/\bBuffer\.([a-zA-Z]+)/g, 'b4a.$1');
-    content = `var b4a = require('b4a');\n` + content;
-    fs.writeFileSync(outputPath, content, 'utf-8');
-    console.log(`${outputPath} has been modified to use b4a.`);
-}
-
-function generatePbjsModule(pbjsPath, protoRootPath, entryPath, outputPath) {
-    execFileSync(pbjsPath, [
+function generatePbjsModule(pbjsPath, protoRootPath, entryPaths, outputPath, rootName) {
+    const generated = execFileSync(pbjsPath, [
         '-t', 'static-module',
         '-w', 'commonjs',
         '--keep-case',
+        '--root', rootName,
         '-p', protoRootPath,
-        '-o', outputPath,
-        entryPath
-    ]);
-    console.log(`${outputPath} has been generated.`);
-}
-
-function transformPbjsForBare(outputPath) {
-    let content = fs.readFileSync(outputPath, 'utf-8');
-    const shim = `if (typeof globalThis !== 'undefined' && typeof globalThis.self === 'undefined') {\n  globalThis.self = globalThis;\n}\n`;
-    const strictDirective = '"use strict";';
-
-    if (content.includes(strictDirective)) {
-        content = content.replace(strictDirective, `${strictDirective}\n${shim}`);
-    } else {
-        content = `${strictDirective}\n${shim}${content}`;
-    }
-
+        ...entryPaths
+    ], { encoding: 'utf-8', maxBuffer: 8 * 1024 * 1024 });
+    const runtimePath = path.join(path.dirname(fileURLToPath(import.meta.url)), '../src/codecs/protobufRuntime.cjs');
+    let relativeRuntimePath = path.relative(path.dirname(outputPath), runtimePath).split(path.sep).join('/');
+    if (!relativeRuntimePath.startsWith('.')) relativeRuntimePath = `./${relativeRuntimePath}`;
+    const content = transformProtobufs(generated, relativeRuntimePath);
     fs.writeFileSync(outputPath, content, 'utf-8');
-    console.log(`${outputPath} has been modified for bare-compatible protobufjs runtime.`);
+    console.log(`${outputPath} has been generated with b4a-compatible binary handling.`);
 }
 
 function main() {
     const directoryName = path.dirname(fileURLToPath(import.meta.url));
 
     const inputDir = path.join(directoryName, '../proto');
-    const outputDir = path.join(directoryName, '../src/utils/protobuf');
+    const applyOutputDir = path.join(directoryName, '../src/codecs/apply');
+    const networkOutputDir = path.join(directoryName, '../src/codecs/network/v1');
+    const consensusOutputDir = path.join(directoryName, '../src/codecs/consensus/v1');
+    const stateOutputDir = path.join(directoryName, '../src/codecs/state');
     const pbjsPath = path.join(directoryName, '../node_modules/.bin/pbjs');
-    const applyInputPath = path.join(inputDir, 'applyOperations.proto');
-    const applyOutputPath = path.join(outputDir, 'applyOperations.cjs');
+    const applyOperationsEntryPath = path.join(inputDir, 'applyOperations/applyOperations.proto');
+    const generatedApplyOperationsOutputPath = path.join(applyOutputDir, 'applyOperations.generated.cjs');
     const networkEntryPath = path.join(inputDir, 'network/v1/network_message.proto');
-    const generatedNetworkOutputPath = path.join(outputDir, 'networkV1.generated.cjs');
+    const generatedNetworkOutputPath = path.join(networkOutputDir, 'networkV1.generated.cjs');
+    const consensusEntryPath = path.join(inputDir, 'consensus/v1/consensus_message_header.proto');
+    const epochProofV1EntryPath = path.join(inputDir, 'common/consensus/epoch_proof_v1.proto');
+    const generatedConsensusOutputPath = path.join(consensusOutputDir, 'consensusV1.generated.cjs');
+    const stateEntryPath = path.join(inputDir, 'state/escrow_entry.proto');
+    const generatedStateOutputPath = path.join(stateOutputDir, 'state.generated.cjs');
 
-    fs.mkdirSync(outputDir, { recursive: true });
+    fs.mkdirSync(applyOutputDir, { recursive: true });
+    fs.mkdirSync(networkOutputDir, { recursive: true });
+    fs.mkdirSync(consensusOutputDir, { recursive: true });
+    fs.mkdirSync(stateOutputDir, { recursive: true });
 
-    generateCJSFromProto(applyInputPath, applyOutputPath);
-    transformToUseB4a(applyOutputPath);
+    generatePbjsModule(
+        pbjsPath,
+        inputDir,
+        [applyOperationsEntryPath],
+        generatedApplyOperationsOutputPath,
+        'applyOperations'
+    );
 
-    generatePbjsModule(pbjsPath, inputDir, networkEntryPath, generatedNetworkOutputPath);
-    transformPbjsForBare(generatedNetworkOutputPath);
+    generatePbjsModule(
+        pbjsPath,
+        inputDir,
+        [networkEntryPath],
+        generatedNetworkOutputPath,
+        'networkV1'
+    );
+
+    generatePbjsModule(
+        pbjsPath,
+        inputDir,
+        [consensusEntryPath, epochProofV1EntryPath],
+        generatedConsensusOutputPath,
+        'consensusV1'
+    );
+    generatePbjsModule(
+        pbjsPath,
+        inputDir,
+        [stateEntryPath],
+        generatedStateOutputPath,
+        'state'
+    );
 }
 
 main();

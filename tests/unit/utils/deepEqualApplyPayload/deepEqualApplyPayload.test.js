@@ -1,7 +1,7 @@
 import test from 'brittle';
 import b4a from 'b4a';
 
-import fixtures from '../../../fixtures/protobuf.fixtures.js';
+import fixtures from '../../../fixtures/applyOperation.fixtures.js';
 import { isDeepEqualApplyPayload } from '../../../../src/utils/deepEqualApplyPayload.js';
 
 const applyPayloads = new Map([

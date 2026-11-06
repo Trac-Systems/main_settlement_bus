@@ -3,6 +3,7 @@ import { isAddressValid } from '../core/state/utils/address.js';
 import tracCryptoApi from 'trac-crypto-api';
 import b4a from 'b4a';
 import { ZERO_LICENSE } from '../core/state/utils/nodeEntry.js';
+import { PUBLIC_KEY_LENGTH } from './constants.js';
 
 export async function validateAddressFromIncomingFile(stateInstance, config, address, adminEntry) {
     if (!isAddressValid(address, config.addressPrefix)) {
@@ -11,7 +12,7 @@ export async function validateAddressFromIncomingFile(stateInstance, config, add
 
     const publicKey = tracCryptoApi.address.decode(address);
 
-    if (!publicKey || publicKey.length !== 32) {
+    if (!publicKey || publicKey.length !== PUBLIC_KEY_LENGTH) {
         throw new Error(`Invalid public key: '${address}'. Please ensure all addresses are valid.`);
     }
 

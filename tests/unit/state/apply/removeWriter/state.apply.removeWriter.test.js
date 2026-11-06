@@ -14,7 +14,7 @@ import removeWriterUnstakeFailureScenario from './removeWriterUnstakeFailureScen
 import removeWriterRequesterBalanceInsufficientScenario from './removeWriterRequesterBalanceInsufficientScenario.js';
 import RoleAccessOperationValidationScenario from '../common/access-control/roleAccessOperationValidationScenario.js';
 import RequesterAddressValidationScenario from '../common/requesterAddressValidationScenario.js';
-import createRequesterPublicKeyValidationScenario from '../common/requesterPublicKeyValidationScenario.js';
+import createRequesterInvalidChecksumScenario from '../common/requesterInvalidChecksumScenario.js';
 import PartialOperationValidationScenario, {
     PartialOperationMutationStrategy
 } from '../common/payload-structure/partialOperationValidationScenario.js';
@@ -23,7 +23,7 @@ import InvalidSignatureValidationScenario, {
     SignatureMutationStrategy
 } from '../common/payload-structure/invalidSignatureValidationScenario.js';
 import InvalidAddressValidationScenario from '../common/payload-structure/invalidAddressValidationScenario.js';
-import createAddressWithInvalidPublicKeyScenario from '../common/payload-structure/addressWithInvalidPublicKeyScenario.js';
+import createAddressWithInvalidChecksumScenario from '../common/payload-structure/addressWithInvalidChecksumScenario.js';
 import TransactionValidityMismatchScenario from '../common/transactionValidityMismatchScenario.js';
 import IndexerSequenceStateInvalidScenario from '../common/indexer/indexerSequenceStateInvalidScenario.js';
 import OperationAlreadyAppliedScenario from '../common/operationAlreadyAppliedScenario.js';
@@ -112,12 +112,12 @@ new RequesterAddressValidationScenario({
     expectedLogs: ['Requester address is invalid.']
 }).performScenario();
 
-createRequesterPublicKeyValidationScenario({
-    title: 'State.apply removeWriter rejects payloads when requester public key is invalid',
+createRequesterInvalidChecksumScenario({
+    title: 'State.apply removeWriter rejects an invalid requester address checksum',
     setupScenario: setupRemoveWriterScenario,
     buildValidPayload: context => buildRemoveWriterPayload(context),
     assertStateUnchanged: assertRemoveWriterFailureState,
-    expectedLogs: ['Error while decoding requester public key.']
+    expectedLogs: ['Requester address is invalid.']
 }).performScenario();
 
 new InvalidHashValidationScenario({
@@ -163,13 +163,13 @@ new InvalidAddressValidationScenario({
     expectedLogs: ['Failed to verify validator address.']
 }).performScenario();
 
-createAddressWithInvalidPublicKeyScenario({
-    title: 'State.apply removeWriter rejects payloads when validator public key is invalid',
+createAddressWithInvalidChecksumScenario({
+    title: 'State.apply removeWriter rejects an invalid validator address checksum',
     setupScenario: setupRemoveWriterScenario,
     buildValidPayload: context => buildRemoveWriterPayload(context),
     assertStateUnchanged: assertRemoveWriterFailureState,
     addressPath: ['rao', 'va'],
-    expectedLogs: ['Failed to decode validator public key.']
+    expectedLogs: ['Failed to verify validator address.']
 }).performScenario();
 
 removeWriterInvalidValidatorSignatureScenario();

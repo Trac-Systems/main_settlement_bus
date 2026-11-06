@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package apply.operations;
+
+import "common/consensus/consensus_config.proto";
+
+// SET_GENESIS_EPOCH, SET_CONSENSUS_CONFIG
+message ConsensusControlOperation {
+    bytes tx                             = 1; // Transaction hash (unique identifier for the transaction)
+    bytes txv                            = 2; // Transaction expiration
+    .common.consensus.ConsensusConfig cc = 3; // Consensus configuration
+    bytes in                             = 4; // Nonce of the invoker (admin)
+    bytes is                             = 5; // Signature of the invoker (admin)
+}

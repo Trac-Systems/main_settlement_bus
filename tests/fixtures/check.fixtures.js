@@ -7,10 +7,16 @@ import {
     WRITER_BYTE_LENGTH,
     BOOTSTRAP_BYTE_LENGTH,
     NONCE_BYTE_LENGTH,
-    OperationType, AMOUNT_BYTE_LENGTH
+    OperationType,
+    AMOUNT_BYTE_LENGTH,
+    CONSENSUS_CONFIG_SCHEMA_VERSION_BYTE_LENGTH,
+    HTLC_LOCK_ID_BYTE_LENGTH,
+    HTLC_PREIMAGE_BYTE_LENGTH
 } from '../../src/utils/constants.js';
 import { config } from '../helpers/config.js'
 import { asAddress } from '../helpers/address.js';
+import { proofProposalApproval, proofProposalData } from '../helpers/proofProposal.js';
+import { encodeEpochProofV1 } from '../../src/codecs/apply/applyOperationCodec.js';
 
 export const TRO = {
     valid_partial_transfer: {
@@ -398,6 +404,111 @@ export const BIO = {
         in: NONCE_BYTE_LENGTH,
         ia: config.addressLength,
         am: AMOUNT_BYTE_LENGTH,
+        is: SIGNATURE_BYTE_LENGTH
+    }
+}
+
+const validEpochProofV1 = {
+    pd: proofProposalData(),
+    app: [
+        proofProposalApproval(0x15, 0x16),
+        proofProposalApproval(0x17, 0x18)
+    ]
+};
+
+export const SEO = {
+    valid_epoch_proof_v1: validEpochProofV1,
+    valid_set_epoch_operation: {
+        type: OperationType.SET_EPOCH,
+        address: addressToBuffer(asAddress('3801ebd1f12462ad335b821807c9d87e4f20d57505222284b2634a7e8e5edac2'), config.addressPrefix),
+        seo: {
+            sv: b4a.from([0x01]),
+            data: encodeEpochProofV1(validEpochProofV1)
+        }
+    },
+
+    top_fields_set_epoch: ['type', 'address', 'seo'],
+    set_epoch_value_fields: ['sv', 'data']
+}
+
+export const SGO = {
+    valid_set_genesis_epoch_operation: {
+        type: OperationType.SET_GENESIS_EPOCH,
+        address: addressToBuffer(asAddress('3801ebd1f12462ad335b821807c9d87e4f20d57505222284b2634a7e8e5edac2'), config.addressPrefix),
+        cco: {
+            tx: b4a.from('1bd4f96adeffba9c04943a82993c5b19660c3a5f572620d82a67464f381640e2', 'hex'),
+            txv: b4a.from('f24e61cf7941256b080be2133bccb520414c78021215edfcb781622da526c414', 'hex'),
+            cc: {
+                sv: b4a.from('01', 'hex'),
+                cd: b4a.from('000f42400800', 'hex')
+            },
+            in: b4a.from('0ad7fe36a35a27ea4df932b800200823a97d4db31bca247f43ad7523b0493645', 'hex'),
+            is: b4a.from('5b534be7a374148962c271d194c26cf5b1ad705ab218a87709a33fe74f9d1b811772447c939b17b2f803e3da7648f49b666b929fbb20e458ced952f147162c08', 'hex')
+        }
+    },
+
+    top_fields_set_genesis_epoch: ['type', 'address', 'cco'],
+    set_genesis_epoch_value_fields: ['tx', 'txv', 'cc', 'in', 'is'],
+    consensus_config_fields: ['sv', 'cd'],
+    required_length_of_fields_for_set_genesis_epoch: {
+        tx: HASH_BYTE_LENGTH,
+        txv: HASH_BYTE_LENGTH,
+        in: NONCE_BYTE_LENGTH,
+        is: SIGNATURE_BYTE_LENGTH
+    }
+}
+
+export const CCO = {
+    valid_set_consensus_config_operation: {
+        type: OperationType.SET_CONSENSUS_CONFIG,
+        address: addressToBuffer(asAddress('3801ebd1f12462ad335b821807c9d87e4f20d57505222284b2634a7e8e5edac2'), config.addressPrefix),
+        cco: {
+            tx: b4a.from('1bd4f96adeffba9c04943a82993c5b19660c3a5f572620d82a67464f381640e2', 'hex'),
+            txv: b4a.from('f24e61cf7941256b080be2133bccb520414c78021215edfcb781622da526c414', 'hex'),
+            cc: {
+                sv: b4a.from('01', 'hex'),
+                cd: b4a.from('{"difficulty":1000000}', 'utf8')
+            },
+            in: b4a.from('0ad7fe36a35a27ea4df932b800200823a97d4db31bca247f43ad7523b0493645', 'hex'),
+            is: b4a.from('5b534be7a374148962c271d194c26cf5b1ad705ab218a87709a33fe74f9d1b811772447c939b17b2f803e3da7648f49b666b929fbb20e458ced952f147162c08', 'hex')
+        }
+    },
+
+    top_fields_set_consensus_config: ['type', 'address', 'cco'],
+    set_consensus_config_value_fields: ['tx', 'txv', 'cc', 'in', 'is'],
+    consensus_config_fields: ['sv', 'cd'],
+    required_length_of_fields_for_set_consensus_config: {
+        tx: HASH_BYTE_LENGTH,
+        txv: HASH_BYTE_LENGTH,
+        in: NONCE_BYTE_LENGTH,
+        is: SIGNATURE_BYTE_LENGTH
+    },
+    required_length_of_consensus_config_fields: {
+        sv: CONSENSUS_CONFIG_SCHEMA_VERSION_BYTE_LENGTH
+    }
+}
+
+export const HCO = {
+    valid_htlc_claim_operation: {
+        type: OperationType.HTLC_CLAIM,
+        address: addressToBuffer(asAddress('544514242356432739de9af71deb8d526fb03d6c5c15e0a934d9a20b6710e2fe'), config.addressPrefix),
+        hco: {
+            tx: b4a.from('77d1646b575144aeafaa2eab8ac8a36cebeed04f4b275f23f77c972fc5a21b64', 'hex'),
+            txv: b4a.from('8527bf71c57a435d280ba794c31255210c4c6ed31ce619f8a5428d26afd7e38f', 'hex'),
+            li: b4a.from('37d945281373acf4a3c214228ea6bd5a9865b6d8329224870eda8f9d54431b3b', 'hex'),
+            pi: b4a.from('24ef8d04c91f8c745b336d12a80929c4863b9a4e6b54fc093bd5849019510adc', 'hex'),
+            in: b4a.from('a36760285dcfb6f61ae6bef42b743b73df2d0043aae5e9b08bb4e5cb53fd6764', 'hex'),
+            is: b4a.from('b4215709fee946172b186563b6d3315db71195f1269d4070cc721b8a1bfe824dcc8921fa2ed1c0275526a8edd2752ad3d3be6948a2ee944078694044ca75026b', 'hex')
+        }
+    },
+    top_fields_htlc_claim: ['type', 'address', 'hco'],
+    htlc_claim_value_fields: ['tx', 'txv', 'li', 'pi', 'in', 'is'],
+    required_length_of_fields_for_htlc_claim: {
+        tx: HASH_BYTE_LENGTH,
+        txv: HASH_BYTE_LENGTH,
+        li: HTLC_LOCK_ID_BYTE_LENGTH,
+        pi: HTLC_PREIMAGE_BYTE_LENGTH,
+        in: NONCE_BYTE_LENGTH,
         is: SIGNATURE_BYTE_LENGTH
     }
 }

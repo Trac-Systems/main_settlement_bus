@@ -5,43 +5,86 @@ import b4a from 'b4a';
 import {
     ACK_INTERVAL,
     ADMIN_INITIAL_BALANCE,
-    EntryType,
-    OperationType,
+    ADMIN_INITIAL_STAKED_BALANCE,
     AUTOBASE_VALUE_ENCODING,
+    BATCH_SIZE,
+    CONSENSUS_CONFIG_INDEX_SIZE,
+    CONSENSUS_CONFIG_SCHEMA_VERSION_BYTE_LENGTH,
+    ConsensusVersion,
+    CustomEventType,
+    EntryType,
+    EPOCH_BYTE_LENGTH,
+    EventType,
+    HASH_BYTE_LENGTH,
     HYPERBEE_KEY_ENCODING,
     HYPERBEE_VALUE_ENCODING,
-    BATCH_SIZE,
-    ADMIN_INITIAL_STAKED_BALANCE,
+    OperationType,
     TRAC_NAMESPACE,
-    CustomEventType
+    UINT32_MAX,
+    VDF_PROOF_BYTE_LENGTHS,
+    HTLC_MIN_LOCK_DURATION_EPOCHS,
+    PUBLIC_KEY_LENGTH,
 } from '../../utils/constants.js';
-import { isHexString, sleep } from '../../utils/helpers.js';
+import {isHexString, isTransactionRecordPut, sleep} from '../../utils/helpers.js';
 import tracCryptoApi from 'trac-crypto-api';
-import Check from '../../utils/check.js';
-import { safeDecodeApplyOperation } from '../../utils/protobuf/operationHelpers.js';
-import { createMessage, ZERO_WK, NULL_BUFFER } from '../../utils/buffer.js';
+import {verifyWesolowski} from '@tracsystems/trac-vdf';
+import StateValidationSchema from './validators/StateValidationSchema.js';
+import {
+    safeDecodeApplyOperation,
+    safeDecodeConsensusConfig,
+    safeDecodeEpochProofV1,
+    safeEncodeConsensusConfig,
+    safeEncodeEpochProofV1,
+    safeEncodeEpochRecord
+} from '../../codecs/apply/applyOperationCodec.js';
+import {
+    createMessage,
+    deepCopyBuffer,
+    incrementBuffer,
+    isBufferValid,
+    isZeroBuffer,
+    NULL_BUFFER,
+    safeReadUint32BE,
+    safeReadUint8,
+    safeToUIntString,
+    safeWriteUInt32BE,
+    uint16ToBuffer,
+    ZERO_WK
+} from '../../utils/buffer.js';
+import {
+    safeDecodeProofProposal,
+    safeDecodeProofProposalApproval
+} from '../../codecs/consensus/v1/consensusV1OperationCodec.js';
 import addressUtils from './utils/address.js';
 import adminEntryUtils from './utils/adminEntry.js';
-import nodeEntryUtils, { setWritingKey, NODE_ENTRY_SIZE } from './utils/nodeEntry.js';
+import nodeEntryUtils, {NODE_ENTRY_SIZE, setWritingKey} from './utils/nodeEntry.js';
 import nodeRoleUtils from './utils/roles.js';
 import lengthEntryUtils from './utils/lengthEntry.js';
-import transactionUtils from './utils/transaction.js';
+import transactionUtils, {Status} from './utils/transaction.js';
 import {
     BALANCE_FEE,
-    toBalance,
-    PERCENT_75,
-    PERCENT_50,
-    PERCENT_25,
     BALANCE_TO_STAKE,
     BALANCE_ZERO,
+    PERCENT_25,
+    PERCENT_50,
+    PERCENT_75,
+    toBalance,
     toTerm,
 } from './utils/balance.js';
-import { safeWriteUInt32BE } from '../../utils/buffer.js';
 import deploymentEntryUtils from './utils/deploymentEntry.js';
-import { deepCopyBuffer } from '../../utils/buffer.js';
-import { Status } from './utils/transaction.js';
+import * as escrowEntryUtils from './utils/escrowEntry.js';
 import remote from 'hypercore/lib/fully-remote-proof.js'
 import PQueue from 'p-queue';
+import {createGenesisEpochProof} from './utils/epochProof.js';
+import {decodeVersionedConsensusConfig} from '../../utils/consensusConfig.js';
+import {safeDecodeVdfConfig} from '../../codecs/consensus/v1/vdfConfigCodec.js';
+import { readEpochAppenderSelectionContext, readEpochAppendOutcome } from '../consensus/epochAppenderSelection/epochAppenderSelectionLedgerReader.js';
+import _ from 'lodash';
+import {StateEventQueue} from './StateEventQueue.js';
+import {
+    createHtlcLockSigningMessage,
+    verifyOrderedHtlcCosignerSignatures,
+} from '../../utils/htlcLock.js';
 import { ConfirmationWatch } from './ConfirmationWatch.js';
 
 const OVERSIZED_BATCH_PENALTY_MULTIPLIER = BATCH_SIZE;
@@ -56,7 +99,10 @@ class State extends ReadyResource {
     #writingKey;
     #config
     #wallet
+    #stateValidationSchema;
     #activeWriterCountCache = new Map();
+    #stateEventQueue = new StateEventQueue();
+    #viewUpdateListener;
     #confirmationWatch = null;
 
     /**
@@ -71,7 +117,8 @@ class State extends ReadyResource {
         this.#wallet = wallet
         this.#store = store;
 
-        this.check = new Check(config);
+        this.#stateValidationSchema = new StateValidationSchema(config);
+        this.#viewUpdateListener = this.handleViewUpdate.bind(this);
         this.#base = new Autobase(this.#store, this.#config.bootstrap, {
             ackInterval: ACK_INTERVAL,
             valueEncoding: AUTOBASE_VALUE_ENCODING,
@@ -90,6 +137,10 @@ class State extends ReadyResource {
         return this.#writingKey;
     }
 
+    get stateValidationSchema() {
+        return this.#stateValidationSchema;
+    }
+
     get applyHandler() {
         return this.#apply.bind(this);
     }
@@ -98,6 +149,11 @@ class State extends ReadyResource {
         console.log("State initialization...")
         await this.#base.ready();
         this.#writingKey = this.#base.local.key;
+
+        // Catch-up events describe state which is already available at startup.
+        this.#stateEventQueue.clear();
+        this.#base.on('update', this.#viewUpdateListener);
+        await this.#listeners()
         this.#confirmationWatch = new ConfirmationWatch(this.#base, { timeout: this.#config.confirmationStallTimeout });
         this.#confirmationWatch.start();
     }
@@ -105,16 +161,55 @@ class State extends ReadyResource {
     async _close() {
         console.log("State: closing gracefully...");
         this.#confirmationWatch?.stop();
+
+        this.#base.off('update', this.#viewUpdateListener);
+        this.#stateEventQueue.clear();
+        this.removeAllListeners();
+
         if (this.#bee !== null) {
             await this.#bee.close();
         }
         await sleep(100);
 
+        [EventType.IS_INDEXER, 
+            EventType.IS_NON_INDEXER,
+            EventType.WRITABLE,
+            EventType.UNWRITABLE
+        ].forEach(event => {
+            this.#base.removeAllListeners(event)
+        })
+
         if (this.#base !== null) {
             await this.#base.close();
         }
         await sleep(100);
+    }
 
+
+    async #listeners() {
+        this.#base.on(EventType.IS_INDEXER, () => {
+            console.log("Current node is an indexer");
+        });
+
+        this.#base.on(EventType.IS_NON_INDEXER, async () => {
+            // Prevent further actions if closing is in progress
+            // The reason is that getNodeEntry is async and may cause issues if we will access state after closing
+            console.log("Current node is not an indexer anymore");
+        });
+
+        this.#base.on(EventType.WRITABLE, async () => {
+            console.log("Current node is writable");
+        });
+
+        this.#base.on(EventType.UNWRITABLE, async () => {
+            console.log("Current node is unwritable");
+        });
+    }
+
+    #emitEvent(event, ...args) {
+        try {
+            this.emit(event, ...args)
+        } catch (_ignored) { }
     }
 
     isWritable() {
@@ -125,12 +220,120 @@ class State extends ReadyResource {
         return this.#base.isIndexer;
     }
 
+    async indexerCount() {
+        return (await this.getIndexersEntry()).length;
+    }
+
     getUnsignedLength() {
         return this.#base.view.core.length;
     }
 
     getSignedLength() {
         return this.#base.view.core.signedLength;
+    }
+
+    /**
+     * Reads the current epoch id from signed state.
+     *
+     * @returns {Promise<bigint|null>} Current epoch id, or `null` when genesis
+     * epoch state has not been initialized.
+     */
+    async getCurrentEpoch() {
+        const currentEpoch = await this.getSigned(EntryType.EPOCH_CURRENT);
+        return _.isNil(currentEpoch) ? null : currentEpoch.readBigUInt64BE(0);
+    }
+
+    async getCurrentEpochUnsigned() {
+        const currentEpoch = await this.get(EntryType.EPOCH_CURRENT);
+        return isBufferValid(currentEpoch, EPOCH_BYTE_LENGTH) ? currentEpoch.readBigUInt64BE(0) : null;
+    }
+
+    /**
+     * Reads the required current epoch id from signed state.
+     *
+     * @returns {Promise<bigint>} Current epoch id.
+     * @throws {Error} When genesis epoch state has not been initialized.
+     */
+    async requireCurrentEpoch() {
+        const currentEpoch = await this.getCurrentEpoch();
+        if (_.isNil(currentEpoch)) {
+            throw new Error(
+                'Current epoch is not initialized. Genesis epoch has not been set.'
+            );
+        }
+        return currentEpoch;
+    }
+
+    /**
+     * Reads the epoch hash stored under `/epoch/<epoch>`.
+     *
+     * @param {bigint|number|string} count Epoch id.
+     * @returns {Promise<Buffer|null>} Epoch hash, or `null` when the epoch is not stored.
+     * @throws {Error} When epoch id is missing or invalid.
+     */
+    async getEpoch(count) {
+        if (_.isNil(count)) {
+            throw new Error(
+                'Cannot read epoch: epoch id is required.'
+            );
+        }
+
+        const epochId = typeof count === 'bigint' ? count : BigInt(count);
+        return await this.getSigned(EntryType.EPOCH + epochId.toString());
+    }
+
+    /**
+     * Reads the required epoch hash stored under `/epoch/<epoch>`.
+     *
+     * @param {bigint|number|string} count Epoch id.
+     * @returns {Promise<Buffer>} Epoch hash.
+     * @throws {Error} When epch id is missing or invalid, or the epoch is not stored.
+     */
+    async requireEpoch(count) {
+        const epochHash = await this.getEpoch(count);
+        if (_.isNil(epochHash)) {
+            const epochId = typeof count === 'bigint' ? count : BigInt(count);
+            throw new Error(
+                `Cannot read epoch ${epochId}: epoch is not initialized or does not exist.`
+            );
+        }
+        return epochHash;
+    }
+
+    /**
+     * Reads the encoded epoch record stored under `/epochHash/<epochHash>`.
+     * Decode its { sv, data } envelope with decodeEpochRecord, then decode data
+     * according to the stored sv, not the currently active consensus version.
+     *
+     * @param {Buffer|string} epochHash Epoch hash as a buffer or hex string.
+     * @returns {Promise<Buffer|null>} Encoded epoch record, or `null` when it is not stored.
+     * @throws {Error} When epoch hash is missing.
+     */
+    async getEpochProof(epochHash) {
+        if (_.isNil(epochHash)) {
+            throw new Error('Cannot read epoch proof: epoch hash is required.');
+        }
+
+        const epochHashString = b4a.isBuffer(epochHash) ? epochHash.toString('hex') : epochHash.toString();
+        return await this.getSigned(EntryType.EPOCH_HASH + epochHashString);
+    }
+
+    /**
+     * Reads the required encoded { sv, data } epoch record under `/epochHash/<epochHash>`.
+     *
+     * @param {Buffer|string} epochHash Epoch hash as a buffer or hex string.
+     * @returns {Promise<Buffer>} Encoded epoch record.
+     * @throws {Error} When epoch hash is missing or the epoch proof is not stored.
+     */
+    async requireEpochProof(epochHash) {
+        const epochProof = await this.getEpochProof(epochHash);
+        if (_.isNil(epochProof)) {
+            const epochHashString = b4a.isBuffer(epochHash) ? epochHash.toString('hex') : epochHash.toString();
+            throw new Error(
+                `Cannot read epoch proof ${epochHashString}: epoch proof is not initialized or does not exist.`
+            );
+        }
+        return epochProof;
     }
 
     getFee() {
@@ -154,10 +357,22 @@ class State extends ReadyResource {
         return false;
     }
 
-    async getSigned(key) {
+    /**
+     * Reads a value from the view checked out at the current signed length.
+     * Consensus channel admission uses { wait: false, update: false } to avoid
+     * waiting for replication while deciding whether to open the channel.
+     *
+     * @param {string|Buffer} key Entry key.
+     * @param {object} [options={}] Read options forwarded to Hyperbee.
+     * @param {boolean} [options.wait=true] Wait for missing blocks to be replicated.
+     *   When false, a missing block causes an error rather than waiting.
+     * @param {boolean} [options.update=true] Allow Hyperbee to update an empty view before reading.
+     * @returns {Promise<Buffer|null>} Stored value, or null if the key does not exist.
+     */
+    async getSigned(key, options = {}) {
         const view_session = this.#base.view.checkout(this.#base.view.core.signedLength);
         try {
-            const result = await view_session.get(key);
+            const result = await view_session.get(key, options);
             return result ? result.value : null;
         } finally {
             await view_session.close();
@@ -197,6 +412,11 @@ class State extends ReadyResource {
         return !!adminEntry && this.#wallet?.address === adminEntry?.address && b4a.equals(adminEntry?.wk, this.writingKey)
     }
 
+    async isAdminAddress(targetAddress) {
+        const adminEntry = await this.getAdminEntry();
+        return (adminEntry?.address === targetAddress);
+    }
+
     async isAdminAllowedToValidate() {
         if (!this.writingKey) return false;
 
@@ -217,6 +437,23 @@ class State extends ReadyResource {
         return Object.values(this.#base.system.indexers);
     }
 
+    /**
+     * Checks whether a bech32m address belongs to a registered indexer.
+     * @param {string} targetAddress Address to check.
+     * @param {object} [options] Hyperbee read options, e.g. `wait: false` for channel admission.
+     * @returns {Promise<boolean>} True when the address belongs to an indexer in signed state.
+     */
+    async isIndexerAddress(targetAddress, options) {
+        const targetAddressBuffer = addressUtils.addressToBuffer(targetAddress, this.#config.addressPrefix);
+        if (targetAddressBuffer.length === 0) return false;
+        const entries = await this.getIndexersEntry();
+        for (const entry of entries) {
+            const address = await this.getSigned(EntryType.WRITER_ADDRESS + b4a.toString(entry.key, 'hex'), options);
+            if (address && b4a.equals(targetAddressBuffer, address)) return true;
+        }
+        return false;
+    }
+
     async getActiveWriterCount(excludeAdmin = false) {
         const cached = this.#activeWriterCountCache.get(excludeAdmin);
         const systemLength = this.#base.system?.core?.length ?? -1;
@@ -227,6 +464,10 @@ class State extends ReadyResource {
 
         const activeAddresses = new Set();
         const adminAddress = (await this.getAdminEntry())?.address ?? null;
+
+        // sometimes autobase swaps _applyState while performing a bump which will generate the system to be "empty" (it is just a proxy getter to applyState with a null check).
+        // since this thing is responsible for permissions, it was opted out to perform a realignment check prior instead of safe navigating to respond the query (especially given that there is a cache in place).
+        await this.refresh()
 
         for await (const { key, value } of this.#base.system.list()) {
             if (!key || !value || value.isRemoved) continue;
@@ -250,11 +491,26 @@ class State extends ReadyResource {
         return count;
     }
 
+    async refresh() {
+        return await this.#base.update()
+    }
+
+    /**
+     * Publishes apply events after the related state changes become signed.
+     * The optional length is used by tests which provide their own Autobase instance.
+     *
+     * @param {number} signedLength current signed view length
+     */
+    handleViewUpdate(signedLength = this.getSignedLength()) {
+        this.#stateEventQueue.flush(signedLength, (event, ...args) => {
+            this.#emitEvent(event, ...args);
+        });
+    }
+
     async isWkInIndexersEntry(wk) {
         if (wk === null) return false;
-        const indexerListHasWk = Object.values(this.#base.system.indexers)
+        return Object.values(this.#base.system.indexers)
             .some(entry => b4a.equals(entry.key, wk));
-        return indexerListHasWk;
     }
 
     async getWriterLength() {
@@ -368,7 +624,7 @@ class State extends ReadyResource {
         if (initialization === null) {
             return false
         } else {
-            return b4a.equals(initialization, safeWriteUInt32BE(0, 0))
+            return b4a.equals(initialization, safeWriteUInt32BE(0))
         }
     }
 
@@ -416,16 +672,9 @@ class State extends ReadyResource {
             lte: endSeq
         });
 
-        const filters = (entry) => {
-            const isPut = entry.type === "put";
-            const isHex = isHexString(entry.key);
-            const is64 = entry.key.length === 64;
-            return isPut && isHex && is64;
-        }
-
         let hashes = [];
         for await (const entry of historyStream) {
-            if (filters(entry)) {
+            if (isTransactionRecordPut(entry)) {
                 hashes.push({ hash: entry.key, confirmed_length: entry.seq });
             }
         }
@@ -447,12 +696,63 @@ class State extends ReadyResource {
         return this.#bee;
     }
 
+    async getSignedConsensusConfig() {
+        const currentConfigPointer = await this.getSigned(EntryType.CONSENSUS_CONFIG_CURRENT);
+        if (_.isNil(currentConfigPointer)) return null;
+
+        if (!b4a.isBuffer(currentConfigPointer) || currentConfigPointer.length !== 4) {
+            throw new Error('Invalid current consensus config pointer.');
+        }
+
+        const currentConfigIndex = currentConfigPointer.readUInt32BE(0);
+
+        const encodedConsensusConfig = await this.getSigned(EntryType.CONSENSUS_CONFIG_RECORD + currentConfigIndex);
+        if (_.isNil(encodedConsensusConfig)) {
+            throw new Error(`Consensus config record ${currentConfigIndex} does not exist.`);
+        }
+
+        return decodeVersionedConsensusConfig(encodedConsensusConfig);
+    }
+
+    async requireSignedConsensusConfig() {
+        const consensusConfig = await this.getSignedConsensusConfig();
+        if (_.isNil(consensusConfig)) {
+            throw new Error('Consensus config is not initialized.');
+        }
+        return consensusConfig;
+    }
+
+    /** @returns {Promise<import('../consensus/epochAppenderSelection/epochAppenderSelectionState.js').EpochAppenderSelectionContext>} Signed arbitration context. */
+    getEpochAppenderSelectionContext() {
+        return readEpochAppenderSelectionContext(this.#base, this.#config);
+    }
+
+    /**
+     * @param {import('../consensus/epochAppenderSelection/epochAppenderSelectionState.js').EpochAppendPublication} publication
+     * @returns {Promise<import('../consensus/epochAppenderSelection/epochAppenderSelectionState.js').EpochAppendOutcomeResult>}
+     */
+    getEpochAppendOutcome(publication) {
+        return readEpochAppendOutcome(this.#base, publication);
+    }
+
+    /** Authorizes the epoch append inside the writer queue before writing to Autobase. */
+    appendEpoch(payload, authorizeEpochAppend) {
+        return this.#writeQueue.add(async () => {
+            await authorizeEpochAppend({
+                writerKey: this.#base.local.key.toString('hex'),
+                from: this.#base.local.length,
+            });
+            return this.#base.append(payload);
+        });
+    }
+
     // ATTENTION: DO NOT USE METHODS ABOVE IN APPLY PART!
     ///////////////////////////////APPLY////////////////////////////////////
 
     async #apply(nodes, view, base) {
         const batch = view.batch();
         const batchInvoker = nodes[0].from.key;
+        const postApplyEvents = [];
 
 
         if (nodes.length > BATCH_SIZE) {
@@ -470,7 +770,7 @@ class State extends ReadyResource {
                 this.#safeLogApply("Node payload exceeds the maximum operation payload size.", node.from.key)
                 invalidOperations++;
                 continue;
-            };
+            }
 
             const op = safeDecodeApplyOperation(node.value);
 
@@ -483,7 +783,7 @@ class State extends ReadyResource {
             const handler = this.#getApplyOperationHandler(op.type);
 
             if (handler) {
-                const result = await handler(op, view, base, node, batch);
+                const result = await handler(op, view, base, node, batch, postApplyEvents);
                 if (result === Status.FAILURE) {
                     invalidOperations++;
                 } else if (result === Status.IGNORE) {
@@ -504,6 +804,14 @@ class State extends ReadyResource {
 
         await batch.flush();
         await batch.close();
+
+        if (postApplyEvents.length !== 0) {
+            try {
+                this.#stateEventQueue.enqueue(postApplyEvents, view.core.length);
+            } catch (error) {
+                this.#safeLogApply('StateEventQueue', `Failed to queue post apply events: ${String(error)}`);
+            }
+        }
     }
 
     #getApplyOperationHandler(type) {
@@ -521,12 +829,644 @@ class State extends ReadyResource {
             [OperationType.BOOTSTRAP_DEPLOYMENT]: this.#handleApplyBootstrapDeploymentOperation.bind(this),
             [OperationType.TX]: this.#handleApplyTxOperation.bind(this),
             [OperationType.TRANSFER]: this.#handleApplyTransferOperation.bind(this),
+            [OperationType.SET_EPOCH]: this.#handleApplySetEpochOperation.bind(this),
+            [OperationType.SET_GENESIS_EPOCH]: this.#handleApplySetGenesisEpoch.bind(this),
+            [OperationType.SET_CONSENSUS_CONFIG]: this.#handleApplySetConsensusConfig.bind(this),
+            [OperationType.HTLC_LOCK]: this.#handleApplyHtlcLockOperation.bind(this),
+            [OperationType.HTLC_CLAIM]: this.#handleApplyHtlcClaimOperation.bind(this),
+            [OperationType.HTLC_REFUND]: this.#handleApplyHtlcRefundOperation.bind(this),
         };
         return handlers[type] || null;
     }
 
+    async #handleApplyHtlcLockOperation(op, view, base, node, batch) {
+        if (!this.#stateValidationSchema.validateHtlcLockOperation(op)) {
+            this.#safeLogApply(OperationType.HTLC_LOCK, "Contract schema validation failed.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        if (!Object.hasOwn(op.hlo, "vs") || !Object.hasOwn(op.hlo, "va") || !Object.hasOwn(op.hlo, "vn")) {
+            this.#safeLogApply(OperationType.HTLC_LOCK, "Operation is not complete.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        if (b4a.equals(op.address, op.hlo.va)) {
+            this.#safeLogApply(OperationType.HTLC_LOCK, "Validator cannot sign its own transaction.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        if (b4a.equals(op.hlo.in, op.hlo.vn)) {
+            this.#safeLogApply(OperationType.HTLC_LOCK, "Nonces should not be the same.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        if (b4a.equals(op.hlo.is, op.hlo.vs)) {
+            this.#safeLogApply(OperationType.HTLC_LOCK, "Signatures should not be the same.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        const lockerAddressString = addressUtils.bufferToAddress(op.address, this.#config.addressPrefix);
+        if (lockerAddressString === null) {
+            this.#safeLogApply(OperationType.HTLC_LOCK, "Locker address is invalid.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        const lockerPublicKey = tracCryptoApi.address.decodeSafe(lockerAddressString);
+        if (
+            !b4a.isBuffer(lockerPublicKey) ||
+            lockerPublicKey.length !== PUBLIC_KEY_LENGTH ||
+            isZeroBuffer(lockerPublicKey)
+        ) {
+            this.#safeLogApply(OperationType.HTLC_LOCK, "Failed to decode locker public key.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        let lockerMessage;
+        try {
+            lockerMessage = createHtlcLockSigningMessage(
+                this.#config.networkId,
+                op.address,
+                op.hlo
+            );
+        } catch {
+            this.#safeLogApply(OperationType.HTLC_LOCK, "Invalid locker message.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        const regeneratedTxHash = await tracCryptoApi.hash.blake3Safe(lockerMessage);
+        if (!isBufferValid(regeneratedTxHash, HASH_BYTE_LENGTH)) {
+            this.#safeLogApply(OperationType.HTLC_LOCK, "Failed to hash locker message.", node.from.key);
+            return Status.FAILURE;
+        }
+        if (!b4a.equals(regeneratedTxHash, op.hlo.tx)) {
+            this.#safeLogApply(OperationType.HTLC_LOCK, "Message hash does not match the tx_hash.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        if (!tracCryptoApi.signature.verify(op.hlo.is, regeneratedTxHash, lockerPublicKey)) {
+            this.#safeLogApply(OperationType.HTLC_LOCK, "Failed to verify locker signature.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        if (!b4a.equals(lockerPublicKey, op.hlo.ss[0])) {
+            this.#safeLogApply(OperationType.HTLC_LOCK, "Signer zero does not match the locker.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        if (
+            1 + op.hlo.cs.length < op.hlo.th[0] ||
+            !verifyOrderedHtlcCosignerSignatures(op.hlo.cs, op.hlo.tx, op.hlo.ss)
+        ) {
+            this.#safeLogApply(OperationType.HTLC_LOCK, "HTLC cosigner authorization is invalid.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        const validatorAddressString = addressUtils.bufferToAddress(op.hlo.va, this.#config.addressPrefix);
+        if (validatorAddressString === null) {
+            this.#safeLogApply(OperationType.HTLC_LOCK, "Validator address is invalid.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        const validatorPublicKey = tracCryptoApi.address.decodeSafe(validatorAddressString);
+        if (
+            !b4a.isBuffer(validatorPublicKey) ||
+            validatorPublicKey.length !== PUBLIC_KEY_LENGTH ||
+            isZeroBuffer(validatorPublicKey)
+        ) {
+            this.#safeLogApply(OperationType.HTLC_LOCK, "Failed to decode validator public key.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        const validatorMessage = createMessage(
+            this.#config.networkId,
+            op.hlo.tx,
+            op.hlo.vn,
+            OperationType.HTLC_LOCK
+        );
+        if (validatorMessage.length === 0) {
+            this.#safeLogApply(OperationType.HTLC_LOCK, "Invalid validator message.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        const validatorMessageHash = await tracCryptoApi.hash.blake3Safe(validatorMessage);
+        if (!isBufferValid(validatorMessageHash, HASH_BYTE_LENGTH)) {
+            this.#safeLogApply(OperationType.HTLC_LOCK, "Failed to hash validator message.", node.from.key);
+            return Status.FAILURE;
+        }
+        if (!tracCryptoApi.signature.verify(op.hlo.vs, validatorMessageHash, validatorPublicKey)) {
+            this.#safeLogApply(OperationType.HTLC_LOCK, "Failed to verify validator signature.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        const indexersSequenceState = await this.#getIndexerSequenceStateApply(base);
+        if (indexersSequenceState === null) {
+            this.#safeLogApply(OperationType.HTLC_LOCK, "Indexer sequence state is invalid.", node.from.key);
+            return Status.FAILURE;
+        }
+        if (!b4a.equals(op.hlo.txv, indexersSequenceState)) {
+            this.#safeLogApply(OperationType.HTLC_LOCK, "Transaction was not executed.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        const validatorEntryBuffer = await this.#getEntryApply(validatorAddressString, batch);
+        if (!await this.#isValidatorValidApply(validatorEntryBuffer, node, op)) {
+            this.#safeLogApply(OperationType.HTLC_LOCK, "Validator consistency check failed.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        const lockIdHex = b4a.toString(op.hlo.tx, 'hex');
+        const operationEntry = await this.#getEntryApply(lockIdHex, batch);
+        if (operationEntry !== null) {
+            this.#safeLogApply(OperationType.HTLC_LOCK, "Operation has already been applied.", node.from.key);
+            return Status.IGNORE;
+        }
+
+        const escrowKey = EntryType.HTLC_ESCROW + lockIdHex;
+        const existingEscrow = await this.#getEntryApply(escrowKey, batch);
+        if (existingEscrow !== null) {
+            this.#safeLogApply(OperationType.HTLC_LOCK, "HTLC escrow already exists.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        const currentEpochBuffer = await this.#getEntryApply(EntryType.EPOCH_CURRENT, batch);
+        if (!isBufferValid(currentEpochBuffer, EPOCH_BYTE_LENGTH)) {
+            this.#safeLogApply(OperationType.HTLC_LOCK, "Current epoch is not initialized or is invalid.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        const currentEpoch = currentEpochBuffer.readBigUInt64BE(0);
+        const refundEpoch = op.hlo.re.readBigUInt64BE(0);
+        if (refundEpoch < currentEpoch + HTLC_MIN_LOCK_DURATION_EPOCHS) {
+            this.#safeLogApply(OperationType.HTLC_LOCK, "Refund epoch is below the minimum lock duration.", node.from.key);
+            return Status.IGNORE;
+        }
+
+        const principal = toBalance(op.hlo.am);
+        const surchargeFee = toBalance(op.hlo.fa);
+        const networkFee = toBalance(transactionUtils.FEE);
+        if (principal === null || surchargeFee === null || networkFee === null) {
+            this.#safeLogApply(OperationType.HTLC_LOCK, "Invalid HTLC or network fee amount.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        const escrowAmount = principal.add(surchargeFee);
+        const totalDeductedAmount = escrowAmount?.add(networkFee) ?? null;
+        if (escrowAmount === null || totalDeductedAmount === null) {
+            this.#safeLogApply(OperationType.HTLC_LOCK, "HTLC total amount overflow.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        const lockerEntryBuffer = await this.#getEntryApply(lockerAddressString, batch);
+        const lockerEntry = nodeEntryUtils.decode(lockerEntryBuffer);
+        if (lockerEntry === null) {
+            this.#safeLogApply(OperationType.HTLC_LOCK, "Locker account does not exist or is invalid.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        const lockerBalance = toBalance(lockerEntry.balance);
+        if (lockerBalance === null) {
+            this.#safeLogApply(OperationType.HTLC_LOCK, "Locker balance is invalid.", node.from.key);
+            return Status.FAILURE;
+        }
+        if (!lockerBalance.greaterThanOrEquals(totalDeductedAmount)) {
+            this.#safeLogApply(OperationType.HTLC_LOCK, "Insufficient locker balance.", node.from.key);
+            return Status.IGNORE;
+        }
+
+        const updatedLockerBalance = lockerBalance.sub(totalDeductedAmount);
+        const updatedLockerEntry = updatedLockerBalance?.update(lockerEntryBuffer) ?? null;
+        if (updatedLockerEntry === null) {
+            this.#safeLogApply(OperationType.HTLC_LOCK, "Failed to update locker balance.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        const validatorEntry = nodeEntryUtils.decode(validatorEntryBuffer);
+        const validatorBalance = validatorEntry ? toBalance(validatorEntry.balance) : null;
+        const validatorReward = networkFee.percentage(PERCENT_75);
+        if (validatorBalance === null || validatorReward === null) {
+            this.#safeLogApply(OperationType.HTLC_LOCK, "Validator balance or reward is invalid.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        const updatedValidatorBalance = validatorBalance.add(validatorReward);
+        const updatedValidatorEntry = updatedValidatorBalance?.update(validatorEntryBuffer) ?? null;
+        if (updatedValidatorEntry === null) {
+            this.#safeLogApply(OperationType.HTLC_LOCK, "Failed to update validator balance.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        const escrowEntry = escrowEntryUtils.init({
+            lockId: op.hlo.tx,
+            lockerAddress: op.address,
+            claimRecipientAddress: op.hlo.ca,
+            refundRecipientAddress: op.hlo.ra,
+            amount: op.hlo.am,
+            additionalFeeAmount: op.hlo.fa,
+            additionalFeeRecipientAddress: op.hlo.fr,
+            hashLock: op.hlo.hl,
+            refundEpoch: op.hlo.re,
+            metadata: op.hlo.md,
+        }, this.#config.addressPrefix);
+        if (escrowEntry.length === 0) {
+            this.#safeLogApply(OperationType.HTLC_LOCK, "Failed to encode HTLC escrow.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        await batch.put(lockerAddressString, updatedLockerEntry);
+        await batch.put(validatorAddressString, updatedValidatorEntry);
+        await batch.put(escrowKey, escrowEntry);
+        await batch.put(lockIdHex, node.value);
+
+        if (this.#config.enableTxApplyLogs) {
+            console.info(`HTLC lock operation: ${lockIdHex} has been appended.`);
+        }
+        return Status.SUCCESS;
+    }
+
+    async #handleApplyHtlcClaimOperation(op, view, base, node, batch) {
+        if (!this.#stateValidationSchema.validateHtlcClaimOperation(op)) {
+            this.#safeLogApply(OperationType.HTLC_CLAIM, "Contract schema validation failed.", node.from.key);
+            return Status.FAILURE;
+        }
+        if (!Object.hasOwn(op.hco, "vs") || !Object.hasOwn(op.hco, "va") || !Object.hasOwn(op.hco, "vn")) {
+            this.#safeLogApply(OperationType.HTLC_CLAIM, "Operation is not complete.", node.from.key);
+            return Status.FAILURE;
+        }
+        if (b4a.equals(op.address, op.hco.va)) {
+            this.#safeLogApply(OperationType.HTLC_CLAIM, "Validator cannot sign its own transaction.", node.from.key);
+            return Status.FAILURE;
+        }
+        if (b4a.equals(op.hco.in, op.hco.vn)) {
+            this.#safeLogApply(OperationType.HTLC_CLAIM, "Nonces should not be the same.", node.from.key);
+            return Status.FAILURE;
+        }
+        if (b4a.equals(op.hco.is, op.hco.vs)) {
+            this.#safeLogApply(OperationType.HTLC_CLAIM, "Signatures should not be the same.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        const submitterAddress = addressUtils.bufferToAddress(op.address, this.#config.addressPrefix);
+        if (submitterAddress === null) {
+            this.#safeLogApply(OperationType.HTLC_CLAIM, "Submitter address is invalid.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        const submitterPublicKey = tracCryptoApi.address.decodeSafe(submitterAddress);
+        if (!isBufferValid(submitterPublicKey, PUBLIC_KEY_LENGTH) || isZeroBuffer(submitterPublicKey)) {
+            this.#safeLogApply(OperationType.HTLC_CLAIM, "Submitter public key is invalid.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        const message = createMessage(
+            this.#config.networkId,
+            op.hco.txv,
+            op.hco.li,
+            op.hco.pi,
+            op.hco.in,
+            OperationType.HTLC_CLAIM
+        );
+        if (message.length === 0) {
+            this.#safeLogApply(OperationType.HTLC_CLAIM, "Invalid claim message.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        const txHash = await tracCryptoApi.hash.blake3Safe(message);
+        if (!isBufferValid(txHash, HASH_BYTE_LENGTH)) {
+            this.#safeLogApply(OperationType.HTLC_CLAIM, "Failed to hash claim message.", node.from.key);
+            return Status.FAILURE;
+        }
+        if (!b4a.equals(txHash, op.hco.tx)) {
+            this.#safeLogApply(OperationType.HTLC_CLAIM, "Claim transaction hash is invalid.", node.from.key);
+            return Status.FAILURE;
+        }
+        if (!tracCryptoApi.signature.verify(op.hco.is, txHash, submitterPublicKey)) {
+            this.#safeLogApply(OperationType.HTLC_CLAIM, "Claim submitter signature is invalid.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        const validatorAddress = addressUtils.bufferToAddress(op.hco.va, this.#config.addressPrefix);
+        if (validatorAddress === null) {
+            this.#safeLogApply(OperationType.HTLC_CLAIM, "Validator address is invalid.", node.from.key);
+            return Status.FAILURE;
+        }
+        const validatorPublicKey = tracCryptoApi.address.decodeSafe(validatorAddress);
+        if (!isBufferValid(validatorPublicKey, PUBLIC_KEY_LENGTH) || isZeroBuffer(validatorPublicKey)) {
+            this.#safeLogApply(OperationType.HTLC_CLAIM, "Validator public key is invalid.", node.from.key);
+            return Status.FAILURE;
+        }
+        const validatorMessage = createMessage(
+            this.#config.networkId,
+            op.hco.tx,
+            op.hco.vn,
+            OperationType.HTLC_CLAIM
+        );
+        if (validatorMessage.length === 0) {
+            this.#safeLogApply(OperationType.HTLC_CLAIM, "Invalid validator message.", node.from.key);
+            return Status.FAILURE;
+        }
+        const validatorHash = await tracCryptoApi.hash.blake3Safe(validatorMessage);
+        if (!isBufferValid(validatorHash, HASH_BYTE_LENGTH)) {
+            this.#safeLogApply(OperationType.HTLC_CLAIM, "Failed to hash validator message.", node.from.key);
+            return Status.FAILURE;
+        }
+        if (!tracCryptoApi.signature.verify(op.hco.vs, validatorHash, validatorPublicKey)) {
+            this.#safeLogApply(OperationType.HTLC_CLAIM, "Validator signature is invalid.", node.from.key);
+            return Status.FAILURE;
+        }
+        const validatorEntry = await this.#getEntryApply(validatorAddress, batch);
+        if (!await this.#isValidatorValidApply(validatorEntry, node, op)) {
+            this.#safeLogApply(OperationType.HTLC_CLAIM, "Validator consistency check failed.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        const indexersSequenceState = await this.#getIndexerSequenceStateApply(base);
+        if (indexersSequenceState === null || !b4a.equals(op.hco.txv, indexersSequenceState)) {
+            this.#safeLogApply(OperationType.HTLC_CLAIM, "Transaction was not executed.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        const claimTxHashHex = b4a.toString(op.hco.tx, 'hex');
+        if (await this.#getEntryApply(claimTxHashHex, batch) !== null) {
+            this.#safeLogApply(OperationType.HTLC_CLAIM, "Operation has already been applied.", node.from.key);
+            return Status.IGNORE;
+        }
+
+        const escrowKey = EntryType.HTLC_ESCROW + b4a.toString(op.hco.li, 'hex');
+        const escrowBuffer = await this.#getEntryApply(escrowKey, batch);
+        if (escrowBuffer === null) {
+            this.#safeLogApply(OperationType.HTLC_CLAIM, "HTLC escrow does not exist.", node.from.key);
+            return Status.FAILURE;
+        }
+        const escrow = escrowEntryUtils.decode(escrowBuffer, this.#config.addressPrefix);
+        if (!escrow || !b4a.equals(escrow.lockId, op.hco.li)) {
+            this.#safeLogApply(OperationType.HTLC_CLAIM, "HTLC escrow is invalid.", node.from.key);
+            return Status.FAILURE;
+        }
+        if (escrow.status !== escrowEntryUtils.Status.PENDING) {
+            this.#safeLogApply(OperationType.HTLC_CLAIM, "HTLC escrow is already settled.", node.from.key);
+            return Status.IGNORE;
+        }
+
+        const currentEpoch = await this.#getEntryApply(EntryType.EPOCH_CURRENT, batch);
+        if (!isBufferValid(currentEpoch, EPOCH_BYTE_LENGTH)) {
+            this.#safeLogApply(OperationType.HTLC_CLAIM, "Current epoch is not initialized or is invalid.", node.from.key);
+            return Status.FAILURE;
+        }
+        if (b4a.compare(currentEpoch, escrow.refundEpoch) >= 0) {
+            this.#safeLogApply(OperationType.HTLC_CLAIM, "Claim window has expired.", node.from.key);
+            return Status.IGNORE;
+        }
+
+        const settlement = escrowEntryUtils.makeClaim(escrowBuffer, op.hco.pi, currentEpoch, this.#config.addressPrefix);
+        if (settlement === null) {
+            this.#safeLogApply(OperationType.HTLC_CLAIM, "HTLC preimage or escrow transition is invalid.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        const payouts = [
+            [settlement.address, settlement.amount],
+            [settlement.additionalFeeRecipientAddress, settlement.additionalFeeAmount],
+        ];
+        const credits = new Map();
+        for (const [addressBytes, amount] of payouts) {
+            if (addressBytes === null) continue;
+            const address = addressUtils.bufferToAddress(addressBytes, this.#config.addressPrefix);
+            if (address === null || amount === null) {
+                this.#safeLogApply(OperationType.HTLC_CLAIM, "Settlement recipient or amount is invalid.", node.from.key);
+                return Status.FAILURE;
+            }
+            const total = credits.has(address) ? credits.get(address).add(amount) : amount;
+            if (total === null) {
+                this.#safeLogApply(OperationType.HTLC_CLAIM, "Settlement amount overflow.", node.from.key);
+                return Status.FAILURE;
+            }
+            credits.set(address, total);
+        }
+
+        const updatedRecipients = new Map();
+        for (const [address, amount] of credits) {
+            const entryBuffer = await this.#getEntryApply(address, batch);
+            let updatedEntry;
+            if (entryBuffer === null) {
+                updatedEntry = nodeEntryUtils.init(ZERO_WK, nodeRoleUtils.NodeRole.READER, amount.value);
+            } else {
+                const entry = nodeEntryUtils.decode(entryBuffer);
+                if (entry === null) {
+                    this.#safeLogApply(OperationType.HTLC_CLAIM, "Settlement recipient account is invalid.", node.from.key);
+                    return Status.FAILURE;
+                }
+                const balance = toBalance(entry.balance);
+                if (balance === null) {
+                    this.#safeLogApply(OperationType.HTLC_CLAIM, "Settlement recipient balance is invalid.", node.from.key);
+                    return Status.FAILURE;
+                }
+                const updatedBalance = balance.add(amount);
+                if (updatedBalance === null) {
+                    this.#safeLogApply(OperationType.HTLC_CLAIM, "Settlement recipient balance overflow.", node.from.key);
+                    return Status.FAILURE;
+                }
+                updatedEntry = updatedBalance.update(entryBuffer);
+            }
+            if (!isBufferValid(updatedEntry, NODE_ENTRY_SIZE)) {
+                this.#safeLogApply(OperationType.HTLC_CLAIM, "Failed to credit settlement recipient.", node.from.key);
+                return Status.FAILURE;
+            }
+            updatedRecipients.set(address, updatedEntry);
+        }
+
+        for (const [address, entry] of updatedRecipients) await batch.put(address, entry);
+        await batch.put(escrowKey, settlement.claimedEscrowEntry);
+        await batch.put(claimTxHashHex, node.value);
+
+        if (this.#config.enableTxApplyLogs) {
+            console.info(`HTLC claim operation: ${claimTxHashHex} has been appended.`);
+        }
+        return Status.SUCCESS;
+    }
+
+    async #handleApplyHtlcRefundOperation(op, view, base, node, batch) {
+        if (!this.#stateValidationSchema.validateHtlcRefundOperation(op)) {
+            this.#safeLogApply(OperationType.HTLC_REFUND, "Contract schema validation failed.", node.from.key);
+            return Status.FAILURE;
+        }
+        if (!Object.hasOwn(op.hro, "vs") || !Object.hasOwn(op.hro, "va") || !Object.hasOwn(op.hro, "vn")) {
+            this.#safeLogApply(OperationType.HTLC_REFUND, "Operation is not complete.", node.from.key);
+            return Status.FAILURE;
+        }
+        if (b4a.equals(op.address, op.hro.va)) {
+            this.#safeLogApply(OperationType.HTLC_REFUND, "Validator cannot sign its own transaction.", node.from.key);
+            return Status.FAILURE;
+        }
+        if (b4a.equals(op.hro.in, op.hro.vn)) {
+            this.#safeLogApply(OperationType.HTLC_REFUND, "Nonces should not be the same.", node.from.key);
+            return Status.FAILURE;
+        }
+        if (b4a.equals(op.hro.is, op.hro.vs)) {
+            this.#safeLogApply(OperationType.HTLC_REFUND, "Signatures should not be the same.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        const submitterAddress = addressUtils.bufferToAddress(op.address, this.#config.addressPrefix);
+        if (submitterAddress === null) {
+            this.#safeLogApply(OperationType.HTLC_REFUND, "Submitter address is invalid.", node.from.key);
+            return Status.FAILURE;
+        }
+        const submitterPublicKey = tracCryptoApi.address.decodeSafe(submitterAddress);
+        if (!isBufferValid(submitterPublicKey, PUBLIC_KEY_LENGTH) || isZeroBuffer(submitterPublicKey)) {
+            this.#safeLogApply(OperationType.HTLC_REFUND, "Submitter public key is invalid.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        const message = createMessage(
+            this.#config.networkId,
+            op.hro.txv,
+            op.hro.li,
+            op.hro.in,
+            OperationType.HTLC_REFUND
+        );
+        if (message.length === 0) {
+            this.#safeLogApply(OperationType.HTLC_REFUND, "Invalid refund message.", node.from.key);
+            return Status.FAILURE;
+        }
+        const txHash = await tracCryptoApi.hash.blake3Safe(message);
+        if (!isBufferValid(txHash, HASH_BYTE_LENGTH)) {
+            this.#safeLogApply(OperationType.HTLC_REFUND, "Failed to hash refund message.", node.from.key);
+            return Status.FAILURE;
+        }
+        if (!b4a.equals(txHash, op.hro.tx)) {
+            this.#safeLogApply(OperationType.HTLC_REFUND, "Refund transaction hash is invalid.", node.from.key);
+            return Status.FAILURE;
+        }
+        if (!tracCryptoApi.signature.verify(op.hro.is, txHash, submitterPublicKey)) {
+            this.#safeLogApply(OperationType.HTLC_REFUND, "Refund submitter signature is invalid.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        const validatorAddress = addressUtils.bufferToAddress(op.hro.va, this.#config.addressPrefix);
+        if (validatorAddress === null) {
+            this.#safeLogApply(OperationType.HTLC_REFUND, "Validator address is invalid.", node.from.key);
+            return Status.FAILURE;
+        }
+        const validatorPublicKey = tracCryptoApi.address.decodeSafe(validatorAddress);
+        if (!isBufferValid(validatorPublicKey, PUBLIC_KEY_LENGTH) || isZeroBuffer(validatorPublicKey)) {
+            this.#safeLogApply(OperationType.HTLC_REFUND, "Validator public key is invalid.", node.from.key);
+            return Status.FAILURE;
+        }
+        const validatorMessage = createMessage(
+            this.#config.networkId,
+            op.hro.tx,
+            op.hro.vn,
+            OperationType.HTLC_REFUND
+        );
+        if (validatorMessage.length === 0) {
+            this.#safeLogApply(OperationType.HTLC_REFUND, "Invalid validator message.", node.from.key);
+            return Status.FAILURE;
+        }
+        const validatorHash = await tracCryptoApi.hash.blake3Safe(validatorMessage);
+        if (!isBufferValid(validatorHash, HASH_BYTE_LENGTH)) {
+            this.#safeLogApply(OperationType.HTLC_REFUND, "Failed to hash validator message.", node.from.key);
+            return Status.FAILURE;
+        }
+        if (!tracCryptoApi.signature.verify(op.hro.vs, validatorHash, validatorPublicKey)) {
+            this.#safeLogApply(OperationType.HTLC_REFUND, "Validator signature is invalid.", node.from.key);
+            return Status.FAILURE;
+        }
+        const validatorEntry = await this.#getEntryApply(validatorAddress, batch);
+        if (!await this.#isValidatorValidApply(validatorEntry, node, op)) {
+            this.#safeLogApply(OperationType.HTLC_REFUND, "Validator consistency check failed.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        const indexersSequenceState = await this.#getIndexerSequenceStateApply(base);
+        if (indexersSequenceState === null || !b4a.equals(op.hro.txv, indexersSequenceState)) {
+            this.#safeLogApply(OperationType.HTLC_REFUND, "Transaction was not executed.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        const refundTxHashHex = b4a.toString(op.hro.tx, 'hex');
+        if (await this.#getEntryApply(refundTxHashHex, batch) !== null) {
+            this.#safeLogApply(OperationType.HTLC_REFUND, "Operation has already been applied.", node.from.key);
+            return Status.IGNORE;
+        }
+
+        const escrowKey = EntryType.HTLC_ESCROW + b4a.toString(op.hro.li, 'hex');
+        const escrowBuffer = await this.#getEntryApply(escrowKey, batch);
+        if (escrowBuffer === null) {
+            this.#safeLogApply(OperationType.HTLC_REFUND, "HTLC escrow does not exist.", node.from.key);
+            return Status.FAILURE;
+        }
+        const escrow = escrowEntryUtils.decode(escrowBuffer, this.#config.addressPrefix);
+        if (!escrow || !b4a.equals(escrow.lockId, op.hro.li)) {
+            this.#safeLogApply(OperationType.HTLC_REFUND, "HTLC escrow is invalid.", node.from.key);
+            return Status.FAILURE;
+        }
+        if (escrow.status !== escrowEntryUtils.Status.PENDING) {
+            this.#safeLogApply(OperationType.HTLC_REFUND, "HTLC escrow is already settled.", node.from.key);
+            return Status.IGNORE;
+        }
+
+        const currentEpoch = await this.#getEntryApply(EntryType.EPOCH_CURRENT, batch);
+        if (!isBufferValid(currentEpoch, EPOCH_BYTE_LENGTH)) {
+            this.#safeLogApply(OperationType.HTLC_REFUND, "Current epoch is not initialized or is invalid.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        if (b4a.compare(currentEpoch, escrow.refundEpoch) < 0) {
+            this.#safeLogApply(OperationType.HTLC_REFUND, "Refund epoch has not been reached.", node.from.key);
+            return Status.IGNORE;
+        }
+
+        const settlement = escrowEntryUtils.makeRefund(escrowBuffer, currentEpoch, this.#config.addressPrefix);
+        if (settlement === null) {
+            this.#safeLogApply(OperationType.HTLC_REFUND, "HTLC refund transition is invalid.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        const recipientAddress = addressUtils.bufferToAddress(settlement.address, this.#config.addressPrefix);
+        if (recipientAddress === null || settlement.amount === null) {
+            this.#safeLogApply(OperationType.HTLC_REFUND, "Refund recipient or amount is invalid.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        const recipientEntryBuffer = await this.#getEntryApply(recipientAddress, batch);
+        let updatedRecipientEntry;
+        if (recipientEntryBuffer === null) {
+            updatedRecipientEntry = nodeEntryUtils.init(ZERO_WK, nodeRoleUtils.NodeRole.READER, settlement.amount.value);
+        } else {
+            const recipientEntry = nodeEntryUtils.decode(recipientEntryBuffer);
+            if (recipientEntry === null) {
+                this.#safeLogApply(OperationType.HTLC_REFUND, "Refund recipient account is invalid.", node.from.key);
+                return Status.FAILURE;
+            }
+            const recipientBalance = toBalance(recipientEntry.balance);
+            if (recipientBalance === null) {
+                this.#safeLogApply(OperationType.HTLC_REFUND, "Refund recipient balance is invalid.", node.from.key);
+                return Status.FAILURE;
+            }
+            const updatedBalance = recipientBalance.add(settlement.amount);
+            if (updatedBalance === null) {
+                this.#safeLogApply(OperationType.HTLC_REFUND, "Refund recipient balance overflow.", node.from.key);
+                return Status.FAILURE;
+            }
+            updatedRecipientEntry = updatedBalance.update(recipientEntryBuffer);
+        }
+        if (!isBufferValid(updatedRecipientEntry, NODE_ENTRY_SIZE)) {
+            this.#safeLogApply(OperationType.HTLC_REFUND, "Failed to credit refund recipient.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        await batch.put(recipientAddress, updatedRecipientEntry);
+        await batch.put(escrowKey, settlement.refundedEscrowEntry);
+        await batch.put(refundTxHashHex, node.value);
+
+        if (this.#config.enableTxApplyLogs) {
+            console.info(`HTLC refund operation: ${refundTxHashHex} has been appended.`);
+        }
+        return Status.SUCCESS;
+    }
+
     async #handleApplyInitializeBalanceOperation(op, view, base, node, batch) {
-        if (!this.check.validateBalanceInitialization(op)) {
+        if (!this.#stateValidationSchema.validateBalanceInitialization(op)) {
             this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "Contract schema validation failed.", node.from.key)
             return Status.FAILURE;
         };
@@ -622,8 +1562,8 @@ class State extends ReadyResource {
         };
 
         // Verify signature
-        const isMessageVerifed = tracCryptoApi.signature.verify(op.bio.is, hash, adminPublicKey);
-        if (!isMessageVerifed) {
+        const isMessageVerified = tracCryptoApi.signature.verify(op.bio.is, hash, adminPublicKey);
+        if (!isMessageVerified) {
             this.#safeLogApply(OperationType.BALANCE_INITIALIZATION, "Failed to verify message signature.", node.from.key)
             return Status.FAILURE;
         };
@@ -671,7 +1611,7 @@ class State extends ReadyResource {
     }
 
     async #handleApplyDisableBalanceInitializationOperation(op, view, base, node, batch) {
-        if (!this.check.validateCoreAdminOperation(op)) {
+        if (!this.#stateValidationSchema.validateCoreAdminOperation(op)) {
             this.#safeLogApply(OperationType.DISABLE_INITIALIZATION, "Schema validation failed.", node.from.key)
             return Status.FAILURE;
         };
@@ -744,8 +1684,8 @@ class State extends ReadyResource {
         };
 
         // Verify signature
-        const isMessageVerifed = tracCryptoApi.signature.verify(op.cao.is, hash, adminPublicKey);
-        if (!isMessageVerifed) {
+        const isMessageVerified = tracCryptoApi.signature.verify(op.cao.is, hash, adminPublicKey);
+        if (!isMessageVerified) {
             this.#safeLogApply(OperationType.DISABLE_INITIALIZATION, "Failed to verify message signature.", node.from.key)
             return Status.FAILURE;
         };
@@ -769,7 +1709,7 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        await batch.put(EntryType.INITIALIZATION, safeWriteUInt32BE(0, 0));
+        await batch.put(EntryType.INITIALIZATION, safeWriteUInt32BE(0));
         await batch.put(txHashHexString, node.value);
 
         return Status.SUCCESS;
@@ -782,7 +1722,7 @@ class State extends ReadyResource {
             INITIALIZATION, THEIR STAKED BALANCE WILL BE REDUCED (PUNISHMENT).
         */
 
-        if (!this.check.validateCoreAdminOperation(op)) {
+        if (!this.#stateValidationSchema.validateCoreAdminOperation(op)) {
             this.#safeLogApply(OperationType.ADD_ADMIN, "Contract schema validation failed.", node.from.key)
             return Status.FAILURE;
         };
@@ -829,9 +1769,9 @@ class State extends ReadyResource {
         };
 
         // verify signature
-        const isMessageVerifed = tracCryptoApi.signature.verify(op.cao.is, op.cao.tx, adminPublicKey)
+        const isMessageVerified = tracCryptoApi.signature.verify(op.cao.is, op.cao.tx, adminPublicKey)
         const txHashHexString = op.cao.tx.toString('hex');
-        if (!isMessageVerifed) {
+        if (!isMessageVerified) {
             this.#safeLogApply(OperationType.ADD_ADMIN, "Failed to verify message signature.", node.from.key)
             return Status.FAILURE;
         };
@@ -908,7 +1848,7 @@ class State extends ReadyResource {
 
         // initialize admin entry and initialization flag
         await batch.put(EntryType.ADMIN, newAdminEntry);
-        await batch.put(EntryType.INITIALIZATION, safeWriteUInt32BE(1, 0));
+        await batch.put(EntryType.INITIALIZATION, safeWriteUInt32BE(1));
         await batch.put(txHashHexString, node.value);
 
         if (this.#config.enableTxApplyLogs) {
@@ -919,7 +1859,7 @@ class State extends ReadyResource {
     }
 
     async #handleApplyAdminRecoveryOperation(op, view, base, node, batch) {
-        if (!this.check.validateRoleAccessOperation(op)) {
+        if (!this.#stateValidationSchema.validateRoleAccessOperation(op)) {
             this.#safeLogApply(OperationType.ADMIN_RECOVERY, "Contract schema validation failed.", node.from.key)
             return Status.FAILURE;
         };
@@ -1170,7 +2110,7 @@ class State extends ReadyResource {
     }
 
     async #handleApplyAppendWhitelistOperation(op, view, base, node, batch) {
-        if (!this.check.validateAdminControlOperation(op)) {
+        if (!this.#stateValidationSchema.validateAdminControlOperation(op)) {
             this.#safeLogApply(OperationType.APPEND_WHITELIST, "Contract schema validation failed.", node.from.key)
             return Status.FAILURE;
         };
@@ -1419,7 +2359,7 @@ class State extends ReadyResource {
     }
 
     async #handleApplyAddWriterOperation(op, view, base, node, batch) {
-        if (!this.check.validateRoleAccessOperation(op)) {
+        if (!this.#stateValidationSchema.validateRoleAccessOperation(op)) {
             this.#safeLogApply(OperationType.ADD_WRITER, "Contract schema validation failed.", node.from.key)
             return Status.FAILURE;
         };
@@ -1723,7 +2663,7 @@ class State extends ReadyResource {
     }
 
     async #handleApplyRemoveWriterOperation(op, view, base, node, batch) {
-        if (!this.check.validateRoleAccessOperation(op)) {
+        if (!this.#stateValidationSchema.validateRoleAccessOperation(op)) {
             this.#safeLogApply(OperationType.REMOVE_WRITER, "Contract schema validation failed.", node.from.key)
             return Status.FAILURE;
         };
@@ -1987,7 +2927,7 @@ class State extends ReadyResource {
     }
 
     async #handleApplyAddIndexerOperation(op, view, base, node, batch) {
-        if (!this.check.validateAdminControlOperation(op)) {
+        if (!this.#stateValidationSchema.validateAdminControlOperation(op)) {
             this.#safeLogApply(OperationType.ADD_INDEXER, "Contract schema validation failed.", node.from.key)
             return Status.FAILURE;
         };
@@ -2073,9 +3013,9 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const isMessageVerifed = tracCryptoApi.signature.verify(op.aco.is, hash, adminPublicKey);
+        const isMessageVerified = tracCryptoApi.signature.verify(op.aco.is, hash, adminPublicKey);
         const txHashHexString = hash.toString('hex');
-        if (!isMessageVerifed) {
+        if (!isMessageVerified) {
             this.#safeLogApply(OperationType.ADD_INDEXER, "Failed to verify message signature.", node.from.key)
             return Status.FAILURE;
         };
@@ -2205,7 +3145,7 @@ class State extends ReadyResource {
     }
 
     async #handleApplyRemoveIndexerOperation(op, view, base, node, batch) {
-        if (!this.check.validateAdminControlOperation(op)) {
+        if (!this.#stateValidationSchema.validateAdminControlOperation(op)) {
             this.#safeLogApply(OperationType.REMOVE_INDEXER, "Contract schema validation failed.", node.from.key)
             return Status.FAILURE;
         };
@@ -2288,9 +3228,9 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const isMessageVerifed = tracCryptoApi.signature.verify(op.aco.is, hash, adminPublicKey);
+        const isMessageVerified = tracCryptoApi.signature.verify(op.aco.is, hash, adminPublicKey);
         const txHashHexString = hash.toString('hex');
-        if (!isMessageVerifed) {
+        if (!isMessageVerified) {
             this.#safeLogApply(OperationType.REMOVE_INDEXER, "Failed to verify message signature.", node.from.key)
             return Status.FAILURE;
         };
@@ -2419,10 +3359,13 @@ class State extends ReadyResource {
         if (this.#config.enableTxApplyLogs) {
             console.info(`Indexer has been removed addr:wk:tx - ${toRemoveAddressString}:${decodedNodeEntry.wk.toString('hex')}:${txHashHexString}`);
         }
+
+        this.#emitEvent(CustomEventType.IS_NON_INDEXER, tracCryptoApi.address.decodeSafe(toRemoveAddressString))
+        return Status.SUCCESS;
     }
 
     async #handleApplyBanValidatorOperation(op, view, base, node, batch) {
-        if (!this.check.validateAdminControlOperation(op)) {
+        if (!this.#stateValidationSchema.validateAdminControlOperation(op)) {
             this.#safeLogApply(OperationType.BAN_VALIDATOR, "Contract schema validation failed.", node.from.key)
             return Status.FAILURE;
         };
@@ -2491,9 +3434,9 @@ class State extends ReadyResource {
             return Status.FAILURE;
         };
 
-        const isMessageVerifed = tracCryptoApi.signature.verify(op.aco.is, regeneratedHash, adminPublicKey);
+        const isMessageVerified = tracCryptoApi.signature.verify(op.aco.is, regeneratedHash, adminPublicKey);
         const txHashHexString = regeneratedHash.toString('hex');
-        if (!isMessageVerifed) {
+        if (!isMessageVerified) {
             this.#safeLogApply(OperationType.BAN_VALIDATOR, "Failed to verify message signature.", node.from.key)
             return Status.FAILURE;
         }
@@ -2623,7 +3566,7 @@ class State extends ReadyResource {
     }
 
     async #handleApplyBootstrapDeploymentOperation(op, view, base, node, batch) {
-        if (!this.check.validateBootstrapDeploymentOperation(op)) {
+        if (!this.#stateValidationSchema.validateBootstrapDeploymentOperation(op)) {
             this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Contract schema validation failed.", node.from.key)
             return Status.FAILURE;
         };
@@ -2857,7 +3800,7 @@ class State extends ReadyResource {
 
     async #handleApplyTxOperation(op, view, base, node, batch) {
         // ATTENTION: The sanitization should be done before ANY other check, otherwise we risk crashing
-        if (!this.check.validateTransactionOperation(op)) {
+        if (!this.#stateValidationSchema.validateTransactionOperation(op)) {
             this.#safeLogApply(OperationType.TX, "Contract schema validation failed.", node.from.key)
             return Status.FAILURE;
         };
@@ -3071,7 +4014,7 @@ class State extends ReadyResource {
     }
 
     async #handleApplyTransferOperation(op, view, base, node, batch) {
-        if (!this.check.validateTransferOperation(op)) {
+        if (!this.#stateValidationSchema.validateTransferOperation(op)) {
             this.#safeLogApply(OperationType.TRANSFER, "Contract schema validation failed.", node.from.key)
             return Status.FAILURE;
         };
@@ -3108,7 +4051,7 @@ class State extends ReadyResource {
         if (b4a.equals(requesterPublicKey, NULL_BUFFER)) {
             this.#safeLogApply(OperationType.TRANSFER, "Error while decoding requester public key.", node.from.key)
             return Status.FAILURE;
-        };
+        }
 
         // recreate requester message
         const requesterMessage = createMessage(
@@ -3272,6 +4215,290 @@ class State extends ReadyResource {
             console.info(`Transfer operation: ${hashHexString} has been appended.`);
         }
         return Status.SUCCESS;
+    }
+
+    async #handleApplySetEpochOperation(op, _view, base, node, batch) {
+        if (!this.#stateValidationSchema.validateSetEpochOperation(op)) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Contract schema validation failed.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const currentConsensusConfigIndexBuffer = await this.#getEntryApply(EntryType.CONSENSUS_CONFIG_CURRENT, batch);
+        if (currentConsensusConfigIndexBuffer === null) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Consensus config is not initialized.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        if (currentConsensusConfigIndexBuffer.length !== CONSENSUS_CONFIG_INDEX_SIZE) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Consensus config data is malformed or corrupted.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const currentConsensusConfigIndex = safeReadUint32BE(currentConsensusConfigIndexBuffer);
+        const consensusConfigBuffer = await this.#getEntryApply(
+            EntryType.CONSENSUS_CONFIG_RECORD + currentConsensusConfigIndex,
+            batch
+        );
+        if (consensusConfigBuffer === null) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Consensus config record does not exist.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const consensusConfig = safeDecodeConsensusConfig(consensusConfigBuffer);
+        if (consensusConfig === null) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Failed to decode consensus config.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const consensusSchemaVersion = safeReadUint8(consensusConfig.sv);
+        const epochSchemaVersion = safeReadUint8(op.seo.sv);
+        if (consensusSchemaVersion !== epochSchemaVersion) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Epoch schema version does not match the current consensus config.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        // Use the config at this point in replay, including earlier updates in this batch.
+        switch (consensusSchemaVersion) {
+            case ConsensusVersion.VDF_V1:
+                return await this.#applyVdfV1Epoch(op, consensusConfig, base, node, batch);
+            default:
+                this.#safeLogApply(OperationType.SET_EPOCH, "Unsupported epoch schema version.", node.from.key)
+                return Status.FAILURE;
+        }
+    }
+
+    async #applyVdfV1Epoch(op, consensusConfig, base, node, batch) {
+        const epochProof = safeDecodeEpochProofV1(op.seo.data);
+        if (epochProof === null) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Failed to decode epoch data.", node.from.key)
+            return Status.FAILURE;
+        }
+        if (!this.#stateValidationSchema.validateEpochProofV1(epochProof)) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Epoch data schema validation failed.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const { pd: encodedProofProposal, app: encodedApprovals } = epochProof;
+
+        const requesterAddressBuffer = op.address;
+        const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer, this.#config.addressPrefix);
+        if (requesterAddressString === null) {
+            this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Requester address is invalid.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        // validate requester public key
+        const requesterPublicKey = tracCryptoApi.address.decodeSafe(requesterAddressString);
+        if (b4a.equals(requesterPublicKey, NULL_BUFFER)) {
+            this.#safeLogApply(OperationType.BOOTSTRAP_DEPLOYMENT, "Failed to decode requester public key.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const proofProposal = safeDecodeProofProposal(encodedProofProposal);
+        if (proofProposal === null) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Failed to decode proof proposal.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const currentEpochBuffer = await this.#getEntryApply(EntryType.EPOCH_CURRENT, batch);
+        if (currentEpochBuffer === null) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Current epoch is not initialized. Genesis epoch has not been set.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const nextEpochBuffer = incrementBuffer(currentEpochBuffer, EPOCH_BYTE_LENGTH);
+        if (nextEpochBuffer === null) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Current epoch index value is invalid or corrupted", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const proposedEpochBuffer = proofProposal.epoch;
+        const epochIndexCompare = b4a.compare(nextEpochBuffer, proposedEpochBuffer)
+
+        // String helpers
+        const currentEpochStr = safeToUIntString(currentEpochBuffer);
+        const nextEpochStr = safeToUIntString(nextEpochBuffer);
+        if (nextEpochStr === null || currentEpochStr === null) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Epoch index data is malformed or corrupted.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        if (epochIndexCompare > 0) { // proposedEpoch < nextEpoch
+            this.#safeLogApply(OperationType.SET_EPOCH, `Stale epoch proposal. Epoch ${currentEpochStr} is already committed.`, node.from.key)
+            return Status.IGNORE;
+        }
+
+        if (epochIndexCompare < 0) { // proposedEpoch > nextEpoch
+            this.#safeLogApply(OperationType.SET_EPOCH, `Unexpected epoch. Proposal must target epoch ${nextEpochStr} but got ${safeToUIntString(proposedEpochBuffer)}.`, node.from.key)
+            return Status.FAILURE;
+        }
+
+        const expectedNetworkId = uint16ToBuffer(this.#config.networkId);
+        if (!b4a.equals(proofProposal.network_id, expectedNetworkId)) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Invalid proof proposal network id.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const currentEpochHash = await this.#getEntryApply(EntryType.EPOCH + currentEpochStr, batch);
+        if (currentEpochHash === null || !b4a.equals(currentEpochHash, proofProposal.previous_epoch_record_hash)) {
+            this.#safeLogApply(OperationType.SET_EPOCH, `Previous epoch record hash mismatch for epoch ${currentEpochStr}.`, node.from.key)
+            return Status.FAILURE;
+        }
+
+        const decodedVdfParams = safeDecodeVdfConfig(consensusConfig.cd);
+        if (decodedVdfParams === null) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Invalid VDF params value.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const { difficulty, discriminantBitSize } = decodedVdfParams;
+        if (
+            !b4a.equals(difficulty, proofProposal.difficulty) ||
+            !b4a.equals(discriminantBitSize, proofProposal.discriminant_bit_size)
+        ) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "VDF parameters do not match the current consensus config.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const indexers = Object.values(base.system.indexers);
+        const indexerAddresses = new Set();
+        for (const indexer of indexers) {
+            const indexerAddressBuffer = await this.#getRegisteredWriterKeyApply(batch, indexer.key.toString('hex'));
+            if (!indexerAddressBuffer) continue;
+            const indexerAddress = addressUtils.bufferToAddress(indexerAddressBuffer, this.#config.addressPrefix);
+            if (indexerAddress) indexerAddresses.add(indexerAddress);
+        }
+
+        const proposerAddress = addressUtils.bufferToAddress(proofProposal.proposer, this.#config.addressPrefix);
+        if (!proposerAddress || !indexerAddresses.has(proposerAddress)) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Proposer is not a registered indexer.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const indexerCount = indexers.length;
+        const quorumThreshold = indexerCount <= 2 ? 1 : Math.floor(indexerCount / 2) + 1;
+        const approvalCount = 1 + encodedApprovals.length; // proposer plus submitted approvals (proposer's own verified signature counts as one approval)
+
+        if (approvalCount < quorumThreshold) {
+            this.#safeLogApply(OperationType.SET_EPOCH, `Insufficient submitted approvals for quorum. Required ${quorumThreshold}, got ${approvalCount}.`, node.from.key)
+            return Status.FAILURE;
+        }
+
+        const challengeData = createMessage(
+            proofProposal.network_id,
+            proofProposal.epoch,
+            proofProposal.previous_epoch_record_hash,
+            proofProposal.proposer,
+            proofProposal.difficulty,
+            proofProposal.discriminant_bit_size
+        );
+
+        const proposerPublicKey = tracCryptoApi.address.decodeSafe(proposerAddress);
+        let proposalSignatureVerified = false;
+        if (!b4a.equals(proposerPublicKey, NULL_BUFFER)) {
+            const proposalMessage = createMessage(challengeData, proofProposal.proof);
+            const proposalHash = await tracCryptoApi.hash.blake3Safe(proposalMessage);
+            proposalSignatureVerified = tracCryptoApi.signature.verify(proofProposal.signature, proposalHash, proposerPublicKey);
+        }
+        if (!proposalSignatureVerified) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Failed to verify proof proposal signature.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const approvalErrorMessage = await this.#validateEpochApprovals(
+            encodedApprovals,
+            indexerAddresses,
+            proposerAddress,
+            challengeData,
+            proofProposal
+        );
+        if (approvalErrorMessage) {
+            this.#safeLogApply(OperationType.SET_EPOCH, approvalErrorMessage, node.from.key)
+            return Status.FAILURE;
+        }
+
+        let vdfProofVerified = false;
+        try {
+            vdfProofVerified = await verifyWesolowski(
+                challengeData,
+                difficulty.readUInt32BE(0),
+                proofProposal.proof,
+                discriminantBitSize.readUInt16BE(0)
+            );
+        } catch (error) {
+            console.error(error);
+        }
+        if (!vdfProofVerified) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "VDF proof is invalid.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const encodedEpochProof = safeEncodeEpochProofV1(epochProof);
+        if (encodedEpochProof.length === 0) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Failed to encode epoch proof.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const encodedEpochRecord = safeEncodeEpochRecord({ sv: op.seo.sv, data: encodedEpochProof });
+        if (encodedEpochRecord.length === 0) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Failed to encode epoch record.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const epochProofHash = await tracCryptoApi.hash.blake3Safe(encodedEpochRecord);
+        if (!isBufferValid(epochProofHash, HASH_BYTE_LENGTH)) {
+            this.#safeLogApply(OperationType.SET_EPOCH, "Failed to hash epoch proof.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        await batch.put(EntryType.EPOCH_CURRENT, nextEpochBuffer);
+        await batch.put(EntryType.EPOCH + nextEpochStr, epochProofHash);
+        await batch.put(EntryType.EPOCH_HASH + epochProofHash.toString('hex'), encodedEpochRecord);
+
+        if (this.#config.enableTxApplyLogs) {
+            console.info(`Epoch ${nextEpochStr} committed. proposer:approvals - ${proposerAddress}:${encodedApprovals.length + 1}`); // We should account for the proposer approval too, hence the '+ 1' at the end
+        }
+
+        this.#emitEvent(CustomEventType.EPOCH_CREATED, { epoch: b4a.from(nextEpochBuffer), proposerAddress }); // notify epoch committed
+        return Status.SUCCESS;
+    }
+
+    async #validateEpochApprovals(encodedApprovals, indexerAddresses, proposerAddress, challengeData, proofProposal) {
+        const approverIdentities = new Set();
+
+        for (const encodedApproval of encodedApprovals) {
+            const approval = safeDecodeProofProposalApproval(encodedApproval);
+            if (approval === null) return 'Failed to decode epoch approval.';
+
+            const approverAddress = addressUtils.bufferToAddress(approval.approver, this.#config.addressPrefix);
+            if (!approverAddress) return 'Epoch approval contains an invalid approver.';
+            if (approverAddress === proposerAddress) return 'Proposer cannot approve its own epoch proposal.';
+            if (!indexerAddresses.has(approverAddress)) return 'Epoch approver is not a registered indexer.';
+            if (approverIdentities.has(approverAddress)) return 'Epoch approval contains a duplicate approver.';
+
+            const approverPublicKey = tracCryptoApi.address.decodeSafe(approverAddress);
+            if (b4a.equals(approverPublicKey, NULL_BUFFER)) return 'Failed to decode epoch approver public key.';
+
+            const approvalMessage = createMessage(
+                challengeData,
+                proofProposal.proof,
+                approval.approver,
+                proofProposal.signature
+            );
+            let approvalVerified = false;
+            const approvalHash = await tracCryptoApi.hash.blake3Safe(approvalMessage);
+            approvalVerified = tracCryptoApi.signature.verify(
+                approval.approval_sig,
+                approvalHash,
+                approverPublicKey
+            );
+
+            if (!approvalVerified) return 'Failed to verify epoch approval signature.';
+
+            approverIdentities.add(approverAddress);
+        }
+
+        return null;
     }
 
     async #transfer(senderAddressString, recipientAddressString, validatorAddressString, validatorEntryBuffer, transferAmountBuffer, feeAmountBuffer, isSelfTransfer, isRecipientValidator, batch, node) {
@@ -3461,6 +4688,7 @@ class State extends ReadyResource {
             return null
         }
     }
+
     async #isValidatorValidApply(validatorEntryBuffer, node, op) {
         // TODO: Maybe we should transfer all validator checks to this function (address, pubKey, signature, etc)
         if (validatorEntryBuffer === null) {
@@ -3507,7 +4735,7 @@ class State extends ReadyResource {
         if (initialization === null) {
             return false
         } else {
-            return b4a.equals(initialization, safeWriteUInt32BE(0, 0))
+            return b4a.equals(initialization, safeWriteUInt32BE(0))
         }
     }
 
@@ -3786,12 +5014,6 @@ class State extends ReadyResource {
         return { newLicenseLength, decodedNewLicenseLength };
     }
 
-    #emitEvent(event, ...args) {
-        try {
-            this.emit(event, ...args)
-        } catch (_ignored) { }
-    }
-
     async #transferFeeTxOperation(requesterAddressString, validatorAddressString, validatorEntryBuffer, subnetworkCreatorAddressString, feeAmount, batch, node) {
         if (!requesterAddressString ||
             !validatorAddressString ||
@@ -3943,6 +5165,400 @@ class State extends ReadyResource {
             validatorEntry: updatedValidatorNodeEntry,
             subnetworkCreatorEntry: updatedSubnetworkCreatorNodeEntry
         };
+    }
+
+    #validateConsensusConfigApply(consensusConfig) {
+        if (!isBufferValid(consensusConfig?.sv, CONSENSUS_CONFIG_SCHEMA_VERSION_BYTE_LENGTH)) {
+            return false;
+        }
+
+        switch (safeReadUint8(consensusConfig.sv)) {
+            case ConsensusVersion.VDF_V1: {
+                const configData = safeDecodeVdfConfig(consensusConfig.cd);
+                if (configData === null) return false;
+
+                return !isZeroBuffer(configData.difficulty) &&
+                    Object.hasOwn(VDF_PROOF_BYTE_LENGTHS, configData.discriminantBitSize.readUInt16BE(0));
+            }
+            default:
+                return false;
+        }
+    }
+
+    async #handleApplySetGenesisEpoch(op, view, base, node, batch) {
+        if (!this.#stateValidationSchema.validateConsensusControlOperation(op)) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Contract schema validation failed.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        // Extract and validate the requester address (admin)
+        const requesterAddressBuffer = op.address;
+        const requesterAddressString = addressUtils.bufferToAddress(requesterAddressBuffer, this.#config.addressPrefix);
+        if (requesterAddressString === null) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Requester address is invalid.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        // Validate requester public key
+        const requesterPublicKey = tracCryptoApi.address.decodeSafe(requesterAddressString);
+        if (b4a.equals(requesterPublicKey, NULL_BUFFER)) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Failed to decode requester public key.", node.from.key)
+            return Status.FAILURE;
+        }
+        // ensure that an admin invoked this operation
+        const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
+        if (adminEntry === null) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Invalid admin entry.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const decodedAdminEntry = adminEntryUtils.decode(adminEntry, this.#config.addressPrefix);
+        if (decodedAdminEntry === null) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Failed to decode admin entry.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        if (!this.#isAdminApply(decodedAdminEntry, node)) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Node is not allowed to perform this operation. (ADMIN ONLY)", node.from.key)
+            return Status.FAILURE;
+        }
+
+        // Extract admin public key
+        const adminPublicKey = tracCryptoApi.address.decodeSafe(decodedAdminEntry.address);
+        if (b4a.equals(adminPublicKey, NULL_BUFFER)) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Failed to decode admin public key.", node.from.key)
+            return Status.FAILURE;
+        }
+        // Admin consistency check
+        if (!b4a.equals(adminPublicKey, requesterPublicKey)) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "System admin and node public keys do not match.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const encodedConsensusConfig = safeEncodeConsensusConfig(op.cco.cc);
+
+        if (encodedConsensusConfig.length === 0) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Failed to encode consensus config.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        if (!this.#validateConsensusConfigApply(op.cco.cc)) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Consensus config validation failed.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        // verify requester signature
+        const message = createMessage(
+            this.#config.networkId,
+            op.cco.txv,
+            encodedConsensusConfig,
+            op.cco.in,
+            OperationType.SET_GENESIS_EPOCH
+        );
+
+        if (message.length === 0) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Invalid requester message.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const hash = await tracCryptoApi.hash.blake3Safe(message);
+        if (!b4a.equals(hash, op.cco.tx)) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Message hash does not match the tx_hash.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        // verify signature
+        const isMessageVerified = tracCryptoApi.signature.verify(op.cco.is, op.cco.tx, adminPublicKey)
+        const txHashHexString = op.cco.tx.toString('hex');
+
+        if (!isMessageVerified) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Failed to verify message signature.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        // verify tx validity - prevent deferred execution attack        
+        const indexersSequenceState = await this.#getIndexerSequenceStateApply(base);
+        if (indexersSequenceState === null) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Indexer sequence state is invalid.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        if (!b4a.equals(op.cco.txv, indexersSequenceState)) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Transaction was not executed.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        // anti-replay attack
+        const opEntry = await this.#getEntryApply(txHashHexString, batch);
+        if (opEntry !== null) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Operation has already been applied.", node.from.key)
+            return Status.IGNORE;
+        }
+
+        // check if CurrentEpoch have been initialized if yes - failure
+        const currentEpoch = await this.#getEntryApply(EntryType.EPOCH_CURRENT, batch);
+        if (currentEpoch !== null) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Current epoch is set. Cannot set a new genesis epoch", node.from.key)
+            return Status.IGNORE;
+        }
+
+        // check if genesis epoch is initialized. If yes - failure
+        const epochZero = EntryType.EPOCH + "0";
+        const genesisEpochHash = await this.#getEntryApply(epochZero , batch);
+        if (genesisEpochHash !== null) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Genesis epoch is set. Cannot set a new one", node.from.key)
+            return Status.IGNORE;
+        }
+
+        const currentConsensusConfigIndex = await this.#getEntryApply(
+            EntryType.CONSENSUS_CONFIG_CURRENT,
+            batch
+        );
+
+        const genesisConsensusConfigKey = EntryType.CONSENSUS_CONFIG_RECORD + 0;
+
+        const genesisConsensusConfig = await this.#getEntryApply(
+            genesisConsensusConfigKey,
+            batch
+        );
+
+        // Check if currently genesis config exists
+        if (currentConsensusConfigIndex !== null || genesisConsensusConfig !== null) {
+            this.#safeLogApply(
+                OperationType.SET_GENESIS_EPOCH,
+                "Genesis consensus config is set. Cannot set a new genesis epoch",
+                node.from.key
+            );
+            return Status.IGNORE;
+        }
+
+
+        const genesisEpoch = await createGenesisEpochProof(
+            requesterAddressString,
+            encodedConsensusConfig,
+            this.#config
+        );
+
+        if (!b4a.isBuffer(genesisEpoch) || genesisEpoch.length === 0) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Could not initialize genesis epoch", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const epochProofHash = await tracCryptoApi.hash.blake3Safe(genesisEpoch);
+        if (!isBufferValid(epochProofHash, HASH_BYTE_LENGTH)) {
+            this.#safeLogApply(OperationType.SET_GENESIS_EPOCH, "Failed to hash genesis epoch proof.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        // initialize CurrentEpoch field
+        const zeroAsUint64Buffer = b4a.alloc(8, 0);
+        await batch.put(
+            EntryType.EPOCH_CURRENT,
+            zeroAsUint64Buffer
+        );
+        
+        // initialize Epoch Field
+        await batch.put(
+            epochZero,
+            epochProofHash
+        );
+
+        // initialize EpochHash Field
+        const epochProofHashString = epochProofHash.toString('hex');
+        const epochHashLedgerEntry = EntryType.EPOCH_HASH + epochProofHashString;
+        await batch.put(
+            epochHashLedgerEntry,
+            genesisEpoch
+        );
+
+        // Record 0 preserves the initial config, including the genesis format version.
+        await batch.put(
+            EntryType.CONSENSUS_CONFIG_CURRENT,
+            safeWriteUInt32BE(0)
+        );
+        await batch.put(
+            genesisConsensusConfigKey,
+            encodedConsensusConfig
+        );
+
+        // Put txHashHexString into the state to avoid replay attack
+        await batch.put(txHashHexString, node.value);
+
+        if (this.#config.enableTxApplyLogs) {
+            console.info(`Genesis Epoch initialized addr:wk:tx - ${requesterAddressString}:${decodedAdminEntry.wk.toString('hex')}:${txHashHexString}`);
+        }
+
+        this.#emitEvent(CustomEventType.GENESIS_EPOCH_CREATED, { epoch: 0n, proposerAddress: requesterAddressString });
+        return Status.SUCCESS;
+    }
+
+    async #handleApplySetConsensusConfig(op, _view, base, node, batch, postApplyEvents) {
+        if (!this.#stateValidationSchema.validateConsensusControlOperation(op)) {
+            this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Contract schema validation failed.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const requesterAddressString = addressUtils.bufferToAddress(op.address, this.#config.addressPrefix);
+        if (requesterAddressString === null) {
+            this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Requester address is invalid.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const requesterPublicKey = tracCryptoApi.address.decodeSafe(requesterAddressString);
+        if (b4a.equals(requesterPublicKey, NULL_BUFFER)) {
+            this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Failed to decode requester public key.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const adminEntry = await this.#getEntryApply(EntryType.ADMIN, batch);
+        if (adminEntry === null) {
+            this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Invalid admin entry.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const decodedAdminEntry = adminEntryUtils.decode(adminEntry, this.#config.addressPrefix);
+        if (decodedAdminEntry === null) {
+            this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Failed to decode admin entry.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        if (!this.#isAdminApply(decodedAdminEntry, node)) {
+            this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Node is not allowed to perform this operation. (ADMIN ONLY)", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const adminPublicKey = tracCryptoApi.address.decodeSafe(decodedAdminEntry.address);
+        if (b4a.equals(adminPublicKey, NULL_BUFFER)) {
+            this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Failed to decode admin public key.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        if (!b4a.equals(adminPublicKey, requesterPublicKey)) {
+            this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "System admin and node public keys do not match.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const encodedConsensusConfig = safeEncodeConsensusConfig(op.cco.cc);
+
+        if (encodedConsensusConfig.length === 0) {
+            this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Failed to encode consensus config.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        if (!this.#validateConsensusConfigApply(op.cco.cc)) {
+            this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Consensus config validation failed.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        const message = createMessage(
+            this.#config.networkId,
+            op.cco.txv,
+            encodedConsensusConfig,
+            op.cco.in,
+            OperationType.SET_CONSENSUS_CONFIG
+        );
+
+        if (message.length === 0) {
+            this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Invalid requester message.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const hash = await tracCryptoApi.hash.blake3Safe(message);
+        if (!b4a.equals(hash, op.cco.tx)) {
+            this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Message hash does not match the tx_hash.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const isMessageVerified = tracCryptoApi.signature.verify(op.cco.is, op.cco.tx, adminPublicKey);
+        if (!isMessageVerified) {
+            this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Failed to verify message signature.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const indexersSequenceState = await this.#getIndexerSequenceStateApply(base);
+        if (indexersSequenceState === null) {
+            this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Indexer sequence state is invalid.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        if (!b4a.equals(op.cco.txv, indexersSequenceState)) {
+            this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Transaction was not executed.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const txHashHexString = op.cco.tx.toString('hex');
+        const opEntry = await this.#getEntryApply(txHashHexString, batch);
+        if (opEntry !== null) {
+            this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Operation has already been applied.", node.from.key)
+            return Status.IGNORE;
+        }
+
+        const currentConsensusConfigIndexBuffer = await this.#getEntryApply(EntryType.CONSENSUS_CONFIG_CURRENT, batch);
+        if (currentConsensusConfigIndexBuffer === null) {
+            this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Initial consensus config has not been initialized yet", node.from.key)
+            return Status.IGNORE;
+        }
+
+        if (currentConsensusConfigIndexBuffer.length !== CONSENSUS_CONFIG_INDEX_SIZE) {
+            this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Consensus config index is malformed or corrupted.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const currentConsensusConfigIndex = safeReadUint32BE(currentConsensusConfigIndexBuffer);
+        if (currentConsensusConfigIndex === null) {
+            this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG,"Failed to read current consensus config index from buffer", node.from.key)
+            return Status.FAILURE;
+        }
+        if (currentConsensusConfigIndex === UINT32_MAX) {
+            this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Consensus config index overflow.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const currentConsensusConfigBuffer = await this.#getEntryApply(
+            EntryType.CONSENSUS_CONFIG_RECORD + currentConsensusConfigIndex,
+            batch
+        );
+        const currentConsensusConfig = safeDecodeConsensusConfig(currentConsensusConfigBuffer);
+        if (currentConsensusConfig === null) {
+            this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Failed to decode current consensus config.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const currentSchemaVersion = safeReadUint8(currentConsensusConfig.sv);
+        const nextSchemaVersion = safeReadUint8(op.cco.cc.sv);
+        if (currentSchemaVersion === null || currentSchemaVersion === 0) {
+            this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Current consensus config schema version is invalid.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        // Same-version parameter changes are allowed; returning to an older consensus is not.
+        if (nextSchemaVersion < currentSchemaVersion) {
+            this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Consensus config schema version cannot decrease.", node.from.key)
+            return Status.FAILURE;
+        }
+
+        const nextConsensusConfigIndex = currentConsensusConfigIndex + 1;
+        const nextConsensusConfigKey = EntryType.CONSENSUS_CONFIG_RECORD + nextConsensusConfigIndex;
+        const nextConsensusConfigIndexBuffer = safeWriteUInt32BE(nextConsensusConfigIndex);
+
+        if (nextConsensusConfigIndexBuffer.length === 0) {
+            this.#safeLogApply(OperationType.SET_CONSENSUS_CONFIG, "Failed to encode next consensus config index.", node.from.key);
+            return Status.FAILURE;
+        }
+
+        await batch.put(EntryType.CONSENSUS_CONFIG_CURRENT, nextConsensusConfigIndexBuffer);
+        await batch.put(nextConsensusConfigKey, encodedConsensusConfig);
+        await batch.put(txHashHexString, node.value);
+
+        if (this.#config.enableTxApplyLogs) {
+            console.info(`Consensus config updated addr:wk:tx - ${requesterAddressString}:${decodedAdminEntry.wk.toString('hex')}:${txHashHexString}`);
+        }
+
+        postApplyEvents.push({
+            type: CustomEventType.CONSENSUS_CONFIG_CHANGED,
+        });
+
+        return Status.SUCCESS;
     }
 
 }

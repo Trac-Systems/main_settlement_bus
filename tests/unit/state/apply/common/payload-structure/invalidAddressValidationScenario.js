@@ -3,7 +3,7 @@ import { eventFlush } from '../../../../../helpers/autobaseTestHelpers.js';
 import {
     safeDecodeApplyOperation,
     safeEncodeApplyOperation
-} from '../../../../../../src/utils/protobuf/operationHelpers.js';
+} from '../../../../../../src/codecs/apply/applyOperationCodec.js';
 import OperationValidationScenarioBase from '../base/OperationValidationScenarioBase.js';
 
 export default class InvalidAddressValidationScenario extends OperationValidationScenarioBase {

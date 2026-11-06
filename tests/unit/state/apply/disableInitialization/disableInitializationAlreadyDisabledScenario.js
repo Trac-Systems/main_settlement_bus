@@ -4,7 +4,7 @@ import setupDisableInitializationScenario, {
     buildDisableInitializationPayload,
     assertInitializationDisabledState
 } from './disableInitializationScenarioHelpers.js';
-import { safeDecodeApplyOperation } from '../../../../../src/utils/protobuf/operationHelpers.js';
+import { safeDecodeApplyOperation } from '../../../../../src/codecs/apply/applyOperationCodec.js';
 
 export default function disableInitializationAlreadyDisabledScenario() {
     test('State.apply disableInitialization aborts when initialization already disabled', async t => {

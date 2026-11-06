@@ -2,40 +2,54 @@ import ReadyResource from "ready-resource";
 import Corestore from "corestore";
 import tracCryptoApi from "trac-crypto-api";
 import b4a from "b4a";
+import _ from "lodash";
 import { sleep, isHexString } from "./utils/helpers.js";
 import { applyStateMessageFactory } from "./messages/state/applyStateMessageFactory.js";
-import { isAddressValid } from "./core/state/utils/address.js";
+import { isAddressValid, bufferToAddress } from "./core/state/utils/address.js";
 import Network from "./core/network/Network.js";
-import Check from "./utils/check.js";
 import State from "./core/state/State.js";
 import {
-    EventType,
     WHITELIST_SLEEP_INTERVAL,
     BOOTSTRAP_HEXSTRING_LENGTH,
-    CustomEventType,
     BALANCE_MIGRATION_SLEEP_INTERVAL,
     WHITELIST_MIGRATION_DIR,
-    OperationType
+    OperationType,
+    EntryType,
+    HTLC_LOCK_ID_BYTE_LENGTH,
+    ConsensusVersion,
+    MAX_VDF_DIFFICULTY,
+    VDF_PROOF_BYTE_LENGTHS
 } from "./utils/constants.js";
 import { decimalStringToBigInt, bigIntTo16ByteBuffer, bufferToBigInt, bigIntToDecimalString } from "./utils/amountSerialization.js"
 import {
     normalizeDecodedPayloadForJson,
     normalizeTransactionOperation,
-    normalizeTransferOperation
+    normalizeTransferOperation,
+    normalizeMessageByOperationType
 } from "./utils/normalizers.js";
+import { operationToPayload } from "./utils/applyOperations.js";
+import PartialHtlcValidator from "./core/network/protocols/validators/shared/validators/PartialHtlcValidator.js";
+import { V1ProtocolError } from "./core/network/protocols/validators/v1/V1ProtocolError.js";
+import * as escrowEntryUtils from "./core/state/utils/escrowEntry.js";
 import fileUtils from './utils/fileUtils.js';
 import migrationUtils from './utils/migrationUtils.js';
-import {safeDecodeApplyOperation, safeEncodeApplyOperation} from "./utils/protobuf/operationHelpers.js";
-import PartialTransactionValidator from "./core/network/protocols/shared/validators/PartialTransactionValidator.js";
-import PartialTransferValidator from "./core/network/protocols/shared/validators/PartialTransferValidator.js";
+import {
+    encodeApplyOperation,
+    encodeConsensusConfig,
+    safeDecodeApplyOperation,
+    safeEncodeApplyOperation
+} from "./codecs/apply/applyOperationCodec.js";
+import { encodeVdfConfig } from "./codecs/consensus/v1/vdfConfigCodec.js";
+import PartialTransactionValidator from "./core/network/protocols/validators/shared/validators/PartialTransactionValidator.js";
+import PartialTransferValidator from "./core/network/protocols/validators/shared/validators/PartialTransferValidator.js";
 import { BroadcastError, ValidationError } from "./utils/errors.js";
+import { uint8ToBuffer, uint16ToBuffer, uint32ToBuffer } from "./utils/buffer.js";
 
 export class MainSettlementBus extends ReadyResource {
     #store;
     #wallet;
     #network;
     #state;
-    #isClosing = false;
     #config
 
     /**
@@ -47,7 +61,6 @@ export class MainSettlementBus extends ReadyResource {
         this.#config = config
         this.#wallet = wallet;
         this.#store = new Corestore(this.#config.storesFullPath);
-        this.check = new Check(this.#config);
     }
 
     get config() {
@@ -71,26 +84,17 @@ export class MainSettlementBus extends ReadyResource {
 
     async _open() {
         this.#state = new State(this.#store, this.#wallet, this.#config);
-        this.#network = new Network(this.#state, this.#config, this.#wallet?.address ?? null);
+        this.#network = new Network(this.#state, this.#store, this.#config, this.#wallet);
 
         await this.#state.ready();
         await this.#network.ready();
-        await this.#stateEventsListener();
 
         if (this.#wallet) {
             this.#printWalletInfo();
         }
 
-        await this.#network.replicate(
-            this.#state,
-            this.#store,
-            this.#wallet,
-        );
-
         const adminEntry = await this.#state.getAdminEntry();
         await this.#setUpRoleAutomatically(adminEntry);
-
-
 
         console.log(`isIndexer: ${this.#state.isIndexer()}`);
         console.log(`isWriter: ${this.#state.isWritable()}`);
@@ -105,7 +109,6 @@ export class MainSettlementBus extends ReadyResource {
     async _close() {
         console.log("Closing everything gracefully... This may take a moment.");
 
-        this.#isClosing = true;
         await this.#network.close();
 
         await sleep(100);
@@ -129,6 +132,58 @@ export class MainSettlementBus extends ReadyResource {
         return await this.#network.validatorMessageOrchestrator.send(partialTransactionPayload);
     }
 
+    async htlcLock(payload) {
+        if (payload?.type !== OperationType.HTLC_LOCK) {
+            throw new ValidationError('HTLC lock payload is required.');
+        }
+        return this.broadcastTransaction(payload);
+    }
+
+    async htlcClaim(payload) {
+        if (payload?.type !== OperationType.HTLC_CLAIM) {
+            throw new ValidationError('HTLC claim payload is required.');
+        }
+        return this.broadcastTransaction(payload);
+    }
+
+    async htlcRefund(payload) {
+        if (payload?.type !== OperationType.HTLC_REFUND) {
+            throw new ValidationError('HTLC refund payload is required.');
+        }
+        return this.broadcastTransaction(payload);
+    }
+
+    async getHtlc(lockId, confirmed = true) {
+        if (typeof lockId !== 'string' || lockId.length !== HTLC_LOCK_ID_BYTE_LENGTH * 2 || !isHexString(lockId)) {
+            throw new ValidationError('Invalid HTLC lock ID.');
+        }
+        const normalizedId = lockId.toLowerCase();
+        const key = EntryType.HTLC_ESCROW + normalizedId;
+        const entry = confirmed ? await this.#state.getSigned(key) : await this.#state.get(key);
+        if (!entry) return null;
+
+        const escrow = escrowEntryUtils.decode(entry, this.#config.addressPrefix);
+        if (!escrow || b4a.toString(escrow.lockId, 'hex') !== normalizedId) {
+            throw new Error('Stored HTLC escrow is invalid.');
+        }
+        const address = value => value ? bufferToAddress(value, this.#config.addressPrefix) : null;
+        const hex = value => value ? b4a.toString(value, 'hex') : null;
+        return {
+            lockId: normalizedId,
+            status: Object.keys(escrowEntryUtils.Status).find(name => escrowEntryUtils.Status[name] === escrow.status),
+            lockerAddress: address(escrow.lockerAddress),
+            claimRecipientAddress: address(escrow.claimRecipientAddress),
+            refundRecipientAddress: address(escrow.refundRecipientAddress),
+            amount: bufferToBigInt(escrow.amount).toString(),
+            additionalFeeAmount: bufferToBigInt(escrow.additionalFeeAmount).toString(),
+            additionalFeeRecipientAddress: address(escrow.additionalFeeRecipientAddress),
+            hashLock: hex(escrow.hashLock),
+            refundEpoch: escrow.refundEpoch.readBigUInt64BE(0).toString(),
+            metadata: hex(escrow.metadata),
+            preimage: hex(escrow.preimage),
+        };
+    }
+
     async validateTransfer(payload) {
         const partialTransferValidator = new PartialTransferValidator(this.#state, null, this.#config);
         return await partialTransferValidator.validate(payload);
@@ -138,6 +193,11 @@ export class MainSettlementBus extends ReadyResource {
     async validateTransaction(payload) {
         const partialTransactionValidator = new PartialTransactionValidator(this.#state, null, this.#config);
         return await partialTransactionValidator.validate(payload);
+    }
+
+    async validateHtlc(payload) {
+        const validator = new PartialHtlcValidator(this.#state, null, this.#config);
+        return validator.validate(payload);
     }
 
     async broadcastTransaction(payload) {
@@ -161,6 +221,21 @@ export class MainSettlementBus extends ReadyResource {
                 throw new ValidationError("Invalid transaction payload.");
             }
             hash = b4a.toString(normalizedPayload.txo.tx, "hex");
+        } else if ([OperationType.HTLC_LOCK, OperationType.HTLC_CLAIM, OperationType.HTLC_REFUND].includes(payload.type)) {
+            try {
+                normalizedPayload = normalizeMessageByOperationType(payload, this.#config);
+            } catch (error) {
+                throw new ValidationError(error.message || 'Invalid HTLC payload.');
+            }
+            try {
+                await this.validateHtlc(normalizedPayload);
+            } catch (error) {
+                if (error instanceof V1ProtocolError) throw new ValidationError(error.message);
+                throw error;
+            }
+            hash = b4a.toString(normalizedPayload[operationToPayload(payload.type)].tx, 'hex');
+        } else {
+            throw new ValidationError('Unsupported transaction operation.');
         }
 
         const success = await this.broadcastPartialTransaction(payload);
@@ -202,37 +277,6 @@ export class MainSettlementBus extends ReadyResource {
         return nodeEntry?.isWhitelisted && !this.isAdmin(adminEntry);
     }
 
-    async #stateEventsListener() {
-        this.#state.on(CustomEventType.IS_INDEXER, (publicKey) => {
-            if (this.#isClosing) return;
-            this.#network.disconnectValidatorPeer(publicKey, 'peer promoted to indexer');
-        });
-
-        this.#state.on(CustomEventType.UNWRITABLE, (publicKey) => {
-            if (this.#isClosing) return;
-            this.#network.disconnectValidatorPeer(publicKey, 'peer became unwritable');
-        });
-
-        this.#state.base.on(EventType.IS_INDEXER, () => {
-            console.log("Current node is an indexer");
-        });
-
-        this.#state.base.on(EventType.IS_NON_INDEXER, async () => {
-            // Prevent further actions if closing is in progress
-            // The reason is that getNodeEntry is async and may cause issues if we will access state after closing
-            if (this.#isClosing) return;
-            console.log("Current node is not an indexer anymore");
-        });
-
-        this.#state.base.on(EventType.WRITABLE, async () => {
-            console.log("Current node is writable");
-        });
-
-        this.#state.base.on(EventType.UNWRITABLE, async () => {
-            console.log("Current node is unwritable");
-        });
-    }
-
     async getConfirmedTxInfo(txHash) {
         const payload = await this.#state.getSigned(txHash);
         if (!payload) return null
@@ -257,7 +301,7 @@ export class MainSettlementBus extends ReadyResource {
         return { payload, decoded }
     }
 
-    handleGetFee() {        
+    handleGetFee() {
         const fee = this.#state.getFee();
         return bufferToBigInt(fee);
     }
@@ -297,7 +341,7 @@ export class MainSettlementBus extends ReadyResource {
             let dagSystem = await this.#state.base.system.core.treeHash();
             let lengthdagSystem = this.#state.base.system.core.length;
             const wl = await this.#state.getWriterLength();
-            
+
             console.log("---------- node & network stats ----------");
             console.log("wallet.publicKey:", this.#wallet?.publicKey?.toString("hex") ?? "unset");
             console.log("wallet.address:", this.#wallet?.address ?? "unset");
@@ -332,6 +376,9 @@ export class MainSettlementBus extends ReadyResource {
             console.log("- /add_indexer <address>: Change a role of the selected writer node to indexer role. Charges a fee.");
             console.log("- /remove_indexer <address>: Change a role of the selected indexer node to default role. Charges a fee.");
             console.log("- /ban_writer <address>: Demote a whitelisted writer to default role and remove it from the whitelist. Charges a fee.");
+            console.log("- /init_genesis: Initialize genesis epoch.");
+            console.log("- /set_consensus_config: Set new configuration data for a specific consensus schema version from JSON.");
+            console.log("- /set_vdf_params: Update VDF difficulty and discriminant bit size.");
         }
         console.log("Available commands:");
         console.log("- /add_writer: Add yourself as a validator to this MSB once whitelisted. Requires a fee + 10x the fee as a stake in $TNK.");
@@ -746,45 +793,45 @@ export class MainSettlementBus extends ReadyResource {
         }
     }
 
-    async banValidator(addresstToBan) {
+    async banValidator(addressToBan) {
         if (!this.#config.enableWallet) {
             throw new Error(
-                `Can not ban writer with address: ${addresstToBan} - wallet is not enabled.`
+                `Can not ban writer with address: ${addressToBan} - wallet is not enabled.`
             );
         }
         const adminEntry = await this.#state.getAdminEntry();
 
         if (!adminEntry) {
             throw new Error(
-                `Can not ban writer with address: ${addresstToBan} - admin entry has not been initialized.`
+                `Can not ban writer with address: ${addressToBan} - admin entry has not been initialized.`
             );
         }
 
-        if (!isAddressValid(addresstToBan, this.#config.addressPrefix)) {
+        if (!isAddressValid(addressToBan, this.#config.addressPrefix)) {
             throw new Error(
-                `Can not ban writer with address:  ${addresstToBan} - invalid address.`
+                `Can not ban writer with address:  ${addressToBan} - invalid address.`
             );
         }
 
         if (!this.isAdmin(adminEntry)) {
             throw new Error(
-                `Can not ban writer with address: ${addresstToBan} - You are not an admin.`
+                `Can not ban writer with address: ${addressToBan} - You are not an admin.`
             );
         }
 
-        const isWhitelisted = await this.#state.isAddressWhitelisted(addresstToBan);
-        const nodeEntry = await this.#state.getNodeEntry(addresstToBan);
+        const isWhitelisted = await this.#state.isAddressWhitelisted(addressToBan);
+        const nodeEntry = await this.#state.getNodeEntry(addressToBan);
 
         if (!isWhitelisted || null === nodeEntry || nodeEntry.isIndexer === true) {
             throw new Error(
-                `Can not ban writer with address: ${addresstToBan} - node is not whitelisted or is an indexer.`
+                `Can not ban writer with address: ${addressToBan} - node is not whitelisted or is an indexer.`
             );
         }
         const txValidity = await this.#state.getIndexerSequenceState();
         const assembledBanValidatorMessage = await applyStateMessageFactory(this.#wallet, this.#config)
             .buildCompleteBanWriterMessage(
                 this.#wallet.address,
-                addresstToBan,
+                addressToBan,
                 txValidity,
             )
         const encodedPayload = safeEncodeApplyOperation(assembledBanValidatorMessage)
@@ -1099,6 +1146,149 @@ export class MainSettlementBus extends ReadyResource {
         console.log('Disabling initialization...');
         const encodedPayload = safeEncodeApplyOperation(payload);
         await this.#state.append(encodedPayload);
+    }
+
+    async handleEpochGenesisInitialization(consensusConfig) {
+        if (!this.#config.enableWallet) {
+            throw new Error("Can not initialize genesis epoch - wallet is not enabled.");
+        }
+
+        const adminEntry = await this.#state.getAdminEntry();
+
+        if (!adminEntry) {
+            throw new Error(
+                "Can not initialize genesis epoch - admin has not been initialized."
+            );
+        }
+        if (!this.#wallet) {
+            throw new Error("Can not initialize genesis epoch - wallet is not initialized.");
+        }
+        if (!this.isAdmin(adminEntry)) {
+            throw new Error("Can not initialize genesis epoch - you are not the admin.");
+        }
+
+        const existingConsensusConfig = await this.#state.getSignedConsensusConfig();
+        if (existingConsensusConfig) {
+            throw new Error("Can not initialize genesis epoch - consensus config already exists.");
+        }
+
+        const encodedConsensusConfig = this.#validateAndEncodeConsensusConfig(consensusConfig);
+
+        const txValidity = await this.#state.getIndexerSequenceState();
+        const payload = await applyStateMessageFactory(this.#wallet, this.#config)
+            .buildCompleteSetGenesisEpochMessage(
+                this.#wallet.address,
+                txValidity,
+                encodedConsensusConfig,
+            )
+        const encodedPayload = encodeApplyOperation(payload);
+        await this.#state.append(encodedPayload);
+    }
+
+    async handleSetConsensusConfig(consensusConfig) {
+        if (!this.#config.enableWallet) {
+            throw new Error("Can not set consensus config - wallet is not enabled.");
+        }
+
+        const adminEntry = await this.#state.getAdminEntry();
+
+        if (!adminEntry) {
+            throw new Error("Can not set consensus config - admin has not been initialized.");
+        }
+        if (!this.#wallet) {
+            throw new Error("Can not set consensus config - wallet is not initialized.");
+        }
+        if (!this.isAdmin(adminEntry)) {
+            throw new Error("Can not set consensus config - you are not the admin.");
+        }
+
+        const encodedConsensusConfig = this.#validateAndEncodeConsensusConfig(consensusConfig);
+
+        const txValidity = await this.#state.getIndexerSequenceState();
+        const payload = await applyStateMessageFactory(this.#wallet, this.#config)
+            .buildCompleteSetConsensusConfigMessage(
+                this.#wallet.address,
+                txValidity,
+                encodedConsensusConfig
+            );
+        const encodedPayload = encodeApplyOperation(payload);
+        await this.#state.append(encodedPayload);
+    }
+
+    #validateAndEncodeConsensusConfig(consensusConfig) {
+        if (!this.#hasExactKeys(consensusConfig, ["schemaVersion", "configData"])) {
+            throw new Error(
+                "Consensus config must contain only schemaVersion and configData."
+            );
+        }
+
+        const { schemaVersion, configData } = consensusConfig;
+        if (
+            !Number.isInteger(schemaVersion) ||
+            schemaVersion <= 0 ||
+            schemaVersion > 0xFF
+        ) {
+            throw new Error(
+                "Consensus config schemaVersion must be an integer from 1 to 255."
+            );
+        }
+
+        let encodedConfigData;
+        switch (schemaVersion) {
+            case ConsensusVersion.VDF_V1:
+                encodedConfigData = this.#encodeVdfV1ConfigData(configData);
+                break;
+            default:
+                throw new Error(
+                    `Unsupported consensus config schema version: ${schemaVersion}.`
+                );
+        }
+
+        return encodeConsensusConfig({
+            sv: uint8ToBuffer(schemaVersion),
+            cd: encodedConfigData
+        });
+    }
+
+    // TODO: REFACTOR - In the future, this function should be extracted into another module.
+    #encodeVdfV1ConfigData(configData) {
+        if (!this.#hasExactKeys(configData, ["difficulty", "discriminantBitSize"])) {
+            throw new Error(
+                "Consensus config schema version 1 configData must contain only difficulty and discriminantBitSize."
+            );
+        }
+
+        if (
+            !Number.isInteger(configData.difficulty) ||
+            configData.difficulty <= 0 ||
+            configData.difficulty > MAX_VDF_DIFFICULTY
+        ) {
+            throw new Error(
+                "VDF difficulty must be a positive unsigned 32-bit integer."
+            );
+        }
+
+        if (
+            !Number.isInteger(configData.discriminantBitSize) ||
+            !Object.hasOwn(VDF_PROOF_BYTE_LENGTHS, configData.discriminantBitSize)
+        ) {
+            throw new Error(
+                "VDF discriminant bit size must be one of: 1024, 2048, 4096."
+            );
+        }
+
+        return encodeVdfConfig({
+            difficulty: uint32ToBuffer(configData.difficulty),
+            discriminantBitSize: uint16ToBuffer(configData.discriminantBitSize)
+        });
+    }
+
+    #hasExactKeys(value, expectedKeys) {
+        return (
+            _.isPlainObject(value) &&
+            Object.keys(value).length === expectedKeys.length &&
+            expectedKeys.every(key => Object.hasOwn(value, key))
+        );
     }
 }
 

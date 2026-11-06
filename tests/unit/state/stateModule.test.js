@@ -3,13 +3,16 @@ import { isBare } from './stateTestUtils.js';
 
 async function runStateTests() {
     test.pause();
-
+    await import('./StateValidationSchema/stateValidationSchema.test.js');
+    await import('./StateEventQueue.test.js');
     await import('./utils/address.test.js');
     await import('./utils/adminEntry.test.js');
     await import('./utils/balance.test.js');
+    await import('./utils/escrowEntry.test.js');
     await import('./utils/nodeEntry.test.js');
     await import('./utils/lengthEntry.test.js');
     await import('./utils/roles.test.js');
+    await import('./utils/epochProof.test.js');
     await import('./ConfirmationWatch.test.js');
     // These tests are skipped temoporarily because the mock library sinon does not work with bare.
     // TODO: replace esmock, sinon is actually fine
@@ -21,4 +24,4 @@ async function runStateTests() {
     test.resume();
 }
 
-runStateTests();
+await runStateTests();

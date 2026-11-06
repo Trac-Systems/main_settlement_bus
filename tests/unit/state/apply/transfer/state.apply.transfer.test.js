@@ -23,7 +23,7 @@ import InvalidSignatureValidationScenario, {
     SignatureMutationStrategy
 } from '../common/payload-structure/invalidSignatureValidationScenario.js';
 import InvalidAddressValidationScenario from '../common/payload-structure/invalidAddressValidationScenario.js';
-import createAddressWithInvalidPublicKeyScenario from '../common/payload-structure/addressWithInvalidPublicKeyScenario.js';
+import createAddressWithInvalidChecksumScenario from '../common/payload-structure/addressWithInvalidChecksumScenario.js';
 import OperationAlreadyAppliedScenario from '../common/operationAlreadyAppliedScenario.js';
 import ValidatorEntryMissingScenario from '../common/validatorConsistency/validatorEntryMissingScenario.js';
 import ValidatorEntryDecodeFailureScenario from '../common/validatorConsistency/validatorEntryDecodeFailureScenario.js';
@@ -67,7 +67,7 @@ import {
     ZERO_TRANSFER_AMOUNT
 } from './transferScenarioHelpers.js';
 import RequesterAddressValidationScenario from '../common/requesterAddressValidationScenario.js';
-import createRequesterPublicKeyValidationScenario from '../common/requesterPublicKeyValidationScenario.js';
+import createRequesterInvalidChecksumScenario from '../common/requesterInvalidChecksumScenario.js';
 /*
  * Standard, recipient exists, am > 0
  * Sender: -(am + fee) recipient: +am validator: +75% fee (25% fee burned) tx hash recorded for replay protection.
@@ -202,15 +202,15 @@ new RequesterAddressValidationScenario({
     expectedLogs: ['Requester address is invalid.']
 }).performScenario();
 
-createRequesterPublicKeyValidationScenario({
-    title: 'State.apply transfer rejects payloads when requester public key is invalid',
+createRequesterInvalidChecksumScenario({
+    title: 'State.apply transfer rejects an invalid requester address checksum',
     setupScenario: setupTransferScenario,
     buildValidPayload: context => buildTransferPayload(context),
     assertStateUnchanged: (t, context, _valid, invalid) =>
         assertTransferFailureState(t, context, { payload: invalid }),
     applyInvalidPayload: (context, invalidPayload, t) =>
         applyInvalidTransferPayloadWithNoMutations(t, context, invalidPayload),
-    expectedLogs: ['Error while decoding requester public key.']
+    expectedLogs: ['Requester address is invalid.']
 }).performScenario();
 
 new InvalidHashValidationScenario({
@@ -248,16 +248,16 @@ new InvalidAddressValidationScenario({
     expectedLogs: ['Validator address is invalid.']
 }).performScenario();
 
-createAddressWithInvalidPublicKeyScenario(
+createAddressWithInvalidChecksumScenario(
     {
-        title: 'State.apply transfer rejects payloads when validator public key is invalid',
+        title: 'State.apply transfer rejects an invalid validator address checksum',
         setupScenario: setupTransferScenario,
         buildValidPayload: context => buildTransferPayload(context),
         assertStateUnchanged: (t, context, _valid, invalid) =>
             assertTransferFailureState(t, context, { payload: invalid }),
         applyInvalidPayload: (context, invalidPayload, t) =>
             applyInvalidTransferPayloadWithNoMutations(t, context, invalidPayload),
-        expectedLogs: ['Failed to decode validator public key.']
+        expectedLogs: ['Validator address is invalid.']
     },
     ['tro', 'va']
 ).performScenario();

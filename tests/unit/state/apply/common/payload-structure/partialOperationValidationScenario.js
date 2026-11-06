@@ -3,7 +3,7 @@ import OperationValidationScenarioBase from '../base/OperationValidationScenario
 import {
     safeDecodeApplyOperation,
     safeEncodeApplyOperation
-} from '../../../../../../src/utils/protobuf/operationHelpers.js';
+} from '../../../../../../src/codecs/apply/applyOperationCodec.js';
 import { eventFlush } from '../../../../../helpers/autobaseTestHelpers.js';
 
 export const PartialOperationMutationStrategy = {

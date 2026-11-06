@@ -1,0 +1,383 @@
+import test from 'brittle';
+import sinon from 'sinon';
+import b4a from 'b4a';
+import { EpochCoordinatorOperations } from '../../../../../src/core/consensus/services/EpochCoordinatorOperations.js';
+import { ConsensusResultCode } from '../../../../../src/utils/constants.js';
+import { addressToBuffer } from '../../../../../src/core/state/utils/address.js';
+
+const isBareRuntime = typeof globalThis.Bare !== 'undefined';
+// esmock depends on node:module - tests that mock module imports (via opsWithMocks) are Node-only.
+const nodeOnlyTest = isBareRuntime ? test.skip : test;
+
+// Mock keys are relative to THIS test file (esmock resolves from test file location)
+const FACTORY_PATH = '../../../../../src/messages/consensus/v1/consensusMessageFactory.js';
+const APPLY_STATE_FACTORY_PATH = '../../../../../src/messages/state/applyStateMessageFactory.js';
+const ADDRESS_UTILS_PATH = '../../../../../src/core/state/utils/address.js';
+const APPLY_CODEC_PATH = '../../../../../src/codecs/apply/applyOperationCodec.js';
+const CONSENSUS_CODEC_PATH = '../../../../../src/codecs/consensus/v1/consensusV1OperationCodec.js';
+
+const CONFIG = Object.freeze({
+    vdfDifficulty: 100,
+    vdfDiscriminantSizeBits: 2048,
+    networkId: 1,
+    addressPrefix: 'trac',
+});
+
+const WALLET_ADDRESS = 'trac1walletaddress';
+
+const makeState = (overrides = {}) => ({
+    getRegisteredWriterKey: sinon.stub().resolves(b4a.alloc(32, 0xaa)),
+    writingKey: b4a.alloc(32, 1),
+    append: sinon.stub().resolves(),
+    appendEpoch: sinon.stub().resolves(),
+    ...overrides,
+});
+
+const makeVdfService = (overrides = {}) => ({
+    calculateVDF: sinon.stub().resolves({ result: { solution: b4a.alloc(516, 0xff) } }),
+    ...overrides,
+});
+
+const makeConnectionManager = (overrides = {}) => ({
+    connected: sinon.stub().returns(true),
+    send: sinon.stub().resolves({ resultCode: ConsensusResultCode.OK, approval: { approver: b4a.alloc(21, 0x02), approval_sig: b4a.alloc(64, 0xbb) } }),
+    ...overrides,
+});
+
+// EpochCoordinatorOperations takes no connectionManager - callers pass it per method call
+// (sendProofApprovalRequest/requestProofApproval), it is never stored on the instance.
+const makeOps = (overrides = {}) =>
+    new EpochCoordinatorOperations(
+        overrides.state ?? makeState(),
+        overrides.vdfService ?? makeVdfService(),
+        overrides.wallet ?? { address: WALLET_ADDRESS },
+        overrides.config ?? { ...CONFIG },
+    );
+
+for (const preparation of ['proposal signing', 'writer lookup']) {
+    test(`requestProofApproval ignores old preparation after ${preparation} finishes in a new attempt`, async t => {
+        const address = addressToBuffer('trac1quszuupdwwk2h2mlfc5pdcgv8a78pdr30gcakyy7dw7xzasltwyspt524z', 'trac');
+        const state = makeState({ getRegisteredWriterKey: sinon.stub().resolves(address) });
+        const ops = makeOps({ state });
+        const createProposal = sinon.stub(ops, 'createProofProposal').resolves({ session_id: 'new' });
+        const entered = Promise.withResolvers();
+        const release = Promise.withResolvers();
+        const pendingStep = preparation === 'proposal signing' ? createProposal : state.getRegisteredWriterKey;
+        pendingStep.onFirstCall().callsFake(async () => {
+            entered.resolve();
+            await release.promise;
+            return preparation === 'proposal signing' ? { session_id: 'old' } : address;
+        });
+        const manager = makeConnectionManager();
+        const oldCollection = { closed: false };
+        const oldResult = ops.requestProofApproval({ key: b4a.alloc(32) }, {}, manager, oldCollection).catch(error => error);
+        await entered.promise;
+        oldCollection.closed = true;
+
+        const currentCollection = { closed: false };
+        const currentResult = await ops.requestProofApproval({ key: b4a.alloc(32) }, {}, manager, currentCollection);
+        release.resolve();
+
+        t.is((await oldResult).message, 'Epoch approval request was cancelled');
+        t.ok(manager.send.calledOnce, 'only the current attempt reaches the transport');
+        t.is(manager.send.firstCall.args[1].session_id, 'new');
+        t.alike(currentResult.approver, address);
+        t.absent(currentCollection.closed, 'old preparation cannot close the new collection');
+    });
+}
+
+const opsWithMocks = async (mocks = {}) => {
+    const { default: esmock } = await import('esmock');
+    const { EpochCoordinatorOperations: Ops } = await esmock(
+        '../../../../../src/core/consensus/services/EpochCoordinatorOperations.js',
+        mocks,
+    );
+    return (overrides = {}) => new Ops(
+        overrides.state ?? makeState(),
+        overrides.vdfService ?? makeVdfService(),
+        overrides.wallet ?? { address: WALLET_ADDRESS },
+        overrides.config ?? { ...CONFIG },
+    );
+};
+
+// --- calculateVDF ---
+
+test('calculateVDF calls vdfService with hash/difficulty/discriminantSizeBits and returns the solution', async t => {
+    const hash = b4a.alloc(32, 0xcc);
+    const solution = b4a.alloc(516, 0xdd);
+    const vdfService = makeVdfService({ calculateVDF: sinon.stub().resolves({ result: { solution } }) });
+    const ops = makeOps({ vdfService });
+
+    const result = await ops.calculateVDF(hash, 150, 4096);
+
+    t.ok(vdfService.calculateVDF.calledWith(hash, 150, 4096));
+    t.ok(b4a.equals(result.solution, solution));
+    t.is(result.difficulty, 150);
+    t.is(result.discriminantSizeBits, 4096);
+});
+
+// --- createProofProposal ---
+
+nodeOnlyTest('createProofProposal targets epoch = prevEpochId + 1n and forwards the previous epoch hash', async t => {
+    const buildProofProposal = sinon.stub().resolves({ proof_proposal: { epoch: b4a.alloc(8) } });
+    const make = await opsWithMocks({
+        [FACTORY_PATH]: { consensusMessageFactory: () => ({ buildProofProposal }) },
+    });
+    const prevEpochHash = b4a.alloc(32, 0x01);
+    const vdf = { difficulty: 100, discriminantSizeBits: 2048, solution: b4a.alloc(516, 0xff) };
+
+    const result = await make().createProofProposal(4n, prevEpochHash, vdf);
+
+    t.ok(result);
+    const [, , epoch, hash, , difficulty, discriminantBitSize, solution] = buildProofProposal.firstCall.args;
+    t.is(epoch, 5n);
+    t.ok(b4a.equals(hash, prevEpochHash));
+    t.is(difficulty.readUInt32BE(0), vdf.difficulty);
+    t.is(discriminantBitSize.readUInt16BE(0), vdf.discriminantSizeBits);
+    t.ok(b4a.equals(solution, vdf.solution));
+});
+
+// --- sendProofApprovalRequest ---
+
+test('sendProofApprovalRequest throws if the indexer is not in the connection manager', async t => {
+    const connectionManager = makeConnectionManager({ connected: sinon.stub().returns(false) });
+    const ops = makeOps();
+    await t.exception(ops.sendProofApprovalRequest('abcd', {}, connectionManager), /Indexer not in the manager/);
+});
+
+test('sendProofApprovalRequest returns resultCode and signature from the response', async t => {
+    const sig = b4a.alloc(64, 0xaa);
+    const connectionManager = makeConnectionManager({
+        send: sinon.stub().resolves({ resultCode: ConsensusResultCode.OK, approval: { approval_sig: sig } }),
+    });
+    const ops = makeOps();
+
+    const result = await ops.sendProofApprovalRequest('abcd', { type: 1 }, connectionManager);
+
+    t.is(result.resultCode, ConsensusResultCode.OK);
+    t.ok(b4a.equals(result.signature, sig));
+});
+
+test('sendProofApprovalRequest surfaces a non-OK resultCode with no signature', async t => {
+    const connectionManager = makeConnectionManager({
+        send: sinon.stub().resolves({ resultCode: ConsensusResultCode.EPOCH_INVALID }),
+    });
+    const ops = makeOps();
+
+    const result = await ops.sendProofApprovalRequest('abcd', { type: 1 }, connectionManager);
+
+    t.is(result.resultCode, ConsensusResultCode.EPOCH_INVALID);
+    t.absent(result.signature);
+});
+
+// --- requestProofApproval ---
+
+// requestProofApproval builds its own per-request proposal internally via createProofProposal
+// (a fresh session id per approver) - that's covered by the createProofProposal tests above,
+// so here it's stubbed out and these tests focus on requestProofApproval's own logic.
+
+test('requestProofApproval throws if getRegisteredWriterKey returns null', async t => {
+    const ops = makeOps({ state: makeState({ getRegisteredWriterKey: sinon.stub().resolves(null) }) });
+    sinon.stub(ops, 'createProofProposal').resolves({});
+    await t.exception(ops.requestProofApproval({ key: b4a.alloc(32) }, {}, makeConnectionManager()), /Registered writer key not found/);
+});
+
+nodeOnlyTest('requestProofApproval throws if address cannot be resolved', async t => {
+    const make = await opsWithMocks({
+        [ADDRESS_UTILS_PATH]: { default: { bufferToAddress: sinon.stub().returns(null) } },
+    });
+    const ops = make();
+    sinon.stub(ops, 'createProofProposal').resolves({});
+    await t.exception(ops.requestProofApproval({ key: b4a.alloc(32) }, {}, makeConnectionManager()), /Writer address could not be decoded/);
+});
+
+nodeOnlyTest('requestProofApproval throws with resultCode attached when the peer rejects with a non-OK code', async t => {
+    const otherAddress = 'trac1otheraddress';
+    const decodedPublicKey = b4a.alloc(32, 0x09);
+    const make = await opsWithMocks({
+        [ADDRESS_UTILS_PATH]: { default: { bufferToAddress: sinon.stub().returns(otherAddress) } },
+        'trac-crypto-api': { default: { address: { decode: sinon.stub().returns(decodedPublicKey) } } },
+    });
+    const connectionManager = makeConnectionManager({
+        send: sinon.stub().resolves({ resultCode: ConsensusResultCode.EPOCH_INVALID }),
+    });
+
+    const ops = make();
+    sinon.stub(ops, 'createProofProposal').resolves({});
+    let caught;
+    try {
+        await ops.requestProofApproval({ key: b4a.alloc(32) }, {}, connectionManager);
+    } catch (err) {
+        caught = err;
+    }
+    t.is(caught?.resultCode, ConsensusResultCode.EPOCH_INVALID);
+});
+
+nodeOnlyTest('requestProofApproval throws if resultCode is OK but no signature was returned', async t => {
+    const otherAddress = 'trac1otheraddress';
+    const decodedPublicKey = b4a.alloc(32, 0x09);
+    const make = await opsWithMocks({
+        [ADDRESS_UTILS_PATH]: { default: { bufferToAddress: sinon.stub().returns(otherAddress) } },
+        'trac-crypto-api': { default: { address: { decode: sinon.stub().returns(decodedPublicKey) } } },
+    });
+    const connectionManager = makeConnectionManager({
+        send: sinon.stub().resolves({ resultCode: ConsensusResultCode.OK, approval: null }),
+    });
+
+    const ops = make();
+    sinon.stub(ops, 'createProofProposal').resolves({});
+    await t.exception(ops.requestProofApproval({ key: b4a.alloc(32) }, {}, connectionManager), /Approval signature not received/);
+});
+
+nodeOnlyTest('requestProofApproval returns signature and approver address buffer on success', async t => {
+    const otherAddress = 'trac1otheraddress';
+    const decodedPublicKey = b4a.alloc(32, 0x09);
+    const sig = b4a.alloc(64, 0xbb);
+    const memberKey = b4a.alloc(32, 0x01);
+    const make = await opsWithMocks({
+        [ADDRESS_UTILS_PATH]: { default: { bufferToAddress: sinon.stub().returns(otherAddress) } },
+        'trac-crypto-api': { default: { address: { decode: sinon.stub().returns(decodedPublicKey) } } },
+    });
+    const connectionManager = makeConnectionManager({
+        send: sinon.stub().resolves({ resultCode: ConsensusResultCode.OK, approval: { approval_sig: sig } }),
+    });
+
+    const ops = make();
+    sinon.stub(ops, 'createProofProposal').resolves({});
+    const result = await ops.requestProofApproval({ key: memberKey }, {}, connectionManager);
+
+    t.ok(b4a.equals(result.signature, sig));
+    t.ok(result.approver);
+});
+
+nodeOnlyTest('requestProofApproval does not send a request after its approval collection is closed', async t => {
+    const otherAddress = 'trac1otheraddress';
+    const decodedPublicKey = b4a.alloc(32, 0x09);
+    const make = await opsWithMocks({
+        [ADDRESS_UTILS_PATH]: { default: { bufferToAddress: sinon.stub().returns(otherAddress) } },
+        'trac-crypto-api': { default: { address: { decode: sinon.stub().returns(decodedPublicKey) } } },
+    });
+    const connectionManager = makeConnectionManager();
+    const approvalCollection = { closed: true };
+    const ops = make();
+    sinon.stub(ops, 'createProofProposal').resolves({});
+
+    await t.exception(
+        ops.requestProofApproval(
+            { key: b4a.alloc(32) },
+            {},
+            connectionManager,
+            approvalCollection,
+        ),
+        /cancelled/,
+    );
+
+    t.absent(connectionManager.send.called);
+});
+
+// --- buildSetEpochPayload ---
+
+nodeOnlyTest('buildSetEpochPayload encodes proof + approvals into the applied payload', async t => {
+    const encoded = b4a.alloc(64, 0xcc);
+    const builtMessage = { some: 'message' };
+    const buildCompleteSetEpochMessage = sinon.stub().resolves(builtMessage);
+    const make = await opsWithMocks({
+        [APPLY_STATE_FACTORY_PATH]: { applyStateMessageFactory: () => ({ buildCompleteSetEpochMessage }) },
+        [APPLY_CODEC_PATH]: { encodeApplyOperation: sinon.stub().returns(encoded) },
+        [CONSENSUS_CODEC_PATH]: {
+            encodeProofProposal: sinon.stub().returns(b4a.alloc(1)),
+            encodeProofProposalApproval: sinon.stub().returns(b4a.alloc(1)),
+        },
+    });
+    const proofProposal = { network_id: 1, epoch: 2, previous_epoch_record_hash: b4a.alloc(32), difficulty: b4a.alloc(4), discriminant_bit_size: b4a.alloc(2), proof: b4a.alloc(516), signature: b4a.alloc(64) };
+    const signatures = [{ signature: b4a.alloc(64), approver: b4a.alloc(21) }];
+
+    const payload = await make().buildSetEpochPayload(proofProposal, signatures);
+
+    t.ok(b4a.equals(payload, encoded));
+    t.ok(buildCompleteSetEpochMessage.calledWith(WALLET_ADDRESS));
+});
+
+nodeOnlyTest('buildSetEpochPayload does not append to state', async t => {
+    const state = makeState();
+    const make = await opsWithMocks({
+        [APPLY_STATE_FACTORY_PATH]: { applyStateMessageFactory: () => ({ buildCompleteSetEpochMessage: sinon.stub().resolves({}) }) },
+        [APPLY_CODEC_PATH]: { encodeApplyOperation: sinon.stub().returns(b4a.alloc(64)) },
+        [CONSENSUS_CODEC_PATH]: {
+            encodeProofProposal: sinon.stub().returns(b4a.alloc(1)),
+            encodeProofProposalApproval: sinon.stub().returns(b4a.alloc(1)),
+        },
+    });
+    const proofProposal = { network_id: 1, epoch: 2, previous_epoch_record_hash: b4a.alloc(32), difficulty: b4a.alloc(4), discriminant_bit_size: b4a.alloc(2), proof: b4a.alloc(516), signature: b4a.alloc(64) };
+
+    await make({ state }).buildSetEpochPayload(proofProposal, []);
+
+    t.absent(state.append.called);
+});
+
+// --- appendSetEpoch ---
+
+test('appendSetEpoch forwards payload and authorization to state.appendEpoch', async t => {
+    const state = makeState();
+    const payload = b4a.alloc(64, 0xcc);
+    const authorizeEpochAppend = sinon.stub().resolves();
+
+    await makeOps({ state }).appendSetEpoch(payload, authorizeEpochAppend);
+
+    t.ok(state.appendEpoch.calledOnceWithExactly(payload, authorizeEpochAppend));
+    t.absent(state.append.called);
+});
+
+test('appendSetEpoch forwards selected-appender authorization to the guarded writer queue', async t => {
+    const failure = new Error('selection expired while queued');
+    const authorizeEpochAppend = sinon.stub().rejects(failure);
+    const location = { writerKey: '01'.repeat(32), from: 12 };
+    const state = makeState({
+        appendEpoch: sinon.stub().callsFake(async (_payload, authorizeEpochAppend) => {
+            await authorizeEpochAppend(location);
+            t.fail('a rejected authorization must stop the append');
+        }),
+    });
+    const payload = b4a.from('selected proof');
+
+    const result = await makeOps({ state }).appendSetEpoch(payload, authorizeEpochAppend).catch(error => error);
+
+    t.is(result, failure);
+    t.ok(state.appendEpoch.calledOnceWith(payload, authorizeEpochAppend));
+    t.ok(authorizeEpochAppend.calledOnceWith(location));
+    t.absent(state.append.called, 'selected appends cannot fall back to the unguarded path');
+});
+
+// --- approvers ---
+
+// approvers() only excludes self (writingKey) - it does not call getAdminEntry at all, so an
+// admin that is also a registered indexer is treated like any other approver.
+test('getProofApprovers excludes only self, including when an admin entry also appears as an indexer', async t => {
+    const writingKey = b4a.alloc(32, 1);
+    const adminKey = b4a.alloc(32, 2);
+    const otherKey = b4a.alloc(32, 3);
+    const state = makeState({
+        writingKey,
+    });
+    const indexers = [{ key: writingKey }, { key: adminKey }, { key: otherKey }];
+
+    const result = makeOps({ state }).getProofApprovers(indexers);
+
+    t.is(result.length, 2);
+    t.ok(result.some(({ key }) => b4a.equals(key, adminKey)));
+    t.ok(result.some(({ key }) => b4a.equals(key, otherKey)));
+});
+
+test('getProofApprovers returns everyone but self', async t => {
+    const writingKey = b4a.alloc(32, 1);
+    const otherKey = b4a.alloc(32, 3);
+    const state = makeState({
+        writingKey,
+    });
+    const indexers = [{ key: writingKey }, { key: otherKey }];
+
+    const result = makeOps({ state }).getProofApprovers(indexers);
+
+    t.is(result.length, 1);
+    t.ok(b4a.equals(result[0].key, otherKey));
+});

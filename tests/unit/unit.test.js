@@ -5,12 +5,18 @@ import { default as test } from 'brittle';
 async function runTests() {
     test.pause();
     await import('./index.test.js');
+    await import('./codecs/codecs.test.js');
     await import('./config/configModule.test.js');
     await import('./cli/commandHandler.test.js');
     await import('./utils/utils.test.js');
     await import('./messages/messages.test.js');
+    await import('./network/protocols/consensus/consensusModule.test.js');
+    await import('./consensus/consensusModule.test.js');
     await import('./network/networkModule.test.js')
     await import('./state/stateModule.test.js');
+    await import('./rpc/handlers.test.js');
+    await import('./rpc/htlcApi.test.js');
+
     test.resume();
 }
 
