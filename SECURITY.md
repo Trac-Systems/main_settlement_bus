@@ -6,9 +6,9 @@ The following table shows which versions of this project are currently receiving
 
 | Version  | Supported          | Pear compatibility |
 | -------- | ------------------ | ------------------ |
-| 0.2.21   | :white_check_mark: | Pear v2 and v3     |
+| 0.3.0   | :white_check_mark: | Pear v2 and v3     |
 | main     | :warning: unstable | Pear v2 and v3     |
-| < 0.2.21 | :x:                | N/A                |
+| < 0.3.0 | :x:                | N/A                |
 
 Versions older than 0.2.21 are deprecated.
 Please upgrade to the latest release to ensure you receive security fixes.
