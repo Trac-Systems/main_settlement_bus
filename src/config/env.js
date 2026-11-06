@@ -17,7 +17,7 @@ const configData = {
         addressPrefixLength: TRAC_NETWORK_MSB_TESTNET1_PREFIX.length,
         bech32mHrpLength: TRAC_NETWORK_MSB_TESTNET1_PREFIX.length + 1, // len(addressPrefix + separator)
         bootstrap: 'c184f4ad8e9cf5e911f9415b60e7dcfb30aed73ebd8a402ef68e1b154624f5ef',
-        channel: '1111trac1network1msb1testnet1111',
+        channel: '2222trac2network2msb2testnet2222',
         dhtBootstrap: ['116.202.214.149:10001','157.180.12.214:10001','node1.hyperdht.org:49737','node2.hyperdht.org:49737','node3.hyperdht.org:49737'], // these are used to peer discovery
         derivationPath: address.TESNET_DERIVATION_PATH,
         pollInterval: 500, // Validator observer poll interval
