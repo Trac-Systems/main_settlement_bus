@@ -676,6 +676,12 @@ class State extends ReadyResource {
         for await (const entry of historyStream) {
             if (isTransactionRecordPut(entry)) {
                 hashes.push({ hash: entry.key, confirmed_length: entry.seq });
+            } else if (entry.type === 'put' && entry.key.startsWith(EntryType.EPOCH_HASH)) {
+                // Epoch records share this history, but have their own key namespace.
+                const hash = entry.key.slice(EntryType.EPOCH_HASH.length);
+                if (hash.length === HASH_BYTE_LENGTH * 2 && isHexString(hash)) {
+                    hashes.push({ hash, confirmed_length: entry.seq });
+                }
             }
         }
 

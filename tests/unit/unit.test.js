@@ -16,6 +16,7 @@ async function runTests() {
     await import('./state/stateModule.test.js');
     await import('./rpc/handlers.test.js');
     await import('./rpc/htlcApi.test.js');
+    await import('./rpc/epochApi.test.js');
 
     test.resume();
 }

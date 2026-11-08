@@ -37,7 +37,8 @@ import {
     encodeApplyOperation,
     encodeConsensusConfig,
     safeDecodeApplyOperation,
-    safeEncodeApplyOperation
+    safeEncodeApplyOperation,
+    decodeEpochRecord
 } from "./codecs/apply/applyOperationCodec.js";
 import { encodeVdfConfig } from "./codecs/consensus/v1/vdfConfigCodec.js";
 import PartialTransactionValidator from "./core/network/protocols/validators/shared/validators/PartialTransactionValidator.js";
@@ -425,7 +426,16 @@ export class MainSettlementBus extends ReadyResource {
 
     async fetchBulkTxPayloads(hashes) {
         const response = { results: [], missing: [] };
-        const results = await Promise.all(hashes.map((hash) => this.getConfirmedTxInfo(hash)));
+        const results = await Promise.all(hashes.map(async (hash) => {
+            const transaction = await this.getConfirmedTxInfo(hash);
+            if (transaction) return transaction.decoded;
+
+            const epochRecord = await this.#state.getEpochProof(hash);
+            if (epochRecord === null) return null;
+
+            // This hash identifies the stored epoch record, not an original transaction.
+            return { type: OperationType.SET_EPOCH, seo: decodeEpochRecord(epochRecord) };
+        }));
 
         results.forEach((result, index) => {
             const hash = hashes[index];
@@ -434,7 +444,7 @@ export class MainSettlementBus extends ReadyResource {
                 return;
             }
 
-            const decodedResult = normalizeDecodedPayloadForJson(result.decoded, this.#config);
+            const decodedResult = normalizeDecodedPayloadForJson(result, this.#config);
             response.results.push({ hash, payload: decodedResult });
         });
 
