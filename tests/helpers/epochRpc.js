@@ -1,6 +1,6 @@
 import EventEmitter from 'bare-events';
 import b4a from 'b4a';
-import { handleConfirmedLength, handleTxHashes, handleFetchBulkTxPayloads, handleCurrentEpoch } from '../../rpc/handlers.js';
+import { handleConfirmedLength, handleTxHashes, handleFetchBulkTxPayloads, handleCurrentEpoch, handleConsensusConfig } from '../../rpc/handlers.js';
 
 // Keep the supplied State's reads intact. Only MSB startup, networking and resource ownership
 // are replaced, so integration tests can use the State owned by their consensus network.
@@ -19,6 +19,8 @@ export async function createEpochReadApi(t, state, config = {}) {
         confirmedTransactionsBetween(start, end) { return state.confirmedTransactionsBetween(start, end); }
         getCurrentEpoch() { return state.getCurrentEpoch(); }
         getCurrentEpochUnsigned() { return state.getCurrentEpochUnsigned(); }
+        getSignedConsensusConfig() { return state.getSignedConsensusConfig(); }
+        getUnsignedConsensusConfig() { return state.getUnsignedConsensusConfig(); }
     }
     class NetworkMock {
         async ready() {}
@@ -52,6 +54,7 @@ export function callEpochRpc(msbInstance, url, body) {
         const readHandlers = {
             '/v1/confirmed-length': handleConfirmedLength,
             '/v1/current-epoch': handleCurrentEpoch,
+            '/v1/consensus-config': handleConsensusConfig,
         };
         const handler = body !== undefined ? handleFetchBulkTxPayloads
             : readHandlers[url.split('?')[0]] ?? handleTxHashes;

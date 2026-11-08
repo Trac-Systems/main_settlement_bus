@@ -17,6 +17,7 @@ async function runTests() {
     await import('./rpc/handlers.test.js');
     await import('./rpc/htlcApi.test.js');
     await import('./rpc/epochApi.test.js');
+    await import('./rpc/consensusConfigApi.test.js');
 
     test.resume();
 }

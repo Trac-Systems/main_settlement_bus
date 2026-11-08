@@ -17,4 +17,5 @@ await import('./replication/consensusPeerBan.test.js');
 await import('./rounds/lateApprovals.test.js');
 await import('./rounds/lateValidation.test.js');
 await import('./epochs/epochRpc.test.js');
+await import('./epochs/consensusConfigRpc.test.js');
 test.resume();

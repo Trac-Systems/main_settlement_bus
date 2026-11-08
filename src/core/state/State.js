@@ -5567,6 +5567,28 @@ class State extends ReadyResource {
         return Status.SUCCESS;
     }
 
+    async getUnsignedConsensusConfig() {
+        // Keep the pointer and record in the same view while unsigned state can change.
+        const snapshot = this.#base.view.snapshot();
+        try {
+            const currentConfigPointer = (await snapshot.get(EntryType.CONSENSUS_CONFIG_CURRENT))?.value;
+            if (_.isNil(currentConfigPointer)) return null;
+
+            if (!b4a.isBuffer(currentConfigPointer) || currentConfigPointer.length !== CONSENSUS_CONFIG_INDEX_SIZE) {
+                throw new Error('Invalid current consensus config pointer.');
+            }
+
+            const currentConfigIndex = currentConfigPointer.readUInt32BE(0);
+            const encodedConsensusConfig = (await snapshot.get(EntryType.CONSENSUS_CONFIG_RECORD + currentConfigIndex))?.value;
+            if (_.isNil(encodedConsensusConfig)) {
+                throw new Error(`Consensus config record ${currentConfigIndex} does not exist.`);
+            }
+
+            return decodeVersionedConsensusConfig(encodedConsensusConfig);
+        } finally {
+            await snapshot.close();
+        }
+    }
 }
 
 export default State;

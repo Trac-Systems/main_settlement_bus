@@ -1307,6 +1307,12 @@ export class MainSettlementBus extends ReadyResource {
             : await this.#state.getCurrentEpochUnsigned();
         return epoch === null ? null : epoch.toString();
     }
+
+    async getConsensusConfig(confirmed = true) {
+        return confirmed
+            ? this.#state.getSignedConsensusConfig()
+            : this.#state.getUnsignedConsensusConfig();
+    }
 }
 
 export default MainSettlementBus;
