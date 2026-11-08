@@ -132,6 +132,10 @@ if (typeof globalThis.Bare !== 'undefined') {
             localWriteDone && await state.getCurrentEpochUnsigned() === 1n
         );
         t.is(await state.getCurrentEpoch(), 0n, 'signed epoch has not advanced');
+        const signedCurrent = await callEpochRpc(msb, '/v1/current-epoch');
+        t.alike(signedCurrent, { status: 200, body: { current_epoch: '0' } });
+        const unsignedCurrent = await callEpochRpc(msb, '/v1/current-epoch?confirmed=false');
+        t.alike(unsignedCurrent, { status: 200, body: { current_epoch: '1' } });
         t.ok(state.getUnsignedLength() > state.getSignedLength(), 'real unsigned view extends beyond signed history');
         const hash = (await state.get(EntryType.EPOCH + '1')).toString('hex');
         t.ok(await state.get(EntryType.EPOCH_HASH + hash), 'epoch record exists in unsigned state');
@@ -143,6 +147,10 @@ if (typeof globalThis.Bare !== 'undefined') {
         await network.reconnect(proposer, nodes[1]);
         await assertSignedEpoch(t, network);
         await waitFor('round completes after confirmation', () => round.completed);
+        for (const confirmed of [true, false]) {
+            const current = await callEpochRpc(msb, `/v1/current-epoch?confirmed=${confirmed}`);
+            t.alike(current, { status: 200, body: { current_epoch: '1' } });
+        }
         const signedHistory = await callEpochRpc(msb, `/v1/tx-hashes/0/${state.getSignedLength()}`);
         t.is(signedHistory.body.hashes.filter(item => item.hash === hash).length, 1);
         const signedBulk = await callEpochRpc(msb, '/v1/tx-payloads-bulk', { hashes: [hash] });

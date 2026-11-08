@@ -663,6 +663,27 @@ paths:
               example:
                 error: An error occurred processing the request.
 
+  /v1/current-epoch:
+    get:
+      tags: [Network]
+      summary: Get current epoch
+      description: Returns the current epoch from signed state by default, or unsigned state when confirmed=false.
+      parameters:
+        - $ref: "#/components/parameters/ConfirmedQueryParamStrict"
+      responses:
+        "200":
+          description: Current epoch returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CurrentEpochResponse"
+              example:
+                current_epoch: "123"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
 components:
   parameters:
     HtlcLockIdParam:
@@ -1131,3 +1152,13 @@ components:
               type: string
               description: Epoch data encoded as hex; decode the nested proof using sv.
               pattern: '^([0-9a-f]{2})+$'
+
+    CurrentEpochResponse:
+      type: object
+      required: [current_epoch]
+      properties:
+        current_epoch:
+          type: string
+          nullable: true
+          pattern: '^(0|[1-9][0-9]*)$'
+          description: Decimal uint64 epoch number, or null before genesis initialization.

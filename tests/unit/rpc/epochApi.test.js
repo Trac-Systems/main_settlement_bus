@@ -23,6 +23,8 @@ if (typeof globalThis.Bare !== 'undefined') {
             getEpochProof: sinon.stub().resolves(null),
             getSignedLength: () => 20,
             getUnsignedLength: () => 25,
+            getCurrentEpoch: sinon.stub().resolves(null),
+            getCurrentEpochUnsigned: sinon.stub().resolves(null),
         };
     }
 
@@ -132,5 +134,37 @@ if (typeof globalThis.Bare !== 'undefined') {
         const tooLarge = await callEpochRpc(msb, '/v1/tx-payloads-bulk', { hashes: hashes.slice(0, 400) });
         t.is(tooLarge.status, 413);
         t.is(tooLarge.body.error, 'Response too large. Reduce number of hashes.');
+    });
+    test('current epoch RPC selects signed or unsigned state and preserves null, zero and uint64 precision', async t => {
+        const state = readState();
+        const msb = await createEpochReadApi(t, state, config);
+        for (const [query, signed] of [['', true], ['?confirmed=true', true], ['?confirmed=false', false]]) {
+            for (const epoch of [null, 0n, 18446744073709551615n]) {
+                const selected = signed ? state.getCurrentEpoch : state.getCurrentEpochUnsigned;
+                const other = signed ? state.getCurrentEpochUnsigned : state.getCurrentEpoch;
+                selected.resetHistory();
+                other.resetHistory();
+                selected.resolves(epoch);
+                const response = await callEpochRpc(msb, '/v1/current-epoch' + query);
+                t.alike(response, { status: 200, body: { current_epoch: epoch === null ? null : epoch.toString() } });
+                t.ok(selected.calledOnceWithExactly(), 'the selected view is read once');
+                t.absent(other.called, 'the other view is not read');
+            }
+        }
+    });
+
+    test('current epoch RPC rejects invalid confirmation modes before reading state and propagates read errors', async t => {
+        const state = readState();
+        const msb = await createEpochReadApi(t, state, config);
+        for (const value of ['', '1', '0', 'TRUE', 'False', 'maybe']) {
+            const response = await callEpochRpc(msb, '/v1/current-epoch?confirmed=' + value);
+            t.alike(response, { status: 400, body: { error: 'Parameter "confirmed" must be exactly "true" or "false"' } });
+        }
+        t.absent(state.getCurrentEpoch.called);
+        t.absent(state.getCurrentEpochUnsigned.called);
+        state.getCurrentEpoch.rejects(new Error('signed epoch read failed'));
+        state.getCurrentEpochUnsigned.rejects(new Error('unsigned epoch read failed'));
+        await t.exception(() => msb.getCurrentEpoch(), /signed epoch read failed/);
+        await t.exception(() => msb.getCurrentEpoch(false), /unsigned epoch read failed/);
     });
 }

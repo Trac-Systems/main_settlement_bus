@@ -1300,6 +1300,13 @@ export class MainSettlementBus extends ReadyResource {
             expectedKeys.every(key => Object.hasOwn(value, key))
         );
     }
+
+    async getCurrentEpoch(confirmed = true) {
+        const epoch = confirmed
+            ? await this.#state.getCurrentEpoch()
+            : await this.#state.getCurrentEpochUnsigned();
+        return epoch === null ? null : epoch.toString();
+    }
 }
 
 export default MainSettlementBus;
