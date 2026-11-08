@@ -410,9 +410,9 @@ paths:
   /v1/tx-hashes/{start_confirmed_length}/{end_confirmed_length}:
     get:
       tags: [Transactions]
-      summary: Get transaction hashes by confirmed-length range
+      summary: Get transaction and epoch record hashes by confirmed-length range
       description: |
-        Returns transaction hashes in inclusive range.
+        Returns confirmed transaction and epoch record hashes in the requested range.
 
         Rules:
         - both params must be integers
@@ -504,9 +504,9 @@ paths:
   /v1/tx-payloads-bulk:
     post:
       tags: [Transactions]
-      summary: Get transaction payloads in bulk
+      summary: Get transaction payloads and epoch records in bulk
       description: |
-        Returns payloads for provided transaction hash list.
+        Returns confirmed transaction payloads and epoch records for the supplied hashes.
 
         Limits:
         - max `1500` hashes per request
@@ -663,6 +663,51 @@ paths:
               example:
                 error: An error occurred processing the request.
 
+  /v1/current-epoch:
+    get:
+      tags: [Network]
+      summary: Get current epoch
+      description: Returns the current epoch from signed state by default, or unsigned state when confirmed=false.
+      parameters:
+        - $ref: "#/components/parameters/ConfirmedQueryParamStrict"
+      responses:
+        "200":
+          description: Current epoch returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CurrentEpochResponse"
+              example:
+                current_epoch: "123"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /v1/consensus-config:
+    get:
+      tags: [Network]
+      summary: Get consensus config
+      description: Returns the consensus config from signed state by default, or unsigned state when confirmed=false.
+      parameters:
+        - $ref: "#/components/parameters/ConfirmedQueryParamStrict"
+      responses:
+        "200":
+          description: Current consensus config, or null before genesis initialization.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsensusConfigResponse"
+              example:
+                schemaVersion: 1
+                configData:
+                  difficulty: 55000000
+                  discriminantBitSize: 2048
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
 components:
   parameters:
     HtlcLockIdParam:
@@ -738,7 +783,7 @@ components:
       name: end_confirmed_length
       in: path
       required: true
-      description: End of confirmed-length range (inclusive).
+      description: End of confirmed-length range (exclusive), capped at the current confirmed length.
       schema:
         type: integer
         minimum: 0
@@ -951,8 +996,10 @@ components:
       properties:
         hash:
           type: string
+          description: Original transaction hash or hash of a stored versioned epoch record.
         confirmed_length:
           type: integer
+          description: Sequence of the confirmed history entry, included when start <= sequence < end.
 
     TxHashesResponse:
       type: object
@@ -1056,6 +1103,7 @@ components:
       properties:
         hashes:
           type: array
+          description: Transaction or epoch record hashes. Duplicate hashes are looked up once.
           minItems: 1
           maxItems: 1500
           items:
@@ -1067,8 +1115,19 @@ components:
       properties:
         hash:
           type: string
+          description: Requested transaction hash or epoch record hash.
         payload:
-          $ref: "#/components/schemas/TxDetailsPayload"
+          oneOf:
+            - type: object
+              description: Normalized original apply operation; fields depend on its type.
+              required: [type, address]
+              properties:
+                type:
+                  type: integer
+                address:
+                  type: string
+              additionalProperties: true
+            - $ref: "#/components/schemas/EpochRecordPayload"
 
     TxPayloadsBulkResponse:
       type: object
@@ -1094,3 +1153,56 @@ components:
           description: Confirmed ledger length (0 when transaction is not yet confirmed).
         fee:
           type: string
+
+    EpochRecordPayload:
+      type: object
+      description: Stored versioned epoch record represented as type 14, including epoch 0.
+      required: [type, seo]
+      additionalProperties: false
+      properties:
+        type:
+          type: integer
+          enum: [14]
+        seo:
+          type: object
+          required: [sv, data]
+          additionalProperties: false
+          properties:
+            sv:
+              type: string
+              description: Non-zero one-byte consensus format version, encoded as hex.
+              pattern: '^[0-9a-f]{2}$'
+            data:
+              type: string
+              description: Epoch data encoded as hex; decode the nested proof using sv.
+              pattern: '^([0-9a-f]{2})+$'
+
+    CurrentEpochResponse:
+      type: object
+      required: [current_epoch]
+      properties:
+        current_epoch:
+          type: string
+          nullable: true
+          pattern: '^(0|[1-9][0-9]*)$'
+          description: Decimal uint64 epoch number, or null before genesis initialization.
+
+    ConsensusConfigResponse:
+      type: object
+      nullable: true
+      required: [schemaVersion, configData]
+      properties:
+        schemaVersion:
+          type: integer
+          enum: [1]
+        configData:
+          type: object
+          required: [difficulty, discriminantBitSize]
+          properties:
+            difficulty:
+              type: integer
+              minimum: 1
+              maximum: 4294967295
+            discriminantBitSize:
+              type: integer
+              enum: [1024, 2048, 4096]

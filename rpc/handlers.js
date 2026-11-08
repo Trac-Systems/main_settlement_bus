@@ -456,3 +456,21 @@ export async function handleAccountDetails({ msbInstance, respond, req }) {
         stakedBalance: bufferToBigInt(nodeEntry.stakedBalance).toString(),
     });
 }
+
+export async function handleCurrentEpoch({ req, msbInstance, respond }) {
+    const confirmed = getConfirmedParameter(buildRequestUrl(req));
+    if (confirmed === null) {
+        return respond(400, { error: 'Parameter "confirmed" must be exactly "true" or "false"' });
+    }
+    const current_epoch = await msbInstance.getCurrentEpoch(confirmed);
+    respond(200, { current_epoch });
+}
+
+export async function handleConsensusConfig({ req, msbInstance, respond }) {
+    const confirmed = getConfirmedParameter(buildRequestUrl(req));
+    if (confirmed === null) {
+        return respond(400, { error: 'Parameter "confirmed" must be exactly "true" or "false"' });
+    }
+    const consensusConfig = await msbInstance.getConsensusConfig(confirmed);
+    respond(200, consensusConfig);
+}

@@ -15,6 +15,8 @@ import {
     handleHtlcClaim,
     handleHtlcRefund,
     handleHtlc,
+    handleCurrentEpoch,
+    handleConsensusConfig,
 } from '../handlers.js';
 
 export const v1Routes = [
@@ -34,4 +36,6 @@ export const v1Routes = [
     { method: 'POST', path: '/tx-payloads-bulk', handler: handleFetchBulkTxPayloads },
     { method: 'GET', path: '/tx/details', handler: handleTransactionExtendedDetails },
     { method: 'GET', path: '/account', handler: handleAccountDetails },
+    { method: 'GET', path: '/current-epoch', exact: true, handler: handleCurrentEpoch },
+    { method: 'GET', path: '/consensus-config', exact: true, handler: handleConsensusConfig },
 ];
