@@ -32,10 +32,13 @@ async function setupMockedState(config) {
 
     const stubs = [];
     
-    stubs.push(sinon.stub(state, 'writingKey').get(() => config.bootstrap));
-    stubs.push(sinon.stub(state, 'isIndexer').resolves(true));
+    const writingKeyStub = sinon.stub(state, 'writingKey').get(() => config.bootstrap);
+    stubs.push(writingKeyStub);
+    stubs.push(sinon.stub(state, 'isIndexer').returns(true));
+    stubs.push(sinon.stub(state, 'isWritable').returns(true));
 
     const adminAddress = randomAddress('trac');
+    dummyWallet.address = adminAddress;
     const adminAddressBuffer = addressUtils.addressToBuffer(adminAddress, 'trac');
     stubs.push(sinon.stub(state, 'getAdminEntry').resolves({ address: adminAddress, wk: config.bootstrap }));
 
@@ -83,6 +86,8 @@ async function setupMockedState(config) {
 
     return { 
         state, 
+        adminAddress,
+        writingKeyStub,
         restore: () => {
             stubs.forEach(s => s.restore());
             try { fs.rmSync(dbPath, { recursive: true, force: true }); } catch (e) {
@@ -114,6 +119,71 @@ test('State#isAdminAllowedToValidate blocks admin when active validator threshol
 
     restore();
 });
+
+for (const recovered of [false, true]) {
+    for (const validators of [9, 10]) {
+        test(`State#isAdminAllowedToValidate: ${recovered ? 'recovered' : 'original'} admin with ${validators} validators`, async t => {
+            const config = createStateConfig({ maxWritersForAdminIndexerConnection: 10 });
+            const { state, adminAddress, writingKeyStub, restore } = await setupMockedState(config);
+            const count = sinon.stub(state, 'getActiveWriterCount').resolves(validators);
+            if (recovered) {
+                const recoveredKey = randomBuffer(WRITER_BYTE_LENGTH);
+                writingKeyStub.get(() => recoveredKey);
+                state.getAdminEntry.resolves({ address: adminAddress, wk: recoveredKey });
+            }
+            try {
+                t.is(await state.isAdminAllowedToValidate(), validators < 10);
+                t.ok(count.calledWithExactly(true), 'threshold excludes admin');
+            } finally {
+                count.restore();
+                await state.close();
+                restore();
+            }
+        });
+    }
+}
+
+test('State#isAdminAllowedToValidate rejects the old bootstrap writer after admin recovery', async t => {
+    const { state, adminAddress, restore } = await setupMockedState(createStateConfig());
+    state.getAdminEntry.resolves({ address: adminAddress, wk: randomBuffer(WRITER_BYTE_LENGTH) });
+    try {
+        t.absent(await state.isAdminAllowedToValidate());
+    } finally {
+        await state.close();
+        restore();
+    }
+});
+
+for (const scenario of [
+    { name: 'ordinary writer', writer: true, indexer: false, expected: true },
+    { name: 'non-admin indexer', writer: true, indexer: true, expected: false },
+    { name: 'removed writer', writer: false, indexer: false, expected: false },
+    { name: 'missing node', missing: true, expected: false },
+    { name: 'admin below threshold', admin: true, writer: true, indexer: true, validators: 9, expected: true },
+    { name: 'admin at threshold', admin: true, writer: true, indexer: true, validators: 10, expected: false },
+    { name: 'admin with obsolete key', admin: true, writer: true, indexer: true, obsoleteKey: true, expected: false },
+]) {
+    test(`State#isValidatorAddress checks current role: ${scenario.name}`, async t => {
+        const config = createStateConfig({ maxWritersForAdminIndexerConnection: 10 });
+        const { state, adminAddress, restore } = await setupMockedState(config);
+        const address = scenario.admin ? adminAddress : randomAddress('trac');
+        const node = sinon.stub(state, 'getNodeEntryUnsigned').resolves(scenario.missing ? null : {
+            isWriter: scenario.writer,
+            isIndexer: scenario.indexer,
+            wk: scenario.obsoleteKey ? randomBuffer(WRITER_BYTE_LENGTH) : config.bootstrap,
+        });
+        const count = sinon.stub(state, 'getActiveWriterCount').resolves(scenario.validators ?? 1);
+        try {
+            t.is(await state.isValidatorAddress(address), scenario.expected);
+            t.ok(node.calledWithExactly(address), 'uses the latest local role before discovery cache expires');
+        } finally {
+            node.restore();
+            count.restore();
+            await state.close();
+            restore();
+        }
+    });
+}
 
 async function setupQueryState(config) {
     const dbPath = './.test-db-query-' + Date.now() + Math.floor(Math.random() * 1000);

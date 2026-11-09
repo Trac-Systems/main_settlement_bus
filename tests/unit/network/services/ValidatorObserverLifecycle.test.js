@@ -36,6 +36,7 @@ function createBaseMocks(overrides = {}) {
     tracCryptoApi.address.decode = defaultMockDecode;
 
     const baseState = {
+        isValidatorAddress: async () => true,
         getAdminEntry: async () => ({ address: "trac_admin" }),
         getRegisteredWriterKey: async (hex) => hex ? b4a.from(hex, "hex") : b4a.alloc(32, "a"),
         getNodeEntry: async () => ({ isWriter: true }),
@@ -101,11 +102,11 @@ function createWriterHistoryMocks(writers, initiallyConnected = false) {
     const mocks = createBaseMocks({
         network: {
             validatorConnectionManager: {
-                connected: (key) => connected.has(b4a.toString(key, "hex")),
+                connected: (key) => connected.has(typeof key === "string" ? key : b4a.toString(key, "hex")),
                 connectedPeers: () => Array.from(connected),
                 connectionCount: () => connected.size,
                 remove: (key) => {
-                    const hex = b4a.toString(key, "hex");
+                    const hex = typeof key === "string" ? key : b4a.toString(key, "hex");
                     observations.removed.push(hex);
                     connected.delete(hex);
                 },
@@ -428,7 +429,7 @@ test("does NOT drop connections when it is the admin and threshold reached", asy
     const clock = sinon.useFakeTimers({ now: 0 });
 
     const removed = [];
-    const publicKeys = ["a", "b", "c"];
+    const publicKeys = [1, 2, 3].map(value => b4a.alloc(32, value).toString('hex'));
 
     const { network, state, config } = createBaseMocks({
         network: {
@@ -478,6 +479,7 @@ test("detaches admin without closing replication when threshold exceeded", async
     });
 
     const state = {
+        isValidatorAddress: async () => false,
         getAdminEntry: async () => ({ address: "placeholder" }),
         getRegisteredWriterKey: async () => b4a.alloc(32),
         getNodeEntry: async () => ({ isWriter: true }),
@@ -739,7 +741,7 @@ test("gracefully catches exceptions in tryConnect", async (t) => {
     }
 });
 
-test("caches null if the address buffer is invalid or missing", async (t) => {
+test("skips an invalid or missing address buffer", async (t) => {
     const clock = sinon.useFakeTimers({ now: 0 });
 
     const { network, state, config } = createBaseMocks({
@@ -764,6 +766,60 @@ test("caches null if the address buffer is invalid or missing", async (t) => {
     } finally {
         clock.restore();
         sinon.restore();
+        await cleanup(service);
+    }
+});
+
+test("rechecks a full validator pool and cached candidates after indexer promotion", async t => {
+    const writers = [{ key: b4a.alloc(32, 1), value: { isRemoved: false } }];
+    const { network, state, config, publicKeyHex, connected, observations } = createWriterHistoryMocks(writers, true);
+    config.writersShortCacheTTL = config.writersLongCacheTTL = 60_000;
+    network.validatorConnectionManager.maxConnectionsReached = () => connected.size === 1;
+    let eligible = true;
+    state.isValidatorAddress = async () => eligible;
+    const service = new ValidatorObserverService(network, state, "self", config);
+    try {
+        await service.worker(() => {});
+        const scans = observations.scans;
+        eligible = false;
+        await service.worker(() => {});
+        await service.worker(() => {});
+        t.is(observations.scans, scans, "discovery cache has not expired");
+        t.alike(observations.removed, [publicKeyHex], "evicts a peer promoted since the last scan");
+        t.alike(observations.attempts, [], "cached writer cannot reconnect as a validator");
+        t.absent(connected.has(publicKeyHex));
+    } finally {
+        await cleanup(service);
+    }
+});
+
+test("fresh writer scan removes an existing non-admin indexer connection", async t => {
+    const writers = [{ key: b4a.alloc(32, 1), value: { isRemoved: false, isIndexer: true } }];
+    const { network, state, config, publicKeyHex, observations } = createWriterHistoryMocks(writers, true);
+    const service = new ValidatorObserverService(network, state, "self", config);
+    try {
+        await service.worker(() => {});
+        t.alike(observations.removed, [publicKeyHex]);
+        t.alike(observations.attempts, []);
+    } finally {
+        await cleanup(service);
+    }
+});
+
+test("discovers a writer when its signed address mapping arrives after membership", async t => {
+    const writers = [{ key: b4a.alloc(32, 1), value: { isRemoved: false } }];
+    const { network, state, config, publicKeyHex, observations } = createWriterHistoryMocks(writers);
+    const lookup = state.getRegisteredWriterKey;
+    let mappingAvailable = false;
+    state.getRegisteredWriterKey = async key => mappingAvailable ? lookup(key) : null;
+    const service = new ValidatorObserverService(network, state, "self", config);
+    try {
+        await service.worker(() => {});
+        t.alike(observations.attempts, []);
+        mappingAvailable = true;
+        await service.worker(() => {});
+        t.alike(observations.attempts, [{ key: publicKeyHex, role: "validator" }]);
+    } finally {
         await cleanup(service);
     }
 });
