@@ -14,13 +14,17 @@ export function hypercoreStallfixStatus(core, store = null) {
         marker,
         expiredRequests: null,
         notAvailableSent: null,
-        notAvailableSuppressed: null
+        notAvailableSuppressed: null,
+        invalidOperationPauses: null,
+        invalidOperationPermanent: null
     };
     if (marker === null) return status;
 
     let expired = 0;
     let sent = 0;
     let suppressed = 0;
+    let opPauses = 0;
+    let opPermanent = 0;
     const cores = store?.cores?.map;
     const list = cores && typeof cores.values === 'function' ? cores.values() : [core.core];
     for (const c of list) {
@@ -29,10 +33,14 @@ export function hypercoreStallfixStatus(core, store = null) {
         expired += stats.expired;
         sent += stats.notAvailableSent;
         suppressed += stats.notAvailableSuppressed;
+        opPauses += stats.invalidOperationPauses ?? 0; // 11.18.3 only (11.8.3 never pauses on INVALID_OPERATION)
+        opPermanent += stats.invalidOperationPermanent ?? 0;
     }
     status.expiredRequests = expired;
     status.notAvailableSent = sent;
     status.notAvailableSuppressed = suppressed;
+    status.invalidOperationPauses = opPauses;
+    status.invalidOperationPermanent = opPermanent;
     return status;
 }
 

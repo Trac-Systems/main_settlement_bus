@@ -14,13 +14,15 @@ test('hypercoreStallfixStatus reports the loaded hypercore copy and sums counter
     t.is(status.expiredRequests, 0);
     core.core.replicator._sfStats.expired += 3;
     t.is(hypercoreStallfixStatus(core, store).expiredRequests, 3, 'summed from the store');
+    core.core.replicator._sfStats.invalidOperationPauses += 2;
+    t.is(hypercoreStallfixStatus(core, store).invalidOperationPauses, 2);
     t.ok(hypercoreStallfixLine('MSB', core).includes('active (openmayhem-stallfix-v1)'));
 });
 
 test('hypercoreStallfixStatus on an unpatched or missing core', (t) => {
     class Replicator {}
     const fake = { core: { replicator: new Replicator() } };
-    t.alike(hypercoreStallfixStatus(fake), { patched: false, marker: null, expiredRequests: null, notAvailableSent: null, notAvailableSuppressed: null });
+    t.alike(hypercoreStallfixStatus(fake), { patched: false, marker: null, expiredRequests: null, notAvailableSent: null, notAvailableSuppressed: null, invalidOperationPauses: null, invalidOperationPermanent: null });
     t.is(hypercoreStallfixStatus(null).patched, false);
     t.ok(hypercoreStallfixLine('MSB', fake).includes('NOT active'));
 });

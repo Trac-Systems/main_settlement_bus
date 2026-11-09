@@ -60,6 +60,8 @@ paths:
                         expiredRequests: { type: integer, nullable: true }
                         notAvailableSent: { type: integer, nullable: true }
                         notAvailableSuppressed: { type: integer, nullable: true }
+                        invalidOperationPauses: { type: integer, nullable: true }
+                        invalidOperationPermanent: { type: integer, nullable: true }
                     stall:
                       type: object
                       nullable: true

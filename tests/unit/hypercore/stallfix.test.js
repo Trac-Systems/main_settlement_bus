@@ -250,3 +250,111 @@ test('stallfix: sweep timer stops when idle and on close', async (t) => {
   await r.close()
   t.is(r.core.replicator._sfTimer, null, 'no timer after close')
 })
+
+// Delays the replies of `core` to upgrade requests (all peers of that core), restored on teardown.
+function delayUpgradeReplies(t, core, ms) {
+  const proto = core.replicator.constructor.Peer.prototype
+  const orig = proto._fulfillRequest
+  const box = { delayed: 0 }
+  proto._fulfillRequest = async function (req) {
+    if (this.core === core.core && req.msg.upgrade) {
+      box.delayed++
+      await sleep(ms)
+    }
+    return orig.call(this, req)
+  }
+  t.teardown(() => { proto._fulfillRequest = orig }, { order: -1 })
+  return box
+}
+
+test('stallfix: a valid upgrade reply that went stale (local length moved) does not pause the responder for good', async (t) => {
+  // The race seen live on MSB followers: Autobase commits a signed view length locally while an upgrade request is
+  // in flight; the valid reply was built for the old start and fails with INVALID_OPERATION "Expected node N, got
+  // node M". Here the local length moves through an append of the same blocks with the writer's key pair.
+  const w = await create(t)
+  await w.append(BLOCKS)
+  const p = await create(t, w.key)
+  replicate(t, w, p)
+  for (let i = 0; i < BLOCKS.length; i++) await p.get(i)
+  const r = new Hypercore(await t.tmp(), { keyPair: w.keyPair })
+  await r.ready()
+  t.teardown(() => r.close().catch(() => {}), { order: 1 })
+  await r.append(BLOCKS.slice(0, 5))
+  const timed = r.replicator._sfOpPauseMin !== undefined
+  if (timed) { r.replicator._sfOpPauseMin = 300; r.replicator._sfInterval = 100 }
+  const errors = []
+  r.on('verification-error', (err) => errors.push(err.code + ' ' + err.message))
+  delayUpgradeReplies(t, p, 400)
+  const { s2 } = replicate(t, p, r)
+  r.update({ wait: true }).catch(() => {})
+  t.ok(await until(() => r.replicator._upgrade !== null && r.replicator._upgrade.inflight.length > 0, 5000, 5), 'upgrade request in flight')
+  t.is(r.replicator._upgrade.inflight[0].upgrade.start, 5)
+  await r.append(BLOCKS.slice(5, 7)) // local length 5 -> 7, identical data
+  t.ok(await until(() => errors.length > 0, 3000), 'stale reply fails verification')
+  t.ok(/INVALID_OPERATION.*Expected node \d+, got node \d+/.test(errors[0]), errors[0])
+  const rp = peerOf(r, s2)
+  t.is(rp.paused, false, 'not paused until disconnect')
+  if (timed) {
+    t.ok(rp._sfOpUntil > Date.now() && rp.isActive() === false, 'timed pause')
+    t.ok(await until(() => rp.isActive() === true, 3000), 'active again after the timed pause')
+  } else {
+    t.is(rp.isActive(), true, 'this Hypercore version never pauses on INVALID_OPERATION')
+  }
+  await w.append(['k', 'l'])
+  t.ok(await until(() => p.length === 12, 5000), 'responder follows the writer')
+  t.ok(await until(() => r.length === 12, 10000), 'next upgrade comes from the same (only) peer')
+  t.is(rp.paused, false)
+})
+
+test('stallfix: a peer that keeps sending INVALID_OPERATION replies is bounded and ends paused', async (t) => {
+  const w = await create(t)
+  const many = []
+  for (let i = 0; i < 64; i++) many.push('block-' + i)
+  await w.append(many)
+  const bad = await create(t, w.key)
+  replicate(t, w, bad)
+  await bad.download({ start: 0, end: 64 }).done()
+  const r = await create(t, w.key)
+  if (r.replicator._sfOpPauseMin === undefined) {
+    t.pass('this Hypercore version never pauses on INVALID_OPERATION (unchanged upstream behaviour)')
+    return
+  }
+  r.replicator._sfOpPauseMin = 100
+  r.replicator._sfInterval = 50
+  const errors = { op: 0, other: 0 }
+  r.on('verification-error', (err) => { if (err.code === 'INVALID_OPERATION') errors.op++; else errors.other++ })
+  const { s1, s2 } = replicate(t, bad, r)
+  t.ok(await until(() => peerOf(bad, s1) !== null && peerOf(r, s2) !== null))
+  await r.update({ wait: true })
+  // the bad peer corrupts every block proof (wrong sibling index) -> INVALID_OPERATION on our side
+  const bp = peerOf(bad, s1)
+  const orig = bp._fulfillRequest.bind(bp)
+  bp._fulfillRequest = async (req) => {
+    if (!req.msg.block) return orig(req)
+    const fulfill = req.fulfill.bind(req)
+    req.fulfill = async () => {
+      const proof = await fulfill()
+      if (proof && proof.block && proof.block.nodes.length > 0) proof.block.nodes[0] = { ...proof.block.nodes[0], index: proof.block.nodes[0].index + 2 }
+      return proof
+    }
+    return orig(req)
+  }
+  const gets = []
+  for (let i = 0; i < 64; i++) gets.push(r.get(i).catch(() => null))
+  const rp = peerOf(r, s2)
+  t.ok(await until(() => rp.paused === true, 15000), 'paused until disconnect after the last episode')
+  const st = r.replicator._sfStats
+  t.is(st.invalidOperationPauses, 5, '5 timed episodes')
+  t.is(st.invalidOperationPermanent, 1, 'then permanent')
+  const maxInflight = rp.getMaxInflight()
+  t.comment('invalid replies verified: ' + errors.op + ' (max inflight ' + maxInflight + ')')
+  t.ok(errors.op >= 6 && errors.op <= 6 * maxInflight, 'bounded: at most one window of in-flight replies per episode')
+  t.is(errors.other, 0)
+  const before = errors.op
+  await sleep(500)
+  t.is(errors.op, before, 'nothing more once paused')
+  // a good peer still serves everything
+  replicate(t, w, r)
+  const values = await Promise.race([Promise.all(gets), sleep(15000).then(() => null)])
+  t.ok(values !== null && values.every((v, i) => v !== null && b4a.toString(v) === 'block-' + i), 'all blocks from the good peer')
+})

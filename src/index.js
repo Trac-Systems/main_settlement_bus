@@ -342,7 +342,7 @@ export class MainSettlementBus extends ReadyResource {
             const replication = this.replicationStatus();
             console.log("---------- replication ----------");
             console.log(`hypercoreStallfix: ${replication.hypercoreStallfix.patched ? replication.hypercoreStallfix.marker : "NOT ACTIVE"}` +
-                ` (expired requests: ${replication.hypercoreStallfix.expiredRequests ?? "n/a"})`);
+                ` (expired requests: ${replication.hypercoreStallfix.expiredRequests ?? "n/a"}, timed pauses: ${replication.hypercoreStallfix.invalidOperationPauses ?? "n/a"})`);
             console.log(`replicationStall: ${replication.stall?.state ?? "off"} (reconnects: ${replication.stall?.reconnects ?? 0})`);
         } catch (error) {
             console.error("Error during DAG monitoring:", error.message);

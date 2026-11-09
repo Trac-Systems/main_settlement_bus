@@ -6,7 +6,7 @@ export default {
   version: '11.18.3',
   file: 'lib/replicator.js',
   originalSha256: '2e7a2631a0d8e805861339bbc75e6f6de75565813cf201256105408c53c8ac93',
-  patchedSha256: '98bdbebee69e7ecf99b887a5446922dc32a81f2b374b18b23a1d1c7efc43140b',
+  patchedSha256: '79944caa33cc875d563f7eba8b820ffbd9323984d30e2fd6c58030804ded2f6c',
   edits: [
     // 1. Constants + marker.
     [
@@ -17,7 +17,8 @@ export default {
 // OPENMAYHEM-STALLFIX v1 (hypercore 11.18.3). Install-time patch shipped by trac-msb and trac-peer
 // (scripts/hypercore-stallfix/). Fixes the waiting-side replication stall: an in-flight request that a peer
 // never answers is cancelled after STALLFIX_REQUEST_MAX_AGE and asked elsewhere; that peer gets a cool-down;
-// a peer we paused gets a capped NOT_AVAILABLE instead of silence. Wire format unchanged.
+// a peer we paused gets a capped NOT_AVAILABLE instead of silence; an INVALID_OPERATION verification error pauses
+// a peer for an escalating time instead of until disconnect. Wire format unchanged.
 const STALLFIX = 'openmayhem-stallfix-v1'
 const STALLFIX_REQUEST_MAX_AGE = 30000 // ms an in-flight request may wait for its answer
 const STALLFIX_SWEEP_INTERVAL = 5000 // one unref'd timer per replicator, only while requests are in flight
@@ -27,6 +28,8 @@ const STALLFIX_COOLDOWN_MIN = 30000 // first cool-down of a peer that let a requ
 const STALLFIX_COOLDOWN_MAX = 240000
 const STALLFIX_NOT_AVAILABLE_WINDOW = 60000
 const STALLFIX_NOT_AVAILABLE_MAX = 16 // NOT_AVAILABLE replies per window to a peer we paused; silent beyond
+const STALLFIX_OP_PAUSE_MIN = 60000 // first timed pause after an INVALID_OPERATION verification error (doubles)
+const STALLFIX_OP_PAUSE_EPISODES = 5 // timed pauses without valid data in between; the next one is permanent
 `
     ],
     // 2. Per-peer state.
@@ -43,6 +46,8 @@ const STALLFIX_NOT_AVAILABLE_MAX = 16 // NOT_AVAILABLE replies per window to a p
     this._sfCoolUntil = 0
     this._sfNaWindow = 0
     this._sfNaCount = 0
+    this._sfOpUntil = 0 // timed pause after INVALID_OPERATION (0 = none)
+    this._sfOpLevel = 0
 
     replicator._ifAvailable++
     replicator._active++
@@ -61,6 +66,45 @@ const STALLFIX_NOT_AVAILABLE_MAX = 16 // NOT_AVAILABLE replies per window to a p
       this._sfNotAvailable(req.msg.id)
       return
     }
+`
+    ],
+    // 3b. INVALID_OPERATION during verification: timed pause instead of paused until disconnect. On 11.18.3 this
+    //     error is also raised for VALID replies whose upgrade starts at a length we no longer have (local commit
+    //     or another upgrade moved our length while the request was in flight; upstream 11.40.0 #895 refits such
+    //     proofs). Other verification errors (possible forks, bad data) keep the conflict check and the permanent pause.
+    [
+      String.raw`      if (err.code !== 'INVALID_OPERATION') {
+        // might be a fork, verify
+        this._checkIfConflict()
+      }
+
+      this.paused = true
+      this.replicator._onnodata(this, req, 0)
+`,
+      String.raw`      if (err.code !== 'INVALID_OPERATION') {
+        // might be a fork, verify
+        this._checkIfConflict()
+        this.paused = true
+      } else {
+        // OPENMAYHEM-STALLFIX: never a fork (no conflict check); pause for a bounded, escalating time
+        this._sfInvalidOperationPause(Date.now())
+      }
+
+      this.replicator._onnodata(this, req, 0)
+`
+    ],
+    // 3c. A timed pause makes the peer inactive like a pause, until it expires.
+    [
+      String.raw`  isActive() {
+    if (this.paused || this.removed || this.core.header.frozen) return false
+    return true
+  }
+`,
+      String.raw`  isActive() {
+    if (this.paused || this.removed || this.core.header.frozen) return false
+    if (this._sfOpUntil !== 0 && this._sfOpUntil > Date.now()) return false // OPENMAYHEM-STALLFIX timed pause
+    return true
+  }
 `
     ],
     // 4. Peer helpers: capped NOT_AVAILABLE and request expiry.
@@ -83,6 +127,23 @@ const STALLFIX_NOT_AVAILABLE_MAX = 16 // NOT_AVAILABLE replies per window to a p
     this._sfNaCount++
     this.replicator._sfStats.notAvailableSent++
     this.wireNoData.send({ request: id, reason: NOT_AVAILABLE })
+  }
+
+  // OPENMAYHEM-STALLFIX: timed pause after INVALID_OPERATION. Replies already in flight do not extend it.
+  // Episodes double (60 s .. 16 min); valid block data from the peer resets the level (_ondata); after
+  // STALLFIX_OP_PAUSE_EPISODES episodes without valid data the peer is paused until disconnect, as upstream.
+  _sfInvalidOperationPause(now) {
+    if (this.paused === true || this._sfOpUntil > now) return
+    if (this._sfOpLevel >= STALLFIX_OP_PAUSE_EPISODES) {
+      this._sfOpUntil = 0
+      this.paused = true
+      this.replicator._sfStats.invalidOperationPermanent++
+      return
+    }
+    this._sfOpLevel++
+    this._sfOpUntil = now + this.replicator._sfOpPauseMin * 2 ** (this._sfOpLevel - 1)
+    this.replicator._sfStats.invalidOperationPauses++
+    this.replicator._sfArm()
   }
 
   // OPENMAYHEM-STALLFIX: give up on one request this peer did not answer in time. Bookkeeping as for a
@@ -154,7 +215,14 @@ const STALLFIX_NOT_AVAILABLE_MAX = 16 // NOT_AVAILABLE replies per window to a p
     this._sfMaxAge = STALLFIX_REQUEST_MAX_AGE
     this._sfInterval = STALLFIX_SWEEP_INTERVAL
     this._sfCooldownMin = STALLFIX_COOLDOWN_MIN
-    this._sfStats = { expired: 0, notAvailableSent: 0, notAvailableSuppressed: 0 }
+    this._sfOpPauseMin = STALLFIX_OP_PAUSE_MIN
+    this._sfStats = {
+      expired: 0,
+      notAvailableSent: 0,
+      notAvailableSuppressed: 0,
+      invalidOperationPauses: 0,
+      invalidOperationPermanent: 0
+    }
 `
     ],
     // 8. Valid block data from a peer ends its cool-down.
@@ -168,6 +236,7 @@ const STALLFIX_NOT_AVAILABLE_MAX = 16 // NOT_AVAILABLE replies per window to a p
     if (data.block !== null) {
       peer._sfTimeouts = 0 // OPENMAYHEM-STALLFIX
       peer._sfCoolUntil = 0
+      peer._sfOpLevel = 0
 `
     ],
     // 9. The sweep (bounded work, one timer per replicator).
@@ -209,11 +278,20 @@ const STALLFIX_NOT_AVAILABLE_MAX = 16 // NOT_AVAILABLE replies per window to a p
 
     let cooling = 0
     let usable = 0
+    let opPaused = 0
     let cooled = false
     for (const peer of this.peers) {
       if (peer._sfCoolUntil !== 0 && peer._sfCoolUntil <= now) {
         peer._sfCoolUntil = 0
         cooled = true
+      }
+      if (peer._sfOpUntil !== 0) {
+        if (peer._sfOpUntil <= now) {
+          peer._sfOpUntil = 0
+          cooled = true
+        } else {
+          opPaused++
+        }
       }
       if (peer._sfCoolUntil !== 0) cooling++
       else if (peer.isActive()) usable++
@@ -224,7 +302,7 @@ const STALLFIX_NOT_AVAILABLE_MAX = 16 // NOT_AVAILABLE replies per window to a p
     if (expired > 0) this._sfStats.expired += expired
     if (expired > 0 || cooled) this.updateAll()
 
-    if (live > 0 || cooling > 0 || scan < reqs.length) this._sfArm()
+    if (live > 0 || cooling > 0 || opPaused > 0 || scan < reqs.length) this._sfArm()
   }
 
   _sfCoolingDown(peer) {
