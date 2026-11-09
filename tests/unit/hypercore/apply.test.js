@@ -87,10 +87,14 @@ test('apply: hoisted + nested layout, both packages, idempotent, concurrent', as
   const copiesFromPeer = findHypercoreCopies(peer).map((c) => c.dir).sort()
   t.alike(copiesFromPeer, (v8 ? [nested, hoisted] : [hoisted]).map((d) => fs.realpathSync(d)).sort(), 'trac-peer finds its own copy and trac-msb\'s copy')
 
-  // both postinstalls at the same time (npm runs scripts of one depth in parallel)
-  const [a, b] = await Promise.all([runScript(msb), runScript(peer)])
-  t.is(a.code, 0, 'trac-msb script ok')
-  t.is(b.code, 0, 'trac-peer script ok')
+  // both postinstalls at the same time (npm may run them in parallel), several rounds on fresh copies
+  for (let round = 0; round < 8; round++) {
+    hypercoreAt(hoisted, v18, pristine.get(v18))
+    if (v8) hypercoreAt(nested, v8, pristine.get(v8))
+    const [a, b] = await Promise.all([runScript(msb), runScript(peer)])
+    t.is(a.code, 0, 'trac-msb script ok, round ' + round)
+    t.is(b.code, 0, 'trac-peer script ok, round ' + round)
+  }
   t.is(replicatorSha(hoisted), sets.get(v18).patchedSha256, 'hoisted copy patched')
   if (v8) t.is(replicatorSha(nested), sets.get(v8).patchedSha256, 'nested copy patched')
   t.absent(fs.readdirSync(path.join(hoisted, 'lib')).some((f) => f.includes('.stallfix-')), 'no temp files left')

@@ -113,6 +113,8 @@ export function inspectCopy(copy, sets) {
   }
   const file = path.join(copy.dir, set.file)
   const text = fs.readFileSync(file, 'utf8')
+  // keep the inspected text: patching must not re-read the file, a parallel run may have replaced it meanwhile
+  Object.defineProperty(result, 'text', { value: text, enumerable: false })
   result.sha256 = sha256(text)
   if (result.sha256 === set.patchedSha256) result.state = 'patched'
   else if (result.sha256 === set.originalSha256) result.state = 'original'
@@ -146,7 +148,7 @@ export async function run({ packageDir, check = false, quiet = false, log = cons
       const file = path.join(r.dir, set.file)
       let patched
       try {
-        patched = applyPatchSet(fs.readFileSync(file, 'utf8'), set)
+        patched = applyPatchSet(r.text, set)
       } catch (err) {
         warn(tag + ' ERROR: hypercore ' + r.version + ' at ' + where + ': ' + err.message + '; nothing written')
         failed = true
@@ -159,6 +161,7 @@ export async function run({ packageDir, check = false, quiet = false, log = cons
         results.push(r)
         continue
       }
+      // atomic: a parallel run (trac-msb and trac-peer postinstall) writes the same bytes, rename keeps one
       const tmp = file + '.stallfix-' + process.pid + '.tmp'
       fs.writeFileSync(tmp, patched)
       fs.renameSync(tmp, file)
