@@ -156,6 +156,9 @@ test('State#isAdminAllowedToValidate rejects the old bootstrap writer after admi
 
 for (const scenario of [
     { name: 'ordinary writer', writer: true, indexer: false, expected: true },
+    { name: 'writer admission without a signed entry', writer: true, indexer: false, missingSigned: true, expected: false },
+    { name: 'writer admission with a signed reader entry', writer: true, indexer: false, signedWriter: false, expected: false },
+    { name: 'pending indexer promotion', writer: true, indexer: true, signedIndexer: false, expected: false },
     { name: 'non-admin indexer', writer: true, indexer: true, expected: false },
     { name: 'removed writer', writer: false, indexer: false, expected: false },
     { name: 'missing node', missing: true, expected: false },
@@ -172,6 +175,11 @@ for (const scenario of [
             isIndexer: scenario.indexer,
             wk: scenario.obsoleteKey ? randomBuffer(WRITER_BYTE_LENGTH) : config.bootstrap,
         });
+        state.getNodeEntry.withArgs(address).resolves(scenario.missingSigned ? null : {
+            isWriter: scenario.signedWriter ?? scenario.writer,
+            isIndexer: scenario.signedIndexer ?? scenario.indexer,
+            wk: config.bootstrap,
+        });
         const count = sinon.stub(state, 'getActiveWriterCount').resolves(scenario.validators ?? 1);
         try {
             t.is(await state.isValidatorAddress(address), scenario.expected);
@@ -184,6 +192,26 @@ for (const scenario of [
         }
     });
 }
+
+test('State#isValidatorAddress waits for signed indexer demotion before allowing validation', async t => {
+    const { state, restore } = await setupMockedState(createStateConfig());
+    const address = randomAddress('trac');
+    const node = sinon.stub(state, 'getNodeEntryUnsigned').resolves({ isWriter: true, isIndexer: false });
+    state.getNodeEntry.withArgs(address).resolves({ isWriter: true, isIndexer: true });
+    try {
+        t.absent(await state.isValidatorAddress(address), 'unsigned demotion cannot admit a confirmed indexer');
+        t.absent(await state.allowedToValidate(address), 'the receiver still rejects requests while Autobase considers it an indexer');
+
+        state.getNodeEntry.withArgs(address).resolves({ isWriter: true, isIndexer: false });
+        state.isIndexer.returns(false);
+        t.ok(await state.isValidatorAddress(address), 'signed demotion makes the writer eligible');
+        t.ok(await state.allowedToValidate(address), 'the receiver can now validate requests');
+    } finally {
+        node.restore();
+        await state.close();
+        restore();
+    }
+});
 
 async function setupQueryState(config) {
     const dbPath = './.test-db-query-' + Date.now() + Math.floor(Math.random() * 1000);

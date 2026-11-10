@@ -430,7 +430,10 @@ class State extends ReadyResource {
     async isValidatorAddress(address) {
         const entry = await this.getNodeEntryUnsigned(address);
         if (!entry?.isWriter) return false;
-        if (!entry.isIndexer) return true;
+        if (!entry.isIndexer) {
+            const signedEntry = await this.getNodeEntry(address);
+            return !!signedEntry?.isWriter && !signedEntry.isIndexer;
+        }
 
         const admin = await this.getAdminEntry();
         if (address !== admin?.address || !entry.wk || !admin.wk || !b4a.equals(entry.wk, admin.wk)) return false;
