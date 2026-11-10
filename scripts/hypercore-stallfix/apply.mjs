@@ -30,166 +30,166 @@ const FOLLOW = ['autobase', 'corestore', 'trac-msb', 'trac-peer']
 const MAX_DEPTH = 3
 
 export async function loadPatchSets() {
-  const sets = new Map()
-  for (const name of PATCH_SETS) {
-    const mod = await import(pathToFileURL(path.join(here, name)).href)
-    sets.set(mod.default.version, mod.default)
-  }
-  return sets
+    const sets = new Map()
+    for (const name of PATCH_SETS) {
+        const mod = await import(pathToFileURL(path.join(here, name)).href)
+        sets.set(mod.default.version, mod.default)
+    }
+    return sets
 }
 
 function sha256(text) {
-  return crypto.createHash('sha256').update(text).digest('hex')
+    return crypto.createHash('sha256').update(text).digest('hex')
 }
 
 function findPackageDir(name, fromDir) {
-  let dir = fromDir
-  for (;;) {
-    const candidate = path.join(dir, 'node_modules', name)
-    if (fs.existsSync(path.join(candidate, 'package.json'))) return fs.realpathSync(candidate)
-    const parent = path.dirname(dir)
-    if (parent === dir) return null
-    dir = parent
-  }
+    let dir = fromDir
+    for (;;) {
+        const candidate = path.join(dir, 'node_modules', name)
+        if (fs.existsSync(path.join(candidate, 'package.json'))) return fs.realpathSync(candidate)
+        const parent = path.dirname(dir)
+        if (parent === dir) return null
+        dir = parent
+    }
 }
 
 // Every Hypercore copy loaded from packageDir: bounded walk over FOLLOW packages, deduplicated by real path.
 export function findHypercoreCopies(packageDir) {
-  const copies = new Map()
-  const seen = new Set()
-  let level = [fs.realpathSync(packageDir)]
-  for (let depth = 0; depth <= MAX_DEPTH && level.length > 0; depth++) {
-    const next = []
-    for (const dir of level) {
-      if (seen.has(dir)) continue
-      seen.add(dir)
-      const hc = findPackageDir('hypercore', dir)
-      if (hc !== null && !copies.has(hc)) copies.set(hc, path.relative(packageDir, dir) || '.')
-      for (const name of FOLLOW) {
-        const d = findPackageDir(name, dir)
-        if (d !== null && !seen.has(d)) next.push(d)
-      }
+    const copies = new Map()
+    const seen = new Set()
+    let level = [fs.realpathSync(packageDir)]
+    for (let depth = 0; depth <= MAX_DEPTH && level.length > 0; depth++) {
+        const next = []
+        for (const dir of level) {
+            if (seen.has(dir)) continue
+            seen.add(dir)
+            const hc = findPackageDir('hypercore', dir)
+            if (hc !== null && !copies.has(hc)) copies.set(hc, path.relative(packageDir, dir) || '.')
+            for (const name of FOLLOW) {
+                const d = findPackageDir(name, dir)
+                if (d !== null && !seen.has(d)) next.push(d)
+            }
+        }
+        level = next
     }
-    level = next
-  }
-  return [...copies.entries()].map(([dir, from]) => ({ dir, from }))
+    return [...copies.entries()].map(([dir, from]) => ({ dir, from }))
 }
 
 export function applyPatchSet(text, set) {
-  let out = text
-  for (const [original, replacement] of set.edits) {
-    const parts = out.split(original)
-    if (parts.length !== 2) {
-      throw new Error('expected original text exactly once, found ' + (parts.length - 1) + ': ' + JSON.stringify(original.slice(0, 80)))
+    let out = text
+    for (const [original, replacement] of set.edits) {
+        const parts = out.split(original)
+        if (parts.length !== 2) {
+            throw new Error('expected original text exactly once, found ' + (parts.length - 1) + ': ' + JSON.stringify(original.slice(0, 80)))
+        }
+        out = parts[0] + replacement + parts[1]
     }
-    out = parts[0] + replacement + parts[1]
-  }
-  return out
+    return out
 }
 
 // Reverse of applyPatchSet (tests and forensics): restores the original text from a patched file.
 export function unapplyPatchSet(text, set) {
-  let out = text
-  for (let i = set.edits.length - 1; i >= 0; i--) {
-    const [original, replacement] = set.edits[i]
-    const parts = out.split(replacement)
-    if (parts.length !== 2) throw new Error('expected patched text exactly once, found ' + (parts.length - 1))
-    out = parts[0] + original + parts[1]
-  }
-  return out
+    let out = text
+    for (let i = set.edits.length - 1; i >= 0; i--) {
+        const [original, replacement] = set.edits[i]
+        const parts = out.split(replacement)
+        if (parts.length !== 2) throw new Error('expected patched text exactly once, found ' + (parts.length - 1))
+        out = parts[0] + original + parts[1]
+    }
+    return out
 }
 
 export function sha256Hex(text) {
-  return sha256(text)
+    return sha256(text)
 }
 
 export function inspectCopy(copy, sets) {
-  const pkg = JSON.parse(fs.readFileSync(path.join(copy.dir, 'package.json'), 'utf8'))
-  const set = sets.get(pkg.version) || null
-  const result = { dir: copy.dir, from: copy.from, version: pkg.version, supported: set !== null, state: null, sha256: null }
-  if (set === null) {
-    result.state = 'unsupported-version'
+    const pkg = JSON.parse(fs.readFileSync(path.join(copy.dir, 'package.json'), 'utf8'))
+    const set = sets.get(pkg.version) || null
+    const result = { dir: copy.dir, from: copy.from, version: pkg.version, supported: set !== null, state: null, sha256: null }
+    if (set === null) {
+        result.state = 'unsupported-version'
+        return result
+    }
+    const file = path.join(copy.dir, set.file)
+    const text = fs.readFileSync(file, 'utf8')
+    // keep the inspected text: patching must not re-read the file, a parallel run may have replaced it meanwhile
+    Object.defineProperty(result, 'text', { value: text, enumerable: false })
+    result.sha256 = sha256(text)
+    if (result.sha256 === set.patchedSha256) result.state = 'patched'
+    else if (result.sha256 === set.originalSha256) result.state = 'original'
+    else if (text.includes('OPENMAYHEM-STALLFIX')) result.state = 'other-stallfix-revision'
+    else result.state = 'mismatch'
     return result
-  }
-  const file = path.join(copy.dir, set.file)
-  const text = fs.readFileSync(file, 'utf8')
-  // keep the inspected text: patching must not re-read the file, a parallel run may have replaced it meanwhile
-  Object.defineProperty(result, 'text', { value: text, enumerable: false })
-  result.sha256 = sha256(text)
-  if (result.sha256 === set.patchedSha256) result.state = 'patched'
-  else if (result.sha256 === set.originalSha256) result.state = 'original'
-  else if (text.includes('OPENMAYHEM-STALLFIX')) result.state = 'other-stallfix-revision'
-  else result.state = 'mismatch'
-  return result
 }
 
 export async function run({ packageDir, check = false, quiet = false, log = console.log, warn = console.error } = {}) {
-  const sets = await loadPatchSets()
-  const copies = findHypercoreCopies(packageDir)
-  const name = JSON.parse(fs.readFileSync(path.join(packageDir, 'package.json'), 'utf8')).name
-  const tag = '[hypercore-stallfix ' + name + ']'
-  let failed = false
+    const sets = await loadPatchSets()
+    const copies = findHypercoreCopies(packageDir)
+    const name = JSON.parse(fs.readFileSync(path.join(packageDir, 'package.json'), 'utf8')).name
+    const tag = '[hypercore-stallfix ' + name + ']'
+    let failed = false
 
-  if (copies.length === 0) warn(tag + ' WARNING: no hypercore copy found from ' + packageDir + ' (nothing patched)')
+    if (copies.length === 0) warn(tag + ' WARNING: no hypercore copy found from ' + packageDir + ' (nothing patched)')
 
-  const results = []
-  for (const copy of copies) {
-    const r = inspectCopy(copy, sets)
-    const where = r.dir + ' (via ' + r.from + ')'
-    if (r.state === 'unsupported-version') {
-      warn(tag + ' WARNING: hypercore ' + r.version + ' at ' + where + ' is not a supported version (' + [...sets.keys()].join(', ') + '); NOT patched')
-    } else if (r.state === 'patched') {
-      if (!quiet) log(tag + ' hypercore ' + r.version + ' at ' + where + ': already patched (sha256 ' + r.sha256 + ')')
-    } else if (r.state === 'original' && check) {
-      warn(tag + ' hypercore ' + r.version + ' at ' + where + ': NOT patched')
-      failed = true
-    } else if (r.state === 'original') {
-      const set = sets.get(r.version)
-      const file = path.join(r.dir, set.file)
-      let patched
-      try {
-        patched = applyPatchSet(r.text, set)
-      } catch (err) {
-        warn(tag + ' ERROR: hypercore ' + r.version + ' at ' + where + ': ' + err.message + '; nothing written')
-        failed = true
-        results.push(r)
-        continue
-      }
-      if (sha256(patched) !== set.patchedSha256) {
-        warn(tag + ' ERROR: hypercore ' + r.version + ' at ' + where + ': patched result has an unexpected hash; nothing written')
-        failed = true
-        results.push(r)
-        continue
-      }
-      // atomic: a parallel run (trac-msb and trac-peer postinstall) writes the same bytes, rename keeps one
-      const tmp = file + '.stallfix-' + process.pid + '.tmp'
-      fs.writeFileSync(tmp, patched)
-      fs.renameSync(tmp, file)
-      r.state = 'patched'
-      r.sha256 = set.patchedSha256
-      log(tag + ' hypercore ' + r.version + ' at ' + where + ': PATCHED (sha256 ' + r.sha256 + ')')
-    } else {
-      const set = sets.get(r.version)
-      warn(tag + ' ERROR: hypercore ' + r.version + ' at ' + where + ' has unexpected ' + set.file + ' content (sha256 ' + r.sha256 +
+    const results = []
+    for (const copy of copies) {
+        const r = inspectCopy(copy, sets)
+        const where = r.dir + ' (via ' + r.from + ')'
+        if (r.state === 'unsupported-version') {
+            warn(tag + ' WARNING: hypercore ' + r.version + ' at ' + where + ' is not a supported version (' + [...sets.keys()].join(', ') + '); NOT patched')
+        } else if (r.state === 'patched') {
+            if (!quiet) log(tag + ' hypercore ' + r.version + ' at ' + where + ': already patched (sha256 ' + r.sha256 + ')')
+        } else if (r.state === 'original' && check) {
+            warn(tag + ' hypercore ' + r.version + ' at ' + where + ': NOT patched')
+            failed = true
+        } else if (r.state === 'original') {
+            const set = sets.get(r.version)
+            const file = path.join(r.dir, set.file)
+            let patched
+            try {
+                patched = applyPatchSet(r.text, set)
+            } catch (err) {
+                warn(tag + ' ERROR: hypercore ' + r.version + ' at ' + where + ': ' + err.message + '; nothing written')
+                failed = true
+                results.push(r)
+                continue
+            }
+            if (sha256(patched) !== set.patchedSha256) {
+                warn(tag + ' ERROR: hypercore ' + r.version + ' at ' + where + ': patched result has an unexpected hash; nothing written')
+                failed = true
+                results.push(r)
+                continue
+            }
+            // atomic: a parallel run (trac-msb and trac-peer postinstall) writes the same bytes, rename keeps one
+            const tmp = file + '.stallfix-' + process.pid + '.tmp'
+            fs.writeFileSync(tmp, patched)
+            fs.renameSync(tmp, file)
+            r.state = 'patched'
+            r.sha256 = set.patchedSha256
+            log(tag + ' hypercore ' + r.version + ' at ' + where + ': PATCHED (sha256 ' + r.sha256 + ')')
+        } else {
+            const set = sets.get(r.version)
+            warn(tag + ' ERROR: hypercore ' + r.version + ' at ' + where + ' has unexpected ' + set.file + ' content (sha256 ' + r.sha256 +
         (r.state === 'other-stallfix-revision' ? ', patched by a different stallfix revision' : '') +
         '; expected original ' + set.originalSha256 + ' or patched ' + set.patchedSha256 + '). Refusing to patch.')
-      failed = true
+            failed = true
+        }
+        results.push(r)
     }
-    results.push(r)
-  }
-  return { ok: !failed, results }
+    return { ok: !failed, results }
 }
 
 if (process.argv[1] && fs.realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const args = process.argv.slice(2)
-  const packageDir = path.resolve(here, '..', '..')
-  run({ packageDir, check: args.includes('--check'), quiet: args.includes('--quiet') }).then(({ ok }) => {
-    if (!ok) {
-      console.error('[hypercore-stallfix] FAILED: see the messages above. The Hypercore replication stall fix is not in place.')
-      process.exit(1)
-    }
-  }, (err) => {
-    console.error('[hypercore-stallfix] FAILED:', err && err.stack ? err.stack : err)
-    process.exit(1)
-  })
+    const args = process.argv.slice(2)
+    const packageDir = path.resolve(here, '..', '..')
+    run({ packageDir, check: args.includes('--check'), quiet: args.includes('--quiet') }).then(({ ok }) => {
+        if (!ok) {
+            console.error('[hypercore-stallfix] FAILED: see the messages above. The Hypercore replication stall fix is not in place.')
+            process.exit(1)
+        }
+    }, (err) => {
+        console.error('[hypercore-stallfix] FAILED:', err && err.stack ? err.stack : err)
+        process.exit(1)
+    })
 }

@@ -3,16 +3,16 @@
 // Keep this file free of backticks and dollar-brace sequences inside the edit texts (String.raw templates).
 
 export default {
-  version: '11.18.3',
-  file: 'lib/replicator.js',
-  originalSha256: '2e7a2631a0d8e805861339bbc75e6f6de75565813cf201256105408c53c8ac93',
-  patchedSha256: '79944caa33cc875d563f7eba8b820ffbd9323984d30e2fd6c58030804ded2f6c',
-  edits: [
+    version: '11.18.3',
+    file: 'lib/replicator.js',
+    originalSha256: '2e7a2631a0d8e805861339bbc75e6f6de75565813cf201256105408c53c8ac93',
+    patchedSha256: '79944caa33cc875d563f7eba8b820ffbd9323984d30e2fd6c58030804ded2f6c',
+    edits: [
     // 1. Constants + marker.
-    [
-      String.raw`const MAX_BACKOFFS = MAX_INVALID_REQUESTS / 2
+        [
+            String.raw`const MAX_BACKOFFS = MAX_INVALID_REQUESTS / 2
 `,
-      String.raw`const MAX_BACKOFFS = MAX_INVALID_REQUESTS / 2
+            String.raw`const MAX_BACKOFFS = MAX_INVALID_REQUESTS / 2
 
 // OPENMAYHEM-STALLFIX v1 (hypercore 11.18.3). Install-time patch shipped by trac-msb and trac-peer
 // (scripts/hypercore-stallfix/). Fixes the waiting-side replication stall: an in-flight request that a peer
@@ -31,16 +31,16 @@ const STALLFIX_NOT_AVAILABLE_MAX = 16 // NOT_AVAILABLE replies per window to a p
 const STALLFIX_OP_PAUSE_MIN = 60000 // first timed pause after an INVALID_OPERATION verification error (doubles)
 const STALLFIX_OP_PAUSE_EPISODES = 5 // timed pauses without valid data in between; the next one is permanent
 `
-    ],
-    // 2. Per-peer state.
-    [
-      String.raw`    this.lastExtensionRecv = ''
+        ],
+        // 2. Per-peer state.
+        [
+            String.raw`    this.lastExtensionRecv = ''
 
     replicator._ifAvailable++
     replicator._active++
   }
 `,
-      String.raw`    this.lastExtensionRecv = ''
+            String.raw`    this.lastExtensionRecv = ''
 
     this._sfTimeouts = 0 // OPENMAYHEM-STALLFIX: cool-down level of this peer
     this._sfCoolUntil = 0
@@ -53,27 +53,27 @@ const STALLFIX_OP_PAUSE_EPISODES = 5 // timed pauses without valid data in betwe
     replicator._active++
   }
 `
-    ],
-    // 3. Responder: reply NOT_AVAILABLE (capped) to a peer we paused instead of dropping the request silently.
-    //    Also covers proof === null for an inactive peer (upstream 03f7156: that case threw a TypeError here).
-    [
-      String.raw`    if (!this.isActive() && proof.block !== null) {
+        ],
+        // 3. Responder: reply NOT_AVAILABLE (capped) to a peer we paused instead of dropping the request silently.
+        //    Also covers proof === null for an inactive peer (upstream 03f7156: that case threw a TypeError here).
+        [
+            String.raw`    if (!this.isActive() && proof.block !== null) {
       return
     }
 `,
-      String.raw`    if (!this.isActive() && (proof === null || proof.block !== null)) {
+            String.raw`    if (!this.isActive() && (proof === null || proof.block !== null)) {
       // OPENMAYHEM-STALLFIX: upstream returns silently here and the remote waits forever. Never INVALID_REQUEST.
       this._sfNotAvailable(req.msg.id)
       return
     }
 `
-    ],
-    // 3b. INVALID_OPERATION during verification: timed pause instead of paused until disconnect. On 11.18.3 this
-    //     error is also raised for VALID replies whose upgrade starts at a length we no longer have (local commit
-    //     or another upgrade moved our length while the request was in flight; upstream 11.40.0 #895 refits such
-    //     proofs). Other verification errors (possible forks, bad data) keep the conflict check and the permanent pause.
-    [
-      String.raw`      if (err.code !== 'INVALID_OPERATION') {
+        ],
+        // 3b. INVALID_OPERATION during verification: timed pause instead of paused until disconnect. On 11.18.3 this
+        //     error is also raised for VALID replies whose upgrade starts at a length we no longer have (local commit
+        //     or another upgrade moved our length while the request was in flight; upstream 11.40.0 #895 refits such
+        //     proofs). Other verification errors (possible forks, bad data) keep the conflict check and the permanent pause.
+        [
+            String.raw`      if (err.code !== 'INVALID_OPERATION') {
         // might be a fork, verify
         this._checkIfConflict()
       }
@@ -81,7 +81,7 @@ const STALLFIX_OP_PAUSE_EPISODES = 5 // timed pauses without valid data in betwe
       this.paused = true
       this.replicator._onnodata(this, req, 0)
 `,
-      String.raw`      if (err.code !== 'INVALID_OPERATION') {
+            String.raw`      if (err.code !== 'INVALID_OPERATION') {
         // might be a fork, verify
         this._checkIfConflict()
         this.paused = true
@@ -92,27 +92,27 @@ const STALLFIX_OP_PAUSE_EPISODES = 5 // timed pauses without valid data in betwe
 
       this.replicator._onnodata(this, req, 0)
 `
-    ],
-    // 3c. A timed pause makes the peer inactive like a pause, until it expires.
-    [
-      String.raw`  isActive() {
+        ],
+        // 3c. A timed pause makes the peer inactive like a pause, until it expires.
+        [
+            String.raw`  isActive() {
     if (this.paused || this.removed || this.core.header.frozen) return false
     return true
   }
 `,
-      String.raw`  isActive() {
+            String.raw`  isActive() {
     if (this.paused || this.removed || this.core.header.frozen) return false
     if (this._sfOpUntil !== 0 && this._sfOpUntil > Date.now()) return false // OPENMAYHEM-STALLFIX timed pause
     return true
   }
 `
-    ],
-    // 4. Peer helpers: capped NOT_AVAILABLE and request expiry.
-    [
-      String.raw`  _cancelRequest(req) {
+        ],
+        // 4. Peer helpers: capped NOT_AVAILABLE and request expiry.
+        [
+            String.raw`  _cancelRequest(req) {
     if (req.priority === PRIORITY.CANCELLED) return
 `,
-      String.raw`  // OPENMAYHEM-STALLFIX: at most STALLFIX_NOT_AVAILABLE_MAX replies per window, silent beyond the cap.
+            String.raw`  // OPENMAYHEM-STALLFIX: at most STALLFIX_NOT_AVAILABLE_MAX replies per window, silent beyond the cap.
   _sfNotAvailable(id) {
     if (this.removed === true) return
     const now = Date.now()
@@ -181,31 +181,31 @@ const STALLFIX_OP_PAUSE_EPISODES = 5 // timed pauses without valid data in betwe
   _cancelRequest(req) {
     if (req.priority === PRIORITY.CANCELLED) return
 `
-    ],
-    // 5. Arm the sweep when a request goes in flight.
-    [
-      String.raw`    this.inflight++
+        ],
+        // 5. Arm the sweep when a request goes in flight.
+        [
+            String.raw`    this.inflight++
     this.replicator._inflight.add(req)
 `,
-      String.raw`    this.inflight++
+            String.raw`    this.inflight++
     this.replicator._inflight.add(req)
     if (this.replicator._sfTimer === null) this.replicator._sfArm() // OPENMAYHEM-STALLFIX
 `
-    ],
-    // 6. Marker on the Replicator class (runtime check: core.replicator.constructor.STALLFIX).
-    [
-      String.raw`  static Peer = Peer // hack to be able to access Peer from outside this module
+        ],
+        // 6. Marker on the Replicator class (runtime check: core.replicator.constructor.STALLFIX).
+        [
+            String.raw`  static Peer = Peer // hack to be able to access Peer from outside this module
 `,
-      String.raw`  static Peer = Peer // hack to be able to access Peer from outside this module
+            String.raw`  static Peer = Peer // hack to be able to access Peer from outside this module
   static STALLFIX = STALLFIX // OPENMAYHEM-STALLFIX marker
 `
-    ],
-    // 7. Replicator state.
-    [
-      String.raw`    this._notDownloadingLinger = notDownloadingLinger
+        ],
+        // 7. Replicator state.
+        [
+            String.raw`    this._notDownloadingLinger = notDownloadingLinger
     this._downloadingTimer = null
 `,
-      String.raw`    this._notDownloadingLinger = notDownloadingLinger
+            String.raw`    this._notDownloadingLinger = notDownloadingLinger
     this._downloadingTimer = null
 
     // OPENMAYHEM-STALLFIX state (the _sf* numbers are only changed by tests)
@@ -224,28 +224,28 @@ const STALLFIX_OP_PAUSE_EPISODES = 5 // timed pauses without valid data in betwe
       invalidOperationPermanent: 0
     }
 `
-    ],
-    // 8. Valid block data from a peer ends its cool-down.
-    [
-      String.raw`  _ondata(peer, req, data) {
+        ],
+        // 8. Valid block data from a peer ends its cool-down.
+        [
+            String.raw`  _ondata(peer, req, data) {
     req.elapsed = Date.now() - req.timestamp
     if (data.block !== null) {
 `,
-      String.raw`  _ondata(peer, req, data) {
+            String.raw`  _ondata(peer, req, data) {
     req.elapsed = Date.now() - req.timestamp
     if (data.block !== null) {
       peer._sfTimeouts = 0 // OPENMAYHEM-STALLFIX
       peer._sfCoolUntil = 0
       peer._sfOpLevel = 0
 `
-    ],
-    // 9. The sweep (bounded work, one timer per replicator).
-    [
-      String.raw`  _maybeUpdate() {
+        ],
+        // 9. The sweep (bounded work, one timer per replicator).
+        [
+            String.raw`  _maybeUpdate() {
     return this._upgrade !== null && this._upgrade.inflight.length === 0
   }
 `,
-      String.raw`  _maybeUpdate() {
+            String.raw`  _maybeUpdate() {
     return this._upgrade !== null && this._upgrade.inflight.length === 0
   }
 
@@ -309,23 +309,23 @@ const STALLFIX_OP_PAUSE_EPISODES = 5 // timed pauses without valid data in betwe
     return peer._sfCoolUntil !== 0 && this._sfAllCooling === false && peer._sfCoolUntil > Date.now()
   }
 `
-    ],
-    // 10. Hotswap does not pick a cooling peer.
-    [
-      String.raw`    if (!peer.isActive() || peer.inflight >= maxHotswaps) return
+        ],
+        // 10. Hotswap does not pick a cooling peer.
+        [
+            String.raw`    if (!peer.isActive() || peer.inflight >= maxHotswaps) return
 `,
-      String.raw`    if (!peer.isActive() || peer.inflight >= maxHotswaps || this._sfCoolingDown(peer)) return
+            String.raw`    if (!peer.isActive() || peer.inflight >= maxHotswaps || this._sfCoolingDown(peer)) return
 `
-    ],
-    // 11. _updatePeer: skip a cooling peer + backport upstream 8cf8ad9 fix 2 (stale queue entry must not
-    //     consume the peer's update).
-    [
-      String.raw`  _updatePeer(peer) {
+        ],
+        // 11. _updatePeer: skip a cooling peer + backport upstream 8cf8ad9 fix 2 (stale queue entry must not
+        //     consume the peer's update).
+        [
+            String.raw`  _updatePeer(peer) {
     if (!peer.isActive() || peer.inflight >= peer.getMaxInflight() || !peer.remoteUploading) {
       return false
     }
 `,
-      String.raw`  _updatePeer(peer) {
+            String.raw`  _updatePeer(peer) {
     if (
       !peer.isActive() ||
       peer.inflight >= peer.getMaxInflight() ||
@@ -335,9 +335,9 @@ const STALLFIX_OP_PAUSE_EPISODES = 5 // timed pauses without valid data in betwe
       return false
     }
 `
-    ],
-    [
-      String.raw`    for (const b of blks) {
+        ],
+        [
+            String.raw`    for (const b of blks) {
       if (b.queued === false || peer._requestBlock(b) === true) {
         b.queued = false
         blks.dequeue()
@@ -345,7 +345,7 @@ const STALLFIX_OP_PAUSE_EPISODES = 5 // timed pauses without valid data in betwe
       }
     }
 `,
-      String.raw`    for (const b of blks) {
+            String.raw`    for (const b of blks) {
       if (b.queued === false) {
         // upstream 8cf8ad9 (#896) fix 2, backported by OPENMAYHEM-STALLFIX
         blks.dequeue()
@@ -358,15 +358,15 @@ const STALLFIX_OP_PAUSE_EPISODES = 5 // timed pauses without valid data in betwe
       }
     }
 `
-    ],
-    // 12. _updatePeerNonPrimary: skip a cooling peer.
-    [
-      String.raw`  _updatePeerNonPrimary(peer) {
+        ],
+        // 12. _updatePeerNonPrimary: skip a cooling peer.
+        [
+            String.raw`  _updatePeerNonPrimary(peer) {
     if (!peer.isActive() || peer.inflight >= peer.getMaxInflight() || !peer.remoteUploading) {
       return false
     }
 `,
-      String.raw`  _updatePeerNonPrimary(peer) {
+            String.raw`  _updatePeerNonPrimary(peer) {
     if (
       !peer.isActive() ||
       peer.inflight >= peer.getMaxInflight() ||
@@ -376,17 +376,17 @@ const STALLFIX_OP_PAUSE_EPISODES = 5 // timed pauses without valid data in betwe
       return false
     }
 `
-    ],
-    // 13. destroy() clears the sweep timer.
-    [
-      String.raw`    if (this._downloadingTimer) {
+        ],
+        // 13. destroy() clears the sweep timer.
+        [
+            String.raw`    if (this._downloadingTimer) {
       clearTimeout(this._downloadingTimer)
       this._downloadingTimer = null
     }
 
     while (this.peers.length) {
 `,
-      String.raw`    if (this._downloadingTimer) {
+            String.raw`    if (this._downloadingTimer) {
       clearTimeout(this._downloadingTimer)
       this._downloadingTimer = null
     }
@@ -398,17 +398,17 @@ const STALLFIX_OP_PAUSE_EPISODES = 5 // timed pauses without valid data in betwe
 
     while (this.peers.length) {
 `
-    ],
-    // 14. Timer trampoline.
-    [
-      String.raw`function setDownloadingLater(repl, downloading, session) {
+        ],
+        // 14. Timer trampoline.
+        [
+            String.raw`function setDownloadingLater(repl, downloading, session) {
 `,
-      String.raw`function sfSweepLater(repl) {
+            String.raw`function sfSweepLater(repl) {
   repl._sfSweep() // OPENMAYHEM-STALLFIX
 }
 
 function setDownloadingLater(repl, downloading, session) {
 `
+        ]
     ]
-  ]
 }
