@@ -4,6 +4,7 @@ import b4a from "b4a";
 import { bufferToAddress } from "../../../core/state/utils/address.js";
 import tracCryptoApi from "trac-crypto-api";
 import { WRITER_BYTE_LENGTH, CONNECTION_STATUS } from "../../../utils/constants.js";
+import { publicKeyToAddress } from "../../../utils/helpers.js";
 
 // Internal constants
 const VALIDATOR_CANDIDATES_PER_CYCLE = 10;
@@ -48,27 +49,19 @@ class ValidatorObserverService extends SchedulableService {
      * - Assumes writers list is already pre-filtered and deduplicated from scan phase.
      * - Excludes self.
      * - Excludes already connected or pending nodes.
-     * - Applies admin connection restriction based on the threshold of ALIVE writers.
+     * - Revalidates roles and the admin threshold before connecting.
      * - Randomizes selection (Fisher-Yates) to avoid bias.
      * @param {Array<Object>} writers - The deduplicated list of active writers.
-     * @param {Object} adminEntry - The current admin node entry.
      * @returns {{candidates: Array<Object>, slots: number}} The selected candidates and the number of available connection slots.
      */
-    #selectCandidates(writers, adminEntry) {
+    #selectCandidates(writers) {
         const manager = this.#network.validatorConnectionManager;
-        const adminThreshold = this.#config.maxWritersForAdminIndexerConnection;
-        
-        // Evaluates the admin blockage policy based on fully connected/alive writers
-        const aliveWritersCount = this.#countAliveWriters(writers, adminEntry);
-        const adminBlocked = adminEntry && aliveWritersCount >= adminThreshold;
-        
         // Target calculation: ensures the observer deducts its own slot from the network size 
         // only if it belongs to the valid writers list.
         const isSelfInWriters = writers.some(w => w.address === this.#address);
         const networkSize = isSelfInWriters ? writers.length - 1 : writers.length;
         const target = Math.min(networkSize, this.#config.maxValidators);
         
-        const isSelfAdmin = this.#address === adminEntry?.address;
         const totalConnected = manager.connectionCount();
 
         const available = writers.filter((w) => {
@@ -82,9 +75,6 @@ class ValidatorObserverService extends SchedulableService {
             // Skips nodes we are already interacting with
             if (isConnected || isPending) return false;
             
-            // The admin is actively filtered out from the pool if the threshold policy is triggered
-            if (adminBlocked && !isSelfAdmin && w.address === adminEntry?.address) return false;
-
             return true;
         });
 
@@ -108,37 +98,6 @@ class ValidatorObserverService extends SchedulableService {
     }
    
     /**
-     * Enforces admin-specific connection rules.
-     *
-     * If the count of fully connected writers exceeds the threshold:
-     * - The admin node is excluded from the validator pool (handled in selection phase).
-     * - Non-admin nodes detach the admin from the validator pool, preserving replication.
-     *
-     * NOTE:
-     * The admin is not forcibly disconnected from all roles.
-     * It can still maintain connections for tx submission and observation.
-     * @param {Array<Object>} writers - The deduplicated list of active writers.
-     * @param {Object} adminEntry - The current admin node entry.
-     */
-    #enforceAdminPolicy(writers, adminEntry) {
-        // Evaluates against alive network peers rather than dormant database entries
-        const aliveWritersCount = this.#countAliveWriters(writers, adminEntry);
-        
-        if (aliveWritersCount < this.#config.maxWritersForAdminIndexerConnection) return;
-
-        this.#logger.debug("Validator threshold reached → enforcing admin policy");
-
-        const isAdmin = adminEntry && this.#address === adminEntry.address;
-        if (isAdmin) return;
-
-        // Non-admin nodes: ensure the admin is not kept as a validator connection
-        const adminWriter = writers.find((w) => w.address === adminEntry?.address);
-        if (adminWriter?.publicKey) {
-            this.#network.validatorConnectionManager.remove(adminWriter.publicKey);
-        }
-    }
-
-    /**
      * Removes active connections to writers that are no longer valid (e.g., removed/soft-deleted).
      * @param {Uint8Array} publicKey - The public key of the stale connection to be removed.
      */
@@ -161,40 +120,6 @@ class ValidatorObserverService extends SchedulableService {
         return !this.isInterrupted;
     }
     
-    /**
-     * Counts the number of physically active and connected writers in the network.
-     * This method bridges the gap between the Autobase state (which may include 
-     * offline/dormant writers due to its append-only/soft-delete nature) and the 
-     * actual physical network layer. It ensures the admin threshold policy is 
-     * evaluated against truly active nodes rather than historical state.
-     *
-     * @param {Array<Object>} writers - The deduplicated list of writers from the Autobase.
-     * @param {Object} adminEntry - The current admin node entry.
-     * @returns {number} The count of alive, fully connected writers (including self).
-     */
-    #countAliveWriters(writers, adminEntry) {
-        let aliveCount = 0;
-        const manager = this.#network.validatorConnectionManager;
-
-        for (const w of writers) {
-            // Ignores the admin in the threshold calculation
-            if (w.address === adminEntry?.address) continue;
-
-            // Always counts the current node as alive if it's in the valid writers list
-            if (w.address === this.#address) {
-                aliveCount++;
-                continue;
-            }
-
-            // Counts only fully connected nodes (ignores pending or offline peers)
-            if (manager.connected(w.publicKey)) {
-                aliveCount++;
-            }
-        }
-
-        return aliveCount;
-    }
-
     /**
      * Starts the validator observer loop.
      * Initializes the scheduler and bootstrap state.
@@ -226,8 +151,8 @@ class ValidatorObserverService extends SchedulableService {
      * Main worker loop (executed periodically).
      *
      * Flow:
-     * 1. Fetch admin + writers (cached).
-     * 2. Enforce admin connection policy.
+     * 1. Revalidate connected peers against current roles and the admin threshold.
+     * 2. Fetch admin + writers (cached).
      * 3. Skip if the connection pool is full.
      * 4. Select candidates.
      * 5. Attempt connections (with pacing).
@@ -245,18 +170,23 @@ class ValidatorObserverService extends SchedulableService {
         }
 
         try {
+            // Recheck bounded connection pools on every cycle, even when discovery
+            // is cached or the pool is full. Removing a role preserves replication.
+            const manager = this.#network.validatorConnectionManager;
+            for (const publicKey of manager.connectedPeers()) {
+                if (!await this.#state.isValidatorAddress(publicKeyToAddress(publicKey, this.#config))) {
+                    manager.remove(publicKey);
+                }
+            }
             const adminEntry = await this.#getAdminEntryCached();
             const writers = await this.#getWritersCached(adminEntry);
             
             if (writers.length === 0) return next(interval);
 
-            this.#enforceAdminPolicy(writers, adminEntry);
-
-            const manager = this.#network.validatorConnectionManager;
             // CEILING: do not exceed the max connections limit
             if (manager.maxConnectionsReached()) return next(interval); 
             
-            const { candidates, slots} = this.#selectCandidates(writers, adminEntry);
+            const { candidates, slots} = this.#selectCandidates(writers);
             if (candidates.length > 0) {
                 await this.#processCandidates(candidates, slots);
             }
@@ -389,7 +319,8 @@ class ValidatorObserverService extends SchedulableService {
                     const addressBuffer = await this.#state.getRegisteredWriterKey(writerKeyHex);
 
                     if (!addressBuffer || b4a.byteLength(addressBuffer) !== this.#config.addressLength) {
-                        this.#keyDecodeCache.set(writerKeyHex, null);
+                        // Autobase membership can arrive before the signed address mapping.
+                        // Retry on the next scan instead of caching a transient absence forever.
                         continue;
                     }
 
@@ -410,9 +341,7 @@ class ValidatorObserverService extends SchedulableService {
 
                 const { addr, publicKey, publicKeyHex } = decodedIdentity;
 
-                if (value.isIndexer && addr !== adminEntry?.address) continue;
-
-                if (value.isRemoved) {
+                if (value.isRemoved || (value.isIndexer && addr !== adminEntry?.address)) {
                     removedMap.set(addr, publicKey);
                     continue;
                 }
@@ -436,7 +365,7 @@ class ValidatorObserverService extends SchedulableService {
     /**
      * Attempts to establish a connection with a validator candidate.
      *
-     * Assumes the candidate was pre-filtered and validated during scan/selection.
+     * Revalidates the role because discovery may predate a promotion or removal.
      *
      * Behavior:
      * - Delegates connection attempt to the network layer.
@@ -445,6 +374,7 @@ class ValidatorObserverService extends SchedulableService {
      */
     async #tryConnect(candidate) {
         try {
+            if (!await this.#state.isValidatorAddress(candidate.address)) return CONNECTION_STATUS.IGNORED;
             return await this.#network.tryConnect(candidate.publicKeyHex, "validator");
         } catch (err) {
             this.#logger.error(`Validator connection attempt failed: ${err.message}`);

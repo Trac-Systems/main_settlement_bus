@@ -3,7 +3,7 @@ import sinon from 'sinon';
 import ValidatorMessageOrchestrator from '../../../../src/core/network/services/ValidatorMessageOrchestrator.js';
 import State from '../../../../src/core/state/State.js';
 import { OperationType, ResultCode } from '../../../../src/utils/constants.js';
-import { testKeyPair1, testKeyPair2 } from '../../../fixtures/apply.fixtures.js';
+import { testKeyPair1, testKeyPair2, testKeyPair3 } from '../../../fixtures/apply.fixtures.js';
 import { publicKeyToAddress } from '../../../../src/utils/helpers.js';
 import { PeerConnectionManagerError } from '../../../../src/core/network/shared/PeerConnectionManager.js';
 import { ValidatorPendingRequestServiceTimeoutError } from '../../../../src/core/network/protocols/validators/v1/ValidatorPendingRequestService.js';
@@ -69,10 +69,45 @@ hook('teardown', () => {
     consoleSandbox.restore();
 });
 
+for (const preferredProtocol of ['v1', 'legacy']) {
+    test(`ValidatorMessageOrchestrator.send ${preferredProtocol} skips a peer promoted to indexer before observer runs`, async t => {
+        const indexerKey = testKeyPair3.publicKey;
+        const manager = createValidatorConnectionManager({
+            preferredProtocol,
+            connectedPeers: [indexerKey, VALIDATOR_KEY],
+        });
+        const state = {
+            isValidatorAddress: async address => address === publicKeyToAddress(VALIDATOR_KEY, config),
+            waitForUnsigned: async () => true,
+        };
+        const wallet = await createWallet(config);
+        const orchestrator = new ValidatorMessageOrchestrator(manager, state, config, wallet);
+        const random = sinon.stub(Math, 'random').returns(0);
+        try {
+            t.ok(await orchestrator.send(createTransferMessage(config, wallet)));
+            t.is(manager.remove.callCount, 1);
+            t.is(manager.remove.firstCall.args[0], indexerKey);
+            t.is(manager.sendSingleMessage.callCount, 1, 'never sends a request to the indexer');
+            t.is(manager.sendSingleMessage.firstCall.args[1], VALIDATOR_KEY);
+        } finally {
+            random.restore();
+        }
+    });
+}
+
+test('ValidatorMessageOrchestrator.send returns false when every cached peer has lost eligibility', async t => {
+    const manager = createValidatorConnectionManager({ connectedPeers: [testKeyPair3.publicKey, VALIDATOR_KEY] });
+    const wallet = await createWallet(config);
+    const orchestrator = new ValidatorMessageOrchestrator(manager, { isValidatorAddress: async () => false }, config, wallet);
+    t.absent(await orchestrator.send(createTransferMessage(config, wallet)));
+    t.is(manager.sendSingleMessage.callCount, 0);
+    t.is(manager.remove.callCount, 2);
+});
+
 test('ValidatorMessageOrchestrator.send returns false for unsupported protocol', async t => {
     const validatorConnectionManager = createValidatorConnectionManager({ preferredProtocol: 'unknown' });
     const wallet = await createWallet(config);
-    const orchestrator = new ValidatorMessageOrchestrator(validatorConnectionManager, { get: async () => null }, config, wallet);
+    const orchestrator = new ValidatorMessageOrchestrator(validatorConnectionManager, { get: async () => null, isValidatorAddress: async () => true }, config, wallet);
     const message = createTransferMessage(config, wallet);
     const result = await orchestrator.send(message, 0);
 
@@ -86,7 +121,7 @@ test('ValidatorMessageOrchestrator.send V1 matrix: OK -> SUCCESS', async t => {
         sentCount: 0,
     });
     const wallet = await createWallet(config);
-    const orchestrator = new ValidatorMessageOrchestrator(validatorConnectionManager, { get: async () => null }, config, wallet);
+    const orchestrator = new ValidatorMessageOrchestrator(validatorConnectionManager, { get: async () => null, isValidatorAddress: async () => true }, config, wallet);
     const message = createTransferMessage(config, wallet);
     const result = await orchestrator.send(message);
 
@@ -100,7 +135,7 @@ test('ValidatorMessageOrchestrator.send V1 matrix: TIMEOUT -> ROTATE', async t =
         sendSingleMessage: sinon.stub().resolves(ResultCode.TIMEOUT),
     });
     const wallet = await createWallet(config);
-    const orchestrator = new ValidatorMessageOrchestrator(validatorConnectionManager, { get: async () => null }, config, wallet);
+    const orchestrator = new ValidatorMessageOrchestrator(validatorConnectionManager, { get: async () => null, isValidatorAddress: async () => true }, config, wallet);
     const message = createTransferMessage(config, wallet);
     const result = await orchestrator.send(message);
 
@@ -115,7 +150,7 @@ test('ValidatorMessageOrchestrator.send V1 matrix: TX_ALREADY_PENDING -> NO_ROTA
         sendSingleMessage: sinon.stub().resolves(ResultCode.TX_ALREADY_PENDING),
     });
     const wallet = await createWallet(config);
-    const orchestrator = new ValidatorMessageOrchestrator(validatorConnectionManager, { get: async () => null }, config, wallet);
+    const orchestrator = new ValidatorMessageOrchestrator(validatorConnectionManager, { get: async () => null, isValidatorAddress: async () => true }, config, wallet);
     const message = createTransferMessage(config, wallet);
     const result = await orchestrator.send(message);
 
@@ -130,7 +165,7 @@ test('ValidatorMessageOrchestrator.send treats TX_ALREADY_EXISTS as success when
         sendSingleMessage: sinon.stub().resolves(ResultCode.TX_ALREADY_EXISTS),
     });
     const wallet = await createWallet(config);
-    const orchestrator = new ValidatorMessageOrchestrator(validatorConnectionManager, { get: async () => null }, config, wallet);
+    const orchestrator = new ValidatorMessageOrchestrator(validatorConnectionManager, { get: async () => null, isValidatorAddress: async () => true }, config, wallet);
     const message = createTransferMessage(config, wallet);
     sinon.stub(orchestrator, 'waitForUnsignedState').resolves(true);
     const result = await orchestrator.send(message);
@@ -146,7 +181,7 @@ test('ValidatorMessageOrchestrator.send treats OPERATION_ALREADY_COMPLETED as su
         sendSingleMessage: sinon.stub().resolves(ResultCode.OPERATION_ALREADY_COMPLETED),
     });
     const wallet = await createWallet(config);
-    const orchestrator = new ValidatorMessageOrchestrator(validatorConnectionManager, { get: async () => null }, config, wallet);
+    const orchestrator = new ValidatorMessageOrchestrator(validatorConnectionManager, { get: async () => null, isValidatorAddress: async () => true }, config, wallet);
     const message = createTransferMessage(config, wallet);
     sinon.stub(orchestrator, 'waitForUnsignedState').resolves(true);
     const result = await orchestrator.send(message);
@@ -162,7 +197,7 @@ test('ValidatorMessageOrchestrator.send V1 matrix: unknown code -> UNDEFINED', a
         sendSingleMessage: sinon.stub().resolves(99999),
     });
     const wallet = await createWallet(config);
-    const orchestrator = new ValidatorMessageOrchestrator(validatorConnectionManager, { get: async () => null }, config, wallet);
+    const orchestrator = new ValidatorMessageOrchestrator(validatorConnectionManager, { get: async () => null, isValidatorAddress: async () => true }, config, wallet);
     const message = createTransferMessage(config, wallet);
     const result = await orchestrator.send(message);
 
@@ -177,7 +212,7 @@ test('ValidatorMessageOrchestrator.send removes validator when threshold reached
         sentCount: config.messageThreshold,
     });
     const wallet = await createWallet(config);
-    const orchestrator = new ValidatorMessageOrchestrator(validatorConnectionManager, { get: async () => null }, config, wallet);
+    const orchestrator = new ValidatorMessageOrchestrator(validatorConnectionManager, { get: async () => null, isValidatorAddress: async () => true }, config, wallet);
     const message = createTransferMessage(config, wallet);
     const result = await orchestrator.send(message);
 
@@ -194,7 +229,7 @@ test('ValidatorMessageOrchestrator.send retries on PeerConnectionManagerError wi
 
     const validatorConnectionManager = createValidatorConnectionManager({ sendSingleMessage, sentCount: 0 });
     const wallet = await createWallet(config);
-    const orchestrator = new ValidatorMessageOrchestrator(validatorConnectionManager, { get: async () => null }, config, wallet);
+    const orchestrator = new ValidatorMessageOrchestrator(validatorConnectionManager, { get: async () => null, isValidatorAddress: async () => true }, config, wallet);
     const message = createTransferMessage(config, wallet);
     const result = await orchestrator.send(message);
 
@@ -212,7 +247,7 @@ test('ValidatorMessageOrchestrator.send retries on generic catch error with remo
 
     const validatorConnectionManager = createValidatorConnectionManager({ sendSingleMessage, sentCount: 0 });
     const wallet = await createWallet(config);
-    const orchestrator = new ValidatorMessageOrchestrator(validatorConnectionManager, { get: async () => null }, config, wallet);
+    const orchestrator = new ValidatorMessageOrchestrator(validatorConnectionManager, { get: async () => null, isValidatorAddress: async () => true }, config, wallet);
     const message = createTransferMessage(config, wallet);
     const result = await orchestrator.send(message);
 
@@ -228,7 +263,7 @@ test('ValidatorMessageOrchestrator.send max retries guard returns false immediat
         sendSingleMessage: sinon.stub().resolves(ResultCode.OK),
     });
     const wallet = await createWallet(config);
-    const orchestrator = new ValidatorMessageOrchestrator(validatorConnectionManager, { get: async () => null }, config, wallet);
+    const orchestrator = new ValidatorMessageOrchestrator(validatorConnectionManager, { get: async () => null, isValidatorAddress: async () => true }, config, wallet);
     const message = createTransferMessage(config, wallet);
     const result = await orchestrator.send(message, 2);
 
@@ -247,7 +282,7 @@ test('ValidatorMessageOrchestrator.send timeout split: pending timeout rejection
 
     const validatorConnectionManager = createValidatorConnectionManager({ sendSingleMessage });
     const wallet = await createWallet(config);
-    const orchestrator = new ValidatorMessageOrchestrator(validatorConnectionManager, { get: async () => null }, config, wallet);
+    const orchestrator = new ValidatorMessageOrchestrator(validatorConnectionManager, { get: async () => null, isValidatorAddress: async () => true }, config, wallet);
     const message = createTransferMessage(config, wallet);
     const result = await orchestrator.send(message);
 
@@ -261,7 +296,7 @@ test('ValidatorMessageOrchestrator.send timeout split: TIMEOUT result code stays
     const sendSingleMessage = sinon.stub().resolves(ResultCode.TIMEOUT);
     const validatorConnectionManager = createValidatorConnectionManager({ sendSingleMessage });
     const wallet = await createWallet(config);
-    const orchestrator = new ValidatorMessageOrchestrator(validatorConnectionManager, { get: async () => null }, config, wallet);
+    const orchestrator = new ValidatorMessageOrchestrator(validatorConnectionManager, { get: async () => null, isValidatorAddress: async () => true }, config, wallet);
     const message = createTransferMessage(config, wallet);
     const result = await orchestrator.send(message);
 
@@ -278,7 +313,7 @@ test('ValidatorMessageOrchestrator.send validation split: thrown validation erro
 
     const validatorConnectionManager = createValidatorConnectionManager({ sendSingleMessage });
     const wallet = await createWallet(config);
-    const orchestrator = new ValidatorMessageOrchestrator(validatorConnectionManager, { get: async () => null }, config, wallet);
+    const orchestrator = new ValidatorMessageOrchestrator(validatorConnectionManager, { get: async () => null, isValidatorAddress: async () => true }, config, wallet);
     const message = createTransferMessage(config, wallet);
     const result = await orchestrator.send(message);
 
@@ -292,7 +327,7 @@ test('ValidatorMessageOrchestrator.send validation split: non-OK result code sta
     const sendSingleMessage = sinon.stub().resolves(ResultCode.SCHEMA_VALIDATION_FAILED);
     const validatorConnectionManager = createValidatorConnectionManager({ sendSingleMessage });
     const wallet = await createWallet(config);
-    const orchestrator = new ValidatorMessageOrchestrator(validatorConnectionManager, { get: async () => null }, config, wallet);
+    const orchestrator = new ValidatorMessageOrchestrator(validatorConnectionManager, { get: async () => null, isValidatorAddress: async () => true }, config, wallet);
     const message = createTransferMessage(config, wallet);
     const result = await orchestrator.send(message);
 
@@ -304,7 +339,7 @@ test('ValidatorMessageOrchestrator.send validation split: non-OK result code sta
 test('ValidatorMessageOrchestrator.send legacy path succeeds and increments sent count', async t => {
     const config = overrideConfig({ maxRetries: 0 });
     const sendSingleMessage = sinon.stub().resolves(true);
-    const state = { waitForUnsigned: sinon.stub().resolves(true) };
+    const state = { isValidatorAddress: async () => true, waitForUnsigned: sinon.stub().resolves(true) };
     const validatorConnectionManager = createValidatorConnectionManager({
         preferredProtocol: 'legacy',
         sendSingleMessage,
@@ -325,7 +360,7 @@ test('ValidatorMessageOrchestrator.send legacy path succeeds and increments sent
 test('ValidatorMessageOrchestrator.send legacy path false result removes validator and retries', async t => {
     const config = overrideConfig({ maxRetries: 1 });
     const sendSingleMessage = sinon.stub().resolves(true);
-    const state = { waitForUnsigned: sinon.stub() };
+    const state = { isValidatorAddress: async () => true, waitForUnsigned: sinon.stub() };
     state.waitForUnsigned.onFirstCall().resolves(false);
     state.waitForUnsigned.onSecondCall().resolves(true);
     const validatorConnectionManager = createValidatorConnectionManager({
@@ -348,7 +383,7 @@ test('ValidatorMessageOrchestrator.send legacy path catches send error and retri
     const sendSingleMessage = sinon.stub();
     sendSingleMessage.onFirstCall().rejects(new Error('legacy send failed'));
     sendSingleMessage.onSecondCall().resolves(true);
-    const state = { waitForUnsigned: sinon.stub().resolves(true) };
+    const state = { isValidatorAddress: async () => true, waitForUnsigned: sinon.stub().resolves(true) };
 
     const validatorConnectionManager = createValidatorConnectionManager({
         preferredProtocol: 'legacy',
@@ -423,7 +458,7 @@ test('ValidatorMessageOrchestrator.send V1 avoids selecting validator with reque
     });
 
     const wallet = await createWallet(config);
-    const orchestrator = new ValidatorMessageOrchestrator(validatorConnectionManager, { get: async () => null }, config, wallet);
+    const orchestrator = new ValidatorMessageOrchestrator(validatorConnectionManager, { get: async () => null, isValidatorAddress: async () => true }, config, wallet);
     const requesterAddress = publicKeyToAddress(requesterValidatorKey, config);
     const message = {
         ...createTransferMessage(config, wallet),

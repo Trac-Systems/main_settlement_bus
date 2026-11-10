@@ -42,9 +42,9 @@ class ValidatorMessageOrchestrator {
      *
      * @param {object} [message] Outgoing operation payload.
      * @param {string} [message.address] Requester address (bech32m).
-     * @returns {string|null} Selected validator public key hex, or null when unavailable.
+     * @returns {Promise<string|null>} Selected validator public key hex, or null when unavailable.
      */
-    #pickValidatorForMessage(message) {
+    async #pickValidatorForMessage(message) {
         const requesterAddress = message?.address;
 
         if (!requesterAddress) return null
@@ -58,10 +58,15 @@ class ValidatorMessageOrchestrator {
             return publicKeyToAddress(publicKey, this.#config) !== requesterAddress;
         });
 
-        const pool = eligible.length > 0 ? eligible : connected;
-
-        const index = Math.floor(Math.random() * pool.length);
-        return pool[index] ?? null;
+        const pool = [...(eligible.length > 0 ? eligible : connected)];
+        while (pool.length > 0) {
+            const index = Math.floor(Math.random() * pool.length);
+            const [publicKey] = pool.splice(index, 1);
+            const address = publicKeyToAddress(publicKey, this.#config);
+            if (await this.state.isValidatorAddress(address)) return publicKey;
+            this.validatorConnectionManager.remove(publicKey);
+        }
+        return null;
     }
 
     /**
@@ -76,7 +81,7 @@ class ValidatorMessageOrchestrator {
             return false;
         }
 
-        const validatorPublicKey = this.#pickValidatorForMessage(message);
+        const validatorPublicKey = await this.#pickValidatorForMessage(message);
         if (!validatorPublicKey) return false;
         console.log("Sending message to validator:", publicKeyToAddress(validatorPublicKey, this.#config));
 
@@ -91,6 +96,7 @@ class ValidatorMessageOrchestrator {
 
         // TODO: After Legacy is deprecated, we don't need to check preferred protocol here.
         const validatorConnection = this.validatorConnectionManager.getConnection(validatorPublicKey);
+        if (!validatorConnection) return this.send(message, retries + 1);
         const preferredProtocol = validatorConnection.protocolSessions.validator.preferredProtocol;
         let success = false;
         if (preferredProtocol === validatorConnection.protocolSessions.validator.supportedProtocols.LEGACY) {

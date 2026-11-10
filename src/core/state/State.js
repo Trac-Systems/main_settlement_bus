@@ -418,13 +418,26 @@ class State extends ReadyResource {
     }
 
     async isAdminAllowedToValidate() {
-        if (!this.writingKey) return false;
-
-        const isAdmin = this.writingKey.toString('hex') === this.#config.bootstrap.toString('hex');
-        const isIndexer = this.isIndexer();
+        if (!this.isWritable() || !this.isIndexer() || !await this.isAdmin()) return false;
         const activeWriters = await this.getActiveWriterCount(true);
-        const lengthCondition = activeWriters < this.#config.maxWritersForAdminIndexerConnection;
-        return !!(isAdmin && isIndexer && lengthCondition);
+        return activeWriters < this.#config.maxWritersForAdminIndexerConnection;
+    }
+
+    /**
+     * Checks a remote validator against the current local view, including pending
+     * role changes. Cached discovery and established transports do not grant a role.
+     */
+    async isValidatorAddress(address) {
+        const entry = await this.getNodeEntryUnsigned(address);
+        if (!entry?.isWriter) return false;
+        if (!entry.isIndexer) {
+            const signedEntry = await this.getNodeEntry(address);
+            return !!signedEntry?.isWriter && !signedEntry.isIndexer;
+        }
+
+        const admin = await this.getAdminEntry();
+        if (address !== admin?.address || !entry.wk || !admin.wk || !b4a.equals(entry.wk, admin.wk)) return false;
+        return await this.getActiveWriterCount(true) < this.#config.maxWritersForAdminIndexerConnection;
     }
 
     async isAddressWhitelisted(address) {
