@@ -1,7 +1,7 @@
 {
   "name": "trac-msb",
   "main": "msb.mjs",
-  "version": "0.2.26",
+  "version": "0.2.27",
   "pear": {
     "name": "trac-msb",
     "type": "terminal"
@@ -13,10 +13,12 @@
     "NOTICE",
     "rpc/",
     "SECURITY.md",
+    "scripts/hypercore-stallfix/",
     "scripts/pear-runner.js",
     "src/"
   ],
   "scripts": {
+    "postinstall": "node scripts/hypercore-stallfix/apply.mjs",
     "start": "NODE_OPTIONS='--max-old-space-size=4096' node scripts/pear-runner.js",
     "rpc": "NODE_OPTIONS='--max-old-space-size=4096' node scripts/pear-runner.js --rpc --host ${npm_config_host} --port ${npm_config_port}",
     "env": "if [ -f .env ]; then set -a; . ./.env; set +a; fi; NODE_OPTIONS='--max-old-space-size=4096' node scripts/pear-runner.js --stores-directory ${STORES_DIRECTORY:-stores} --network ${NETWORK:-mainnet}",
@@ -28,11 +30,12 @@
     "docs:check": "node scripts/docs/docs-checker.js",
     "test:acceptance": "node --experimental-vm-modules node_modules/jest/bin/jest.js --testTimeout=200000 tests/acceptance/v1/rpc.test.mjs --runInBand",
     "test:integration": "brittle-node -t 1200000 tests/integration/integration.test.js",
+    "test:unit:prepare": "node scripts/hypercore-stallfix/apply.mjs && node scripts/hypercore-stallfix/apply.mjs --check",
     "test:unit:node": "brittle-node -t 60000 tests/unit/unit.test.js",
     "test:unit:bare": "brittle-bare -t 60000 tests/unit/unit.test.js",
     "test:unit:pear": "BRITTLE='-t 60000' brittle-pear tests/unit/unit.test.js",
     "test:pear-runner": "node --test tests/runner/pear-runner.test.js",
-    "test:unit:all": "(npm run test:unit:node && npm run test:unit:bare && npm run test:pear-runner) || exit 1",
+    "test:unit:all": "(npm run test:unit:prepare && npm run test:unit:node && npm run test:unit:bare && npm run test:pear-runner) || exit 1",
     "test:unit:node:cov": "brittle-node -c -t 60000 tests/unit/unit.test.js"
   },
   "dependencies": {
