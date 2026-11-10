@@ -343,6 +343,9 @@ test('stallfix: a peer that keeps sending INVALID_OPERATION replies is bounded a
     for (let i = 0; i < 64; i++) gets.push(r.get(i).catch(() => null))
     const rp = peerOf(r, s2)
     t.ok(await until(() => rp.paused === true, 15000), 'paused until disconnect after the last episode')
+    const requestsAtPause = rp.stats.wireRequest.tx
+    // Pausing stops new requests; replies already in flight can still finish verification.
+    t.ok(await until(() => rp.inflight === 0 && rp.dataProcessing === 0, 5000), 'outstanding replies finish after pausing')
     const st = r.replicator._sfStats
     t.is(st.invalidOperationPauses, 5, '5 timed episodes')
     t.is(st.invalidOperationPermanent, 1, 'then permanent')
@@ -352,7 +355,8 @@ test('stallfix: a peer that keeps sending INVALID_OPERATION replies is bounded a
     t.is(errors.other, 0)
     const before = errors.op
     await sleep(500)
-    t.is(errors.op, before, 'nothing more once paused')
+    t.is(errors.op, before, 'no more errors after outstanding replies finish')
+    t.is(rp.stats.wireRequest.tx, requestsAtPause, 'no new requests once paused')
     // a good peer still serves everything
     replicate(t, w, r)
     const values = await Promise.race([Promise.all(gets), sleep(15000).then(() => null)])
