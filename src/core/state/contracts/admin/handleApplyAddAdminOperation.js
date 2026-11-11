@@ -1,12 +1,12 @@
 import b4a from 'b4a';
-import { ADMIN_INITIAL_BALANCE, ADMIN_INITIAL_STAKED_BALANCE, EntryType, OperationType } from '../../../utils/constants.js';
+import { ADMIN_INITIAL_BALANCE, ADMIN_INITIAL_STAKED_BALANCE, EntryType, OperationType } from '../../../../utils/constants.js';
 import tracCryptoApi from 'trac-crypto-api';
-import { createMessage, NULL_BUFFER, safeWriteUInt32BE } from '../../../utils/buffer.js';
-import addressUtils from '../utils/address.js';
-import adminEntryUtils from '../utils/adminEntry.js';
-import nodeEntryUtils from '../utils/nodeEntry.js';
-import nodeRoleUtils from '../utils/roles.js';
-import { Status } from '../utils/transaction.js';
+import { createMessage, NULL_BUFFER, safeWriteUInt32BE } from '../../../../utils/buffer.js';
+import addressUtils from '../../utils/address.js';
+import adminEntryUtils from '../../utils/adminEntry.js';
+import nodeEntryUtils from '../../utils/nodeEntry.js';
+import nodeRoleUtils from '../../utils/roles.js';
+import { Status } from '../../utils/transaction.js';
 
 export const handleApplyAddAdminOperation = baseState => class extends baseState {
 

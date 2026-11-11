@@ -1,13 +1,13 @@
 import b4a from 'b4a';
-import { CONSENSUS_CONFIG_INDEX_SIZE, ConsensusVersion, CustomEventType, EntryType, EPOCH_BYTE_LENGTH, HASH_BYTE_LENGTH, OperationType } from '../../../utils/constants.js';
+import { CONSENSUS_CONFIG_INDEX_SIZE, ConsensusVersion, CustomEventType, EntryType, EPOCH_BYTE_LENGTH, HASH_BYTE_LENGTH, OperationType } from '../../../../utils/constants.js';
 import tracCryptoApi from 'trac-crypto-api';
 import { verifyWesolowski } from '@tracsystems/trac-vdf';
-import { safeDecodeConsensusConfig, safeDecodeEpochProofV1, safeEncodeEpochProofV1, safeEncodeEpochRecord } from '../../../codecs/apply/applyOperationCodec.js';
-import { createMessage, incrementBuffer, isBufferValid, NULL_BUFFER, safeReadUint32BE, safeReadUint8, safeToUIntString, uint16ToBuffer } from '../../../utils/buffer.js';
-import { safeDecodeProofProposal, safeDecodeProofProposalApproval } from '../../../codecs/consensus/v1/consensusV1OperationCodec.js';
-import addressUtils from '../utils/address.js';
-import { Status } from '../utils/transaction.js';
-import { safeDecodeVdfConfig } from '../../../codecs/consensus/v1/vdfConfigCodec.js';
+import { safeDecodeConsensusConfig, safeDecodeEpochProofV1, safeEncodeEpochProofV1, safeEncodeEpochRecord } from '../../../../codecs/apply/applyOperationCodec.js';
+import { createMessage, incrementBuffer, isBufferValid, NULL_BUFFER, safeReadUint32BE, safeReadUint8, safeToUIntString, uint16ToBuffer } from '../../../../utils/buffer.js';
+import { safeDecodeProofProposal, safeDecodeProofProposalApproval } from '../../../../codecs/consensus/v1/consensusV1OperationCodec.js';
+import addressUtils from '../../utils/address.js';
+import { Status } from '../../utils/transaction.js';
+import { safeDecodeVdfConfig } from '../../../../codecs/consensus/v1/vdfConfigCodec.js';
 
 export const handleApplySetEpochOperation = baseState => class extends baseState {
 

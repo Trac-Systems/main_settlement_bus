@@ -1,12 +1,12 @@
 import b4a from 'b4a';
-import { OperationType } from '../../../utils/constants.js';
+import { OperationType } from '../../../../utils/constants.js';
 import tracCryptoApi from 'trac-crypto-api';
-import { createMessage, NULL_BUFFER } from '../../../utils/buffer.js';
-import addressUtils from '../utils/address.js';
-import nodeEntryUtils from '../utils/nodeEntry.js';
-import transactionUtils, { Status } from '../utils/transaction.js';
-import { PERCENT_25, PERCENT_50, toBalance } from '../utils/balance.js';
-import deploymentEntryUtils from '../utils/deploymentEntry.js';
+import { createMessage, NULL_BUFFER } from '../../../../utils/buffer.js';
+import addressUtils from '../../utils/address.js';
+import nodeEntryUtils from '../../utils/nodeEntry.js';
+import transactionUtils, { Status } from '../../utils/transaction.js';
+import { PERCENT_25, PERCENT_50, toBalance } from '../../utils/balance.js';
+import deploymentEntryUtils from '../../utils/deploymentEntry.js';
 
 export const handleApplyTxOperation = baseState => class extends baseState {
 

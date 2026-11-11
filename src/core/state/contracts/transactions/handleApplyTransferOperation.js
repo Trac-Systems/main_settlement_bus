@@ -1,12 +1,12 @@
 import b4a from 'b4a';
-import { OperationType } from '../../../utils/constants.js';
+import { OperationType } from '../../../../utils/constants.js';
 import tracCryptoApi from 'trac-crypto-api';
-import { createMessage, NULL_BUFFER, ZERO_WK } from '../../../utils/buffer.js';
-import addressUtils from '../utils/address.js';
-import nodeEntryUtils from '../utils/nodeEntry.js';
-import nodeRoleUtils from '../utils/roles.js';
-import transactionUtils, { Status } from '../utils/transaction.js';
-import { PERCENT_75, toBalance } from '../utils/balance.js';
+import { createMessage, NULL_BUFFER, ZERO_WK } from '../../../../utils/buffer.js';
+import addressUtils from '../../utils/address.js';
+import nodeEntryUtils from '../../utils/nodeEntry.js';
+import nodeRoleUtils from '../../utils/roles.js';
+import transactionUtils, { Status } from '../../utils/transaction.js';
+import { PERCENT_75, toBalance } from '../../utils/balance.js';
 
 export const handleApplyTransferOperation = baseState => class extends baseState {
 

@@ -1,11 +1,11 @@
 import b4a from 'b4a';
-import { CONSENSUS_CONFIG_INDEX_SIZE, CustomEventType, EntryType, OperationType, UINT32_MAX } from '../../../utils/constants.js';
+import { CONSENSUS_CONFIG_INDEX_SIZE, CustomEventType, EntryType, OperationType, UINT32_MAX } from '../../../../utils/constants.js';
 import tracCryptoApi from 'trac-crypto-api';
-import { safeDecodeConsensusConfig, safeEncodeConsensusConfig } from '../../../codecs/apply/applyOperationCodec.js';
-import { createMessage, NULL_BUFFER, safeReadUint32BE, safeReadUint8, safeWriteUInt32BE } from '../../../utils/buffer.js';
-import addressUtils from '../utils/address.js';
-import adminEntryUtils from '../utils/adminEntry.js';
-import { Status } from '../utils/transaction.js';
+import { safeDecodeConsensusConfig, safeEncodeConsensusConfig } from '../../../../codecs/apply/applyOperationCodec.js';
+import { createMessage, NULL_BUFFER, safeReadUint32BE, safeReadUint8, safeWriteUInt32BE } from '../../../../utils/buffer.js';
+import addressUtils from '../../utils/address.js';
+import adminEntryUtils from '../../utils/adminEntry.js';
+import { Status } from '../../utils/transaction.js';
 
 export const handleApplySetConsensusConfig = baseState => class extends baseState {
 

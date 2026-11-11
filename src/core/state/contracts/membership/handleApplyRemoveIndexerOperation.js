@@ -1,13 +1,13 @@
 import b4a from 'b4a';
-import { CustomEventType, EntryType, OperationType } from '../../../utils/constants.js';
+import { CustomEventType, EntryType, OperationType } from '../../../../utils/constants.js';
 import tracCryptoApi from 'trac-crypto-api';
-import { createMessage, NULL_BUFFER } from '../../../utils/buffer.js';
-import addressUtils from '../utils/address.js';
-import adminEntryUtils from '../utils/adminEntry.js';
-import nodeEntryUtils from '../utils/nodeEntry.js';
-import nodeRoleUtils from '../utils/roles.js';
-import { Status } from '../utils/transaction.js';
-import { BALANCE_FEE, toBalance } from '../utils/balance.js';
+import { createMessage, NULL_BUFFER } from '../../../../utils/buffer.js';
+import addressUtils from '../../utils/address.js';
+import adminEntryUtils from '../../utils/adminEntry.js';
+import nodeEntryUtils from '../../utils/nodeEntry.js';
+import nodeRoleUtils from '../../utils/roles.js';
+import { Status } from '../../utils/transaction.js';
+import { BALANCE_FEE, toBalance } from '../../utils/balance.js';
 
 export const handleApplyRemoveIndexerOperation = baseState => class extends baseState {
 

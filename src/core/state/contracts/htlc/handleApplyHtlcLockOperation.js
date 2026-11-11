@@ -1,13 +1,13 @@
 import b4a from 'b4a';
-import { EntryType, EPOCH_BYTE_LENGTH, HASH_BYTE_LENGTH, OperationType, HTLC_MIN_LOCK_DURATION_EPOCHS, PUBLIC_KEY_LENGTH } from '../../../utils/constants.js';
+import { EntryType, EPOCH_BYTE_LENGTH, HASH_BYTE_LENGTH, OperationType, HTLC_MIN_LOCK_DURATION_EPOCHS, PUBLIC_KEY_LENGTH } from '../../../../utils/constants.js';
 import tracCryptoApi from 'trac-crypto-api';
-import { createMessage, isBufferValid, isZeroBuffer } from '../../../utils/buffer.js';
-import addressUtils from '../utils/address.js';
-import nodeEntryUtils from '../utils/nodeEntry.js';
-import transactionUtils, { Status } from '../utils/transaction.js';
-import { PERCENT_75, toBalance } from '../utils/balance.js';
-import * as escrowEntryUtils from '../utils/escrowEntry.js';
-import { createHtlcLockSigningMessage, verifyOrderedHtlcCosignerSignatures } from '../../../utils/htlcLock.js';
+import { createMessage, isBufferValid, isZeroBuffer } from '../../../../utils/buffer.js';
+import addressUtils from '../../utils/address.js';
+import nodeEntryUtils from '../../utils/nodeEntry.js';
+import transactionUtils, { Status } from '../../utils/transaction.js';
+import { PERCENT_75, toBalance } from '../../utils/balance.js';
+import * as escrowEntryUtils from '../../utils/escrowEntry.js';
+import { createHtlcLockSigningMessage, verifyOrderedHtlcCosignerSignatures } from '../../../../utils/htlcLock.js';
 
 export const handleApplyHtlcLockOperation = baseState => class extends baseState {
 

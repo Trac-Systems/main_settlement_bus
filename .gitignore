@@ -9,6 +9,7 @@ stores/
 stores_/
 
 admin/
+!/src/core/state/contracts/admin/
 w*/
 
 

@@ -11,25 +11,25 @@ import { stateApi } from './api/StateApi.js';
 import { sharedApply } from './contracts/SharedApply.js';
 import { applyDispatcher } from './contracts/ApplyDispatcher.js';
 
-import { handleApplyInitializeBalanceOperation } from './contracts/handleApplyInitializeBalanceOperation.js';
-import { handleApplyDisableBalanceInitializationOperation } from './contracts/handleApplyDisableBalanceInitializationOperation.js';
-import { handleApplyAddAdminOperation } from './contracts/handleApplyAddAdminOperation.js';
-import { handleApplyAppendWhitelistOperation } from './contracts/handleApplyAppendWhitelistOperation.js';
-import { handleApplyAddWriterOperation } from './contracts/handleApplyAddWriterOperation.js';
-import { handleApplyRemoveWriterOperation } from './contracts/handleApplyRemoveWriterOperation.js';
-import { handleApplyAdminRecoveryOperation } from './contracts/handleApplyAdminRecoveryOperation.js';
-import { handleApplyAddIndexerOperation } from './contracts/handleApplyAddIndexerOperation.js';
-import { handleApplyRemoveIndexerOperation } from './contracts/handleApplyRemoveIndexerOperation.js';
-import { handleApplyBanValidatorOperation } from './contracts/handleApplyBanValidatorOperation.js';
-import { handleApplyBootstrapDeploymentOperation } from './contracts/handleApplyBootstrapDeploymentOperation.js';
-import { handleApplyTxOperation } from './contracts/handleApplyTxOperation.js';
-import { handleApplyTransferOperation } from './contracts/handleApplyTransferOperation.js';
-import { handleApplySetEpochOperation } from './contracts/handleApplySetEpochOperation.js';
-import { handleApplySetGenesisEpoch } from './contracts/handleApplySetGenesisEpoch.js';
-import { handleApplySetConsensusConfig } from './contracts/handleApplySetConsensusConfig.js';
-import { handleApplyHtlcLockOperation } from './contracts/handleApplyHtlcLockOperation.js';
-import { handleApplyHtlcClaimOperation } from './contracts/handleApplyHtlcClaimOperation.js';
-import { handleApplyHtlcRefundOperation } from './contracts/handleApplyHtlcRefundOperation.js';
+import { handleApplyInitializeBalanceOperation } from './contracts/initialization/handleApplyInitializeBalanceOperation.js';
+import { handleApplyDisableBalanceInitializationOperation } from './contracts/initialization/handleApplyDisableBalanceInitializationOperation.js';
+import { handleApplyAddAdminOperation } from './contracts/admin/handleApplyAddAdminOperation.js';
+import { handleApplyAppendWhitelistOperation } from './contracts/admin/handleApplyAppendWhitelistOperation.js';
+import { handleApplyAddWriterOperation } from './contracts/membership/handleApplyAddWriterOperation.js';
+import { handleApplyRemoveWriterOperation } from './contracts/membership/handleApplyRemoveWriterOperation.js';
+import { handleApplyAdminRecoveryOperation } from './contracts/admin/handleApplyAdminRecoveryOperation.js';
+import { handleApplyAddIndexerOperation } from './contracts/membership/handleApplyAddIndexerOperation.js';
+import { handleApplyRemoveIndexerOperation } from './contracts/membership/handleApplyRemoveIndexerOperation.js';
+import { handleApplyBanValidatorOperation } from './contracts/membership/handleApplyBanValidatorOperation.js';
+import { handleApplyBootstrapDeploymentOperation } from './contracts/deployments/handleApplyBootstrapDeploymentOperation.js';
+import { handleApplyTxOperation } from './contracts/transactions/handleApplyTxOperation.js';
+import { handleApplyTransferOperation } from './contracts/transactions/handleApplyTransferOperation.js';
+import { handleApplySetEpochOperation } from './contracts/consensus/handleApplySetEpochOperation.js';
+import { handleApplySetGenesisEpoch } from './contracts/consensus/handleApplySetGenesisEpoch.js';
+import { handleApplySetConsensusConfig } from './contracts/consensus/handleApplySetConsensusConfig.js';
+import { handleApplyHtlcLockOperation } from './contracts/htlc/handleApplyHtlcLockOperation.js';
+import { handleApplyHtlcClaimOperation } from './contracts/htlc/handleApplyHtlcClaimOperation.js';
+import { handleApplyHtlcRefundOperation } from './contracts/htlc/handleApplyHtlcRefundOperation.js';
 
 // TODO: _addWriter, _removeWriter, _transfer, _transferFeeTxOperation need to receive actor node entries as buffers.
 const StateBase = [

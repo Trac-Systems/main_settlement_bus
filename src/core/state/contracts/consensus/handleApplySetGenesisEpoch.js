@@ -1,12 +1,12 @@
 import b4a from 'b4a';
-import { CustomEventType, EntryType, HASH_BYTE_LENGTH, OperationType } from '../../../utils/constants.js';
+import { CustomEventType, EntryType, HASH_BYTE_LENGTH, OperationType } from '../../../../utils/constants.js';
 import tracCryptoApi from 'trac-crypto-api';
-import { safeEncodeConsensusConfig } from '../../../codecs/apply/applyOperationCodec.js';
-import { createMessage, isBufferValid, NULL_BUFFER, safeWriteUInt32BE } from '../../../utils/buffer.js';
-import addressUtils from '../utils/address.js';
-import adminEntryUtils from '../utils/adminEntry.js';
-import { Status } from '../utils/transaction.js';
-import { createGenesisEpochProof } from '../utils/epochProof.js';
+import { safeEncodeConsensusConfig } from '../../../../codecs/apply/applyOperationCodec.js';
+import { createMessage, isBufferValid, NULL_BUFFER, safeWriteUInt32BE } from '../../../../utils/buffer.js';
+import addressUtils from '../../utils/address.js';
+import adminEntryUtils from '../../utils/adminEntry.js';
+import { Status } from '../../utils/transaction.js';
+import { createGenesisEpochProof } from '../../utils/epochProof.js';
 
 export const handleApplySetGenesisEpoch = baseState => class extends baseState {
 

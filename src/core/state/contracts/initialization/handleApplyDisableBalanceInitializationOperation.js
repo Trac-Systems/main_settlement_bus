@@ -1,10 +1,10 @@
 import b4a from 'b4a';
-import { EntryType, OperationType } from '../../../utils/constants.js';
+import { EntryType, OperationType } from '../../../../utils/constants.js';
 import tracCryptoApi from 'trac-crypto-api';
-import { createMessage, NULL_BUFFER, safeWriteUInt32BE } from '../../../utils/buffer.js';
-import addressUtils from '../utils/address.js';
-import adminEntryUtils from '../utils/adminEntry.js';
-import { Status } from '../utils/transaction.js';
+import { createMessage, NULL_BUFFER, safeWriteUInt32BE } from '../../../../utils/buffer.js';
+import addressUtils from '../../utils/address.js';
+import adminEntryUtils from '../../utils/adminEntry.js';
+import { Status } from '../../utils/transaction.js';
 
 export const handleApplyDisableBalanceInitializationOperation = baseState => class extends baseState {
 
