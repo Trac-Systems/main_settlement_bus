@@ -13,7 +13,7 @@ import { decodeVersionedConsensusConfig } from '../../../utils/consensusConfig.j
 import { readEpochAppenderSelectionContext, readEpochAppendOutcome } from '../../consensus/epochAppenderSelection/epochAppenderSelectionLedgerReader.js';
 import _ from 'lodash';
 
-export const withStateApi = Base => class extends Base {
+export const stateApi = baseState => class extends baseState {
 
     isWritable() {
         return this._base.writable;

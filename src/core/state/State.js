@@ -7,28 +7,57 @@ import StateValidationSchema from './validators/StateValidationSchema.js';
 import PQueue from 'p-queue';
 import { StateEventQueue } from './StateEventQueue.js';
 import { ConfirmationWatch } from './ConfirmationWatch.js';
-import { withStateApi } from './api/StateApi.js';
-import { withApplyDispatcher } from './apply/ApplyDispatcher.js';
-import { withHtlcApply } from './apply/HtlcApply.js';
-import { withAdminApply } from './apply/AdminApply.js';
-import { withMembershipApply } from './apply/MembershipApply.js';
-import { withTransactionApply } from './apply/TransactionApply.js';
-import { withConsensusApply } from './apply/ConsensusApply.js';
-import { withSharedApply } from './apply/SharedApply.js';
+import { stateApi } from './api/StateApi.js';
+import { sharedApply } from './contracts/SharedApply.js';
+import { applyDispatcher } from './contracts/ApplyDispatcher.js';
+
+import { handleApplyInitializeBalanceOperation } from './contracts/handleApplyInitializeBalanceOperation.js';
+import { handleApplyDisableBalanceInitializationOperation } from './contracts/handleApplyDisableBalanceInitializationOperation.js';
+import { handleApplyAddAdminOperation } from './contracts/handleApplyAddAdminOperation.js';
+import { handleApplyAppendWhitelistOperation } from './contracts/handleApplyAppendWhitelistOperation.js';
+import { handleApplyAddWriterOperation } from './contracts/handleApplyAddWriterOperation.js';
+import { handleApplyRemoveWriterOperation } from './contracts/handleApplyRemoveWriterOperation.js';
+import { handleApplyAdminRecoveryOperation } from './contracts/handleApplyAdminRecoveryOperation.js';
+import { handleApplyAddIndexerOperation } from './contracts/handleApplyAddIndexerOperation.js';
+import { handleApplyRemoveIndexerOperation } from './contracts/handleApplyRemoveIndexerOperation.js';
+import { handleApplyBanValidatorOperation } from './contracts/handleApplyBanValidatorOperation.js';
+import { handleApplyBootstrapDeploymentOperation } from './contracts/handleApplyBootstrapDeploymentOperation.js';
+import { handleApplyTxOperation } from './contracts/handleApplyTxOperation.js';
+import { handleApplyTransferOperation } from './contracts/handleApplyTransferOperation.js';
+import { handleApplySetEpochOperation } from './contracts/handleApplySetEpochOperation.js';
+import { handleApplySetGenesisEpoch } from './contracts/handleApplySetGenesisEpoch.js';
+import { handleApplySetConsensusConfig } from './contracts/handleApplySetConsensusConfig.js';
+import { handleApplyHtlcLockOperation } from './contracts/handleApplyHtlcLockOperation.js';
+import { handleApplyHtlcClaimOperation } from './contracts/handleApplyHtlcClaimOperation.js';
+import { handleApplyHtlcRefundOperation } from './contracts/handleApplyHtlcRefundOperation.js';
 
 // TODO: _addWriter, _removeWriter, _transfer, _transferFeeTxOperation need to receive actor node entries as buffers.
-const StateBehavior = [
-    withStateApi,
-    withSharedApply,
-    withHtlcApply,
-    withAdminApply,
-    withMembershipApply,
-    withTransactionApply,
-    withConsensusApply,
-    withApplyDispatcher,
-].reduce((Base, mixin) => mixin(Base), ReadyResource);
+const StateBase = [
+    stateApi,
+    sharedApply,
+    handleApplyInitializeBalanceOperation,
+    handleApplyDisableBalanceInitializationOperation,
+    handleApplyAddAdminOperation,
+    handleApplyAppendWhitelistOperation,
+    handleApplyAddWriterOperation,
+    handleApplyRemoveWriterOperation,
+    handleApplyAdminRecoveryOperation,
+    handleApplyAddIndexerOperation,
+    handleApplyRemoveIndexerOperation,
+    handleApplyBanValidatorOperation,
+    handleApplyBootstrapDeploymentOperation,
+    handleApplyTxOperation,
+    handleApplyTransferOperation,
+    handleApplySetEpochOperation,
+    handleApplySetGenesisEpoch,
+    handleApplySetConsensusConfig,
+    handleApplyHtlcLockOperation,
+    handleApplyHtlcClaimOperation,
+    handleApplyHtlcRefundOperation,
+    applyDispatcher,
+].reduce((baseState, contract) => contract(baseState), ReadyResource);
 
-class State extends StateBehavior {
+class State extends StateBase {
     _writeQueue = new PQueue({ concurrency: 1 });
     _base;
     _bee;
@@ -61,6 +90,7 @@ class State extends StateBehavior {
             valueEncoding: AUTOBASE_VALUE_ENCODING,
             bigBatches: false,
             optimistic: false,
+            fastForward: true,
             open: this._setupHyperbee.bind(this),
             apply: this.applyHandler,
         })

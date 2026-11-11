@@ -44,6 +44,10 @@ let futureStateClass;
 
 async function getFutureStateClass() {
     if (!futureStateClass) {
+        const validateConfig = consensusConfig =>
+            b4a.equals(consensusConfig.cd, b4a.from([consensusConfig.sv[0], 1])) ||
+            b4a.equals(consensusConfig.cd, b4a.from([consensusConfig.sv[0], 2]));
+
         futureStateClass = await loadStateWithMockConsensus({
             '../../utils/consensusConfig.js': {
                 decodeVersionedConsensusConfig: encoded => {
@@ -58,12 +62,10 @@ async function getFutureStateClass() {
                     return decodeVersionedConsensusConfig(encoded);
                 },
             },
-        }, `
-            case 2:
-            case 3:
-                return b4a.equals(consensusConfig.cd, b4a.from([consensusConfig.sv[0], 1])) ||
-                    b4a.equals(consensusConfig.cd, b4a.from([consensusConfig.sv[0], 2]));
-        `);
+        }, {
+            2: validateConfig,
+            3: validateConfig,
+        });
     }
     return futureStateClass;
 }

@@ -1,46 +1,29 @@
-// Simulate a future State build without adding an override to production apply.
-// Only requested config cases are added; the existing V1 rules stay real.
-export async function loadStateWithMockConsensus(mocks, configCases) {
-    const { registerHooks } = await import('node:module');
+import { CONSENSUS_CONFIG_SCHEMA_VERSION_BYTE_LENGTH, ConsensusVersion } from '../../src/utils/constants.js';
+import { isBufferValid, safeReadUint8 } from '../../src/utils/buffer.js';
+
+// Simulate future config versions in tests while preserving the production V1 rules.
+export async function loadStateWithMockConsensus(mocks, configValidators) {
     const { default: esmock } = await import('esmock');
     const stateUrl = new URL('../../src/core/state/State.js', import.meta.url);
-    const consensusApplyUrl = new URL('../../src/core/state/apply/ConsensusApply.js', import.meta.url);
-    let loaded = false;
+    // Keep dependency mocks active in the original shared methods as well as State.
+    const { sharedApply } = await esmock('./contracts/SharedApply.js', stateUrl.href, {}, mocks);
 
-    const hook = registerHooks({
-        load(url, context, nextLoad) {
-            const result = nextLoad(url, context);
-            const target = new URL(url);
-            if (target.origin !== consensusApplyUrl.origin || target.pathname !== consensusApplyUrl.pathname ||
-                (!target.searchParams.has('esmk') && !target.searchParams.has('esmkgdefs'))) return result;
+    return esmock('./State.js', stateUrl.href, {}, {
+        ...mocks,
+        './contracts/SharedApply.js': {
+            sharedApply: baseState => class extends sharedApply(baseState) {
+                _validateConsensusConfigApply(consensusConfig) {
+                    if (!isBufferValid(consensusConfig?.sv, CONSENSUS_CONFIG_SCHEMA_VERSION_BYTE_LENGTH)) {
+                        return false;
+                    }
 
-            const source = typeof result.source === 'string' ? result.source : Buffer.from(result.source).toString();
-            const method = '    _validateConsensusConfigApply(consensusConfig) {';
-            const start = source.indexOf(method);
-            const end = source.indexOf('\n    }', start);
-            if (loaded || start === -1 || end === -1 || source.indexOf(method, start + method.length) !== -1) {
-                throw new Error('Cannot locate the unique apply config validator in ConsensusApply.');
-            }
-
-            const validator = source.slice(start, end);
-            const selector = 'switch (safeReadUint8(consensusConfig.sv)) {';
-            if (validator.split(selector).length !== 2) {
-                throw new Error('The apply config validator switch changed; update the mock State fixture.');
-            }
-
-            loaded = true;
-            return {
-                ...result,
-                source: source.slice(0, start) + validator.replace(selector, `${selector}\n${configCases}`) + source.slice(end),
-            };
+                    const version = safeReadUint8(consensusConfig.sv);
+                    if (version === ConsensusVersion.VDF_V1 || !Object.hasOwn(configValidators, version)) {
+                        return super._validateConsensusConfigApply(consensusConfig);
+                    }
+                    return configValidators[version](consensusConfig);
+                }
+            },
         },
     });
-
-    try {
-        const State = await esmock('./State.js', stateUrl.href, {}, mocks);
-        if (!loaded) throw new Error('Mock consensus cases were not loaded into ConsensusApply.');
-        return State;
-    } finally {
-        hook.deregister();
-    }
 }

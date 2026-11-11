@@ -1,7 +1,8 @@
 import b4a from 'b4a';
-import { EntryType } from '../../../utils/constants.js';
+import { CONSENSUS_CONFIG_SCHEMA_VERSION_BYTE_LENGTH, ConsensusVersion, EntryType, VDF_PROOF_BYTE_LENGTHS } from '../../../utils/constants.js';
 import tracCryptoApi from 'trac-crypto-api';
-import { deepCopyBuffer, NULL_BUFFER, safeWriteUInt32BE } from '../../../utils/buffer.js';
+import { deepCopyBuffer, isBufferValid, isZeroBuffer, NULL_BUFFER, safeReadUint8, safeWriteUInt32BE } from '../../../utils/buffer.js';
+import { safeDecodeVdfConfig } from '../../../codecs/consensus/v1/vdfConfigCodec.js';
 import addressUtils from '../utils/address.js';
 import adminEntryUtils from '../utils/adminEntry.js';
 import nodeEntryUtils, { NODE_ENTRY_SIZE } from '../utils/nodeEntry.js';
@@ -9,7 +10,25 @@ import nodeRoleUtils from '../utils/roles.js';
 import lengthEntryUtils from '../utils/lengthEntry.js';
 import { BALANCE_FEE, BALANCE_TO_STAKE, BALANCE_ZERO, toBalance, toTerm } from '../utils/balance.js';
 
-export const withSharedApply = Base => class extends Base {
+export const sharedApply = baseState => class extends baseState {
+
+    _validateConsensusConfigApply(consensusConfig) {
+        if (!isBufferValid(consensusConfig?.sv, CONSENSUS_CONFIG_SCHEMA_VERSION_BYTE_LENGTH)) {
+            return false;
+        }
+
+        switch (safeReadUint8(consensusConfig.sv)) {
+            case ConsensusVersion.VDF_V1: {
+                const configData = safeDecodeVdfConfig(consensusConfig.cd);
+                if (configData === null) return false;
+
+                return !isZeroBuffer(configData.difficulty) &&
+                    Object.hasOwn(VDF_PROOF_BYTE_LENGTHS, configData.discriminantBitSize.readUInt16BE(0));
+            }
+            default:
+                return false;
+        }
+    }
 
     _isAdminApply(adminEntry, node) {
         if (!adminEntry || !node) return false;

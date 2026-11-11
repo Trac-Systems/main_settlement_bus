@@ -5,7 +5,7 @@ import transactionUtils, { Status } from '../utils/transaction.js';
 
 const OVERSIZED_BATCH_PENALTY_MULTIPLIER = BATCH_SIZE;
 
-export const withApplyDispatcher = Base => class extends Base {
+export const applyDispatcher = baseState => class extends baseState {
 
     // ATTENTION: DO NOT USE METHODS ABOVE IN APPLY PART!
     ///////////////////////////////APPLY////////////////////////////////////
