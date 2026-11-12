@@ -61,10 +61,9 @@ if (typeof globalThis.Bare !== 'undefined') {
                     throw new Error('V2 genesis must not enter VDF config validation or generation.');
                 },
             },
-        }, `
-            case 2:
-                return b4a.equals(consensusConfig.cd, b4a.from([2, 42]));
-        `);
+        }, {
+            2: consensusConfig => b4a.equals(consensusConfig.cd, b4a.from([2, 42])),
+        });
         const context = await setupStateNetwork({
             nodes: 2,
             stateClass: StateWithV2,
