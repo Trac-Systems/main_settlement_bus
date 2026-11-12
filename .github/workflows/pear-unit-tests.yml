@@ -31,7 +31,10 @@ jobs:
         run: npm ci
       - name: Install bare
         run: npm i -g bare
-      - name: Install Pear
-        run: npm i -g pear
+      - name: Install Pear v2
+        # brittle-pear uses the script entrypoint removed in Pear v3.
+        run: npm i -g pear@2.0.4
+      - name: Initialize Pear runtime
+        run: pear -v
       - name: Run Pear unit tests
         run: npm run test:unit:pear
