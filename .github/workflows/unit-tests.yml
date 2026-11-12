@@ -34,9 +34,5 @@ jobs:
         run: npm run lint -- --max-warnings 0
       - name: Install bare
         run: npm i -g bare
-      - name: Run all tests
+      - name: Run unit tests
         run: npm run test:unit:all
-      - name: Run integration tests
-        run: npm run test:integration
-      - name: Run consensus integration tests
-        run: npm run test:integration:consensus

@@ -280,11 +280,11 @@ export class VDFBare extends VDFService {
         // `pear run`) fails with UNKNOWN_PROTOCOL there. Pear.config.dir is the
         // real on-disk path this app runs from (trac-msb is always run via a
         // local directory link, not a seeded pear:// app), so build a plain
-        // file:// URL from it instead. Outside Pear (plain `bare`), the injected/default
-        // worker URL is already a file:// URL and works as-is.
-        if (typeof globalThis.Pear !== 'undefined') {
+        // file:// URL from it instead, preserving the selected worker's path.
+        // An injected file:// URL already works as-is, including under Pear.
+        if (typeof globalThis.Pear !== 'undefined' && this.#workerURL.protocol === 'pear:') {
             const applicationDirectory = globalThis.Pear.config.dir;
-            return new URL('./vdf-worker.js', `file://${applicationDirectory}/src/core/consensus/services/`).href;
+            return new URL(`.${this.#workerURL.pathname}`, `file://${applicationDirectory}/`).href;
         }
         return this.#workerURL.href;
     }
