@@ -1,0 +1,37 @@
+name: MSB-Pear-Unit-Tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - '*'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: Pear unit tests (${{ matrix.node-version }})
+    runs-on: [self-hosted, Linux, X64]
+
+    strategy:
+      matrix:
+        node-version: [lts/*]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: Install dependencies
+        run: npm ci
+      - name: Install bare
+        run: npm i -g bare
+      - name: Install Pear
+        run: npm i -g pear
+      - name: Run Pear unit tests
+        run: npm run test:unit:pear

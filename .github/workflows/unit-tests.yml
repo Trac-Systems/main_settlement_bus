@@ -36,7 +36,26 @@ jobs:
         run: npm i -g bare
       - name: Run all tests
         run: npm run test:unit:all
+
+  integration-tests:
+    name: ${{ matrix.test-script }} (${{ matrix.node-version }})
+    runs-on: [self-hosted, Linux, X64]
+
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [lts/*]
+        test-script: [test:integration, test:integration:consensus]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: Install dependencies
+        run: npm ci
+      - name: Install bare
+        if: matrix.test-script == 'test:integration:consensus'
+        run: npm i -g bare
       - name: Run integration tests
-        run: npm run test:integration
-      - name: Run consensus integration tests
-        run: npm run test:integration:consensus
+        run: npm run ${{ matrix.test-script }}

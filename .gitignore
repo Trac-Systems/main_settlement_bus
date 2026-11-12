@@ -11,6 +11,7 @@ stores_/
 admin/
 !/src/core/state/contracts/admin/
 w*/
+!/.github/workflows/
 
 
 # NPM configuration and lock file
