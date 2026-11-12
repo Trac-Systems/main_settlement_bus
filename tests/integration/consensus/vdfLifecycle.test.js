@@ -3,10 +3,9 @@ import test from 'brittle';
 // A separate host survives the application SIGKILL and can both assert and clean
 // up the subprocess. POSIX signals are exercised, not mocked worker events.
 if (typeof globalThis.Bare === 'undefined' && process.platform !== 'win32') {
-    const { spawn } = await import('node:child_process');
+    const { default: spawn } = await import('bare-runtime/spawn');
     const { fileURLToPath } = await import('node:url');
     const { once } = await import('node:events');
-    const binary = fileURLToPath(new URL(`../../../node_modules/bare-runtime-${process.platform}-${process.arch}/bin/bare`, import.meta.url));
     const fixture = fileURLToPath(new URL('./fixtures/vdf-parent-bare.js', import.meta.url));
     const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -19,7 +18,8 @@ if (typeof globalThis.Bare === 'undefined' && process.platform !== 'win32') {
 
     for (const when of ['startup', 'computing']) {
         test(`parent SIGKILL during ${when} leaves no running VDF process`, { timeout: 15000 }, async t => {
-            const parent = spawn(binary, [fixture], { stdio: ['ignore', 'pipe', 'pipe'] });
+            // The runtime launcher restores the executable bit after a fresh npm install.
+            const parent = spawn({ args: [fixture], stdio: ['ignore', 'pipe', 'pipe'] });
             const exited = once(parent, 'exit');
             const children = new Set();
             let buffer = '';
