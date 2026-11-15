@@ -37,6 +37,40 @@ cd main_settlement_bus
 npm install
 ```
 
+## HyperDHT LAN compatibility (0.2.28)
+
+HyperDHT 6.29.x calls `bogon.isReserved` when connecting peers through a relay on
+one host or LAN. Bogon 1.1.0 lacks that export; 1.2.0 first supplies it. This
+release requires `bogon ^1.3.0` and checks the Bogon actually resolved by every
+reachable HyperDHT copy during `postinstall`. This applies to regular peers as
+well as validators.
+
+A package lockfile or `overrides` in a dependency does not protect an application's
+installation. Applications should update their own lockfiles and run
+`node node_modules/trac-msb/scripts/check-hyperdht-bogon.cjs` after installation.
+If lifecycle scripts are disabled, also run
+`node node_modules/trac-msb/scripts/hypercore-stallfix/apply.mjs` and then repeat
+it with `--check`. Both checks must succeed before starting the application.
+The check reports an incompatible nested Bogon instead of modifying dependencies.
+
+From this repository, run `npm run check:dependencies` and
+`npm run test:hyperdht-bogon`. The regression uses only a local bootstrap and
+throwaway keys, binds to loopback ports 59100–59199, and does not join a Trac
+network. Start the application with `npm start` (there is no `prod` script).
+
+## Upgrading from releases started with `npm run prod`
+
+Early 0.2.x releases started with `npm run prod --store=<name>` (through `pear run`). Current releases have no
+`prod` script; start a mainnet node with:
+
+```sh
+npm run start -- --stores-directory stores/<name> --network mainnet
+```
+
+The node reads its key from `stores/<name>/db/keypair.json`. A store created by an older release may live in a
+different location, in which case the key file is not found. Copy that store's `db/keypair.json` to the new path
+before the first start, or restore the wallet from its mnemonic.
+
 ## Post-install checklist
 
 Before running tests, install bare globally:
