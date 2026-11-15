@@ -21,7 +21,7 @@ function check(root = path.resolve(__dirname, '..')) {
             if (major < 6 || (major === 6 && minor < 29)) continue
             const bogon = requireFrom('bogon')
             if (typeof bogon.isReserved !== 'function' || typeof bogon.isBogon !== 'function') {
-                throw new Error(`HyperDHT ${pkg.version} resolves incompatible Bogon at ${requireFrom.resolve('bogon')}. Update the consumer lockfile to bogon >=1.3.0 and reinstall; same-host or LAN peer connections can otherwise crash.`)
+                throw new Error(`HyperDHT ${pkg.version} resolves incompatible Bogon at ${requireFrom.resolve('bogon')}. Update the consumer lockfile to bogon >=1.2.0 and reinstall; same-host or LAN peer connections can otherwise crash.`)
             }
         }
         for (const name of Object.keys({ ...pkg.dependencies, ...pkg.optionalDependencies })) {

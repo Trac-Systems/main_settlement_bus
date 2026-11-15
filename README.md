@@ -41,7 +41,7 @@ npm install
 
 HyperDHT 6.29.x calls `bogon.isReserved` when connecting peers through a relay on
 one host or LAN. Bogon 1.1.0 lacks that export; 1.2.0 first supplies it. This
-release requires `bogon ^1.3.0` and checks the Bogon actually resolved by every
+release requires `bogon ^1.2.0` and checks the Bogon actually resolved by every
 reachable HyperDHT copy during `postinstall`. This applies to regular peers as
 well as validators.
 
