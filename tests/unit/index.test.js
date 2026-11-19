@@ -177,7 +177,9 @@ if (isBareRuntime) {
 
     test('MainSettlementBus reports replication stalls and stops its guard on close', async t => {
         const loaded = await loadMainSettlementBus();
-        const clock = sinon.useFakeTimers();
+        // Keep nextTick and the runner's timers native; the guard only uses Date and intervals.
+        // Preserve wall-clock time for fixtures that may be imported while this test runs.
+        const clock = sinon.useFakeTimers({ now: Date.now(), toFake: ['Date', 'setInterval', 'clearInterval'] });
         const consoleLog = sinon.stub(console, 'log');
         const msb = new loaded.MainSettlementBus({ ...buildConfig(), replicationStallTimeout: 15_000 });
         t.teardown(async () => {
@@ -207,7 +209,6 @@ if (isBareRuntime) {
 
         await msb.close();
         await clock.tickAsync(600_000);
-        clock.runMicrotasks();
         t.is(clock.countTimers(), 0, 'guard timer is released');
         t.ok(destroy.calledOnce, 'closed MSB no longer reconnects');
     });
