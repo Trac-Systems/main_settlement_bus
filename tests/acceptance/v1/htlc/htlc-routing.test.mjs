@@ -15,6 +15,10 @@ function registerHtlcRoutingTests() {
         beforeEach(() => {
             calls = [];
             const msb = {
+                async broadcastTransaction(payload) {
+                    calls.push(['broadcast', payload]);
+                    return { tx, signedLength: 1, unsignedLength: 2 };
+                },
                 async htlcLock(payload) {
                     calls.push(['lock', payload]);
                     return { tx, signedLength: 1, unsignedLength: 2 };
@@ -52,6 +56,42 @@ function registerHtlcRoutingTests() {
                 expect(response.body.result.tx).toBe(tx);
                 expect(calls.at(-1)).toEqual([expected, payload]);
             }
+        });
+
+        it.each([
+            ['transfer', OperationType.TRANSFER, 'tro'],
+            ['transaction', OperationType.TX, 'txo'],
+            ['HTLC lock', OperationType.HTLC_LOCK, 'hlo'],
+            ['HTLC claim', OperationType.HTLC_CLAIM, 'hco'],
+            ['HTLC refund', OperationType.HTLC_REFUND, 'hro'],
+        ])('routes %s through the generic broadcast endpoint', async (_name, type, key) => {
+            const operation = { tx };
+            if (key === 'hlo') Object.assign(operation, { ss: [lockId, tx], cs: ['ef'.repeat(64)], md: '0080ff' });
+            if (key === 'hco' || key === 'hro') operation.li = lockId;
+            if (key === 'hco') operation.pi = tx;
+            const payload = { type, address, [key]: operation };
+
+            const response = await request(server).post('/v1/broadcast-transaction').send({ payload: encoded(payload) });
+
+            expect(response.statusCode).toBe(200);
+            expect(response.body.result).toEqual({
+                tx, signedLength: 1, unsignedLength: 2, message: 'Transaction broadcasted successfully.',
+            });
+            expect(calls).toEqual([['broadcast', payload]]);
+        });
+
+        it.each([
+            [OperationType.HTLC_LOCK, 'hco'],
+            [OperationType.HTLC_CLAIM, 'hro'],
+            [OperationType.HTLC_REFUND, 'hlo'],
+            [OperationType.ADD_WRITER, 'rao'],
+        ])('rejects type %s with unsupported or mismatched body %s', async (type, key) => {
+            const response = await request(server).post('/v1/broadcast-transaction').send({
+                payload: encoded({ type, address, [key]: { tx, li: lockId } }),
+            });
+            expect(response.statusCode).toBe(400);
+            expect(response.body).toEqual({ error: 'Invalid payload structure.' });
+            expect(calls).toEqual([]);
         });
 
         it('reads an escrow with the requested confirmation mode', async () => {
