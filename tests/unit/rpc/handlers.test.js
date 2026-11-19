@@ -56,6 +56,17 @@ async function submit(handler, msbInstance, url, payload, params = {}) {
     return ctx;
 }
 
+async function submitBroadcast(msbInstance, payload) {
+    const ctx = context(msbInstance, '/v1/broadcast-transaction');
+    handleBroadcastTransaction(ctx);
+    ctx.req.emit('data', b4a.from(JSON.stringify({
+        payload: b4a.toString(b4a.from(JSON.stringify(payload)), 'base64'),
+    })));
+    ctx.req.emit('end');
+    await new Promise(resolve => setTimeout(resolve, 0));
+    return ctx;
+}
+
 test('HTLC RPC submissions pass signed operations to the corresponding MSB methods', async t => {
     const result = { tx: txHash, signedLength: 2, unsignedLength: 3 };
     const msb = {
@@ -233,16 +244,79 @@ test('RPC tx hash ranges are capped at the confirmed length', async t => {
     t.is(ctx.responses[0].status, 400);
 });
 
-test('RPC generic broadcast forwards the decoded operation', async t => {
+test('RPC generic broadcast forwards transfers, transactions and HTLC operations', async t => {
     const msb = { broadcastTransaction: sinon.stub().resolves({ tx: txHash, signedLength: 2, unsignedLength: 3 }) };
-    const payload = { type: OperationType.TRANSFER, address, tro: { tx: txHash } };
-    const ctx = context(msb, '/v1/broadcast-transaction');
-    handleBroadcastTransaction(ctx);
-    ctx.req.emit('data', b4a.from(JSON.stringify({ payload: b4a.toString(b4a.from(JSON.stringify(payload)), 'base64') })));
-    ctx.req.emit('end');
-    await new Promise(resolve => setTimeout(resolve, 0));
-    t.is(ctx.responses[0].status, 200);
-    t.alike(msb.broadcastTransaction.firstCall.args[0], payload);
+    for (const [type, key, operation] of [
+        [OperationType.TRANSFER, 'tro', { tx: txHash }],
+        [OperationType.TX, 'txo', { tx: txHash }],
+        [OperationType.HTLC_LOCK, 'hlo', { tx: txHash, ss: [lockId, txHash], cs: ['ef'.repeat(64)], md: '0080ff' }],
+        [OperationType.HTLC_CLAIM, 'hco', { tx: txHash, li: lockId, pi: txHash }],
+        [OperationType.HTLC_REFUND, 'hro', { tx: txHash, li: lockId }],
+    ]) {
+        const payload = { type, address, [key]: operation };
+        const ctx = await submitBroadcast(msb, payload);
+        t.alike(ctx.responses, [{ status: 200, body: { result: {
+            tx: txHash, signedLength: 2, unsignedLength: 3, message: 'Transaction broadcasted successfully.',
+        } } }], `operation ${type} is accepted`);
+        t.alike(msb.broadcastTransaction.lastCall.args[0], payload, 'the signed operation fields are preserved');
+    }
+    t.is(msb.broadcastTransaction.callCount, 5);
+});
+
+test('RPC generic broadcast sanitizes strings without reordering HTLC signers or changing metadata bytes', async t => {
+    const msb = { broadcastTransaction: sinon.stub().resolves({ tx: txHash }) };
+    const signerSet = [txHash.toUpperCase(), lockId.toUpperCase()];
+    const signatures = ['ef'.repeat(64).toUpperCase()];
+    for (const [type, key] of [
+        [OperationType.TRANSFER, 'tro'],
+        [OperationType.TX, 'txo'],
+        [OperationType.HTLC_LOCK, 'hlo'],
+        [OperationType.HTLC_CLAIM, 'hco'],
+        [OperationType.HTLC_REFUND, 'hro'],
+    ]) {
+        const extra = key === 'hlo' ? { ss: signerSet, cs: signatures, md: ' 0080FF ' } : {};
+        const ctx = await submitBroadcast(msb, {
+            type, address: ` ${address} `, [key]: { tx: ` ${txHash.toUpperCase()} `, ...extra },
+        });
+        t.is(ctx.responses[0].status, 200);
+        t.alike(msb.broadcastTransaction.lastCall.args[0], {
+            type, address, [key]: { tx: txHash, ...(key === 'hlo' ? { ss: signerSet, cs: signatures, md: '0080ff' } : {}) },
+        });
+    }
+});
+
+test('RPC generic broadcast rejects unsupported types and mismatched or malformed operation bodies', async t => {
+    const msb = { broadcastTransaction: sinon.stub() };
+    for (const payload of [
+        { type: OperationType.HTLC_LOCK, address, hco: { tx: txHash } },
+        { type: OperationType.HTLC_CLAIM, address, hro: { tx: txHash } },
+        { type: OperationType.HTLC_REFUND, address, hlo: { tx: txHash } },
+        { type: OperationType.TRANSFER, address, txo: { tx: txHash } },
+        { type: OperationType.TX, address, tro: { tx: txHash } },
+        { type: OperationType.HTLC_LOCK, address, hlo: null },
+        { type: OperationType.HTLC_CLAIM, address, hco: [] },
+        { type: OperationType.HTLC_REFUND, address, hro: 'invalid' },
+        { type: OperationType.ADD_WRITER, address, rao: { tx: txHash } },
+        { type: 255, address, tro: { tx: txHash } },
+    ]) {
+        const ctx = await submitBroadcast(msb, payload);
+        t.alike(ctx.responses, [{ status: 400, body: { error: 'Invalid payload structure.' } }]);
+    }
+    t.is(msb.broadcastTransaction.callCount, 0);
+});
+
+test('RPC generic HTLC broadcast preserves validation and broadcast failure responses', async t => {
+    const { ValidationError, BroadcastError } = await import('../../../src/utils/errors.js');
+    for (const [error, status] of [
+        [new ValidationError('Invalid HTLC signature.'), 400],
+        [new BroadcastError('No validator accepted the HTLC.'), 429],
+    ]) {
+        const msb = { broadcastTransaction: sinon.stub().rejects(error) };
+        const payload = { type: OperationType.HTLC_REFUND, address, hro: { tx: txHash, li: lockId } };
+        const ctx = await submitBroadcast(msb, payload);
+        t.alike(ctx.responses, [{ status, body: { error: error.message } }]);
+        t.is(msb.broadcastTransaction.callCount, 1, 'MSB remains responsible for operation validation');
+    }
 });
 
 test('RPC bulk payload lookup de-duplicates hashes before querying MSB', async t => {

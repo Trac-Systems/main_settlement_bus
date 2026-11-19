@@ -3,6 +3,8 @@ import { operationToPayload } from "../../src/utils/applyOperations.js"
 import { isHexString } from "../../src/utils/helpers.js"; 
 import { ValidationError } from "../../src/utils/errors.js";
 
+const BROADCAST_PAYLOAD_KEYS = new Set(['txo', 'tro', 'hlo', 'hco', 'hro']);
+
 export function decodeBase64Payload(base64) {
     let decodedPayloadString
     try {
@@ -25,22 +27,27 @@ export function isBase64(str) {
 }
 
 export function validatePayloadStructure(payload) {
+    const operationKey = operationToPayload(payload?.type);
     if (
         typeof payload !== "object" ||
-    payload === null ||
-    typeof payload.type !== "number" ||
-    typeof payload.address !== "string" ||
-    !["txo", "tro"].some((key) => key in payload && typeof payload[key] === "object")
+        payload === null ||
+        Array.isArray(payload) ||
+        typeof payload.type !== "number" ||
+        typeof payload.address !== "string" ||
+        !BROADCAST_PAYLOAD_KEYS.has(operationKey) ||
+        !payload[operationKey] ||
+        typeof payload[operationKey] !== "object" ||
+        Array.isArray(payload[operationKey])
     ) {
         throw new ValidationError("Invalid payload structure.")
     }
 }
 
-export function sanitizeTransferPayload(payload) {
+export function sanitizeBroadcastPayload(payload) {
     const operationKey = operationToPayload(payload.type);
 
-    if (operationKey !== 'tro' && operationKey !== 'txo') {
-        throw new ValidationError('Payload is not a transfer/transaction operation.');
+    if (!BROADCAST_PAYLOAD_KEYS.has(operationKey)) {
+        throw new ValidationError('Payload is not a supported broadcast operation.');
     }
 
     const operation = payload[operationKey];

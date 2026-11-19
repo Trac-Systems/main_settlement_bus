@@ -218,12 +218,27 @@ paths:
       tags: [Transactions]
       summary: Broadcast signed transaction
       description: |
-        Broadcasts a signed transaction payload.
+        Broadcasts a signed operation through the existing MSB validation and validator pipeline.
+
+        Supported operations and their JSON body keys:
+        - `TRANSFER`: `tro`
+        - `TX`: `txo`
+        - `HTLC_LOCK`: `hlo`
+        - `HTLC_CLAIM`: `hco`
+        - `HTLC_REFUND`: `hro`
+
+        The decoded operation must include its numeric `type`, submitting `address`,
+        and the matching operation body. Byte fields use hexadecimal strings; addresses
+        use their normal MSB address format. HTLC signer and signature arrays retain
+        their supplied order, and optional lock metadata (`md`) is hexadecimal bytes.
+        Claim and refund operations identify the escrow using `li` inside the signed
+        operation; no lock ID is needed in this URL. All required signatures must
+        already be present: the RPC node does not sign the operation.
 
         Request requirements:
         - body must be valid JSON
         - body must contain `payload`
-        - `payload` must be valid Base64 string
+        - `payload` must be the signed operation JSON encoded as a valid Base64 string
       requestBody:
         required: true
         content:

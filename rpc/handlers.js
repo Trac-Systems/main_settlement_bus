@@ -3,7 +3,7 @@ import {
     isBase64, 
     isValidTxHash, 
     sanitizeBulkPayloadsRequestBody, 
-    sanitizeTransferPayload, 
+    sanitizeBroadcastPayload,
     validatePayloadStructure,
     hasSpacesInUrl
 } from "./utils/helpers.js"
@@ -205,7 +205,7 @@ export async function handleBroadcastTransaction({ msbInstance, respond, req }) 
 
             const decodedPayload = decodeBase64Payload(payload);
             validatePayloadStructure(decodedPayload);
-            const sanitizedPayload = sanitizeTransferPayload(decodedPayload);
+            const sanitizedPayload = sanitizeBroadcastPayload(decodedPayload);
 
             const result = await msbInstance.broadcastTransaction(sanitizedPayload);
             respond(200, { result: { ...result, message: 'Transaction broadcasted successfully.' } });
