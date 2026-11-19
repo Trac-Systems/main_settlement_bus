@@ -61,6 +61,7 @@ const configData = {
         validatorHealthCheckInterval: 5 * 60 * 1000, // How often to check validator health (ms)
         validatorHealthCheckFailureThreshold: 3, // Consecutive failed health checks before a validator is removed
         confirmationStallTimeout: 120_000, // Force a fast-forward when confirmations stall with unconfirmed entries (ms, 0 = off)
+        replicationStallTimeout: 600_000, // Close all MSB connections once (max 1 per 10 min) when signed system data stays unapplied and the confirmed length has not moved for this long (ms, 0 = off)
         epochInterval: 3 * 60 * 1000, // How often to trigger epoch proof proposal (ms)
         epochBackoffDelay: 30_000, // Delay before retrying epoch coordination after a failed attempt (ms)
         epochSignatureTimeout: 20_000, // Max time delay an indexer have to sign a proposal
@@ -120,6 +121,7 @@ const configData = {
         validatorHealthCheckInterval: 5 * 60 * 1000, // How often to check validator health (ms)
         validatorHealthCheckFailureThreshold: 3, // Consecutive failed health checks before a validator is removed
         confirmationStallTimeout: 120_000, // Force a fast-forward when confirmations stall with unconfirmed entries (ms, 0 = off)
+        replicationStallTimeout: 600_000, // Close all MSB connections once (max 1 per 10 min) when signed system data stays unapplied and the confirmed length has not moved for this long (ms, 0 = off)
         epochInterval: 3 * 60 * 1000, // How often to trigger epoch proof proposal (ms)
         epochBackoffDelay: 30_000, // Delay before retrying epoch coordination after a failed attempt (ms)
         epochSignatureTimeout: 20_000, // Max time delay an indexer have to sign a proposal
@@ -179,6 +181,7 @@ const configData = {
         validatorHealthCheckInterval: 1_000, // How often to check validator health (ms)
         validatorHealthCheckFailureThreshold: 3, // Consecutive failed health checks before a validator is removed
         confirmationStallTimeout: 120_000, // Force a fast-forward when confirmations stall with unconfirmed entries (ms, 0 = off)
+        replicationStallTimeout: 600_000, // Close all MSB connections once (max 1 per 10 min) when signed system data stays unapplied and the confirmed length has not moved for this long (ms, 0 = off)
         epochInterval: 30 * 1000, // How often to trigger epoch proof proposal (ms)
         epochBackoffDelay: 30_000, // Delay before retrying epoch coordination after a failed attempt (ms)
         epochSignatureTimeout: 40_000, // Max time delay an indexer have to sign a proposal

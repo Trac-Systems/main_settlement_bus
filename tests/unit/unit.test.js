@@ -14,6 +14,7 @@ async function runTests() {
     await import('./consensus/consensusModule.test.js');
     await import('./network/networkModule.test.js')
     await import('./state/stateModule.test.js');
+    await import('./hypercore/hypercore.test.js');
     await import('./rpc/handlers.test.js');
     await import('./rpc/htlcApi.test.js');
     await import('./rpc/epochApi.test.js');

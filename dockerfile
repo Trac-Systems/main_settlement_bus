@@ -19,6 +19,9 @@ WORKDIR /msb
 USER node
 
 COPY package*.json ./
+# postinstall checks HyperDHT/Bogon compatibility and applies the Hypercore stall fix.
+COPY scripts/check-hyperdht-bogon.cjs ./scripts/check-hyperdht-bogon.cjs
+COPY scripts/hypercore-stallfix ./scripts/hypercore-stallfix
 RUN npm ci --omit=dev
 COPY . .
 

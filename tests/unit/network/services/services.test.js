@@ -14,6 +14,7 @@ async function runTests() {
     await import('./TransactionCommitService.test.js');
     await import('./TransactionPoolService.test.js');
     await import('./ValidatorObserverLifecycle.test.js');
+    await import('./ReplicationStallGuard.test.js');
     test.resume();
 }
 

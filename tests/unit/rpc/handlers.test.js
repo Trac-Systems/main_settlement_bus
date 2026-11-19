@@ -11,6 +11,7 @@ import {
     handleFee,
     handleFetchBulkTxPayloads,
     handleHealth,
+    handleReplication,
     handleHtlc,
     handleHtlcClaim,
     handleHtlcLock,
@@ -22,6 +23,7 @@ import {
     handleUnconfirmedLength,
 } from '../../../rpc/handlers.js';
 import { OperationType } from '../../../src/utils/constants.js';
+import { v1Routes } from '../../../rpc/routes/v1.js';
 
 const lockId = 'ab'.repeat(32);
 const txHash = 'cd'.repeat(32);
@@ -197,6 +199,31 @@ test('RPC health and scalar endpoints return their MSB values', async t => {
     const offline = context({ opened: false }, '/v1/health');
     await handleHealth(offline);
     t.is(offline.responses[0].status, 503);
+});
+
+test('RPC replication route returns the live replication status', async t => {
+    const status = { hypercoreStallfix: { patched: true }, stall: { state: 'behind' }, connections: 2 };
+    const msb = { opened: true, replicationStatus: sinon.stub().returns(status) };
+    const route = v1Routes.find(route => route.method === 'GET' && route.path === '/replication');
+    t.is(route?.handler, handleReplication);
+    const ctx = context(msb, '/v1/replication');
+    await route.handler(ctx);
+    t.alike(ctx.responses, [{ status: 200, body: status }]);
+    t.ok(msb.replicationStatus.calledOnce);
+});
+
+test('RPC replication returns 503 while unavailable or when status fails', async t => {
+    for (const msb of [
+        undefined,
+        { opened: false, replicationStatus: sinon.stub() },
+        { opened: true },
+        { opened: true, replicationStatus: sinon.stub().throws(new Error('Unavailable')) },
+    ]) {
+        const ctx = context(msb, '/v1/replication');
+        await handleReplication(ctx);
+        t.alike(ctx.responses, [{ status: 503, body: { error: 'Could not connect to RPC server' } }]);
+        if (msb?.opened === false) t.is(msb.replicationStatus.callCount, 0);
+    }
 });
 
 test('RPC account, balance and transaction lookups pass parsed inputs', async t => {
