@@ -45,6 +45,8 @@ import PartialTransactionValidator from "./core/network/protocols/validators/sha
 import PartialTransferValidator from "./core/network/protocols/validators/shared/validators/PartialTransferValidator.js";
 import { BroadcastError, ValidationError } from "./utils/errors.js";
 import { uint8ToBuffer, uint16ToBuffer, uint32ToBuffer } from "./utils/buffer.js";
+import { ReplicationStallGuard } from "./core/network/services/ReplicationStallGuard.js";
+import { hypercoreStallfixLine, hypercoreStallfixStatus } from "./utils/hypercoreStallfix.js";
 
 export class MainSettlementBus extends ReadyResource {
     #store;
@@ -52,6 +54,7 @@ export class MainSettlementBus extends ReadyResource {
     #network;
     #state;
     #config
+    #replicationGuard = null;
 
     /**
      * @param {import("./config/config.js").Config} config
@@ -90,6 +93,13 @@ export class MainSettlementBus extends ReadyResource {
         await this.#state.ready();
         await this.#network.ready();
 
+        console.log(hypercoreStallfixLine('MSB', this.#state.base.core));
+        this.#replicationGuard = new ReplicationStallGuard(this.#state.base, () => this.#network?.swarm ?? null, {
+            timeout: this.#config.replicationStallTimeout,
+            refresh: () => this.#network?.swarm?.status?.(this.#config.channel)?.refresh?.()
+        });
+        this.#replicationGuard.start();
+
         if (this.#wallet) {
             this.#printWalletInfo();
         }
@@ -110,6 +120,7 @@ export class MainSettlementBus extends ReadyResource {
     async _close() {
         console.log("Closing everything gracefully... This may take a moment.");
 
+        this.#replicationGuard?.stop();
         await this.#network.close();
 
         await sleep(100);
@@ -123,6 +134,18 @@ export class MainSettlementBus extends ReadyResource {
         }
 
         await sleep(100);
+    }
+
+    /**
+     * Replication health: whether the loaded Hypercore carries the stall fix, and the stall guard state
+     * ('ok' | 'behind' | 'stalled'). Read-only.
+     */
+    replicationStatus() {
+        return {
+            hypercoreStallfix: hypercoreStallfixStatus(this.#state?.base?.core, this.#store),
+            stall: this.#replicationGuard?.status() ?? null,
+            connections: this.#network?.swarm?.connections?.size ?? 0
+        };
     }
 
     async destroy() {
@@ -361,6 +384,11 @@ export class MainSettlementBus extends ReadyResource {
             console.log("---------- flags ----------");
             console.log(`isIndexer: ${this.#state?.isIndexer?.() ?? "unset"}`);
             console.log(`isWriter: ${this.#state?.isWritable?.() ?? "unset"}`);
+            const replication = this.replicationStatus();
+            console.log("---------- replication ----------");
+            console.log(`hypercoreStallfix: ${replication.hypercoreStallfix.patched ? replication.hypercoreStallfix.marker : "NOT ACTIVE"}` +
+                ` (expired requests: ${replication.hypercoreStallfix.expiredRequests ?? "n/a"}, timed pauses: ${replication.hypercoreStallfix.invalidOperationPauses ?? "n/a"})`);
+            console.log(`replicationStall: ${replication.stall?.state ?? "off"} (reconnects: ${replication.stall?.reconnects ?? 0})`);
         } catch (error) {
             console.error("Error during DAG monitoring:", error.message);
         }

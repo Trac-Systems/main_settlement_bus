@@ -249,6 +249,11 @@ export class Config {
         return this.#config.confirmationStallTimeout
     }
 
+    get replicationStallTimeout() {
+        if (this.#isOverriden('replicationStallTimeout')) return this.#options.replicationStallTimeout
+        return this.#config.replicationStallTimeout
+    }
+
     get maxPendingRequestsInPendingRequestsService() {
         return this.#config.maxPendingRequestsInPendingRequestsService
     }

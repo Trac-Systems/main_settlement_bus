@@ -175,6 +175,44 @@ if (isBareRuntime) {
         await msb.close();
     });
 
+    test('MainSettlementBus reports replication stalls and stops its guard on close', async t => {
+        const loaded = await loadMainSettlementBus();
+        // Keep nextTick and the runner's timers native; the guard only uses Date and intervals.
+        // Preserve wall-clock time for fixtures that may be imported while this test runs.
+        const clock = sinon.useFakeTimers({ now: Date.now(), toFake: ['Date', 'setInterval', 'clearInterval'] });
+        const consoleLog = sinon.stub(console, 'log');
+        const msb = new loaded.MainSettlementBus({ ...buildConfig(), replicationStallTimeout: 15_000 });
+        t.teardown(async () => {
+            await msb.close();
+            consoleLog.restore();
+            clock.restore();
+        });
+        await msb.ready();
+
+        const destroy = sinon.spy();
+        const refresh = sinon.stub().resolves();
+        loaded.network.swarm = {
+            connections: new Set([{ destroy }]),
+            status: () => ({ refresh }),
+        };
+        loaded.state.base.core = { length: 5, core: { state: { length: 8 } } };
+        loaded.state.base.view = { core: { signedLength: 12 } };
+
+        t.is(msb.replicationStatus().connections, 1);
+        await clock.tickAsync(15_000);
+        t.is(msb.replicationStatus().stall.state, 'behind');
+        await clock.tickAsync(15_000);
+        t.is(msb.replicationStatus().stall.state, 'stalled');
+        t.is(msb.replicationStatus().stall.reconnects, 1);
+        t.ok(destroy.calledOnce);
+        t.ok(refresh.calledOnce);
+
+        await msb.close();
+        await clock.tickAsync(600_000);
+        t.is(clock.countTimers(), 0, 'guard timer is released');
+        t.ok(destroy.calledOnce, 'closed MSB no longer reconnects');
+    });
+
     test('MainSettlementBus rejects checksum-invalid transfer recipients before submission', async t => {
         const config = buildGenesisConfig();
         const wallet = await createWallet(config);

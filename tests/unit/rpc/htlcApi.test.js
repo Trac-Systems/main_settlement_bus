@@ -24,6 +24,7 @@ if (typeof globalThis.Bare !== 'undefined') {
         }
         class StateMock {
             constructor() {
+                this.base = { core: {} };
                 this.getAdminEntry = sinon.stub().resolves(null);
                 this.getSigned = sinon.stub().resolves(null);
                 this.get = sinon.stub().resolves(null);

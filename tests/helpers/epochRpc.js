@@ -7,6 +7,7 @@ import { handleConfirmedLength, handleTxHashes, handleFetchBulkTxPayloads, handl
 export async function createEpochReadApi(t, state, config = {}) {
     const { default: esmock } = await import('esmock');
     class ReadState {
+        base = state.base ?? { core: {} };
         async ready() {}
         async close() {}
         async getAdminEntry() { return null; }
