@@ -8,7 +8,7 @@ import { PeerConnectionManagerError } from "../../../../src/core/network/shared/
 import { tick } from "../../../helpers/setupApplyTests.js";
 import b4a from 'b4a'
 import { createConfig, ENV } from "../../../../src/config/env.js";
-import { ResultCode } from "../../../../src/utils/constants.js";
+import { NetworkResultCode } from "../../../../src/utils/constants.js";
 
 const createConnection = (key) => {
     const emitter = new EventEmitter()
@@ -27,7 +27,7 @@ const createConnection = (key) => {
     return { key: b4a.from(key, 'hex'), connection: emitter }
 }
 
-const createV1Connection = (key, sendHealthCheckStub = sinon.stub().resolves(ResultCode.OK)) => {
+const createV1Connection = (key, sendHealthCheckStub = sinon.stub().resolves(NetworkResultCode.RESULT_CODE_OK)) => {
     const emitter = new EventEmitter()
     emitter.protocolSessions = {}
     emitter.protocolSessions.validator = {
@@ -171,12 +171,12 @@ test('ConnectionManager', () => {
         test('returns exact resultCode from protocolSession.send', async t => {
             reset()
             const data = createConnection(testKeyPair1.publicKey)
-            data.connection.protocolSessions.validator.send = sinon.stub().resolves(ResultCode.TIMEOUT)
+            data.connection.protocolSessions.validator.send = sinon.stub().resolves(NetworkResultCode.RESULT_CODE_TIMEOUT)
             const validatorConnectionManager = makeManager(6, [data])
 
             const result = await validatorConnectionManager.sendSingleMessage({ payload: 1 }, testKeyPair1.publicKey)
 
-            t.is(result, ResultCode.TIMEOUT, 'should return the exact result code from protocol session')
+            t.is(result, NetworkResultCode.RESULT_CODE_TIMEOUT, 'should return the exact result code from protocol session')
             t.ok(data.connection.protocolSessions.validator.send.calledOnce, 'should invoke protocolSession.send')
         })
 
@@ -298,7 +298,7 @@ test('ConnectionManager', () => {
             const stopSpy = sinon.spy(ValidatorHealthCheckService.prototype, 'stop');
             try {
                 const validatorConnectionManager = await makeHealthCheckManager();
-                const v1Conn = createV1Connection(testKeyPair1.publicKey, sinon.stub().resolves(ResultCode.OK));
+                const v1Conn = createV1Connection(testKeyPair1.publicKey, sinon.stub().resolves(NetworkResultCode.RESULT_CODE_OK));
                 v1Conn.connection.protocolSessions.validator.isHealthCheckSupported = () => true;
                 await validatorConnectionManager.add(v1Conn.key, v1Conn.connection);
 
@@ -318,7 +318,7 @@ test('ConnectionManager', () => {
             const stopSpy = sinon.spy(ValidatorHealthCheckService.prototype, 'stop');
             try {
                 const validatorConnectionManager = await makeHealthCheckManager();
-                const v1Conn = createV1Connection(testKeyPair2.publicKey, sinon.stub().resolves(ResultCode.TIMEOUT));
+                const v1Conn = createV1Connection(testKeyPair2.publicKey, sinon.stub().resolves(NetworkResultCode.RESULT_CODE_TIMEOUT));
                 v1Conn.connection.protocolSessions.validator.isHealthCheckSupported = () => true;
                 await validatorConnectionManager.add(v1Conn.key, v1Conn.connection);
 
@@ -363,8 +363,8 @@ test('ConnectionManager', () => {
         let manager;
         try {
             manager = await makeHealthCheckManager();
-            const send = sinon.stub().resolves(ResultCode.TIMEOUT);
-            send.onCall(2).resolves(ResultCode.OK);
+            const send = sinon.stub().resolves(NetworkResultCode.RESULT_CODE_TIMEOUT);
+            send.onCall(2).resolves(NetworkResultCode.RESULT_CODE_OK);
             const data = createV1Connection(testKeyPair3.publicKey, send);
             data.connection.protocolSessions.validator.isHealthCheckSupported = () => true;
             await manager.add(data.key, data.connection);
@@ -384,7 +384,7 @@ test('ConnectionManager', () => {
             let manager;
             try {
                 manager = await makeHealthCheckManager({ validatorHealthCheckFailureThreshold: threshold });
-                const data = createV1Connection(testKeyPair3.publicKey, sinon.stub().resolves(ResultCode.TIMEOUT));
+                const data = createV1Connection(testKeyPair3.publicKey, sinon.stub().resolves(NetworkResultCode.RESULT_CODE_TIMEOUT));
                 data.connection.protocolSessions.validator.isHealthCheckSupported = () => true;
                 await manager.add(data.key, data.connection);
                 await clock.tickAsync(HEALTH_CHECK_INTERVAL_MS * (expected - 1));
@@ -403,12 +403,12 @@ test('ConnectionManager', () => {
         let manager;
         try {
             manager = await makeHealthCheckManager();
-            const old = createV1Connection(testKeyPair3.publicKey, sinon.stub().resolves(ResultCode.TIMEOUT));
+            const old = createV1Connection(testKeyPair3.publicKey, sinon.stub().resolves(NetworkResultCode.RESULT_CODE_TIMEOUT));
             old.connection.protocolSessions.validator.isHealthCheckSupported = () => true;
             await manager.add(old.key, old.connection);
             await clock.tickAsync(HEALTH_CHECK_INTERVAL_MS * 2);
             manager.remove(old.key);
-            const replacement = createV1Connection(testKeyPair3.publicKey, sinon.stub().resolves(ResultCode.TIMEOUT));
+            const replacement = createV1Connection(testKeyPair3.publicKey, sinon.stub().resolves(NetworkResultCode.RESULT_CODE_TIMEOUT));
             replacement.connection.protocolSessions.validator.isHealthCheckSupported = () => true;
             await manager.add(replacement.key, replacement.connection);
             old.connection.emit('close');
@@ -436,7 +436,7 @@ test('ConnectionManager', () => {
             manager.remove(old.key);
             const replacement = createV1Connection(testKeyPair3.publicKey);
             await manager.add(replacement.key, replacement.connection);
-            finishCheck(ResultCode.TIMEOUT);
+            finishCheck(NetworkResultCode.RESULT_CODE_TIMEOUT);
             await clock.tickAsync(0);
             t.is(manager.getConnection(old.key), replacement.connection);
         } finally {

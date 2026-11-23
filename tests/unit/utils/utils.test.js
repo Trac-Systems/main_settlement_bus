@@ -15,7 +15,6 @@ async function runTests() {
     await import('./type/type.test.js');
     await import('./amountSerialization/amountSerialization.test.js');
     await import('./scheduler/Scheduler.test.js');
-    await import('./stateMachine/stateMachine.test.js');
     test.resume();
 }
 

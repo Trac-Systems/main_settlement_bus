@@ -12,7 +12,7 @@ import {
 } from '../../../../../../src/codecs/apply/applyOperationCodec.js';
 import {addressToBuffer} from '../../../../../../src/core/state/utils/address.js';
 import {publicKeyToAddress} from '../../../../../../src/utils/helpers.js';
-import {OperationType, ResultCode} from '../../../../../../src/utils/constants.js';
+import {OperationType, NetworkResultCode} from '../../../../../../src/utils/constants.js';
 import { config } from '../../../../../helpers/config.js';
 import { createState } from '../../../utils/createState.js';
 import protobufFixtures from '../../../../../fixtures/applyOperation.fixtures.js';
@@ -82,7 +82,7 @@ test('extractRequiredVaFromDecodedTx throws VALIDATOR_TX_OBJECT_INVALID for non-
         extractRequiredVaFromDecodedTx(null);
         t.fail('expected throw');
     } catch (err) {
-        t.is(err.resultCode, ResultCode.VALIDATOR_TX_OBJECT_INVALID);
+        t.is(err.resultCode, NetworkResultCode.RESULT_CODE_VALIDATOR_TX_OBJECT_INVALID);
     }
 });
 
@@ -91,7 +91,7 @@ test('extractRequiredVaFromDecodedTx throws VALIDATOR_VA_MISSING when va is miss
         extractRequiredVaFromDecodedTx({type: 1, txo: {tx: b4a.alloc(32)}});
         t.fail('expected throw');
     } catch (err) {
-        t.is(err.resultCode, ResultCode.VALIDATOR_VA_MISSING);
+        t.is(err.resultCode, NetworkResultCode.RESULT_CODE_VALIDATOR_VA_MISSING);
     }
 });
 
@@ -120,7 +120,7 @@ test('validate skips proof validation when result code is non-OK', async t => {
 
     const payload = {
         broadcast_transaction_response: {
-            result: ResultCode.TIMEOUT,
+            result: NetworkResultCode.RESULT_CODE_TIMEOUT,
         }
     };
 
@@ -165,7 +165,7 @@ test('validate runs proof validation pipeline when result code is OK', async t =
     validator.validateValidatorCorrectness = async () => calls.push('validator-correctness');
 
     const result = await validator.validate(
-        { broadcast_transaction_response: { result: ResultCode.OK } },
+        { broadcast_transaction_response: { result: NetworkResultCode.RESULT_CODE_OK } },
         { remotePublicKey },
         { requestTxData: b4a.alloc(1), requestedTo: b4a.toString(remotePublicKey, 'hex') },
         {}
@@ -195,7 +195,7 @@ test('validate rejects TX_COMMITTED_RECEIPT_MISSING as validator internal error'
 
     const payload = {
         broadcast_transaction_response: {
-            result: ResultCode.TX_COMMITTED_RECEIPT_MISSING,
+            result: NetworkResultCode.RESULT_CODE_TX_COMMITTED_RECEIPT_MISSING,
         }
     };
 
@@ -209,7 +209,7 @@ test('validate rejects TX_COMMITTED_RECEIPT_MISSING as validator internal error'
         t.fail('expected validate to throw');
     } catch (error) {
         t.ok(error instanceof V1ProtocolError);
-        t.is(error.resultCode, ResultCode.TX_COMMITTED_RECEIPT_MISSING);
+        t.is(error.resultCode, NetworkResultCode.RESULT_CODE_TX_COMMITTED_RECEIPT_MISSING);
     }
 });
 
@@ -220,21 +220,21 @@ test('validateDecodedCompletePayloadSchema throws for missing, unknown and unsup
         validator.validateDecodedCompletePayloadSchema({});
         t.fail('expected missing type to throw');
     } catch (error) {
-        t.is(error.resultCode, ResultCode.VALIDATOR_RESPONSE_TX_TYPE_INVALID);
+        t.is(error.resultCode, NetworkResultCode.RESULT_CODE_VALIDATOR_RESPONSE_TX_TYPE_INVALID);
     }
 
     try {
         validator.validateDecodedCompletePayloadSchema({ type: 9999 });
         t.fail('expected unknown type to throw');
     } catch (error) {
-        t.is(error.resultCode, ResultCode.VALIDATOR_RESPONSE_TX_TYPE_UNKNOWN);
+        t.is(error.resultCode, NetworkResultCode.RESULT_CODE_VALIDATOR_RESPONSE_TX_TYPE_UNKNOWN);
     }
 
     try {
         validator.validateDecodedCompletePayloadSchema({ type: OperationType.ADD_ADMIN });
         t.fail('expected unsupported type to throw');
     } catch (error) {
-        t.is(error.resultCode, ResultCode.VALIDATOR_RESPONSE_TX_TYPE_UNSUPPORTED);
+        t.is(error.resultCode, NetworkResultCode.RESULT_CODE_VALIDATOR_RESPONSE_TX_TYPE_UNSUPPORTED);
     }
 });
 
@@ -290,7 +290,7 @@ test('validateDecodedCompletePayloadSchema requires complete refund validator me
             validator.validateDecodedCompletePayloadSchema(incomplete);
             t.fail(`expected missing ${field} to be rejected`);
         } catch (error) {
-            t.is(error.resultCode, ResultCode.VALIDATOR_RESPONSE_SCHEMA_INVALID);
+            t.is(error.resultCode, NetworkResultCode.RESULT_CODE_VALIDATOR_RESPONSE_SCHEMA_INVALID);
         }
     }
 });
@@ -306,7 +306,7 @@ test('validateDecodedCompletePayloadSchema requires complete claim validator met
             validator.validateDecodedCompletePayloadSchema(incomplete);
             t.fail(`expected missing ${field} to be rejected`);
         } catch (error) {
-            t.is(error.resultCode, ResultCode.VALIDATOR_RESPONSE_SCHEMA_INVALID);
+            t.is(error.resultCode, NetworkResultCode.RESULT_CODE_VALIDATOR_RESPONSE_SCHEMA_INVALID);
         }
     }
 
@@ -318,7 +318,7 @@ test('validateDecodedCompletePayloadSchema requires complete claim validator met
         validator.validateDecodedCompletePayloadSchema(invalid);
         t.fail('expected invalid claim lock ID to be rejected');
     } catch (error) {
-        t.is(error.resultCode, ResultCode.VALIDATOR_RESPONSE_SCHEMA_INVALID);
+        t.is(error.resultCode, NetworkResultCode.RESULT_CODE_VALIDATOR_RESPONSE_SCHEMA_INVALID);
     }
 });
 
@@ -338,7 +338,7 @@ test('validate accepts a proven claim with matching validator and writer identit
     overrideFunction(t, Hypercore, 'key', () => writerKey);
 
     t.ok(await validator.validate(
-        {broadcast_transaction_response: {result: ResultCode.OK}},
+        {broadcast_transaction_response: {result: NetworkResultCode.RESULT_CODE_OK}},
         {remotePublicKey},
         {requestTxData},
     ));
@@ -360,7 +360,7 @@ test('validate accepts a proven refund with matching validator and writer identi
     overrideFunction(t, Hypercore, 'key', () => writerKey);
 
     t.ok(await validator.validate(
-        {broadcast_transaction_response: {result: ResultCode.OK}},
+        {broadcast_transaction_response: {result: NetworkResultCode.RESULT_CODE_OK}},
         {remotePublicKey},
         {requestTxData},
     ));
@@ -377,7 +377,7 @@ test('validateDecodedCompletePayloadSchema throws VALIDATOR_RESPONSE_SCHEMA_INVA
         validator.validateDecodedCompletePayloadSchema({ type: OperationType.TX });
         t.fail('expected schema invalid');
     } catch (error) {
-        t.is(error.resultCode, ResultCode.VALIDATOR_RESPONSE_SCHEMA_INVALID);
+        t.is(error.resultCode, NetworkResultCode.RESULT_CODE_VALIDATOR_RESPONSE_SCHEMA_INVALID);
     }
 });
 
@@ -405,7 +405,7 @@ test('validateDecodedCompletePayloadSchema requires all HTLC lock validator meta
             t.fail(`expected metadata combination ${mask} to be rejected`);
         } catch (error) {
             t.ok(error instanceof V1ProtocolError);
-            t.is(error.resultCode, ResultCode.VALIDATOR_RESPONSE_SCHEMA_INVALID);
+            t.is(error.resultCode, NetworkResultCode.RESULT_CODE_VALIDATOR_RESPONSE_SCHEMA_INVALID);
         }
     }
 });
@@ -438,7 +438,7 @@ test('assertProofPayloadMatchesRequestPayload throws when pending request tx dat
         );
         t.fail('expected missing tx data to throw');
     } catch (error) {
-        t.is(error.resultCode, ResultCode.PENDING_REQUEST_MISSING_TX_DATA);
+        t.is(error.resultCode, NetworkResultCode.RESULT_CODE_PENDING_REQUEST_MISSING_TX_DATA);
     }
 });
 
@@ -462,7 +462,7 @@ test('assertProofPayloadMatchesRequestPayload throws PROOF_PAYLOAD_MISMATCH when
         );
         t.fail('expected payload mismatch');
     } catch (error) {
-        t.is(error.resultCode, ResultCode.PROOF_PAYLOAD_MISMATCH);
+        t.is(error.resultCode, NetworkResultCode.RESULT_CODE_PROOF_PAYLOAD_MISMATCH);
     }
 });
 
@@ -482,7 +482,7 @@ test('assertProofPayloadMatchesRequestPayload rejects a claim with a changed pre
         );
         t.fail('expected changed claim preimage to be rejected');
     } catch (error) {
-        t.is(error.resultCode, ResultCode.PROOF_PAYLOAD_MISMATCH);
+        t.is(error.resultCode, NetworkResultCode.RESULT_CODE_PROOF_PAYLOAD_MISMATCH);
     }
 });
 
@@ -502,7 +502,7 @@ test('assertProofPayloadMatchesRequestPayload rejects a refund with a changed lo
         );
         t.fail('expected changed refund lock ID to be rejected');
     } catch (error) {
-        t.is(error.resultCode, ResultCode.PROOF_PAYLOAD_MISMATCH);
+        t.is(error.resultCode, NetworkResultCode.RESULT_CODE_PROOF_PAYLOAD_MISMATCH);
     }
 });
 
@@ -547,7 +547,7 @@ test('validateWritingKey throws when writer key is not registered', async t => {
         await validator.validateWritingKey({}, {});
         t.fail('expected validateWritingKey to throw');
     } catch (error) {
-        t.is(error.resultCode, ResultCode.VALIDATOR_WRITER_KEY_NOT_REGISTERED);
+        t.is(error.resultCode, NetworkResultCode.RESULT_CODE_VALIDATOR_WRITER_KEY_NOT_REGISTERED);
     }
 });
 
@@ -582,7 +582,7 @@ test('validateValidatorCorrectness throws VALIDATOR_ADDRESS_MISMATCH when tx va 
         );
         t.fail('expected address mismatch');
     } catch (error) {
-        t.is(error.resultCode, ResultCode.VALIDATOR_ADDRESS_MISMATCH);
+        t.is(error.resultCode, NetworkResultCode.RESULT_CODE_VALIDATOR_ADDRESS_MISMATCH);
     }
 });
 
@@ -600,7 +600,7 @@ test('validateValidatorCorrectness throws VALIDATOR_ADDRESS_MISMATCH when tx va 
         );
         t.fail('expected address mismatch');
     } catch (error) {
-        t.is(error.resultCode, ResultCode.VALIDATOR_ADDRESS_MISMATCH);
+        t.is(error.resultCode, NetworkResultCode.RESULT_CODE_VALIDATOR_ADDRESS_MISMATCH);
     }
 });
 
@@ -618,7 +618,7 @@ test('validateValidatorCorrectness throws VALIDATOR_NODE_ENTRY_NOT_FOUND when st
         );
         t.fail('expected missing node entry');
     } catch (error) {
-        t.is(error.resultCode, ResultCode.VALIDATOR_NODE_ENTRY_NOT_FOUND);
+        t.is(error.resultCode, NetworkResultCode.RESULT_CODE_VALIDATOR_NODE_ENTRY_NOT_FOUND);
     }
 });
 
@@ -639,7 +639,7 @@ test('validateValidatorCorrectness throws VALIDATOR_NODE_NOT_WRITER when node is
         );
         t.fail('expected node-not-writer');
     } catch (error) {
-        t.is(error.resultCode, ResultCode.VALIDATOR_NODE_NOT_WRITER);
+        t.is(error.resultCode, NetworkResultCode.RESULT_CODE_VALIDATOR_NODE_NOT_WRITER);
     }
 });
 
@@ -660,7 +660,7 @@ test('validateValidatorCorrectness throws VALIDATOR_WRITER_KEY_MISMATCH when sta
         );
         t.fail('expected writer-key mismatch');
     } catch (error) {
-        t.is(error.resultCode, ResultCode.VALIDATOR_WRITER_KEY_MISMATCH);
+        t.is(error.resultCode, NetworkResultCode.RESULT_CODE_VALIDATOR_WRITER_KEY_MISMATCH);
     }
 });
 
@@ -698,7 +698,7 @@ test('validateValidatorCorrectness binds claim validator metadata to the proven 
         );
         t.fail('expected a mismatched claim validator address to be rejected');
     } catch (error) {
-        t.is(error.resultCode, ResultCode.VALIDATOR_ADDRESS_MISMATCH);
+        t.is(error.resultCode, NetworkResultCode.RESULT_CODE_VALIDATOR_ADDRESS_MISMATCH);
     }
 
     try {
@@ -710,7 +710,7 @@ test('validateValidatorCorrectness binds claim validator metadata to the proven 
         );
         t.fail('expected a mismatched proof writer to be rejected');
     } catch (error) {
-        t.is(error.resultCode, ResultCode.VALIDATOR_ADDRESS_MISMATCH);
+        t.is(error.resultCode, NetworkResultCode.RESULT_CODE_VALIDATOR_ADDRESS_MISMATCH);
     }
 
     const nonWriterValidator = createValidator({
@@ -720,7 +720,7 @@ test('validateValidatorCorrectness binds claim validator metadata to the proven 
         await nonWriterValidator.validateValidatorCorrectness(claim, remotePublicKey, writerKey, remoteAddressBuffer);
         t.fail('expected a non-writer responder to be rejected');
     } catch (error) {
-        t.is(error.resultCode, ResultCode.VALIDATOR_NODE_NOT_WRITER);
+        t.is(error.resultCode, NetworkResultCode.RESULT_CODE_VALIDATOR_NODE_NOT_WRITER);
     }
 });
 
@@ -728,12 +728,12 @@ test('validateIfResultCodeIsValidatorInternalError throws only for TX_COMMITTED_
     const validator = createValidator();
 
     try {
-        validator.validateIfResultCodeIsValidatorInternalError(ResultCode.TX_COMMITTED_RECEIPT_MISSING);
+        validator.validateIfResultCodeIsValidatorInternalError(NetworkResultCode.RESULT_CODE_TX_COMMITTED_RECEIPT_MISSING);
         t.fail('expected internal error result code to throw');
     } catch (error) {
-        t.is(error.resultCode, ResultCode.TX_COMMITTED_RECEIPT_MISSING);
+        t.is(error.resultCode, NetworkResultCode.RESULT_CODE_TX_COMMITTED_RECEIPT_MISSING);
     }
 
-    validator.validateIfResultCodeIsValidatorInternalError(ResultCode.OK);
+    validator.validateIfResultCodeIsValidatorInternalError(NetworkResultCode.RESULT_CODE_OK);
     t.pass();
 });

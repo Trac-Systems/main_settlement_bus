@@ -3,7 +3,7 @@ import tracCryptoApi from 'trac-crypto-api';
 import StateValidationSchema from '../../../../../state/validators/StateValidationSchema.js';
 import {bufferToAddress} from "../../../../../state/utils/address.js";
 import {createMessage} from "../../../../../../utils/buffer.js";
-import {OperationType, ResultCode, PUBLIC_KEY_LENGTH} from "../../../../../../utils/constants.js";
+import {OperationType, NetworkResultCode, PUBLIC_KEY_LENGTH} from "../../../../../../utils/constants.js";
 import {bufferToBigInt} from "../../../../../../utils/amountSerialization.js";
 import {FEE} from "../../../../../state/utils/transaction.js";
 import * as operationsUtils from '../../../../../../utils/applyOperations.js';
@@ -37,18 +37,18 @@ class PartialOperationValidator {
     }
 
     async validate() {
-        throw new V1ProtocolError(ResultCode.UNEXPECTED_ERROR, "Method 'validate()' must be implemented.");
+        throw new V1ProtocolError(NetworkResultCode.RESULT_CODE_UNEXPECTED_ERROR, "Method 'validate()' must be implemented.");
     }
 
     isPayloadSchemaValid(payload) {
         if (!payload || !payload.type) {
-            throw new V1ProtocolError(ResultCode.TX_INVALID_PAYLOAD, 'Payload or payload type is missing.');
+            throw new V1ProtocolError(NetworkResultCode.RESULT_CODE_TX_INVALID_PAYLOAD, 'Payload or payload type is missing.');
         }
 
         const selectedValidator = this.#selectStateSchemaValidator(payload.type);
         const isPayloadValid = selectedValidator(payload);
         if (!isPayloadValid) {
-            throw new V1ProtocolError(ResultCode.SCHEMA_VALIDATION_FAILED, 'Payload is invalid.');
+            throw new V1ProtocolError(NetworkResultCode.RESULT_CODE_SCHEMA_VALIDATION_FAILED, 'Payload is invalid.');
         }
     }
 
@@ -72,7 +72,7 @@ class PartialOperationValidator {
                 return this.stateValidationSchema.validateHtlcRefundOperation.bind(this.stateValidationSchema);
             default:
                 throw new V1ProtocolError(
-                    ResultCode.OPERATION_TYPE_UNKNOWN,
+                    NetworkResultCode.RESULT_CODE_OPERATION_TYPE_UNKNOWN,
                     `Unknown operation type: ${type}`
                 );
         }
@@ -81,14 +81,14 @@ class PartialOperationValidator {
     validateRequesterAddress(payload) {
         const incomingAddress = bufferToAddress(payload.address, this.#config.addressPrefix);
         if (!incomingAddress) {
-            throw new V1ProtocolError(ResultCode.REQUESTER_ADDRESS_INVALID, 'Invalid requesting address in payload.');
+            throw new V1ProtocolError(NetworkResultCode.RESULT_CODE_REQUESTER_ADDRESS_INVALID, 'Invalid requesting address in payload.');
         }
 
         const incomingPublicKey = tracCryptoApi.address.decodeSafe(incomingAddress);
 
         // TODO: We can add check if public key belongs to the Ed25519 curve. Validate signature already checks that but it would be amazing to catch it earlier.
         if (!incomingPublicKey || incomingPublicKey.length !== PUBLIC_KEY_LENGTH) {
-            throw new V1ProtocolError(ResultCode.REQUESTER_PUBLIC_KEY_INVALID, 'Invalid requesting public key in payload.');
+            throw new V1ProtocolError(NetworkResultCode.RESULT_CODE_REQUESTER_PUBLIC_KEY_INVALID, 'Invalid requesting public key in payload.');
         }
     }
 
@@ -155,7 +155,7 @@ class PartialOperationValidator {
                 ];
             default:
                 throw new V1ProtocolError(
-                    ResultCode.OPERATION_TYPE_UNKNOWN,
+                    NetworkResultCode.RESULT_CODE_OPERATION_TYPE_UNKNOWN,
                     `Unknown operation type: ${payload.type}`
                 );
         }
@@ -174,13 +174,13 @@ class PartialOperationValidator {
         const payloadHash = operation.tx;
         if (!b4a.equals(payloadHash, messageHash)) {
             throw new V1ProtocolError(
-                ResultCode.TX_HASH_MISMATCH,
+                NetworkResultCode.RESULT_CODE_TX_HASH_MISMATCH,
                 'Regenerated transaction does not match incoming transaction in payload.'
             );
         }
 
         if (!tracCryptoApi.signature.verify(incomingSignature, messageHash, incomingPublicKey)) {
-            throw new V1ProtocolError(ResultCode.TX_SIGNATURE_INVALID, 'Invalid signature in payload.');
+            throw new V1ProtocolError(NetworkResultCode.RESULT_CODE_TX_SIGNATURE_INVALID, 'Invalid signature in payload.');
         }
     }
 
@@ -191,7 +191,7 @@ class PartialOperationValidator {
         const incomingTxv = operation.txv
 
         if (!b4a.equals(currentTxv, incomingTxv)) {
-            throw new V1ProtocolError(ResultCode.TX_EXPIRED, 'Transaction has expired.');
+            throw new V1ProtocolError(NetworkResultCode.RESULT_CODE_TX_EXPIRED, 'Transaction has expired.');
         }
     }
 
@@ -203,7 +203,7 @@ class PartialOperationValidator {
 
         if (await this.state.get(txHex) !== null) {
             throw new V1ProtocolError(
-                ResultCode.TX_ALREADY_EXISTS,
+                NetworkResultCode.RESULT_CODE_TX_ALREADY_EXISTS,
                 `Transaction with hash ${txHex} already exists in the state.`
             );
         }
@@ -217,7 +217,7 @@ class PartialOperationValidator {
         const condition = va === undefined && vn === undefined && vs === undefined
         if (!condition) {
             throw new V1ProtocolError(
-                ResultCode.OPERATION_ALREADY_COMPLETED,
+                NetworkResultCode.RESULT_CODE_OPERATION_ALREADY_COMPLETED,
                 'Transfer operation must not be completed already (va, vn, vs must be undefined).'
             );
         }
@@ -233,12 +233,12 @@ class PartialOperationValidator {
         }
 
         if (!requesterEntry) {
-            throw new V1ProtocolError(ResultCode.REQUESTER_NOT_FOUND, 'Requester address not found in state');
+            throw new V1ProtocolError(NetworkResultCode.RESULT_CODE_REQUESTER_NOT_FOUND, 'Requester address not found in state');
         }
 
         const requesterBalance = bufferToBigInt(requesterEntry.balance);
         if (requesterBalance < FEE_BIGINT) {
-            throw new V1ProtocolError(ResultCode.INSUFFICIENT_FEE_BALANCE, 'Insufficient balance to cover transaction fee.');
+            throw new V1ProtocolError(NetworkResultCode.RESULT_CODE_INSUFFICIENT_FEE_BALANCE, 'Insufficient balance to cover transaction fee.');
         }
     }
 
@@ -249,7 +249,7 @@ class PartialOperationValidator {
         const bs = operation.bs;
         if (b4a.equals(this.#config.bootstrap, bs)) {
             throw new V1ProtocolError(
-                ResultCode.EXTERNAL_BOOTSTRAP_EQUALS_MSB_BOOTSTRAP,
+                NetworkResultCode.RESULT_CODE_EXTERNAL_BOOTSTRAP_EQUALS_MSB_BOOTSTRAP,
                 `External bootstrap is the same as MSB bootstrap: ${bs.toString('hex')}`
             );
         }
@@ -266,7 +266,7 @@ class PartialOperationValidator {
         const requesterAddress = bufferToAddress(payload.address, this.#config.addressPrefix);
         if (this.#selfAddress === requesterAddress) {
             throw new V1ProtocolError(
-                ResultCode.SELF_VALIDATION_FORBIDDEN,
+                NetworkResultCode.RESULT_CODE_SELF_VALIDATION_FORBIDDEN,
                 'Requester address cannot be the same as the validator wallet address.'
             );
         }

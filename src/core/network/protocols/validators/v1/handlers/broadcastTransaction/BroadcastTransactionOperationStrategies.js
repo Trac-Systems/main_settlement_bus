@@ -1,4 +1,4 @@
-import {OperationType, ResultCode} from "../../../../../../../utils/constants.js";
+import {OperationType, NetworkResultCode} from "../../../../../../../utils/constants.js";
 import {V1ProtocolError} from "../../V1ProtocolError.js";
 
 function createOperationStrategy(payloadKey, validator, buildCompleteOperation) {
@@ -164,7 +164,7 @@ export function resolveBroadcastTransactionOperationStrategy(type, operationStra
     const operationStrategy = operationStrategies.get(type);
 
     if (!operationStrategy) {
-        throw new V1ProtocolError(ResultCode.TX_INVALID_PAYLOAD, `Unsupported transaction type: ${type}`);
+        throw new V1ProtocolError(NetworkResultCode.RESULT_CODE_TX_INVALID_PAYLOAD, `Unsupported transaction type: ${type}`);
     }
 
     return operationStrategy;

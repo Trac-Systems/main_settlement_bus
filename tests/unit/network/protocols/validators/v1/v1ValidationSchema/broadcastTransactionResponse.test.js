@@ -6,7 +6,7 @@ import {
     ConsensusResultCode,
     NetworkOperationType,
     NONCE_BYTE_LENGTH,
-    ResultCode,
+    NetworkResultCode,
     SIGNATURE_BYTE_LENGTH,
 } from '../../../../../../../src/utils/constants.js';
 import {not_allowed_data_types} from '../../../../../../fixtures/check.fixtures.js';
@@ -30,7 +30,7 @@ const getValidFixture = () => ({
         signature: b4a.alloc(SIGNATURE_BYTE_LENGTH, 2),
         proof: b4a.from('deadbeef', 'hex'),
         timestamp: Date.now(),
-        result: ResultCode.OK,
+        result: NetworkResultCode.RESULT_CODE_OK,
     },
     capabilities: ['cap:a'],
 });
@@ -105,7 +105,7 @@ test('V1ValidationSchema.validateV1BroadcastTransactionResponse - result value v
     t.absent(v.validateV1BroadcastTransactionResponse(buildWithResult(NaN)), 'result NaN should fail');
     t.absent(v.validateV1BroadcastTransactionResponse(buildWithResult(Infinity)), 'result Infinity should fail');
 
-    const unknownCode = Math.max(...Object.values(ResultCode)) + 1;
+    const unknownCode = Math.max(...Object.values(NetworkResultCode)) + 1;
     t.absent(v.validateV1BroadcastTransactionResponse(buildWithResult(unknownCode)), 'unknown result code should fail');
     t.absent(
         v.validateV1BroadcastTransactionResponse(buildWithResult(ConsensusResultCode.BAD_PROTOCOL_VERSION)),

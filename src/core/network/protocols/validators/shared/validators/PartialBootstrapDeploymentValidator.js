@@ -1,5 +1,5 @@
 import PartialOperationValidator from './PartialOperationValidator.js';
-import {ResultCode} from "../../../../../../utils/constants.js";
+import {NetworkResultCode} from "../../../../../../utils/constants.js";
 import {V1ProtocolError} from '../../v1/V1ProtocolError.js';
 
 class PartialBootstrapDeploymentValidator extends PartialOperationValidator {
@@ -29,7 +29,7 @@ class PartialBootstrapDeploymentValidator extends PartialOperationValidator {
         const bootstrapString = payload.bdo.bs.toString('hex');
         if (null !== await this.state.getRegisteredBootstrapEntryUnsigned(bootstrapString)) {
             throw new V1ProtocolError(
-                ResultCode.BOOTSTRAP_ALREADY_EXISTS,
+                NetworkResultCode.RESULT_CODE_BOOTSTRAP_ALREADY_EXISTS,
                 `Bootstrap with hash ${bootstrapString} already exists in the state. Bootstrap must be unique.`
             );
         }

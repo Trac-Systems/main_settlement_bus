@@ -1,5 +1,5 @@
 import V1ValidationSchema from "./V1ValidationSchema.js";
-import {NetworkOperationType, ResultCode} from "../../../../../../utils/constants.js";
+import {NetworkOperationType, NetworkResultCode} from "../../../../../../utils/constants.js";
 import tracCryptoApi from "trac-crypto-api";
 import b4a from "b4a";
 import {
@@ -27,13 +27,13 @@ class V1BaseOperation {
 
     isPayloadSchemaValid(payload) {
         if (_.isNil(payload?.type)) {
-            throw new V1ProtocolError(ResultCode.INVALID_PAYLOAD,'Payload or payload type is missing.');
+            throw new V1ProtocolError(NetworkResultCode.RESULT_CODE_INVALID_PAYLOAD,'Payload or payload type is missing.');
         }
 
         const selectedValidator = this.#selectCheckSchemaValidator(payload.type);
         const isPayloadValid = selectedValidator(payload);
         if (!isPayloadValid) {
-            throw new V1ProtocolError(ResultCode.SCHEMA_VALIDATION_FAILED, 'Payload is invalid.');
+            throw new V1ProtocolError(NetworkResultCode.RESULT_CODE_SCHEMA_VALIDATION_FAILED, 'Payload is invalid.');
         }
     }
 
@@ -48,18 +48,18 @@ class V1BaseOperation {
             if (error instanceof V1ProtocolError) {
                 throw error;
             }
-            throw new V1ProtocolError(ResultCode.UNEXPECTED_ERROR, `Failed to build signature message: ${error.message}`);
+            throw new V1ProtocolError(NetworkResultCode.RESULT_CODE_UNEXPECTED_ERROR, `Failed to build signature message: ${error.message}`);
         }
 
         if (!remotePublicKey) {
-            throw new V1ProtocolError(ResultCode.UNEXPECTED_ERROR, 'Remote public key is missing.');
+            throw new V1ProtocolError(NetworkResultCode.RESULT_CODE_UNEXPECTED_ERROR, 'Remote public key is missing.');
         }
 
         let hash;
         try {
             hash = await tracCryptoApi.hash.blake3(message);
         } catch {
-            throw new V1ProtocolError(ResultCode.UNEXPECTED_ERROR, 'Failed to hash signature message.');
+            throw new V1ProtocolError(NetworkResultCode.RESULT_CODE_UNEXPECTED_ERROR, 'Failed to hash signature message.');
         }
 
         let verified = false;
@@ -69,16 +69,16 @@ class V1BaseOperation {
             verified = false;
         }
         if (!verified) {
-            throw new V1ProtocolError(ResultCode.SIGNATURE_INVALID, 'signature verification failed.');
+            throw new V1ProtocolError(NetworkResultCode.RESULT_CODE_SIGNATURE_INVALID, 'signature verification failed.');
         }
     }
 
     #buildSignatureMessage(payload) {
         if (!Number.isInteger(payload.type)) {
-            throw new V1ProtocolError(ResultCode.OPERATION_TYPE_UNKNOWN, 'Operation type must be an integer.');
+            throw new V1ProtocolError(NetworkResultCode.RESULT_CODE_OPERATION_TYPE_UNKNOWN, 'Operation type must be an integer.');
         }
         if (payload.type === 0) {
-            throw new V1ProtocolError(ResultCode.OPERATION_TYPE_UNKNOWN, 'Operation type is unspecified.');
+            throw new V1ProtocolError(NetworkResultCode.RESULT_CODE_OPERATION_TYPE_UNKNOWN, 'Operation type is unspecified.');
         }
 
         const idBuf = idToBuffer(payload.id);
@@ -117,23 +117,23 @@ class V1BaseOperation {
                 const timestamp = Number.isSafeInteger(timestampRaw) ? timestampRaw : 0;
                 const hasTimestamp = timestamp > 0;
 
-                if (result === ResultCode.OK) {
+                if (result === NetworkResultCode.RESULT_CODE_OK) {
                     if (!hasProof || !hasTimestamp) {
-                        throw new V1ProtocolError(ResultCode.INVALID_PAYLOAD, 'Result code OK requires non-empty proof and timestamp > 0.');
+                        throw new V1ProtocolError(NetworkResultCode.RESULT_CODE_INVALID_PAYLOAD, 'Result code OK requires non-empty proof and timestamp > 0.');
                     }
-                } else if (result === ResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE) {
+                } else if (result === NetworkResultCode.RESULT_CODE_TX_ACCEPTED_PROOF_UNAVAILABLE) {
                     if (hasProof) {
-                        throw new V1ProtocolError(ResultCode.INVALID_PAYLOAD, 'Result code TX_ACCEPTED_PROOF_UNAVAILABLE requires empty proof.');
+                        throw new V1ProtocolError(NetworkResultCode.RESULT_CODE_INVALID_PAYLOAD, 'Result code TX_ACCEPTED_PROOF_UNAVAILABLE requires empty proof.');
                     }
                     if (!hasTimestamp) {
-                        throw new V1ProtocolError(ResultCode.INVALID_PAYLOAD, 'Result code TX_ACCEPTED_PROOF_UNAVAILABLE requires timestamp > 0.');
+                        throw new V1ProtocolError(NetworkResultCode.RESULT_CODE_INVALID_PAYLOAD, 'Result code TX_ACCEPTED_PROOF_UNAVAILABLE requires timestamp > 0.');
                     }
                 } else {
                     if (hasProof) {
-                        throw new V1ProtocolError(ResultCode.INVALID_PAYLOAD, 'Non-OK result code requires empty proof.');
+                        throw new V1ProtocolError(NetworkResultCode.RESULT_CODE_INVALID_PAYLOAD, 'Non-OK result code requires empty proof.');
                     }
                     if (timestamp !== 0) {
-                        throw new V1ProtocolError(ResultCode.INVALID_PAYLOAD, 'Non-OK result code requires timestamp to be 0, except TX_ACCEPTED_PROOF_UNAVAILABLE.');
+                        throw new V1ProtocolError(NetworkResultCode.RESULT_CODE_INVALID_PAYLOAD, 'Non-OK result code requires timestamp to be 0, except TX_ACCEPTED_PROOF_UNAVAILABLE.');
                     }
                 }
 
@@ -151,16 +151,16 @@ class V1BaseOperation {
                 return {signature, message};
             }
             default:
-                throw new V1ProtocolError(ResultCode.OPERATION_TYPE_UNKNOWN, `Unknown operation type: ${payload.type}`);
+                throw new V1ProtocolError(NetworkResultCode.RESULT_CODE_OPERATION_TYPE_UNKNOWN, `Unknown operation type: ${payload.type}`);
         }
     }
 
     #selectCheckSchemaValidator(type) {
         if (!Number.isInteger(type)) {
-            throw new V1ProtocolError(ResultCode.OPERATION_TYPE_UNKNOWN, 'Operation type must be an integer.');
+            throw new V1ProtocolError(NetworkResultCode.RESULT_CODE_OPERATION_TYPE_UNKNOWN, 'Operation type must be an integer.');
         }
         if (type === 0) {
-            throw new V1ProtocolError(ResultCode.OPERATION_TYPE_UNKNOWN, 'Operation type is unspecified.');
+            throw new V1ProtocolError(NetworkResultCode.RESULT_CODE_OPERATION_TYPE_UNKNOWN, 'Operation type is unspecified.');
         }
 
         switch (type) {
@@ -173,7 +173,7 @@ class V1BaseOperation {
             case NetworkOperationType.BROADCAST_TRANSACTION_RESPONSE:
                 return this.#v1ValidationSchema.validateV1BroadcastTransactionResponse.bind(this.#v1ValidationSchema);
             default:
-                throw new V1ProtocolError(ResultCode.OPERATION_TYPE_UNKNOWN, `Unknown operation type: ${type}`);
+                throw new V1ProtocolError(NetworkResultCode.RESULT_CODE_OPERATION_TYPE_UNKNOWN, `Unknown operation type: ${type}`);
         }
     }
 
@@ -181,7 +181,7 @@ class V1BaseOperation {
         const senderPublicKeyHex = b4a.toString(remotePublicKey, 'hex');
         if (senderPublicKeyHex !== pendingRequestServiceEntry.requestedTo) {
             throw new V1ProtocolError(
-                ResultCode.INVALID_PAYLOAD,
+                NetworkResultCode.RESULT_CODE_INVALID_PAYLOAD,
                 `Response sender mismatch. Expected ${pendingRequestServiceEntry.requestedTo}, got ${senderPublicKeyHex}.`
             );
         }
@@ -198,14 +198,14 @@ class V1BaseOperation {
                 break;
             default:
                 throw new V1ProtocolError(
-                    ResultCode.UNEXPECTED_ERROR,
+                    NetworkResultCode.RESULT_CODE_UNEXPECTED_ERROR,
                     `Unsupported pending request type: ${pendingRequestServiceEntry.requestType}.`
                 );
         }
 
         if (payload.type !== expectedResponseType) {
             throw new V1ProtocolError(
-                ResultCode.INVALID_PAYLOAD,
+                NetworkResultCode.RESULT_CODE_INVALID_PAYLOAD,
                 `Response type mismatch for id ${pendingRequestServiceEntry.id}. Expected ${expectedResponseType}, got ${payload.type}.`
             );
         }

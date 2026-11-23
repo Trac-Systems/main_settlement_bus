@@ -2,7 +2,7 @@ import test from 'brittle';
 import b4a from 'b4a';
 
 import PartialBootstrapDeploymentValidator from '../../../../../../../src/core/network/protocols/validators/shared/validators/PartialBootstrapDeploymentValidator.js';
-import { ResultCode } from '../../../../../../../src/utils/constants.js';
+import { NetworkResultCode } from '../../../../../../../src/utils/constants.js';
 import { bufferToBigInt } from '../../../../../../../src/utils/amountSerialization.js';
 import { FEE } from '../../../../../../../src/core/state/utils/transaction.js';
 import { $TNK } from '../../../../../../../src/core/state/utils/balance.js';
@@ -45,7 +45,7 @@ test('PartialBootstrapDeploymentValidator.validate rejects duplicated and invali
             validator.address,
             config
         ).validate(payload),
-        ResultCode.BOOTSTRAP_ALREADY_EXISTS,
+        NetworkResultCode.RESULT_CODE_BOOTSTRAP_ALREADY_EXISTS,
         'already exists'
     );
 
@@ -60,7 +60,7 @@ test('PartialBootstrapDeploymentValidator.validate rejects duplicated and invali
             validator.address,
             config
         ).validate(sameBootstrapPayload),
-        ResultCode.EXTERNAL_BOOTSTRAP_EQUALS_MSB_BOOTSTRAP,
+        NetworkResultCode.RESULT_CODE_EXTERNAL_BOOTSTRAP_EQUALS_MSB_BOOTSTRAP,
         'same as MSB bootstrap'
     );
 });

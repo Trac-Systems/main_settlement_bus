@@ -221,11 +221,11 @@ class NetworkMessageBuilder {
         const timestamp = Number.isSafeInteger(this.#timestamp_ledger) ? this.#timestamp_ledger : 0;
         const hasTimestamp = timestamp > 0;
 
-        if (this.#resultCode === NetworkResultCode.OK) {
+        if (this.#resultCode === NetworkResultCode.RESULT_CODE_OK) {
             if (!hasProof || !hasTimestamp) {
                 throw new Error('Result code OK requires non-empty proof and timestamp > 0.');
             }
-        } else if (this.#resultCode === NetworkResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE) {
+        } else if (this.#resultCode === NetworkResultCode.RESULT_CODE_TX_ACCEPTED_PROOF_UNAVAILABLE) {
             if (hasProof) {
                 throw new Error('Result code TX_ACCEPTED_PROOF_UNAVAILABLE requires empty proof.');
             }

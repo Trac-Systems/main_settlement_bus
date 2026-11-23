@@ -4,7 +4,7 @@ import b4a from 'b4a';
 
 import TransactionRateLimiterService from '../../../../src/core/network/services/TransactionRateLimiterService.js';
 import { V1ProtocolError } from '../../../../src/core/network/protocols/validators/v1/V1ProtocolError.js';
-import { ResultCode } from '../../../../src/utils/constants.js';
+import { NetworkResultCode } from '../../../../src/utils/constants.js';
 import { config } from '../../../helpers/config.js';
 import { testKeyPair1, testKeyPair2 } from '../../../fixtures/apply.fixtures.js';
 
@@ -86,7 +86,7 @@ test('TransactionRateLimiterService', async () => {
             }
 
             t.ok(err instanceof V1ProtocolError);
-            t.is(err.resultCode, ResultCode.RATE_LIMITED);
+            t.is(err.resultCode, NetworkResultCode.RESULT_CODE_RATE_LIMITED);
             t.ok(err.message.includes('Rate limit exceeded for peer'));
         } finally {
             clock.restore();

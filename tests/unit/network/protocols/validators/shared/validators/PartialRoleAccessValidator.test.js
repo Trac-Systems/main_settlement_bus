@@ -2,7 +2,7 @@ import test from 'brittle';
 import b4a from 'b4a';
 
 import PartialRoleAccessValidator from '../../../../../../../src/core/network/protocols/validators/shared/validators/PartialRoleAccessValidator.js';
-import { ResultCode, OperationType } from '../../../../../../../src/utils/constants.js';
+import { NetworkResultCode, OperationType } from '../../../../../../../src/utils/constants.js';
 import { bufferToBigInt } from '../../../../../../../src/utils/amountSerialization.js';
 import { FEE } from '../../../../../../../src/core/state/utils/transaction.js';
 import { $TNK } from '../../../../../../../src/core/state/utils/balance.js';
@@ -69,7 +69,7 @@ test('PartialRoleAccessValidator.validate enforces add-writer state rules and ex
             validator.address,
             config
         ).validate(payload),
-        ResultCode.ROLE_NODE_ALREADY_WRITER,
+        NetworkResultCode.RESULT_CODE_ROLE_NODE_ALREADY_WRITER,
         'already a writer'
     );
 
@@ -83,7 +83,7 @@ test('PartialRoleAccessValidator.validate enforces add-writer state rules and ex
             validator.address,
             config
         ).validate(payload),
-        ResultCode.ROLE_NODE_NOT_WHITELISTED,
+        NetworkResultCode.RESULT_CODE_ROLE_NODE_NOT_WHITELISTED,
         'not whitelisted'
     );
 
@@ -97,7 +97,7 @@ test('PartialRoleAccessValidator.validate enforces add-writer state rules and ex
             validator.address,
             config
         ).validate(payload),
-        ResultCode.ROLE_INSUFFICIENT_FEE_BALANCE,
+        NetworkResultCode.RESULT_CODE_ROLE_INSUFFICIENT_FEE_BALANCE,
         'Insufficient requester balance'
     );
 
@@ -112,7 +112,7 @@ test('PartialRoleAccessValidator.validate enforces add-writer state rules and ex
             validator.address,
             config
         ).validate(payload),
-        ResultCode.ROLE_INVALID_WRITER_KEY,
+        NetworkResultCode.RESULT_CODE_ROLE_INVALID_WRITER_KEY,
         'Invalid writer key'
     );
 });
@@ -131,7 +131,7 @@ test('PartialRoleAccessValidator.validate enforces remove-writer and admin-recov
             validator.address,
             config
         ).validate(removeWriterPayload),
-        ResultCode.ROLE_NODE_NOT_WRITER,
+        NetworkResultCode.RESULT_CODE_ROLE_NODE_NOT_WRITER,
         'not a writer'
     );
 
@@ -145,7 +145,7 @@ test('PartialRoleAccessValidator.validate enforces remove-writer and admin-recov
             validator.address,
             config
         ).validate(removeWriterPayload),
-        ResultCode.ROLE_NODE_IS_INDEXER,
+        NetworkResultCode.RESULT_CODE_ROLE_NODE_IS_INDEXER,
         'is an indexer'
     );
 
@@ -160,7 +160,7 @@ test('PartialRoleAccessValidator.validate enforces remove-writer and admin-recov
             validator.address,
             config
         ).validate(recoveryPayload),
-        ResultCode.ROLE_ADMIN_ENTRY_MISSING,
+        NetworkResultCode.RESULT_CODE_ROLE_ADMIN_ENTRY_MISSING,
         'Admin entry does not exist'
     );
 
@@ -175,7 +175,7 @@ test('PartialRoleAccessValidator.validate enforces remove-writer and admin-recov
             validator.address,
             config
         ).validate(recoveryPayload),
-        ResultCode.ROLE_INVALID_RECOVERY_CASE,
+        NetworkResultCode.RESULT_CODE_ROLE_INVALID_RECOVERY_CASE,
         'not a valid recovery case'
     );
 });
@@ -188,28 +188,28 @@ test('PartialRoleAccessValidator direct helper checks cover missing entries and 
     await expectSharedValidatorError(
         t,
         () => validatorInstance.validateWriterKey(payload),
-        ResultCode.REQUESTER_NOT_FOUND,
+        NetworkResultCode.RESULT_CODE_REQUESTER_NOT_FOUND,
         'Node entry not found'
     );
 
     await expectSharedValidatorError(
         t,
         () => validatorInstance.validateRequesterBalanceForAddWriterOperation(payload),
-        ResultCode.REQUESTER_NOT_FOUND,
+        NetworkResultCode.RESULT_CODE_REQUESTER_NOT_FOUND,
         'Requester address not found'
     );
 
     await expectSharedValidatorError(
         t,
         () => validatorInstance.validateRequesterBalanceForAddWriterOperation(payload, true),
-        ResultCode.REQUESTER_NOT_FOUND,
+        NetworkResultCode.RESULT_CODE_REQUESTER_NOT_FOUND,
         'Requester address not found'
     );
 
     await expectSharedValidatorError(
         t,
         () => validatorInstance.isRequesterAllowedToChangeRole(payload),
-        ResultCode.ROLE_NODE_ENTRY_NOT_FOUND,
+        NetworkResultCode.RESULT_CODE_ROLE_NODE_ENTRY_NOT_FOUND,
         'entry does not exist'
     );
 
@@ -217,7 +217,7 @@ test('PartialRoleAccessValidator direct helper checks cover missing entries and 
     await expectSharedValidatorError(
         t,
         () => validatorInstance.isRequesterAllowedToChangeRole(removeWriterPayload),
-        ResultCode.ROLE_NODE_ENTRY_NOT_FOUND,
+        NetworkResultCode.RESULT_CODE_ROLE_NODE_ENTRY_NOT_FOUND,
         'entry does not exist'
     );
 
@@ -225,7 +225,7 @@ test('PartialRoleAccessValidator direct helper checks cover missing entries and 
     await expectSharedValidatorError(
         t,
         () => validatorInstance.isRequesterAllowedToChangeRole(unknownPayload),
-        ResultCode.ROLE_UNKNOWN_OPERATION,
+        NetworkResultCode.RESULT_CODE_ROLE_UNKNOWN_OPERATION,
         'Unknown role access operation type'
     );
 });

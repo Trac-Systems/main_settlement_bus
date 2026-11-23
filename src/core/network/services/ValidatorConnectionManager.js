@@ -1,4 +1,4 @@
-import {EventType, ResultCode} from '../../../utils/constants.js';
+import {EventType, NetworkResultCode} from '../../../utils/constants.js';
 import {publicKeyToAddress} from "../../../utils/helpers.js";
 import { PeerConnectionManager, PeerConnectionManagerError } from '../shared/PeerConnectionManager.js'
 import ValidatorHealthCheckService from './ValidatorHealthCheckService.js'
@@ -61,7 +61,7 @@ class ValidatorConnectionManager extends PeerConnectionManager {
             let success = false;
             try {
                 const resultCode = await connection.protocolSessions.validator.sendHealthCheck();
-                success = resultCode === ResultCode.OK;
+                success = resultCode === NetworkResultCode.RESULT_CODE_OK;
             } catch {
                 success = false;
             }

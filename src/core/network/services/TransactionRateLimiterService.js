@@ -1,6 +1,6 @@
 import b4a from 'b4a';
 import {V1ProtocolError} from "../protocols/validators/v1/V1ProtocolError.js";
-import {ResultCode} from "../../../utils/constants.js";
+import {NetworkResultCode} from "../../../utils/constants.js";
 import {publicKeyToAddress} from "../../../utils/helpers.js";
 
 class TransactionRateLimiterService {
@@ -77,7 +77,7 @@ class TransactionRateLimiterService {
 
         if (this.#hasExceededRateLimit(peer, currentTime)) {
             throw new V1ProtocolError(
-                ResultCode.RATE_LIMITED,
+                NetworkResultCode.RESULT_CODE_RATE_LIMITED,
                 `Rate limit exceeded for peer ${publicKeyToAddress(connection.remotePublicKey, this.#config)}`
             );
         }

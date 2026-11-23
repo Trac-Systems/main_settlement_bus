@@ -6,7 +6,7 @@ import NetworkMessageBuilder from '../../../../src/messages/network/v1/NetworkMe
 import {
     ConsensusResultCode,
     NetworkOperationType,
-    ResultCode as NetworkResultCode
+    NetworkResultCode
 } from '../../../../src/utils/constants.js';
 import { decodeV1networkOperation, encodeV1networkOperation } from '../../../../src/codecs/network/v1/networkV1OperationCodec.js';
 import { errorMessageIncludes } from '../../../helpers/regexHelper.js';
@@ -107,8 +107,8 @@ test('NetworkMessageBuilder iterates broadcast transaction response ResultCode v
     const emptyProof = b4a.alloc(0);
 
     for (const code of uniqueResultCodes()) {
-        const includeProof = code === NetworkResultCode.OK;
-        const proofUnavailable = code === NetworkResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE;
+        const includeProof = code === NetworkResultCode.RESULT_CODE_OK;
+        const proofUnavailable = code === NetworkResultCode.RESULT_CODE_TX_ACCEPTED_PROOF_UNAVAILABLE;
         const responseProof = includeProof ? proof : emptyProof;
         const responseTimestampLedger = includeProof || proofUnavailable ? timestamp : 0;
         await builder
@@ -163,7 +163,7 @@ test('NetworkMessageBuilder builds broadcast transaction response with proof and
         .setCapabilities(caps)
         .setProof(proof)
         .setTimestampLedger(timestamp)
-        .setResultCode(NetworkResultCode.OK)
+        .setResultCode(NetworkResultCode.RESULT_CODE_OK)
         .buildPayload();
 
     const payload = builder.getResult();
@@ -177,7 +177,7 @@ test('NetworkMessageBuilder builds broadcast transaction response with proof and
         payload.broadcast_transaction_response.nonce,
         proof,
         timestampToBuffer(timestamp),
-        uint32ToBuffer(NetworkResultCode.OK),
+        uint32ToBuffer(NetworkResultCode.RESULT_CODE_OK),
         encodeCapabilities(caps)
     );
     const hash = await tracCryptoApi.hash.blake3(msg);
@@ -203,7 +203,7 @@ test('NetworkMessageBuilder rejects OK response when proof is provided without t
                 .setTimestamp()
                 .setCapabilities(caps)
                 .setProof(proof)
-                .setResultCode(NetworkResultCode.OK)
+                .setResultCode(NetworkResultCode.RESULT_CODE_OK)
                 .buildPayload(),
         errorMessageIncludes('Result code OK requires non-empty proof and timestamp > 0.')
     );
@@ -224,7 +224,7 @@ test('NetworkMessageBuilder rejects OK response when timestamp is provided witho
                 .setTimestamp()
                 .setCapabilities(caps)
                 .setTimestampLedger(timestamp)
-                .setResultCode(NetworkResultCode.OK)
+                .setResultCode(NetworkResultCode.RESULT_CODE_OK)
                 .buildPayload(),
         errorMessageIncludes('Result code OK requires non-empty proof and timestamp > 0.')
     );
@@ -245,13 +245,13 @@ test('NetworkMessageBuilder allows TX_ACCEPTED_PROOF_UNAVAILABLE response with t
         .setCapabilities(caps)
         .setProof(emptyProof)
         .setTimestampLedger(timestamp)
-        .setResultCode(NetworkResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE)
+        .setResultCode(NetworkResultCode.RESULT_CODE_TX_ACCEPTED_PROOF_UNAVAILABLE)
         .buildPayload();
 
     const payload = builder.getResult();
     t.alike(payload.broadcast_transaction_response.proof, emptyProof);
     t.is(payload.broadcast_transaction_response.timestamp, timestamp);
-    t.is(payload.broadcast_transaction_response.result, NetworkResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE);
+    t.is(payload.broadcast_transaction_response.result, NetworkResultCode.RESULT_CODE_TX_ACCEPTED_PROOF_UNAVAILABLE);
 
     const msg = createMessage(
         payload.type,
@@ -260,7 +260,7 @@ test('NetworkMessageBuilder allows TX_ACCEPTED_PROOF_UNAVAILABLE response with t
         payload.broadcast_transaction_response.nonce,
         emptyProof,
         timestampToBuffer(timestamp),
-        uint32ToBuffer(NetworkResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE),
+        uint32ToBuffer(NetworkResultCode.RESULT_CODE_TX_ACCEPTED_PROOF_UNAVAILABLE),
         encodeCapabilities(caps)
     );
     const hash = await tracCryptoApi.hash.blake3(msg);
@@ -268,7 +268,7 @@ test('NetworkMessageBuilder allows TX_ACCEPTED_PROOF_UNAVAILABLE response with t
 
     const decoded = decodeV1networkOperation(encodeV1networkOperation(payload));
     t.is(decoded.broadcast_transaction_response.timestamp, timestamp);
-    t.is(decoded.broadcast_transaction_response.result, NetworkResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE);
+    t.is(decoded.broadcast_transaction_response.result, NetworkResultCode.RESULT_CODE_TX_ACCEPTED_PROOF_UNAVAILABLE);
 });
 
 test('NetworkMessageBuilder rejects OK response when proof and timestamp are both missing', async t => {
@@ -284,7 +284,7 @@ test('NetworkMessageBuilder rejects OK response when proof and timestamp are bot
                 .setId(id)
                 .setTimestamp()
                 .setCapabilities(caps)
-                .setResultCode(NetworkResultCode.OK)
+                .setResultCode(NetworkResultCode.RESULT_CODE_OK)
                 .buildPayload(),
         errorMessageIncludes('Result code OK requires non-empty proof and timestamp > 0.')
     );
@@ -303,7 +303,7 @@ test('NetworkMessageBuilder rejects TX_ACCEPTED_PROOF_UNAVAILABLE response when 
                 .setId(id)
                 .setTimestamp()
                 .setCapabilities(caps)
-                .setResultCode(NetworkResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE)
+                .setResultCode(NetworkResultCode.RESULT_CODE_TX_ACCEPTED_PROOF_UNAVAILABLE)
                 .buildPayload(),
         errorMessageIncludes('Result code TX_ACCEPTED_PROOF_UNAVAILABLE requires timestamp > 0.')
     );
@@ -324,7 +324,7 @@ test('NetworkMessageBuilder rejects TX_ACCEPTED_PROOF_UNAVAILABLE response when 
                 .setCapabilities(caps)
                 .setProof(b4a.from('deadbeef', 'hex'))
                 .setTimestampLedger(Date.now())
-                .setResultCode(NetworkResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE)
+                .setResultCode(NetworkResultCode.RESULT_CODE_TX_ACCEPTED_PROOF_UNAVAILABLE)
                 .buildPayload(),
         errorMessageIncludes('Result code TX_ACCEPTED_PROOF_UNAVAILABLE requires empty proof.')
     );
@@ -345,7 +345,7 @@ test('NetworkMessageBuilder rejects non-OK response when proof is non-empty', as
                 .setCapabilities(caps)
                 .setProof(b4a.from('deadbeef', 'hex'))
                 .setTimestampLedger(0)
-                .setResultCode(NetworkResultCode.INVALID_PAYLOAD)
+                .setResultCode(NetworkResultCode.RESULT_CODE_INVALID_PAYLOAD)
                 .buildPayload(),
         errorMessageIncludes('Non-OK result code requires empty proof.')
     );
@@ -365,7 +365,7 @@ test('NetworkMessageBuilder rejects non-OK response with timestamp > 0 unless pr
                 .setTimestamp()
                 .setCapabilities(caps)
                 .setTimestampLedger(Date.now())
-                .setResultCode(NetworkResultCode.INVALID_PAYLOAD)
+                .setResultCode(NetworkResultCode.RESULT_CODE_INVALID_PAYLOAD)
                 .buildPayload(),
         errorMessageIncludes('Non-OK result code requires timestamp to be 0, except TX_ACCEPTED_PROOF_UNAVAILABLE.')
     );

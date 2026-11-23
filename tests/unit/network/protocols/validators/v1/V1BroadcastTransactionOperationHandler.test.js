@@ -7,7 +7,7 @@ import PartialTransactionValidator from '../../../../../../src/core/network/prot
 import { TransactionPoolFullError } from '../../../../../../src/core/network/services/TransactionPoolService.js';
 import { V1ProtocolError } from '../../../../../../src/core/network/protocols/validators/v1/V1ProtocolError.js';
 import { applyStateMessageFactory } from '../../../../../../src/messages/state/applyStateMessageFactory.js';
-import { ResultCode } from '../../../../../../src/utils/constants.js';
+import { NetworkResultCode } from '../../../../../../src/utils/constants.js';
 import { WalletProvider } from 'trac-wallet';
 
 async function createWallet(keyPair) {
@@ -106,7 +106,7 @@ test('V1BroadcastTransactionOperationHandler dispatchTransaction does not emit u
 
             t.ok(thrown, 'dispatchTransaction should throw when enqueue fails');
             t.ok(thrown instanceof V1ProtocolError, 'should map tx pool full to V1ProtocolError');
-            t.is(thrown.resultCode, ResultCode.NODE_OVERLOADED);
+            t.is(thrown.resultCode, NetworkResultCode.RESULT_CODE_NODE_OVERLOADED);
             await new Promise(resolve => setImmediate(resolve));
         } finally {
             if (detachUnhandled) {

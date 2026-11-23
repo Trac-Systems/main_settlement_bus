@@ -1,7 +1,7 @@
 import { generateUUID, publicKeyToAddress } from '../../../utils/helpers.js';
 import { operationToPayload } from '../../../utils/applyOperations.js';
 import { networkMessageFactory } from "../../../messages/network/v1/networkMessageFactory.js";
-import { NETWORK_CAPABILITIES, ResultCode } from "../../../utils/constants.js";
+import { NETWORK_CAPABILITIES, NetworkResultCode } from "../../../utils/constants.js";
 import {
     unsafeEncodeApplyOperation
 } from "../../../codecs/apply/applyOperationCodec.js";
@@ -16,8 +16,8 @@ class ValidatorMessageOrchestrator {
     #config;
     #wallet;
     #idempotentSuccessCodes = new Set([
-        ResultCode.TX_ALREADY_EXISTS,
-        ResultCode.OPERATION_ALREADY_COMPLETED,
+        NetworkResultCode.RESULT_CODE_TX_ALREADY_EXISTS,
+        NetworkResultCode.RESULT_CODE_OPERATION_ALREADY_COMPLETED,
     ]);
     /**
      * Attempts to send a message to validators with retries and state checks.

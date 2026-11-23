@@ -19,7 +19,7 @@
  * @property {boolean} [remoteProposalReceived] A validated proposal matches this epoch and parent.
  * @property {boolean} [appendElectionRetry] Use the shorter election backoff for the next retry.
  */
-import { StateMachine } from "../../../utils/StateMachine.js";
+import { StateMachine } from "./StateMachine.js";
 
 export const EPOCH_STATES = Object.freeze({
     LOAD_EPOCH_CONTEXT: "LOAD_EPOCH_CONTEXT",

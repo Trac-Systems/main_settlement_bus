@@ -2,7 +2,7 @@ import { hook, test } from 'brittle';
 import sinon from 'sinon';
 import ValidatorMessageOrchestrator from '../../../../src/core/network/services/ValidatorMessageOrchestrator.js';
 import State from '../../../../src/core/state/State.js';
-import { OperationType, ResultCode } from '../../../../src/utils/constants.js';
+import { OperationType, NetworkResultCode } from '../../../../src/utils/constants.js';
 import { testKeyPair1, testKeyPair2, testKeyPair3 } from '../../../fixtures/apply.fixtures.js';
 import { publicKeyToAddress } from '../../../../src/utils/helpers.js';
 import { PeerConnectionManagerError } from '../../../../src/core/network/shared/PeerConnectionManager.js';
@@ -31,7 +31,7 @@ const createTransferMessage = (config, wallet) => ({
 
 const createValidatorConnectionManager = ({
     preferredProtocol = 'v1',
-    sendSingleMessage = sinon.stub().resolves(ResultCode.OK),
+    sendSingleMessage = sinon.stub().resolves(NetworkResultCode.RESULT_CODE_OK),
     sentCount = 0,
     connectedPeers = [VALIDATOR_KEY],
 } = {}) => ({
@@ -117,7 +117,7 @@ test('ValidatorMessageOrchestrator.send returns false for unsupported protocol',
 
 test('ValidatorMessageOrchestrator.send V1 matrix: OK -> SUCCESS', async t => {
     const validatorConnectionManager = createValidatorConnectionManager({
-        sendSingleMessage: sinon.stub().resolves(ResultCode.OK),
+        sendSingleMessage: sinon.stub().resolves(NetworkResultCode.RESULT_CODE_OK),
         sentCount: 0,
     });
     const wallet = await createWallet(config);
@@ -132,7 +132,7 @@ test('ValidatorMessageOrchestrator.send V1 matrix: OK -> SUCCESS', async t => {
 
 test('ValidatorMessageOrchestrator.send V1 matrix: TIMEOUT -> ROTATE', async t => {
     const validatorConnectionManager = createValidatorConnectionManager({
-        sendSingleMessage: sinon.stub().resolves(ResultCode.TIMEOUT),
+        sendSingleMessage: sinon.stub().resolves(NetworkResultCode.RESULT_CODE_TIMEOUT),
     });
     const wallet = await createWallet(config);
     const orchestrator = new ValidatorMessageOrchestrator(validatorConnectionManager, { get: async () => null, isValidatorAddress: async () => true }, config, wallet);
@@ -147,7 +147,7 @@ test('ValidatorMessageOrchestrator.send V1 matrix: TIMEOUT -> ROTATE', async t =
 
 test('ValidatorMessageOrchestrator.send V1 matrix: TX_ALREADY_PENDING -> NO_ROTATE', async t => {
     const validatorConnectionManager = createValidatorConnectionManager({
-        sendSingleMessage: sinon.stub().resolves(ResultCode.TX_ALREADY_PENDING),
+        sendSingleMessage: sinon.stub().resolves(NetworkResultCode.RESULT_CODE_TX_ALREADY_PENDING),
     });
     const wallet = await createWallet(config);
     const orchestrator = new ValidatorMessageOrchestrator(validatorConnectionManager, { get: async () => null, isValidatorAddress: async () => true }, config, wallet);
@@ -162,7 +162,7 @@ test('ValidatorMessageOrchestrator.send V1 matrix: TX_ALREADY_PENDING -> NO_ROTA
 
 test('ValidatorMessageOrchestrator.send treats TX_ALREADY_EXISTS as success when tx is already visible locally', async t => {
     const validatorConnectionManager = createValidatorConnectionManager({
-        sendSingleMessage: sinon.stub().resolves(ResultCode.TX_ALREADY_EXISTS),
+        sendSingleMessage: sinon.stub().resolves(NetworkResultCode.RESULT_CODE_TX_ALREADY_EXISTS),
     });
     const wallet = await createWallet(config);
     const orchestrator = new ValidatorMessageOrchestrator(validatorConnectionManager, { get: async () => null, isValidatorAddress: async () => true }, config, wallet);
@@ -178,7 +178,7 @@ test('ValidatorMessageOrchestrator.send treats TX_ALREADY_EXISTS as success when
 
 test('ValidatorMessageOrchestrator.send treats OPERATION_ALREADY_COMPLETED as success when tx is already visible locally', async t => {
     const validatorConnectionManager = createValidatorConnectionManager({
-        sendSingleMessage: sinon.stub().resolves(ResultCode.OPERATION_ALREADY_COMPLETED),
+        sendSingleMessage: sinon.stub().resolves(NetworkResultCode.RESULT_CODE_OPERATION_ALREADY_COMPLETED),
     });
     const wallet = await createWallet(config);
     const orchestrator = new ValidatorMessageOrchestrator(validatorConnectionManager, { get: async () => null, isValidatorAddress: async () => true }, config, wallet);
@@ -208,7 +208,7 @@ test('ValidatorMessageOrchestrator.send V1 matrix: unknown code -> UNDEFINED', a
 
 test('ValidatorMessageOrchestrator.send removes validator when threshold reached on success', async t => {
     const validatorConnectionManager = createValidatorConnectionManager({
-        sendSingleMessage: sinon.stub().resolves(ResultCode.OK),
+        sendSingleMessage: sinon.stub().resolves(NetworkResultCode.RESULT_CODE_OK),
         sentCount: config.messageThreshold,
     });
     const wallet = await createWallet(config);
@@ -225,7 +225,7 @@ test('ValidatorMessageOrchestrator.send retries on PeerConnectionManagerError wi
     const config = overrideConfig({ maxRetries: 2 });
     const sendSingleMessage = sinon.stub();
     sendSingleMessage.onFirstCall().rejects(new PeerConnectionManagerError('disconnected'));
-    sendSingleMessage.onSecondCall().resolves(ResultCode.OK);
+    sendSingleMessage.onSecondCall().resolves(NetworkResultCode.RESULT_CODE_OK);
 
     const validatorConnectionManager = createValidatorConnectionManager({ sendSingleMessage, sentCount: 0 });
     const wallet = await createWallet(config);
@@ -243,7 +243,7 @@ test('ValidatorMessageOrchestrator.send retries on generic catch error with remo
     const config = overrideConfig({ maxRetries: 2 });
     const sendSingleMessage = sinon.stub();
     sendSingleMessage.onFirstCall().rejects(new Error('response validation failed'));
-    sendSingleMessage.onSecondCall().resolves(ResultCode.OK);
+    sendSingleMessage.onSecondCall().resolves(NetworkResultCode.RESULT_CODE_OK);
 
     const validatorConnectionManager = createValidatorConnectionManager({ sendSingleMessage, sentCount: 0 });
     const wallet = await createWallet(config);
@@ -260,7 +260,7 @@ test('ValidatorMessageOrchestrator.send retries on generic catch error with remo
 test('ValidatorMessageOrchestrator.send max retries guard returns false immediately', async t => {
     const config = overrideConfig({ maxRetries: 1 });
     const validatorConnectionManager = createValidatorConnectionManager({
-        sendSingleMessage: sinon.stub().resolves(ResultCode.OK),
+        sendSingleMessage: sinon.stub().resolves(NetworkResultCode.RESULT_CODE_OK),
     });
     const wallet = await createWallet(config);
     const orchestrator = new ValidatorMessageOrchestrator(validatorConnectionManager, { get: async () => null, isValidatorAddress: async () => true }, config, wallet);
@@ -278,7 +278,7 @@ test('ValidatorMessageOrchestrator.send timeout split: pending timeout rejection
     sendSingleMessage.onFirstCall().rejects(
         new ValidatorPendingRequestServiceTimeoutError('req-1', publicKeyToAddress(VALIDATOR_KEY, config), config.pendingRequestTimeout)
     );
-    sendSingleMessage.onSecondCall().resolves(ResultCode.OK);
+    sendSingleMessage.onSecondCall().resolves(NetworkResultCode.RESULT_CODE_OK);
 
     const validatorConnectionManager = createValidatorConnectionManager({ sendSingleMessage });
     const wallet = await createWallet(config);
@@ -293,7 +293,7 @@ test('ValidatorMessageOrchestrator.send timeout split: pending timeout rejection
 
 test('ValidatorMessageOrchestrator.send timeout split: TIMEOUT result code stays in then path and does not retry', async t => {
     const config = overrideConfig({ maxRetries: 2 });
-    const sendSingleMessage = sinon.stub().resolves(ResultCode.TIMEOUT);
+    const sendSingleMessage = sinon.stub().resolves(NetworkResultCode.RESULT_CODE_TIMEOUT);
     const validatorConnectionManager = createValidatorConnectionManager({ sendSingleMessage });
     const wallet = await createWallet(config);
     const orchestrator = new ValidatorMessageOrchestrator(validatorConnectionManager, { get: async () => null, isValidatorAddress: async () => true }, config, wallet);
@@ -309,7 +309,7 @@ test('ValidatorMessageOrchestrator.send validation split: thrown validation erro
     const config = overrideConfig({ maxRetries: 2 });
     const sendSingleMessage = sinon.stub();
     sendSingleMessage.onFirstCall().rejects(new Error('validator response validation failed'));
-    sendSingleMessage.onSecondCall().resolves(ResultCode.OK);
+    sendSingleMessage.onSecondCall().resolves(NetworkResultCode.RESULT_CODE_OK);
 
     const validatorConnectionManager = createValidatorConnectionManager({ sendSingleMessage });
     const wallet = await createWallet(config);
@@ -324,7 +324,7 @@ test('ValidatorMessageOrchestrator.send validation split: thrown validation erro
 
 test('ValidatorMessageOrchestrator.send validation split: non-OK result code stays in then and uses policy', async t => {
     const config = overrideConfig({ maxRetries: 2 });
-    const sendSingleMessage = sinon.stub().resolves(ResultCode.SCHEMA_VALIDATION_FAILED);
+    const sendSingleMessage = sinon.stub().resolves(NetworkResultCode.RESULT_CODE_SCHEMA_VALIDATION_FAILED);
     const validatorConnectionManager = createValidatorConnectionManager({ sendSingleMessage });
     const wallet = await createWallet(config);
     const orchestrator = new ValidatorMessageOrchestrator(validatorConnectionManager, { get: async () => null, isValidatorAddress: async () => true }, config, wallet);
@@ -439,7 +439,7 @@ test('State.waitForUnsigned returns false on timeout', async t => {
 test('ValidatorMessageOrchestrator.send V1 avoids selecting validator with requester address when possible', async t => {
     const requesterValidatorKey = testKeyPair1.publicKey;
     const otherValidatorKey = testKeyPair2.publicKey;
-    const sendSingleMessage = sinon.stub().resolves(ResultCode.OK);
+    const sendSingleMessage = sinon.stub().resolves(NetworkResultCode.RESULT_CODE_OK);
 
     const validatorConnectionManager = createValidatorConnectionManager({
         sendSingleMessage,

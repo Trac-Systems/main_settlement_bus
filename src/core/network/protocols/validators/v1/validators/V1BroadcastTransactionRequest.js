@@ -1,6 +1,6 @@
 import V1BaseOperation from "./V1BaseOperation.js";
 import b4a from "b4a";
-import {MAX_PARTIAL_TX_PAYLOAD_BYTE_SIZE, ResultCode} from '../../../../../../utils/constants.js';
+import {MAX_PARTIAL_TX_PAYLOAD_BYTE_SIZE, NetworkResultCode} from '../../../../../../utils/constants.js';
 import {V1ProtocolError} from "../V1ProtocolError.js";
 
 class V1BroadcastTransactionRequest extends V1BaseOperation {
@@ -18,7 +18,7 @@ class V1BroadcastTransactionRequest extends V1BaseOperation {
     isDataPropertySizeValid(payload) {
         if (b4a.byteLength(payload.broadcast_transaction_request.data) > MAX_PARTIAL_TX_PAYLOAD_BYTE_SIZE) {
             throw new V1ProtocolError(
-                ResultCode.SCHEMA_VALIDATION_FAILED,
+                NetworkResultCode.RESULT_CODE_SCHEMA_VALIDATION_FAILED,
                 `The 'data' field exceeds the maximum allowed byte size of ${MAX_PARTIAL_TX_PAYLOAD_BYTE_SIZE}. Actual size: ${b4a.byteLength(payload.broadcast_transaction_request.data)}`);
         }
     }

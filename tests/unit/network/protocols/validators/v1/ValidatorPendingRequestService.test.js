@@ -5,7 +5,7 @@ import sinon from 'sinon';
 import ValidatorPendingRequestService from '../../../../../../src/core/network/protocols/validators/v1/ValidatorPendingRequestService.js';
 import NetworkMessageBuilder from '../../../../../../src/messages/network/v1/NetworkMessageBuilder.js';
 import { V1ProtocolError } from '../../../../../../src/core/network/protocols/validators/v1/V1ProtocolError.js';
-import { NetworkOperationType, ResultCode } from '../../../../../../src/utils/constants.js';
+import { NetworkOperationType, NetworkResultCode } from '../../../../../../src/utils/constants.js';
 import { publicKeyToAddress } from '../../../../../../src/utils/helpers.js';
 import { errorMessageIncludes } from '../../../../../helpers/regexHelper.js';
 import { config } from '../../../../../helpers/config.js';
@@ -87,7 +87,7 @@ test('PendingRequestService preserves typed result-coded errors', async t => {
     const request = await buildV1Request();
 
     const promise = service.registerPendingRequest(peer, request);
-    const expectedError = new V1ProtocolError(ResultCode.TX_INVALID_PAYLOAD, 'domain-invalid');
+    const expectedError = new V1ProtocolError(NetworkResultCode.RESULT_CODE_TX_INVALID_PAYLOAD, 'domain-invalid');
 
     t.ok(service.rejectPendingRequest(request.id, expectedError));
 
@@ -96,7 +96,7 @@ test('PendingRequestService preserves typed result-coded errors', async t => {
         t.fail('Expected pending request promise to reject');
     } catch (error) {
         t.is(error, expectedError);
-        t.is(error.resultCode, ResultCode.TX_INVALID_PAYLOAD);
+        t.is(error.resultCode, NetworkResultCode.RESULT_CODE_TX_INVALID_PAYLOAD);
         t.is(error.message, 'domain-invalid');
     }
 });

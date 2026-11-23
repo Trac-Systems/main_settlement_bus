@@ -3,7 +3,7 @@ import b4a from 'b4a';
 import tracCryptoApi from 'trac-crypto-api';
 
 import PartialOperationValidator from '../../../../../../../src/core/network/protocols/validators/shared/validators/PartialOperationValidator.js';
-import { ResultCode, OperationType } from '../../../../../../../src/utils/constants.js';
+import { NetworkResultCode, OperationType } from '../../../../../../../src/utils/constants.js';
 import { bufferToBigInt } from '../../../../../../../src/utils/amountSerialization.js';
 import { FEE } from '../../../../../../../src/core/state/utils/transaction.js';
 import { $TNK } from '../../../../../../../src/core/state/utils/balance.js';
@@ -33,7 +33,7 @@ test('PartialOperationValidator.validate rejects direct base-class usage', async
     await expectSharedValidatorError(
         t,
         () => validatorInstance.validate(payload),
-        ResultCode.UNEXPECTED_ERROR,
+        NetworkResultCode.RESULT_CODE_UNEXPECTED_ERROR,
         'must be implemented'
     );
 });
@@ -66,14 +66,14 @@ test('PartialOperationValidator.isPayloadSchemaValid rejects missing or unknown 
     await expectSharedValidatorError(
         t,
         () => Promise.resolve(validatorInstance.isPayloadSchemaValid({})),
-        ResultCode.TX_INVALID_PAYLOAD,
+        NetworkResultCode.RESULT_CODE_TX_INVALID_PAYLOAD,
         'type is missing'
     );
 
     await expectSharedValidatorError(
         t,
         () => Promise.resolve(validatorInstance.isPayloadSchemaValid({ ...validPayload, type: 999999 })),
-        ResultCode.OPERATION_TYPE_UNKNOWN,
+        NetworkResultCode.RESULT_CODE_OPERATION_TYPE_UNKNOWN,
         'Unknown operation type'
     );
 
@@ -82,7 +82,7 @@ test('PartialOperationValidator.isPayloadSchemaValid rejects missing or unknown 
     await expectSharedValidatorError(
         t,
         () => Promise.resolve(validatorInstance.isPayloadSchemaValid(invalidShapePayload)),
-        ResultCode.SCHEMA_VALIDATION_FAILED,
+        NetworkResultCode.RESULT_CODE_SCHEMA_VALIDATION_FAILED,
         'Payload is invalid'
     );
 });
@@ -107,7 +107,7 @@ test('PartialOperationValidator.validateRequesterAddress rejects malformed addre
     await expectSharedValidatorError(
         t,
         () => Promise.resolve(validatorInstance.validateRequesterAddress(payload)),
-        ResultCode.REQUESTER_ADDRESS_INVALID,
+        NetworkResultCode.RESULT_CODE_REQUESTER_ADDRESS_INVALID,
         'Invalid requesting address'
     );
 });
@@ -128,7 +128,7 @@ test('PartialOperationValidator.validateRequesterAddress rejects invalid request
     await expectSharedValidatorError(
         t,
         () => Promise.resolve(validatorInstance.validateRequesterAddress(payload)),
-        ResultCode.REQUESTER_PUBLIC_KEY_INVALID,
+        NetworkResultCode.RESULT_CODE_REQUESTER_PUBLIC_KEY_INVALID,
         'Invalid requesting public key'
     );
 });
@@ -151,7 +151,7 @@ test('PartialOperationValidator.validateSignature accepts signed payloads and re
     await expectSharedValidatorError(
         t,
         () => validatorInstance.validateSignature(mismatchedHashPayload),
-        ResultCode.TX_HASH_MISMATCH,
+        NetworkResultCode.RESULT_CODE_TX_HASH_MISMATCH,
         'does not match incoming transaction'
     );
 
@@ -160,7 +160,7 @@ test('PartialOperationValidator.validateSignature accepts signed payloads and re
     await expectSharedValidatorError(
         t,
         () => validatorInstance.validateSignature(invalidSignaturePayload),
-        ResultCode.TX_SIGNATURE_INVALID,
+        NetworkResultCode.RESULT_CODE_TX_SIGNATURE_INVALID,
         'Invalid signature'
     );
 
@@ -170,7 +170,7 @@ test('PartialOperationValidator.validateSignature accepts signed payloads and re
     await expectSharedValidatorError(
         t,
         () => validatorInstance.validateSignature(unknownOperationPayload),
-        ResultCode.OPERATION_TYPE_UNKNOWN,
+        NetworkResultCode.RESULT_CODE_OPERATION_TYPE_UNKNOWN,
         'Unknown operation type'
     );
 });
@@ -188,7 +188,7 @@ test('PartialOperationValidator common state checks cover tx validity, uniquenes
             validator.address,
             config
         ).validateTransactionValidity(payload),
-        ResultCode.TX_EXPIRED,
+        NetworkResultCode.RESULT_CODE_TX_EXPIRED,
         'expired'
     );
 
@@ -199,7 +199,7 @@ test('PartialOperationValidator common state checks cover tx validity, uniquenes
             validator.address,
             config
         ).validateTransactionUniqueness(payload),
-        ResultCode.TX_ALREADY_EXISTS,
+        NetworkResultCode.RESULT_CODE_TX_ALREADY_EXISTS,
         'already exists'
     );
 
@@ -208,7 +208,7 @@ test('PartialOperationValidator common state checks cover tx validity, uniquenes
     await expectSharedValidatorError(
         t,
         () => Promise.resolve(validatorInstance.isOperationNotCompleted(completedPayload)),
-        ResultCode.OPERATION_ALREADY_COMPLETED,
+        NetworkResultCode.RESULT_CODE_OPERATION_ALREADY_COMPLETED,
         'must be undefined'
     );
 
@@ -224,7 +224,7 @@ test('PartialOperationValidator common state checks cover tx validity, uniquenes
     await expectSharedValidatorError(
         t,
         () => new PartialOperationValidator(createState(), validator.address, config).validateRequesterBalance(payload),
-        ResultCode.REQUESTER_NOT_FOUND,
+        NetworkResultCode.RESULT_CODE_REQUESTER_NOT_FOUND,
         'not found'
     );
 
@@ -237,7 +237,7 @@ test('PartialOperationValidator common state checks cover tx validity, uniquenes
             validator.address,
             config
         ).validateRequesterBalance(payload),
-        ResultCode.INSUFFICIENT_FEE_BALANCE,
+        NetworkResultCode.RESULT_CODE_INSUFFICIENT_FEE_BALANCE,
         'Insufficient balance'
     );
 });
@@ -249,7 +249,7 @@ test('PartialOperationValidator bootstrap and self-validation guards reject inva
     await expectSharedValidatorError(
         t,
         () => Promise.resolve(new PartialOperationValidator(createState(), validator.address, config).validateSubnetworkBootstrapEquality(txPayload)),
-        ResultCode.EXTERNAL_BOOTSTRAP_EQUALS_MSB_BOOTSTRAP,
+        NetworkResultCode.RESULT_CODE_EXTERNAL_BOOTSTRAP_EQUALS_MSB_BOOTSTRAP,
         'same as MSB bootstrap'
     );
 
@@ -257,7 +257,7 @@ test('PartialOperationValidator bootstrap and self-validation guards reject inva
     await expectSharedValidatorError(
         t,
         () => Promise.resolve(new PartialOperationValidator(createState(), requester.address, config).validateNoSelfValidation(rolePayload)),
-        ResultCode.SELF_VALIDATION_FORBIDDEN,
+        NetworkResultCode.RESULT_CODE_SELF_VALIDATION_FORBIDDEN,
         'cannot be the same'
     );
 

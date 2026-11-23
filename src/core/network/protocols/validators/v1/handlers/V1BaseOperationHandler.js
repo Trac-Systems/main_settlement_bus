@@ -1,4 +1,4 @@
-import {ResultCode} from "../../../../../../utils/constants.js";
+import {NetworkResultCode} from "../../../../../../utils/constants.js";
 import {V1ProtocolError} from "../V1ProtocolError.js";
 import ConnectionOperationHandler from "../../../shared/ConnectionOperationHandler.js";
 
@@ -42,7 +42,7 @@ class V1BaseOperationHandler extends ConnectionOperationHandler{
         if (error instanceof V1ProtocolError) {
             return error;
         }
-        return new V1ProtocolError(ResultCode.UNEXPECTED_ERROR, error?.message ?? 'Unexpected error');
+        return new V1ProtocolError(NetworkResultCode.RESULT_CODE_UNEXPECTED_ERROR, error?.message ?? 'Unexpected error');
     }
 }
 

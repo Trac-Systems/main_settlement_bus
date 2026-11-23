@@ -1,6 +1,6 @@
 import b4a from 'b4a';
 import { v7 as uuidv7 } from 'uuid';
-import { NetworkOperationType, ResultCode as NetworkResultCode } from '../../src/utils/constants.js';
+import { NetworkOperationType, NetworkResultCode } from '../../src/utils/constants.js';
 
 const payloadLivenessRequest = {
     type: NetworkOperationType.LIVENESS_REQUEST,
@@ -20,7 +20,7 @@ const payloadLivenessResponse = {
     liveness_response: {
         nonce: b4a.from('06', 'hex'),
         signature: b4a.from('07', 'hex'),
-        result: NetworkResultCode.OK
+        result: NetworkResultCode.RESULT_CODE_OK
     },
     capabilities: []
 };
@@ -46,7 +46,7 @@ const payloadBroadcastTransactionResponse = {
         signature: b4a.from('0b', 'hex'),
         proof: b4a.from('0c', 'hex'),
         timestamp: 161719,
-        result: NetworkResultCode.OK
+        result: NetworkResultCode.RESULT_CODE_OK
     },
     capabilities: ['cap:b']
 };
