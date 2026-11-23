@@ -7,7 +7,7 @@ import nodeEntryUtils from '../../utils/nodeEntry.js';
 import transactionUtils, { Status } from '../../utils/transaction.js';
 import { PERCENT_75, toBalance } from '../../utils/balance.js';
 import * as escrowEntryUtils from '../../utils/escrowEntry.js';
-import { createHtlcLockSigningMessage, verifyOrderedHtlcCosignerSignatures } from '../../../../utils/htlcLock.js';
+import { createHtlcLockSigningMessage, verifyOrderedHtlcCosignerSignatures } from './lockAuthorization.js';
 
 export const handleApplyHtlcLockOperation = baseState => class extends baseState {
 

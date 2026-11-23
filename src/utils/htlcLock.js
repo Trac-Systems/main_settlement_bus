@@ -15,6 +15,8 @@ import {
     UINT32_MAX,
 } from './constants.js';
 
+// Off-chain HTLC lock preparation and validation. The contract owns an independent
+// implementation in core/state/contracts/htlc/lockAuthorization.js.
 const EMPTY_METADATA = b4a.alloc(0);
 
 function requireBuffer(value, length, field, allowZero = false) {
