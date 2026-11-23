@@ -1,5 +1,5 @@
 import test from 'brittle';
-import { StateMachine } from '../../../../src/utils/StateMachine.js';
+import { StateMachine } from '../../../../../src/core/consensus/services/StateMachine.js';
 
 const STATES = { IDLE: 'IDLE', RUNNING: 'RUNNING', DONE: 'DONE' };
 const EVENTS = { START: 'START', FINISH: 'FINISH', RESET: 'RESET' };

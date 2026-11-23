@@ -2,6 +2,7 @@ import { default as test } from 'brittle';
 
 async function runConsensusModuleTests() {
     test.pause();
+    await import('./services/stateMachine/stateMachine.test.js');
     await import('./services/VDFService.test.js');
     await import('./services/VDFProgressWatchdog.test.js');
     await import('./services/epochCoordinatorService/epochCoordinatorService.test.js');
