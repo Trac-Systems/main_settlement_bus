@@ -13,7 +13,7 @@ import {
     EntryType,
     OperationType,
     PUBLIC_KEY_LENGTH,
-    ResultCode
+    NetworkResultCode
 } from '../../../../../../utils/constants.js';
 import {verifyOrderedHtlcCosignerSignatures} from '../../../../../../utils/htlcLock.js';
 import {V1ProtocolError} from '../../v1/V1ProtocolError.js';
@@ -34,7 +34,7 @@ class PartialHtlcValidator extends PartialOperationValidator {
         }
         if (payload?.type === OperationType.HTLC_REFUND) return this.#validateRefund(payload);
         if (payload?.type !== OperationType.HTLC_LOCK) {
-            throw new V1ProtocolError(ResultCode.OPERATION_TYPE_UNKNOWN, 'Unsupported HTLC operation type.');
+            throw new V1ProtocolError(NetworkResultCode.RESULT_CODE_OPERATION_TYPE_UNKNOWN, 'Unsupported HTLC operation type.');
         }
         this.isPayloadSchemaValid(payload);
         this.validateNoSelfValidation(payload);
@@ -66,19 +66,19 @@ class PartialHtlcValidator extends PartialOperationValidator {
         const signedEscrowBuffer = await this.state.getSigned(escrowKey);
         const signedEscrow = escrowEntryUtils.decode(signedEscrowBuffer, this.#config.addressPrefix);
         if (!signedEscrow || !b4a.equals(signedEscrow.lockId, payload.hco.li)) {
-            throw new V1ProtocolError(ResultCode.TX_INVALID_PAYLOAD, 'HTLC lock is not confirmed in signed state.');
+            throw new V1ProtocolError(NetworkResultCode.RESULT_CODE_TX_INVALID_PAYLOAD, 'HTLC lock is not confirmed in signed state.');
         }
         if (signedEscrow.status !== escrowEntryUtils.Status.PENDING) {
-            throw new V1ProtocolError(ResultCode.TX_ALREADY_EXISTS, 'HTLC escrow is already settled.');
+            throw new V1ProtocolError(NetworkResultCode.RESULT_CODE_TX_ALREADY_EXISTS, 'HTLC escrow is already settled.');
         }
 
         const escrowBuffer = await this.state.get(escrowKey);
         const escrow = escrowEntryUtils.decode(escrowBuffer, this.#config.addressPrefix);
         if (!escrow || !b4a.equals(escrow.lockId, payload.hco.li)) {
-            throw new V1ProtocolError(ResultCode.TX_INVALID_PAYLOAD, 'HTLC escrow does not exist or is invalid.');
+            throw new V1ProtocolError(NetworkResultCode.RESULT_CODE_TX_INVALID_PAYLOAD, 'HTLC escrow does not exist or is invalid.');
         }
         if (escrow.status !== escrowEntryUtils.Status.PENDING) {
-            throw new V1ProtocolError(ResultCode.TX_ALREADY_EXISTS, 'HTLC escrow is already settled.');
+            throw new V1ProtocolError(NetworkResultCode.RESULT_CODE_TX_ALREADY_EXISTS, 'HTLC escrow is already settled.');
         }
 
         const [signedEpoch, unsignedEpoch] = await Promise.all([
@@ -86,11 +86,11 @@ class PartialHtlcValidator extends PartialOperationValidator {
             this.state.getCurrentEpochUnsigned()
         ]);
         if (typeof signedEpoch !== 'bigint' || typeof unsignedEpoch !== 'bigint') {
-            throw new V1ProtocolError(ResultCode.TX_INVALID_PAYLOAD, 'HTLC claim requires an initialized network epoch.');
+            throw new V1ProtocolError(NetworkResultCode.RESULT_CODE_TX_INVALID_PAYLOAD, 'HTLC claim requires an initialized network epoch.');
         }
         const currentEpoch = signedEpoch > unsignedEpoch ? signedEpoch : unsignedEpoch;
         if (currentEpoch >= escrow.refundEpoch.readBigUInt64BE(0)) {
-            throw new V1ProtocolError(ResultCode.TX_EXPIRED, 'HTLC claim window has expired.');
+            throw new V1ProtocolError(NetworkResultCode.RESULT_CODE_TX_EXPIRED, 'HTLC claim window has expired.');
         }
 
         const settlement = escrowEntryUtils.makeClaim(
@@ -100,7 +100,7 @@ class PartialHtlcValidator extends PartialOperationValidator {
             this.#config.addressPrefix
         );
         if (!settlement) {
-            throw new V1ProtocolError(ResultCode.TX_INVALID_PAYLOAD, 'HTLC claim preimage is invalid.');
+            throw new V1ProtocolError(NetworkResultCode.RESULT_CODE_TX_INVALID_PAYLOAD, 'HTLC claim preimage is invalid.');
         }
         await this.#validateClaimRecipientBalances(settlement);
         return true;
@@ -116,7 +116,7 @@ class PartialHtlcValidator extends PartialOperationValidator {
             const address = bufferToAddress(addressBytes, this.#config.addressPrefix);
             const credit = amount?.asBigInt();
             if (address === null || typeof credit !== 'bigint') {
-                throw new V1ProtocolError(ResultCode.TX_INVALID_PAYLOAD, 'HTLC settlement recipient or amount is invalid.');
+                throw new V1ProtocolError(NetworkResultCode.RESULT_CODE_TX_INVALID_PAYLOAD, 'HTLC settlement recipient or amount is invalid.');
             }
             credits.set(address, (credits.get(address) ?? 0n) + credit);
         }
@@ -127,7 +127,7 @@ class PartialHtlcValidator extends PartialOperationValidator {
             const balance = toBalance(recipient.balance);
             if (!balance || balance.asBigInt() + credit > this.max_amount) {
                 throw new V1ProtocolError(
-                    ResultCode.TRANSFER_RECIPIENT_BALANCE_OVERFLOW,
+                    NetworkResultCode.RESULT_CODE_TRANSFER_RECIPIENT_BALANCE_OVERFLOW,
                     'HTLC claim would overflow a settlement recipient balance.'
                 );
             }
@@ -148,19 +148,19 @@ class PartialHtlcValidator extends PartialOperationValidator {
             await this.state.getSigned(escrowKey), this.#config.addressPrefix
         );
         if (!signedEscrow || !b4a.equals(signedEscrow.lockId, payload.hro.li)) {
-            throw new V1ProtocolError(ResultCode.TX_INVALID_PAYLOAD, 'HTLC lock is not confirmed in signed state.');
+            throw new V1ProtocolError(NetworkResultCode.RESULT_CODE_TX_INVALID_PAYLOAD, 'HTLC lock is not confirmed in signed state.');
         }
         if (signedEscrow.status !== escrowEntryUtils.Status.PENDING) {
-            throw new V1ProtocolError(ResultCode.TX_ALREADY_EXISTS, 'HTLC escrow is already settled.');
+            throw new V1ProtocolError(NetworkResultCode.RESULT_CODE_TX_ALREADY_EXISTS, 'HTLC escrow is already settled.');
         }
 
         const escrowBuffer = await this.state.get(escrowKey);
         const escrow = escrowEntryUtils.decode(escrowBuffer, this.#config.addressPrefix);
         if (!escrow || !b4a.equals(escrow.lockId, payload.hro.li)) {
-            throw new V1ProtocolError(ResultCode.TX_INVALID_PAYLOAD, 'HTLC escrow is missing from current state.');
+            throw new V1ProtocolError(NetworkResultCode.RESULT_CODE_TX_INVALID_PAYLOAD, 'HTLC escrow is missing from current state.');
         }
         if (escrow.status !== escrowEntryUtils.Status.PENDING) {
-            throw new V1ProtocolError(ResultCode.TX_ALREADY_EXISTS, 'HTLC escrow is already settled.');
+            throw new V1ProtocolError(NetworkResultCode.RESULT_CODE_TX_ALREADY_EXISTS, 'HTLC escrow is already settled.');
         }
 
         const [signedEpoch, unsignedEpoch] = await Promise.all([
@@ -168,33 +168,33 @@ class PartialHtlcValidator extends PartialOperationValidator {
             this.state.getCurrentEpochUnsigned()
         ]);
         if (typeof signedEpoch !== 'bigint' || typeof unsignedEpoch !== 'bigint') {
-            throw new V1ProtocolError(ResultCode.TX_INVALID_PAYLOAD, 'HTLC refunds require an initialized network epoch.');
+            throw new V1ProtocolError(NetworkResultCode.RESULT_CODE_TX_INVALID_PAYLOAD, 'HTLC refunds require an initialized network epoch.');
         }
         const refundEpoch = b4a.from(escrow.refundEpoch).readBigUInt64BE(0);
         if (signedEpoch < refundEpoch || unsignedEpoch < refundEpoch) {
-            throw new V1ProtocolError(ResultCode.TX_INVALID_PAYLOAD, 'HTLC refund epoch has not been reached.');
+            throw new V1ProtocolError(NetworkResultCode.RESULT_CODE_TX_INVALID_PAYLOAD, 'HTLC refund epoch has not been reached.');
         }
 
         const settlement = escrowEntryUtils.makeRefund(
             escrowBuffer, uint64ToBuffer(unsignedEpoch), this.#config.addressPrefix
         );
         if (!settlement) {
-            throw new V1ProtocolError(ResultCode.TX_INVALID_PAYLOAD, 'HTLC refund transition is invalid.');
+            throw new V1ProtocolError(NetworkResultCode.RESULT_CODE_TX_INVALID_PAYLOAD, 'HTLC refund transition is invalid.');
         }
         const recipientAddress = bufferToAddress(settlement.address, this.#config.addressPrefix);
         if (recipientAddress === null) {
-            throw new V1ProtocolError(ResultCode.TX_INVALID_PAYLOAD, 'HTLC refund recipient is invalid.');
+            throw new V1ProtocolError(NetworkResultCode.RESULT_CODE_TX_INVALID_PAYLOAD, 'HTLC refund recipient is invalid.');
         }
         const recipientBuffer = await this.state.get(recipientAddress);
         if (recipientBuffer !== null) {
             const recipient = nodeEntryUtils.decode(recipientBuffer);
             if (!recipient) {
-                throw new V1ProtocolError(ResultCode.TX_INVALID_PAYLOAD, 'HTLC refund recipient account is invalid.');
+                throw new V1ProtocolError(NetworkResultCode.RESULT_CODE_TX_INVALID_PAYLOAD, 'HTLC refund recipient account is invalid.');
             }
             const balance = toBalance(recipient.balance);
             if (!balance || balance.asBigInt() + settlement.amount.asBigInt() > this.max_amount) {
                 throw new V1ProtocolError(
-                    ResultCode.TRANSFER_RECIPIENT_BALANCE_OVERFLOW,
+                    NetworkResultCode.RESULT_CODE_TRANSFER_RECIPIENT_BALANCE_OVERFLOW,
                     'HTLC refund would overflow the refund recipient balance.'
                 );
             }
@@ -213,10 +213,10 @@ class PartialHtlcValidator extends PartialOperationValidator {
             this.state.getSigned(escrowKey)
         ]);
         if (transaction !== null || signedTransaction !== null) {
-            throw new V1ProtocolError(ResultCode.TX_ALREADY_EXISTS, 'HTLC lock transaction already exists.');
+            throw new V1ProtocolError(NetworkResultCode.RESULT_CODE_TX_ALREADY_EXISTS, 'HTLC lock transaction already exists.');
         }
         if (escrow !== null || signedEscrow !== null) {
-            throw new V1ProtocolError(ResultCode.TX_ALREADY_EXISTS, 'HTLC escrow already exists.');
+            throw new V1ProtocolError(NetworkResultCode.RESULT_CODE_TX_ALREADY_EXISTS, 'HTLC escrow already exists.');
         }
     }
 
@@ -234,7 +234,7 @@ class PartialHtlcValidator extends PartialOperationValidator {
                 isZeroBuffer(publicKey)
             ) {
                 throw new V1ProtocolError(
-                    ResultCode.TX_INVALID_PAYLOAD,
+                    NetworkResultCode.RESULT_CODE_TX_INVALID_PAYLOAD,
                     `Invalid HTLC ${label} address.`
                 );
             }
@@ -247,14 +247,14 @@ class PartialHtlcValidator extends PartialOperationValidator {
         const lockerPublicKey = tracCryptoApi.address.decodeSafe(lockerAddress);
         if (!b4a.equals(lockerPublicKey, operation.ss[0])) {
             throw new V1ProtocolError(
-                ResultCode.TX_SIGNATURE_INVALID,
+                NetworkResultCode.RESULT_CODE_TX_SIGNATURE_INVALID,
                 'HTLC signer zero must be the locker identified by the operation address.'
             );
         }
 
         if (!verifyOrderedHtlcCosignerSignatures(operation.cs, operation.tx, operation.ss)) {
             throw new V1ProtocolError(
-                ResultCode.TX_SIGNATURE_INVALID,
+                NetworkResultCode.RESULT_CODE_TX_SIGNATURE_INVALID,
                 'HTLC cosigner signatures are invalid or not in signer-set order.'
             );
         }
@@ -267,7 +267,7 @@ class PartialHtlcValidator extends PartialOperationValidator {
         ]);
         if (typeof signedEpoch !== 'bigint' || typeof unsignedEpoch !== 'bigint') {
             throw new V1ProtocolError(
-                ResultCode.TX_INVALID_PAYLOAD,
+                NetworkResultCode.RESULT_CODE_TX_INVALID_PAYLOAD,
                 'HTLC locks require an initialized network epoch.'
             );
         }
@@ -276,7 +276,7 @@ class PartialHtlcValidator extends PartialOperationValidator {
         const refundEpoch = b4a.from(operation.re).readBigUInt64BE(0);
         if (refundEpoch < currentEpoch + HTLC_MIN_LOCK_DURATION_EPOCHS) {
             throw new V1ProtocolError(
-                ResultCode.TX_INVALID_PAYLOAD,
+                NetworkResultCode.RESULT_CODE_TX_INVALID_PAYLOAD,
                 `HTLC refund epoch must be at least ${HTLC_MIN_LOCK_DURATION_EPOCHS} epoch(s) after the current epoch.`
             );
         }
@@ -286,7 +286,7 @@ class PartialHtlcValidator extends PartialOperationValidator {
         const lockerAddress = bufferToAddress(payload.address, this.#config.addressPrefix);
         const lockerEntry = await this.state.getNodeEntryUnsigned(lockerAddress);
         if (!lockerEntry) {
-            throw new V1ProtocolError(ResultCode.TRANSFER_SENDER_NOT_FOUND, 'HTLC locker account not found.');
+            throw new V1ProtocolError(NetworkResultCode.RESULT_CODE_TRANSFER_SENDER_NOT_FOUND, 'HTLC locker account not found.');
         }
 
         const principal = bufferToBigInt(payload.hlo.am);
@@ -294,14 +294,14 @@ class PartialHtlcValidator extends PartialOperationValidator {
         const escrowAmount = principal + surchargeFee;
         if (escrowAmount > this.max_amount || escrowAmount + this.fee > this.max_amount) {
             throw new V1ProtocolError(
-                ResultCode.TRANSFER_AMOUNT_TOO_LARGE,
+                NetworkResultCode.RESULT_CODE_TRANSFER_AMOUNT_TOO_LARGE,
                 'HTLC escrow amount exceeds the maximum allowed value.'
             );
         }
 
         if (bufferToBigInt(lockerEntry.balance) < escrowAmount + this.fee) {
             throw new V1ProtocolError(
-                ResultCode.TRANSFER_INSUFFICIENT_BALANCE,
+                NetworkResultCode.RESULT_CODE_TRANSFER_INSUFFICIENT_BALANCE,
                 'Insufficient balance for HTLC principal, surcharge fee, and network fee.'
             );
         }
@@ -315,7 +315,7 @@ class PartialHtlcValidator extends PartialOperationValidator {
         const reward = BALANCE_FEE.percentage(PERCENT_75);
         if (bufferToBigInt(validatorEntry.balance) + bufferToBigInt(reward.value) > this.max_amount) {
             throw new V1ProtocolError(
-                ResultCode.TRANSFER_RECIPIENT_BALANCE_OVERFLOW,
+                NetworkResultCode.RESULT_CODE_TRANSFER_RECIPIENT_BALANCE_OVERFLOW,
                 'HTLC validator reward would overflow the validator balance.'
             );
         }

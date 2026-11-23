@@ -6,7 +6,7 @@
 
 import { networkMessageFactory } from '../../../../messages/network/v1/networkMessageFactory.js';
 import { generateUUID } from '../../../../utils/helpers.js';
-import { NETWORK_CAPABILITIES, ResultCode } from '../../../../utils/constants.js';
+import { NETWORK_CAPABILITIES, NetworkResultCode } from '../../../../utils/constants.js';
 import { Logger } from '../../../../utils/logger.js';
 
 class ValidatorProtocolSession {
@@ -93,7 +93,7 @@ class ValidatorProtocolSession {
                 throw new Error('ValidatorProtocolSession: v1 protocol not available for probing');
             }
             const result = await this.#v1Protocol.send(message);
-            if (result !== ResultCode.OK) {
+            if (result !== NetworkResultCode.RESULT_CODE_OK) {
                 // TODO: Think about how to handle failure result codes after legacy protocol is retired
                 this.#logger.warn(`ValidatorProtocolSession: v1 protocol probe failed with non-OK result code: ${result}`);
                 this.setLegacyAsPreferredProtocol();
@@ -109,7 +109,7 @@ class ValidatorProtocolSession {
     /**
      * Sends a single health check message to a peer.
      * This is used by the ValidatorHealthCheckService.
-     * @returns {Promise<ResultCode>} Result code indicating success or failure of the health check.
+     * @returns {Promise<NetworkResultCode>} Result code indicating success or failure of the health check.
      */
     async sendHealthCheck() {
         switch (this.#preferredProtocol) {
@@ -120,14 +120,14 @@ class ValidatorProtocolSession {
                 }
                 catch (err) {
                     this.#logger.error(`ValidatorProtocolSession: v1 health check failed: ${err?.message ?? err}`);
-                    return ResultCode.UNEXPECTED_ERROR; // TODO: Consider just propagating the error instead
+                    return NetworkResultCode.RESULT_CODE_UNEXPECTED_ERROR; // TODO: Consider just propagating the error instead
                 }
             case this.#supportedProtocols.LEGACY:
                 this.#logger.warn('ValidatorProtocolSession: health check not supported on LEGACY protocol');
-                return ResultCode.OK; // TODO: Consider implementing a new result code (e.g. NOT_SUPPORTED) instead of returning OK
+                return NetworkResultCode.RESULT_CODE_OK; // TODO: Consider implementing a new result code (e.g. NOT_SUPPORTED) instead of returning OK
             default:
                 this.#logger.warn('ValidatorProtocolSession: preferred protocol not set. Call probe() first.');
-                return ResultCode.UNSPECIFIED; // TODO: Define a more specific result code.
+                return NetworkResultCode.RESULT_CODE_UNSPECIFIED; // TODO: Define a more specific result code.
         }
     }
 

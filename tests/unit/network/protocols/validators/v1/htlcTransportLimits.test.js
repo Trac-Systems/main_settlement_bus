@@ -11,7 +11,7 @@ import {
     HTLC_METADATA_MAX_BYTE_LENGTH,
     MAX_PARTIAL_TX_PAYLOAD_BYTE_SIZE,
     NETWORK_CAPABILITIES,
-    ResultCode,
+    NetworkResultCode,
     V1_PROTOCOL_PAYLOAD_MAX_SIZE,
 } from '../../../../../../src/utils/constants.js';
 import {addressToBuffer} from '../../../../../../src/core/state/utils/address.js';
@@ -119,7 +119,7 @@ for (const environment of [ENV.MAINNET, ENV.TESTNET1]) {
                     t.ok(verified, 'publication proof verifies');
                     t.ok(b4a.equals(await Autobase.decodeValue(verified.block.value), completeData));
                     const response = await networkMessageFactory(validator, config)
-                        .buildBroadcastTransactionResponse(id, NETWORK_CAPABILITIES, ResultCode.OK, proof, Date.now());
+                        .buildBroadcastTransactionResponse(id, NETWORK_CAPABILITIES, NetworkResultCode.RESULT_CODE_OK, proof, Date.now());
                     const encodedResponse = encodeV1networkOperation(response);
                     t.ok(encodedResponse.length <= V1_PROTOCOL_PAYLOAD_MAX_SIZE,
                         `response at writer length ${snapshot.length}, index ${index} fits the 4096-byte router limit`);

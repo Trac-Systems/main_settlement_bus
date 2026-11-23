@@ -1,4 +1,4 @@
-import {ResultCode} from "../../../../../../../utils/constants.js";
+import {NetworkResultCode} from "../../../../../../../utils/constants.js";
 import {V1ProtocolError} from "../../V1ProtocolError.js";
 import {
     TransactionPoolAlreadyQueuedError,
@@ -17,7 +17,7 @@ import {
 export function mapTxPoolAvailabilityError(error) {
     if (error instanceof TransactionPoolFullError) {
         return new V1ProtocolError(
-            ResultCode.NODE_OVERLOADED,
+            NetworkResultCode.RESULT_CODE_NODE_OVERLOADED,
             'Transaction pool is full, ignoring incoming transaction.'
         );
     }
@@ -27,15 +27,15 @@ export function mapTxPoolAvailabilityError(error) {
 
 export function mapPendingCommitRegistrationError(error) {
     if (error instanceof PendingCommitInvalidTxHashError) {
-        return new V1ProtocolError(ResultCode.TX_HASH_INVALID_FORMAT, error.message);
+        return new V1ProtocolError(NetworkResultCode.RESULT_CODE_TX_HASH_INVALID_FORMAT, error.message);
     }
 
     if (error instanceof PendingCommitAlreadyExistsError) {
-        return new V1ProtocolError(ResultCode.TX_ALREADY_PENDING, error.message);
+        return new V1ProtocolError(NetworkResultCode.RESULT_CODE_TX_ALREADY_PENDING, error.message);
     }
 
     if (error instanceof PendingCommitBufferFullError) {
-        return new V1ProtocolError(ResultCode.NODE_OVERLOADED, error.message);
+        return new V1ProtocolError(NetworkResultCode.RESULT_CODE_NODE_OVERLOADED, error.message);
     }
 
     return error;
@@ -43,16 +43,16 @@ export function mapPendingCommitRegistrationError(error) {
 
 export function mapTransactionEnqueueError(error) {
     if (error instanceof TransactionPoolFullError) {
-        return new V1ProtocolError(ResultCode.NODE_OVERLOADED, error.message);
+        return new V1ProtocolError(NetworkResultCode.RESULT_CODE_NODE_OVERLOADED, error.message);
     }
 
     if (error instanceof TransactionPoolAlreadyQueuedError) {
-        return new V1ProtocolError(ResultCode.TX_ALREADY_PENDING, error.message);
+        return new V1ProtocolError(NetworkResultCode.RESULT_CODE_TX_ALREADY_PENDING, error.message);
     }
 
     if (error instanceof TransactionPoolInvalidIncomingDataError) {
         return new V1ProtocolError(
-            ResultCode.INTERNAL_ENQUEUE_VALIDATION_FAILED,
+            NetworkResultCode.RESULT_CODE_INTERNAL_ENQUEUE_VALIDATION_FAILED,
             `Internal enqueue validation failed: ${error.message}`
         );
     }
@@ -63,7 +63,7 @@ export function mapTransactionEnqueueError(error) {
 export function mapPendingCommitResolutionError(error) {
     if (error instanceof TransactionPoolProofUnavailableError) {
         const protocolError = new V1ProtocolError(
-            ResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE,
+            NetworkResultCode.RESULT_CODE_TX_ACCEPTED_PROOF_UNAVAILABLE,
             error.message
         );
         protocolError.timestamp = Number.isSafeInteger(error.timestamp) && error.timestamp > 0
@@ -73,11 +73,11 @@ export function mapPendingCommitResolutionError(error) {
     }
 
     if (error instanceof TransactionPoolMissingCommitReceiptError) {
-        return new V1ProtocolError(ResultCode.TX_COMMITTED_RECEIPT_MISSING, error.message);
+        return new V1ProtocolError(NetworkResultCode.RESULT_CODE_TX_COMMITTED_RECEIPT_MISSING, error.message);
     }
 
     if (error instanceof PendingCommitTimeoutError) {
-        return new V1ProtocolError(ResultCode.TIMEOUT, error.message);
+        return new V1ProtocolError(NetworkResultCode.RESULT_CODE_TIMEOUT, error.message);
     }
 
     return error;

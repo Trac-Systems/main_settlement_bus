@@ -3,7 +3,7 @@ import b4a from 'b4a';
 import tracCryptoApi from 'trac-crypto-api';
 import NetworkMessageDirector from '../../../../src/messages/network/v1/NetworkMessageDirector.js';
 import NetworkMessageBuilder from '../../../../src/messages/network/v1/NetworkMessageBuilder.js';
-import { NetworkOperationType, ResultCode as NetworkResultCode } from '../../../../src/utils/constants.js';
+import { NetworkOperationType, NetworkResultCode } from '../../../../src/utils/constants.js';
 import { decodeV1networkOperation, encodeV1networkOperation } from '../../../../src/codecs/network/v1/networkV1OperationCodec.js';
 import {
     createMessage,
@@ -93,8 +93,8 @@ test('NetworkMessageDirector iterates broadcast transaction response ResultCode 
     const emptyProof = b4a.alloc(0);
 
     for (const code of uniqueResultCodes()) {
-        const includeProof = code === NetworkResultCode.OK;
-        const proofUnavailable = code === NetworkResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE;
+        const includeProof = code === NetworkResultCode.RESULT_CODE_OK;
+        const proofUnavailable = code === NetworkResultCode.RESULT_CODE_TX_ACCEPTED_PROOF_UNAVAILABLE;
         const responseProof = includeProof ? proof : emptyProof;
         const responseTimestamp = includeProof || proofUnavailable ? timestamp : 0;
         const payload = await director.buildBroadcastTransactionResponse(
@@ -141,7 +141,7 @@ test('NetworkMessageDirector builds broadcast transaction response with proof an
     const payload = await director.buildBroadcastTransactionResponse(
         id,
         caps,
-        NetworkResultCode.OK,
+        NetworkResultCode.RESULT_CODE_OK,
         proof,
         timestamp
     );
@@ -156,7 +156,7 @@ test('NetworkMessageDirector builds broadcast transaction response with proof an
         payload.broadcast_transaction_response.nonce,
         proof,
         timestampToBuffer(timestamp),
-        uint32ToBuffer(NetworkResultCode.OK),
+        uint32ToBuffer(NetworkResultCode.RESULT_CODE_OK),
         encodeCapabilities(caps)
     );
     const hash = await tracCryptoApi.hash.blake3(msg);
@@ -179,7 +179,7 @@ test('NetworkMessageDirector rejects OK response when proof is provided without 
         () => director.buildBroadcastTransactionResponse(
             id,
             caps,
-            NetworkResultCode.OK,
+            NetworkResultCode.RESULT_CODE_OK,
             proof
         ),
         errorMessageIncludes('Result code OK requires non-empty proof and timestamp > 0.')
@@ -198,7 +198,7 @@ test('NetworkMessageDirector rejects OK response when timestamp is provided with
         () => director.buildBroadcastTransactionResponse(
             id,
             caps,
-            NetworkResultCode.OK,
+            NetworkResultCode.RESULT_CODE_OK,
             null,
             timestamp
         ),
@@ -218,14 +218,14 @@ test('NetworkMessageDirector allows TX_ACCEPTED_PROOF_UNAVAILABLE response with 
     const payload = await director.buildBroadcastTransactionResponse(
         id,
         caps,
-        NetworkResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE,
+        NetworkResultCode.RESULT_CODE_TX_ACCEPTED_PROOF_UNAVAILABLE,
         emptyProof,
         timestamp
     );
 
     t.alike(payload.broadcast_transaction_response.proof, emptyProof);
     t.is(payload.broadcast_transaction_response.timestamp, timestamp);
-    t.is(payload.broadcast_transaction_response.result, NetworkResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE);
+    t.is(payload.broadcast_transaction_response.result, NetworkResultCode.RESULT_CODE_TX_ACCEPTED_PROOF_UNAVAILABLE);
 
     const msg = createMessage(
         payload.type,
@@ -234,7 +234,7 @@ test('NetworkMessageDirector allows TX_ACCEPTED_PROOF_UNAVAILABLE response with 
         payload.broadcast_transaction_response.nonce,
         emptyProof,
         timestampToBuffer(timestamp),
-        uint32ToBuffer(NetworkResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE),
+        uint32ToBuffer(NetworkResultCode.RESULT_CODE_TX_ACCEPTED_PROOF_UNAVAILABLE),
         encodeCapabilities(caps)
     );
     const hash = await tracCryptoApi.hash.blake3(msg);
@@ -242,7 +242,7 @@ test('NetworkMessageDirector allows TX_ACCEPTED_PROOF_UNAVAILABLE response with 
 
     const decoded = decodeV1networkOperation(encodeV1networkOperation(payload));
     t.is(decoded.broadcast_transaction_response.timestamp, timestamp);
-    t.is(decoded.broadcast_transaction_response.result, NetworkResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE);
+    t.is(decoded.broadcast_transaction_response.result, NetworkResultCode.RESULT_CODE_TX_ACCEPTED_PROOF_UNAVAILABLE);
 });
 
 test('NetworkMessageDirector rejects OK response when proof and timestamp are both missing', async t => {
@@ -256,7 +256,7 @@ test('NetworkMessageDirector rejects OK response when proof and timestamp are bo
         () => director.buildBroadcastTransactionResponse(
             id,
             caps,
-            NetworkResultCode.OK
+            NetworkResultCode.RESULT_CODE_OK
         ),
         errorMessageIncludes('Result code OK requires non-empty proof and timestamp > 0.')
     );
@@ -273,7 +273,7 @@ test('NetworkMessageDirector rejects TX_ACCEPTED_PROOF_UNAVAILABLE response when
         () => director.buildBroadcastTransactionResponse(
             id,
             caps,
-            NetworkResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE
+            NetworkResultCode.RESULT_CODE_TX_ACCEPTED_PROOF_UNAVAILABLE
         ),
         errorMessageIncludes('Result code TX_ACCEPTED_PROOF_UNAVAILABLE requires timestamp > 0.')
     );
@@ -290,7 +290,7 @@ test('NetworkMessageDirector rejects TX_ACCEPTED_PROOF_UNAVAILABLE response when
         () => director.buildBroadcastTransactionResponse(
             id,
             caps,
-            NetworkResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE,
+            NetworkResultCode.RESULT_CODE_TX_ACCEPTED_PROOF_UNAVAILABLE,
             b4a.from('deadbeef', 'hex'),
             Date.now()
         ),
@@ -309,7 +309,7 @@ test('NetworkMessageDirector rejects non-OK response when proof is non-empty', a
         () => director.buildBroadcastTransactionResponse(
             id,
             caps,
-            NetworkResultCode.INVALID_PAYLOAD,
+            NetworkResultCode.RESULT_CODE_INVALID_PAYLOAD,
             b4a.from('deadbeef', 'hex'),
             0
         ),
@@ -328,7 +328,7 @@ test('NetworkMessageDirector rejects non-OK response with timestamp > 0 unless p
         () => director.buildBroadcastTransactionResponse(
             id,
             caps,
-            NetworkResultCode.INVALID_PAYLOAD,
+            NetworkResultCode.RESULT_CODE_INVALID_PAYLOAD,
             null,
             Date.now()
         ),

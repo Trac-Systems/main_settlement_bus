@@ -2,7 +2,7 @@ import test from 'brittle';
 import b4a from 'b4a';
 
 import PartialTransactionValidator from '../../../../../../../src/core/network/protocols/validators/shared/validators/PartialTransactionValidator.js';
-import { ResultCode } from '../../../../../../../src/utils/constants.js';
+import { NetworkResultCode } from '../../../../../../../src/utils/constants.js';
 import { $TNK } from '../../../../../../../src/core/state/utils/balance.js';
 import { config } from '../../../../../../helpers/config.js';
 import {
@@ -50,7 +50,7 @@ test('PartialTransactionValidator.validate rejects bootstrap mismatches and miss
             validator.address,
             config
         ).validate(mismatchedMsbPayload),
-        ResultCode.MSB_BOOTSTRAP_MISMATCH,
+        NetworkResultCode.RESULT_CODE_MSB_BOOTSTRAP_MISMATCH,
         'Declared MSB bootstrap'
     );
 
@@ -64,7 +64,7 @@ test('PartialTransactionValidator.validate rejects bootstrap mismatches and miss
             validator.address,
             config
         ).validate(payload),
-        ResultCode.EXTERNAL_BOOTSTRAP_NOT_DEPLOYED,
+        NetworkResultCode.RESULT_CODE_EXTERNAL_BOOTSTRAP_NOT_DEPLOYED,
         'not registered as deployment entry'
     );
 });
@@ -86,7 +86,7 @@ test('PartialTransactionValidator.validate rejects missing or mismatched externa
             validator.address,
             config
         ).validate(payload),
-        ResultCode.EXTERNAL_BOOTSTRAP_TX_MISSING,
+        NetworkResultCode.RESULT_CODE_EXTERNAL_BOOTSTRAP_TX_MISSING,
         'not registered as usual tx'
     );
 
@@ -104,7 +104,7 @@ test('PartialTransactionValidator.validate rejects missing or mismatched externa
             validator.address,
             config
         ).validate(payload),
-        ResultCode.EXTERNAL_BOOTSTRAP_MISMATCH,
+        NetworkResultCode.RESULT_CODE_EXTERNAL_BOOTSTRAP_MISMATCH,
         'does not match the one in the transaction payload'
     );
 });

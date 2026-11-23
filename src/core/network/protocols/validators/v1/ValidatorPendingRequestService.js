@@ -1,4 +1,4 @@
-import {NetworkOperationType, PEER_PUBLIC_KEY_HEX_LENGTH, ResultCode} from '../../../../../utils/constants.js';
+import {NetworkOperationType, PEER_PUBLIC_KEY_HEX_LENGTH, NetworkResultCode} from '../../../../../utils/constants.js';
 import {isHexString, publicKeyToAddress} from '../../../../../utils/helpers.js';
 import {V1ProtocolError} from "./V1ProtocolError.js";
 import b4a from 'b4a';
@@ -96,7 +96,7 @@ export default class ValidatorPendingRequestService extends BasePendingRequestSe
     }
 
     // for now, we are resolving only resultCode, but we can extend it in the future if needed...
-    resolvePendingRequest(id, resultCode = ResultCode.OK) {
+    resolvePendingRequest(id, resultCode = NetworkResultCode.RESULT_CODE_OK) {
         const entry = this.getAndDeletePendingRequest(id);
         if (!entry) return false;
         entry.resolve(resultCode);
@@ -105,7 +105,7 @@ export default class ValidatorPendingRequestService extends BasePendingRequestSe
 
     _createShutdownError(id) {
         return new V1ProtocolError(
-            ResultCode.UNEXPECTED_ERROR,
+            NetworkResultCode.RESULT_CODE_UNEXPECTED_ERROR,
             `Pending request ${id} cancelled (shutdown).`
         );
     }

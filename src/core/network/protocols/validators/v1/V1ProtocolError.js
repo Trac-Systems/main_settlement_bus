@@ -1,14 +1,14 @@
-import {ResultCode} from '../../../../../utils/constants.js';
+import {NetworkResultCode} from '../../../../../utils/constants.js';
 
 /** 
  * V1 protocol error type.
  *
  * `V1ProtocolError` is the v1 base class used by handlers/validators to attach:
- * - `resultCode`: a stable `ResultCode` enum value for programmatic handling
+ * - `resultCode`: a stable `NetworkResultCode` enum value for programmatic handling
  */
 export class V1ProtocolError extends Error {
     /**
-     * @param {number} resultCode Stable rejection reason (a `ResultCode` enum value).
+     * @param {number} resultCode Stable rejection reason (a `NetworkResultCode` enum value).
      * @param {string} message Human-readable error message.
      */
     constructor(resultCode, message) {
@@ -19,7 +19,7 @@ export class V1ProtocolError extends Error {
 }
 
 export function getResultCode(err) {
-    return err instanceof V1ProtocolError ? err.resultCode : ResultCode.UNEXPECTED_ERROR;
+    return err instanceof V1ProtocolError ? err.resultCode : NetworkResultCode.RESULT_CODE_UNEXPECTED_ERROR;
 }
 
 export function shouldEndConnection(err) {

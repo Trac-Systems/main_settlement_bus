@@ -6,7 +6,7 @@ import V1BroadcastTransactionRequest from '../../../../../../../src/core/network
 import {V1ProtocolError} from '../../../../../../../src/core/network/protocols/validators/v1/V1ProtocolError.js';
 
 import {
-    ResultCode,
+    NetworkResultCode,
     OperationType
 } from '../../../../../../../src/utils/constants.js';
 
@@ -199,7 +199,7 @@ test('Commit service not configured', async t => {
         mockConn(res => {
             t.is(
                 res.broadcast_transaction_response.result,
-                ResultCode.UNEXPECTED_ERROR
+                NetworkResultCode.RESULT_CODE_UNEXPECTED_ERROR
             );
         })
     );
@@ -224,7 +224,7 @@ test('TxPool validateEnqueue full', async t => {
     await handler.handleRequest(
         { id: b4a.alloc(32), broadcast_transaction_request: { data: b4a.alloc(1) } },
         mockConn(res => {
-            t.is(res.broadcast_transaction_response.result, ResultCode.NODE_OVERLOADED);
+            t.is(res.broadcast_transaction_response.result, NetworkResultCode.RESULT_CODE_NODE_OVERLOADED);
         })
     );
 });
@@ -345,7 +345,7 @@ test('Capability validation failure', async t => {
     await handler.handleRequest(
         { id: b4a.alloc(32), broadcast_transaction_request: { data: b4a.alloc(1) } },
         mockConn(res => {
-            t.is(res.broadcast_transaction_response.result, ResultCode.NODE_HAS_NO_WRITE_ACCESS);
+            t.is(res.broadcast_transaction_response.result, NetworkResultCode.RESULT_CODE_NODE_HAS_NO_WRITE_ACCESS);
         })
     );
 });
@@ -501,7 +501,7 @@ test('handleRequest: flushes response before closing when protocol error request
     }
 
     V1BroadcastTransactionRequest.prototype.validate = async () => {
-        throw new V1ProtocolError(ResultCode.INVALID_PAYLOAD, 'validation boom');
+        throw new V1ProtocolError(NetworkResultCode.RESULT_CODE_INVALID_PAYLOAD, 'validation boom');
     };
 
     const connection = {
@@ -536,7 +536,7 @@ test('Malformed encoded transaction returns TX_INVALID_PAYLOAD', async t => {
             broadcast_transaction_request: { data: b4a.from([0x0a, 0x02, 0x01]) }
         },
         mockConn(response => {
-            t.is(response.broadcast_transaction_response.result, ResultCode.TX_INVALID_PAYLOAD);
+            t.is(response.broadcast_transaction_response.result, NetworkResultCode.RESULT_CODE_TX_INVALID_PAYLOAD);
         })
     );
 });
@@ -640,7 +640,7 @@ test('TransactionPoolMissingCommitReceiptError via receipt branch', async t => {
         conn, conn.protocolSession.validator
     );
 
-    t.is(capturedResultCode, ResultCode.TX_COMMITTED_RECEIPT_MISSING);
+    t.is(capturedResultCode, NetworkResultCode.RESULT_CODE_TX_COMMITTED_RECEIPT_MISSING);
 });
 
 test('PendingCommitBufferFullError mapping branch', async t => {
@@ -724,7 +724,7 @@ test('TransactionPoolInvalidIncomingDataError mapping', async t => {
     await handler.handleRequest(
         { id: b4a.alloc(32), broadcast_transaction_request: { data: b4a.alloc(1) } },
         mockConn(res => {
-            t.is(res.broadcast_transaction_response.result, ResultCode.UNEXPECTED_ERROR);
+            t.is(res.broadcast_transaction_response.result, NetworkResultCode.RESULT_CODE_UNEXPECTED_ERROR);
         })
     );
 });
@@ -822,7 +822,7 @@ test('dispatchTransaction maps proof unavailable to V1ProtocolError and preserve
         t.fail('expected dispatchTransaction to throw');
     } catch (error) {
         t.ok(error instanceof V1ProtocolError);
-        t.is(error.resultCode, ResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE);
+        t.is(error.resultCode, NetworkResultCode.RESULT_CODE_TX_ACCEPTED_PROOF_UNAVAILABLE);
         t.is(error.timestamp, proofUnavailableTimestamp);
     }
 });
@@ -850,7 +850,7 @@ test('handleRequest builds proof unavailable response with propagated positive t
     await handler.handleRequest(
         { id: b4a.alloc(32), broadcast_transaction_request: { data: b4a.alloc(1) } },
         mockConn(res => {
-            t.is(res.broadcast_transaction_response.result, ResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE);
+            t.is(res.broadcast_transaction_response.result, NetworkResultCode.RESULT_CODE_TX_ACCEPTED_PROOF_UNAVAILABLE);
             t.is(res.broadcast_transaction_response.timestamp, proofUnavailableTimestamp);
         })
     );
@@ -878,7 +878,7 @@ test('handleRequest keeps connection open for TIMEOUT response', async t => {
             events.push('send');
             t.is(
                 message.broadcast_transaction_response.result,
-                ResultCode.TIMEOUT,
+                NetworkResultCode.RESULT_CODE_TIMEOUT,
                 'validator should answer with TIMEOUT on pending commit timeout'
             );
         }

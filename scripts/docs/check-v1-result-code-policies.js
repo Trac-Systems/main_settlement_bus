@@ -21,7 +21,7 @@ function buildGeneratedProtoResultCodes() {
     return Object.entries(protobufResultCodeEnum)
         .filter(([, value]) => typeof value === 'number')
         .map(([name, value]) => ({
-            resultCodeName: name.replace(/^RESULT_CODE_/, ''),
+            resultCodeName: name,
             value
         }));
 }

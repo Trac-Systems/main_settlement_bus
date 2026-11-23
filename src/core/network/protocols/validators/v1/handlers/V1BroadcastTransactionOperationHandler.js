@@ -1,7 +1,7 @@
 import {networkMessageFactory} from "../../../../../../messages/network/v1/networkMessageFactory.js";
 import {
     NETWORK_CAPABILITIES,
-    ResultCode
+    NetworkResultCode
 } from "../../../../../../utils/constants.js";
 import {
     getResultCode,
@@ -107,7 +107,7 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
                 timestamp
             );
         } catch (error) {
-            throw new V1ProtocolError(ResultCode.UNEXPECTED_ERROR, `Failed to build broadcast transaction response: ${error.message}`);
+            throw new V1ProtocolError(NetworkResultCode.RESULT_CODE_UNEXPECTED_ERROR, `Failed to build broadcast transaction response: ${error.message}`);
         }
     }
 
@@ -115,7 +115,7 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
         try {
             return unsafeDecodeApplyOperation(message);
         } catch (error) {
-            throw new V1ProtocolError(ResultCode.TX_INVALID_PAYLOAD, `Failed to decode apply operation from message: ${error.message}`);
+            throw new V1ProtocolError(NetworkResultCode.RESULT_CODE_TX_INVALID_PAYLOAD, `Failed to decode apply operation from message: ${error.message}`);
         }
     }
 
@@ -140,7 +140,7 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
         return {
             endConnection: false,
             proof,
-            resultCode: ResultCode.OK,
+            resultCode: NetworkResultCode.RESULT_CODE_OK,
             timestamp
         };
     }
@@ -148,12 +148,12 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
     #buildFailedRequestOutcome(error, connection) {
         const protocolError = error instanceof V1ProtocolError
             ? error
-            : new V1ProtocolError(ResultCode.UNEXPECTED_ERROR, error?.message ?? 'Unexpected error');
+            : new V1ProtocolError(NetworkResultCode.RESULT_CODE_UNEXPECTED_ERROR, error?.message ?? 'Unexpected error');
         const resultCode = getResultCode(protocolError);
         let timestamp = 0;
 
         if (
-            resultCode === ResultCode.TX_ACCEPTED_PROOF_UNAVAILABLE &&
+            resultCode === NetworkResultCode.RESULT_CODE_TX_ACCEPTED_PROOF_UNAVAILABLE &&
             Number.isSafeInteger(protocolError.timestamp) &&
             protocolError.timestamp > 0
         ) {
@@ -214,7 +214,7 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
         const canValidate = isAllowedToValidate || isAdminAllowedToValidate;
         if (!canValidate) {
             throw new V1ProtocolError(
-                ResultCode.NODE_HAS_NO_WRITE_ACCESS,
+                NetworkResultCode.RESULT_CODE_NODE_HAS_NO_WRITE_ACCESS,
                 'State is not writable or is an indexer without admin privileges.'
             );
         }
@@ -222,10 +222,10 @@ class V1BroadcastTransactionOperationHandler extends V1BaseOperationHandler {
 
     async dispatchTransaction(decodedTransaction) {
         if (!decodedTransaction || !Number.isInteger(decodedTransaction.type) || decodedTransaction.type === 0) {
-            throw new V1ProtocolError(ResultCode.TX_INVALID_PAYLOAD, 'Decoded transaction type is missing.');
+            throw new V1ProtocolError(NetworkResultCode.RESULT_CODE_TX_INVALID_PAYLOAD, 'Decoded transaction type is missing.');
         }
         if (!this.#transactionCommitService) {
-            throw new V1ProtocolError(ResultCode.UNEXPECTED_ERROR, 'TransactionCommitService is not configured.');
+            throw new V1ProtocolError(NetworkResultCode.RESULT_CODE_UNEXPECTED_ERROR, 'TransactionCommitService is not configured.');
         }
 
         const operationStrategy = resolveBroadcastTransactionOperationStrategy(

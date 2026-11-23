@@ -1,5 +1,5 @@
 import b4a from 'b4a';
-import {OperationType, ResultCode} from "../../../../../../utils/constants.js";
+import {OperationType, NetworkResultCode} from "../../../../../../utils/constants.js";
 import {bufferToAddress} from "../../../../../state/utils/address.js";
 import PartialOperationValidator from './PartialOperationValidator.js';
 import {bufferToBigInt} from "../../../../../../utils/amountSerialization.js";
@@ -44,7 +44,7 @@ class PartialRoleAccessValidator extends PartialOperationValidator {
             const nodeEntry = await this.state.getNodeEntry(nodeAddress);
             if (!nodeEntry) {
                 throw new V1ProtocolError(
-                    ResultCode.ROLE_NODE_ENTRY_NOT_FOUND,
+                    NetworkResultCode.RESULT_CODE_ROLE_NODE_ENTRY_NOT_FOUND,
                     `Node with address ${nodeAddress} entry does not exist.`
                 );
             }
@@ -52,7 +52,7 @@ class PartialRoleAccessValidator extends PartialOperationValidator {
             const isNodeAlreadyWriter = nodeEntry.isWriter;
             if (isNodeAlreadyWriter) {
                 throw new V1ProtocolError(
-                    ResultCode.ROLE_NODE_ALREADY_WRITER,
+                    NetworkResultCode.RESULT_CODE_ROLE_NODE_ALREADY_WRITER,
                     `Node with address ${nodeAddress} is already a writer.`
                 );
             }
@@ -60,7 +60,7 @@ class PartialRoleAccessValidator extends PartialOperationValidator {
             const isNodeWhitelisted = nodeEntry.isWhitelisted;
             if (!isNodeWhitelisted) {
                 throw new V1ProtocolError(
-                    ResultCode.ROLE_NODE_NOT_WHITELISTED,
+                    NetworkResultCode.RESULT_CODE_ROLE_NODE_NOT_WHITELISTED,
                     `Node with address ${nodeAddress} is not whitelisted.`
                 );
             }
@@ -71,7 +71,7 @@ class PartialRoleAccessValidator extends PartialOperationValidator {
             const nodeEntry = await this.state.getNodeEntry(nodeAddress);
             if (!nodeEntry) {
                 throw new V1ProtocolError(
-                    ResultCode.ROLE_NODE_ENTRY_NOT_FOUND,
+                    NetworkResultCode.RESULT_CODE_ROLE_NODE_ENTRY_NOT_FOUND,
                     `Node with address ${nodeAddress} entry does not exist.`
                 );
             }
@@ -79,7 +79,7 @@ class PartialRoleAccessValidator extends PartialOperationValidator {
             const isAlreadyWriter = nodeEntry.isWriter;
             if (!isAlreadyWriter) {
                 throw new V1ProtocolError(
-                    ResultCode.ROLE_NODE_NOT_WRITER,
+                    NetworkResultCode.RESULT_CODE_ROLE_NODE_NOT_WRITER,
                     `Node with address ${nodeAddress} is not a writer.`
                 );
             }
@@ -87,7 +87,7 @@ class PartialRoleAccessValidator extends PartialOperationValidator {
             const isAlreadyIndexer = nodeEntry.isIndexer;
             if (isAlreadyIndexer) {
                 throw new V1ProtocolError(
-                    ResultCode.ROLE_NODE_IS_INDEXER,
+                    NetworkResultCode.RESULT_CODE_ROLE_NODE_IS_INDEXER,
                     `Node with address ${nodeAddress} is an indexer.`
                 );
             }
@@ -96,7 +96,7 @@ class PartialRoleAccessValidator extends PartialOperationValidator {
         } else if (type === OperationType.ADMIN_RECOVERY) {
             const adminEntry = await this.state.getAdminEntry();
             if (!adminEntry) {
-                throw new V1ProtocolError(ResultCode.ROLE_ADMIN_ENTRY_MISSING, 'Admin entry does not exist.');
+                throw new V1ProtocolError(NetworkResultCode.RESULT_CODE_ROLE_ADMIN_ENTRY_MISSING, 'Admin entry does not exist.');
             }
 
             const adminAddressBuffer = payload.address;
@@ -107,7 +107,7 @@ class PartialRoleAccessValidator extends PartialOperationValidator {
             );
             if (!isRecoveryCase) {
                 throw new V1ProtocolError(
-                    ResultCode.ROLE_INVALID_RECOVERY_CASE,
+                    NetworkResultCode.RESULT_CODE_ROLE_INVALID_RECOVERY_CASE,
                     `Node with address ${adminAddress} is not a valid recovery case.`
                 );
             }
@@ -116,7 +116,7 @@ class PartialRoleAccessValidator extends PartialOperationValidator {
         }
 
         throw new V1ProtocolError(
-            ResultCode.ROLE_UNKNOWN_OPERATION,
+            NetworkResultCode.RESULT_CODE_ROLE_UNKNOWN_OPERATION,
             `Unknown role access operation type: ${type}`
         );
     }
@@ -126,7 +126,7 @@ class PartialRoleAccessValidator extends PartialOperationValidator {
         const nodeEntry = await this.state.getNodeEntry(requesterAddress);
         if (!nodeEntry) {
             throw new V1ProtocolError(
-                ResultCode.REQUESTER_NOT_FOUND,
+                NetworkResultCode.RESULT_CODE_REQUESTER_NOT_FOUND,
                 `Node entry not found for address ${requesterAddress}`
             );
         }
@@ -140,7 +140,7 @@ class PartialRoleAccessValidator extends PartialOperationValidator {
 
             if (!isCurrentWk || !isOwner) {
                 throw new V1ProtocolError(
-                    ResultCode.ROLE_INVALID_WRITER_KEY,
+                    NetworkResultCode.RESULT_CODE_ROLE_INVALID_WRITER_KEY,
                     'Invalid writer key: either not owned by requester or different from assigned key'
                 );
             }
@@ -157,14 +157,14 @@ class PartialRoleAccessValidator extends PartialOperationValidator {
         }
 
         if (!requesterEntry) {
-            throw new V1ProtocolError(ResultCode.REQUESTER_NOT_FOUND, 'Requester address not found in state');
+            throw new V1ProtocolError(NetworkResultCode.RESULT_CODE_REQUESTER_NOT_FOUND, 'Requester address not found in state');
         }
         const requesterBalance = bufferToBigInt(requesterEntry.balance);
 
         const requiredBalance = this.fee * 11n;
         if (requesterBalance < requiredBalance) {
             throw new V1ProtocolError(
-                ResultCode.ROLE_INSUFFICIENT_FEE_BALANCE,
+                NetworkResultCode.RESULT_CODE_ROLE_INSUFFICIENT_FEE_BALANCE,
                 'Insufficient requester balance to cover role access operation FEE.'
             );
         }

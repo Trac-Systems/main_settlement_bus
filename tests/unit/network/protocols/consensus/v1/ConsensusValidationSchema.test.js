@@ -135,7 +135,7 @@ test('ConsensusValidationSchema rejects network-only result codes in proof propo
 
     t.is(
         schema.validateV1EpochProofProposalResponse(
-            makeProofProposalResponsePayload(NetworkResultCode.TX_INVALID_PAYLOAD)
+            makeProofProposalResponsePayload(NetworkResultCode.RESULT_CODE_TX_INVALID_PAYLOAD)
         ),
         false
     );

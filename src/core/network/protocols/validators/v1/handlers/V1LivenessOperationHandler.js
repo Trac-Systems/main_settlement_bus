@@ -1,5 +1,5 @@
 import {networkMessageFactory} from "../../../../../../messages/network/v1/networkMessageFactory.js";
-import {NETWORK_CAPABILITIES, ResultCode} from "../../../../../../utils/constants.js";
+import {NETWORK_CAPABILITIES, NetworkResultCode} from "../../../../../../utils/constants.js";
 import V1LivenessRequest from "../validators/V1LivenessRequest.js";
 import {getResultCode, V1ProtocolError} from "../V1ProtocolError.js";
 import V1LivenessResponse from "../validators/V1LivenessResponse.js";
@@ -19,7 +19,7 @@ class V1LivenessOperationHandler extends V1BaseOperationHandler {
     }
 
     async handleRequest(message, connection, protocolSession) {
-        let resultCode = ResultCode.OK;
+        let resultCode = NetworkResultCode.RESULT_CODE_OK;
         let endConnection = false;
         try {
             this.applyRateLimit(connection);
@@ -77,7 +77,7 @@ class V1LivenessOperationHandler extends V1BaseOperationHandler {
                 resultCode
             );
         } catch (error) {
-            throw new V1ProtocolError(ResultCode.UNEXPECTED_ERROR, `Failed to build liveness response: ${error.message}`);
+            throw new V1ProtocolError(NetworkResultCode.RESULT_CODE_UNEXPECTED_ERROR, `Failed to build liveness response: ${error.message}`);
         }
     }
 

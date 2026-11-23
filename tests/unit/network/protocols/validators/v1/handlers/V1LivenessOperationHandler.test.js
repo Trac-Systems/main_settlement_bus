@@ -3,7 +3,7 @@ import b4a from 'b4a';
 import V1LivenessOperationHandler from '../../../../../../../src/core/network/protocols/validators/v1/handlers/V1LivenessOperationHandler.js';
 import V1LivenessRequest from '../../../../../../../src/core/network/protocols/validators/v1/validators/V1LivenessRequest.js';
 import V1LivenessResponse from '../../../../../../../src/core/network/protocols/validators/v1/validators/V1LivenessResponse.js';
-import { ResultCode } from '../../../../../../../src/utils/constants.js';
+import { NetworkResultCode } from '../../../../../../../src/utils/constants.js';
 import {V1ProtocolError} from '../../../../../../../src/core/network/protocols/validators/v1/V1ProtocolError.js';
 
 // Backup original validators
@@ -81,7 +81,7 @@ test('handleRequest: request validation and response send -> covers success and 
     // -------- VALIDATION ERROR with close-on-policy result code --------
     {
         V1LivenessRequest.prototype.validate = async () => {
-            throw new V1ProtocolError(ResultCode.INVALID_PAYLOAD, 'Validation Fail');
+            throw new V1ProtocolError(NetworkResultCode.RESULT_CODE_INVALID_PAYLOAD, 'Validation Fail');
         };
 
         const handler = new V1LivenessOperationHandler(
@@ -104,7 +104,7 @@ test('handleRequest: request validation and response send -> covers success and 
     // -------- VALIDATION ERROR with keep-open result code --------
     {
         V1LivenessRequest.prototype.validate = async () => {
-            throw new V1ProtocolError(ResultCode.TX_ALREADY_PENDING, 'Validation Fail No End');
+            throw new V1ProtocolError(NetworkResultCode.RESULT_CODE_TX_ALREADY_PENDING, 'Validation Fail No End');
         };
 
         const handler = new V1LivenessOperationHandler(

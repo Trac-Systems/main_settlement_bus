@@ -3,7 +3,7 @@ import b4a from 'b4a';
 import tracCryptoApi from 'trac-crypto-api';
 
 import PartialTransferValidator from '../../../../../../../src/core/network/protocols/validators/shared/validators/PartialTransferValidator.js';
-import { ResultCode } from '../../../../../../../src/utils/constants.js';
+import { NetworkResultCode } from '../../../../../../../src/utils/constants.js';
 import { bigIntToBuffer } from '../../../../../../../src/utils/buffer.js';
 import { config } from '../../../../../../helpers/config.js';
 import {
@@ -67,7 +67,7 @@ test('PartialTransferValidator.validate rejects invalid recipient address or pub
     await expectSharedValidatorError(
         t,
         () => invalidAddressValidator.validate(invalidAddressPayload),
-        ResultCode.TRANSFER_RECIPIENT_ADDRESS_INVALID,
+        NetworkResultCode.RESULT_CODE_TRANSFER_RECIPIENT_ADDRESS_INVALID,
         'Invalid recipient address'
     );
 
@@ -87,7 +87,7 @@ test('PartialTransferValidator.validate rejects invalid recipient address or pub
             validator.address,
             config
         ).validate(invalidPublicKeyPayload),
-        ResultCode.TRANSFER_RECIPIENT_PUBLIC_KEY_INVALID,
+        NetworkResultCode.RESULT_CODE_TRANSFER_RECIPIENT_PUBLIC_KEY_INVALID,
         'Invalid recipient public key'
     );
 
@@ -100,8 +100,8 @@ test('PartialTransferValidator rejects high-bit address aliases', async t => {
     const {requester, recipient, validator} = await getWalletSet();
 
     for (const [field, expectedCode] of [
-        ['address', ResultCode.REQUESTER_ADDRESS_INVALID],
-        ['recipient', ResultCode.TRANSFER_RECIPIENT_ADDRESS_INVALID]
+        ['address', NetworkResultCode.RESULT_CODE_REQUESTER_ADDRESS_INVALID],
+        ['recipient', NetworkResultCode.RESULT_CODE_TRANSFER_RECIPIENT_ADDRESS_INVALID]
     ]) {
         const payload = await buildTransferPayload(requester, recipient.address, bigIntToBuffer(1n));
         const addressBytes = field === 'address' ? payload.address : payload.tro.to;
@@ -136,7 +136,7 @@ test('PartialTransferValidator rejects checksum-invalid recipient addresses', as
         await expectSharedValidatorError(
             t,
             () => transferValidator.validate(payload),
-            ResultCode.TRANSFER_RECIPIENT_ADDRESS_INVALID
+            NetworkResultCode.RESULT_CODE_TRANSFER_RECIPIENT_ADDRESS_INVALID
         );
     }
 });
@@ -154,14 +154,14 @@ test('PartialTransferValidator.validate rejects transfer amount and state balanc
     await expectSharedValidatorError(
         t,
         () => amountValidator.validate(payload),
-        ResultCode.TRANSFER_AMOUNT_TOO_LARGE,
+        NetworkResultCode.RESULT_CODE_TRANSFER_AMOUNT_TOO_LARGE,
         'exceeds maximum'
     );
 
     await expectSharedValidatorError(
         t,
         () => new PartialTransferValidator(createState(), validator.address, config).validate(payload),
-        ResultCode.TRANSFER_SENDER_NOT_FOUND,
+        NetworkResultCode.RESULT_CODE_TRANSFER_SENDER_NOT_FOUND,
         'Sender account not found'
     );
 
@@ -175,7 +175,7 @@ test('PartialTransferValidator.validate rejects transfer amount and state balanc
     await expectSharedValidatorError(
         t,
         () => insufficientValidator.validate(insufficientPayload),
-        ResultCode.TRANSFER_INSUFFICIENT_BALANCE,
+        NetworkResultCode.RESULT_CODE_TRANSFER_INSUFFICIENT_BALANCE,
         'Insufficient balance'
     );
 
@@ -189,7 +189,7 @@ test('PartialTransferValidator.validate rejects transfer amount and state balanc
     await expectSharedValidatorError(
         t,
         () => selfInsufficientValidator.validate(selfInsufficientPayload),
-        ResultCode.TRANSFER_INSUFFICIENT_BALANCE,
+        NetworkResultCode.RESULT_CODE_TRANSFER_INSUFFICIENT_BALANCE,
         'fee'
     );
 
@@ -209,7 +209,7 @@ test('PartialTransferValidator.validate rejects transfer amount and state balanc
     await expectSharedValidatorError(
         t,
         () => overflowValidator.validate(overflowPayload),
-        ResultCode.TRANSFER_RECIPIENT_BALANCE_OVERFLOW,
+        NetworkResultCode.RESULT_CODE_TRANSFER_RECIPIENT_BALANCE_OVERFLOW,
         'recipient balance'
     );
 });

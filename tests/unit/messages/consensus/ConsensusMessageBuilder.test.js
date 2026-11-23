@@ -368,8 +368,8 @@ test('ConsensusMessageBuilder rejects invalid buffer and address fields', async 
     );
 
     t.exception(
-        () => builder.setResultCode(NetworkResultCode.TX_INVALID_PAYLOAD),
-        errorMessageIncludes(`Invalid consensus result code: ${NetworkResultCode.TX_INVALID_PAYLOAD}`)
+        () => builder.setResultCode(NetworkResultCode.RESULT_CODE_TX_INVALID_PAYLOAD),
+        errorMessageIncludes(`Invalid consensus result code: ${NetworkResultCode.RESULT_CODE_TX_INVALID_PAYLOAD}`)
     );
 });
 

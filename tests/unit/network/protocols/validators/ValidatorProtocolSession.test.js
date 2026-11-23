@@ -1,7 +1,7 @@
 import { test } from 'brittle';
 import sinon from 'sinon';
 import ValidatorProtocolSession from '../../../../../src/core/network/protocols/validators/ValidatorProtocolSession.js';
-import { ResultCode } from '../../../../../src/utils/constants.js';
+import { NetworkResultCode } from '../../../../../src/utils/constants.js';
 import { config } from '../../../../helpers/config.js';
 import { testKeyPair1 } from '../../../../fixtures/apply.fixtures.js';
 import { WalletProvider } from 'trac-wallet';
@@ -12,7 +12,7 @@ async function createWallet() {
 
 function makeProtocol(sendStub) {
     return {
-        send: sendStub ?? sinon.stub().resolves(ResultCode.OK),
+        send: sendStub ?? sinon.stub().resolves(NetworkResultCode.RESULT_CODE_OK),
         sendAndForget: sinon.stub(),
         decode: sinon.stub(),
         close: sinon.stub()
@@ -23,7 +23,7 @@ test('ValidatorProtocolSession', (t) => {
     t.teardown(() => sinon.restore());
 
     test('probe sets preferred protocol to v1 on OK', async (t) => {
-        const v1Send = sinon.stub().resolves(ResultCode.OK);
+        const v1Send = sinon.stub().resolves(NetworkResultCode.RESULT_CODE_OK);
         const session = new ValidatorProtocolSession(
             makeProtocol(),
             makeProtocol(v1Send),
@@ -37,7 +37,7 @@ test('ValidatorProtocolSession', (t) => {
     });
 
     test('probe sets preferred protocol to legacy on non-OK', async (t) => {
-        const v1Send = sinon.stub().resolves(ResultCode.TIMEOUT);
+        const v1Send = sinon.stub().resolves(NetworkResultCode.RESULT_CODE_TIMEOUT);
         const session = new ValidatorProtocolSession(
             makeProtocol(),
             makeProtocol(v1Send),
@@ -65,7 +65,7 @@ test('ValidatorProtocolSession', (t) => {
     });
 
     test('sendHealthCheck returns OK when preferred is v1', async (t) => {
-        const v1Send = sinon.stub().resolves(ResultCode.OK);
+        const v1Send = sinon.stub().resolves(NetworkResultCode.RESULT_CODE_OK);
         const session = new ValidatorProtocolSession(
             makeProtocol(),
             makeProtocol(v1Send),
@@ -75,7 +75,7 @@ test('ValidatorProtocolSession', (t) => {
 
         session.setV1AsPreferredProtocol();
         const result = await session.sendHealthCheck();
-        t.is(result, ResultCode.OK);
+        t.is(result, NetworkResultCode.RESULT_CODE_OK);
         t.ok(v1Send.calledOnce);
     });
 
@@ -89,7 +89,7 @@ test('ValidatorProtocolSession', (t) => {
 
         session.setLegacyAsPreferredProtocol();
         const result = await session.sendHealthCheck();
-        t.is(result, ResultCode.OK);
+        t.is(result, NetworkResultCode.RESULT_CODE_OK);
     });
 
     test('sendHealthCheck returns UNSPECIFIED when not probed', async (t) => {
@@ -101,7 +101,7 @@ test('ValidatorProtocolSession', (t) => {
         );
 
         const result = await session.sendHealthCheck();
-        t.is(result, ResultCode.UNSPECIFIED);
+        t.is(result, NetworkResultCode.RESULT_CODE_UNSPECIFIED);
     });
 
     test('isHealthCheckSupported returns false when not probed', async (t) => {

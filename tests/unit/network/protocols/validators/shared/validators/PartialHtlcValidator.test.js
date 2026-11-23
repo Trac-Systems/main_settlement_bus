@@ -10,7 +10,7 @@ import * as escrowEntryUtils from '../../../../../../../src/core/state/utils/esc
 import nodeEntryUtils from '../../../../../../../src/core/state/utils/nodeEntry.js';
 import {$TNK, BALANCE_FEE, PERCENT_75} from '../../../../../../../src/core/state/utils/balance.js';
 import {bigIntToBuffer, uint64ToBuffer, uint8ToBuffer} from '../../../../../../../src/utils/buffer.js';
-import {EntryType, HTLC_MIN_LOCK_DURATION_EPOCHS, ResultCode} from '../../../../../../../src/utils/constants.js';
+import {EntryType, HTLC_MIN_LOCK_DURATION_EPOCHS, NetworkResultCode} from '../../../../../../../src/utils/constants.js';
 import {config} from '../../../../../../helpers/config.js';
 import {createHtlcLockTransactionHash} from '../../../../../../helpers/htlcLock.js';
 import {
@@ -44,7 +44,7 @@ test('PartialHtlcValidator rejects a lock with an existing escrow entry', async 
     await expectSharedValidatorError(
         t,
         () => new PartialHtlcValidator(state, validator.address, config).validate(payload),
-        ResultCode.TX_ALREADY_EXISTS,
+        NetworkResultCode.RESULT_CODE_TX_ALREADY_EXISTS,
         'escrow already exists'
     );
 });
@@ -64,7 +64,7 @@ test('PartialHtlcValidator rejects lock transactions and escrows in signed or cu
             await expectSharedValidatorError(
                 t,
                 () => new PartialHtlcValidator(state, validator.address, config).validate(payload),
-                ResultCode.TX_ALREADY_EXISTS,
+                NetworkResultCode.RESULT_CODE_TX_ALREADY_EXISTS,
                 `${entryName} already exists`
             );
         }
@@ -79,7 +79,7 @@ test('PartialHtlcValidator does not validate unrelated operations as locks', asy
     await expectSharedValidatorError(
         t,
         () => new PartialHtlcValidator(state, validator.address, config).validate(transfer),
-        ResultCode.OPERATION_TYPE_UNKNOWN,
+        NetworkResultCode.RESULT_CODE_OPERATION_TYPE_UNKNOWN,
         'Unsupported HTLC operation type'
     );
 });
@@ -94,7 +94,7 @@ test('PartialHtlcValidator checks the latest unsigned epoch at admission', async
     await expectSharedValidatorError(
         t,
         () => new PartialHtlcValidator(state, validator.address, config).validate(payload),
-        ResultCode.TX_INVALID_PAYLOAD,
+        NetworkResultCode.RESULT_CODE_TX_INVALID_PAYLOAD,
         'refund epoch'
     );
 
@@ -102,7 +102,7 @@ test('PartialHtlcValidator checks the latest unsigned epoch at admission', async
     await expectSharedValidatorError(
         t,
         () => new PartialHtlcValidator(state, validator.address, config).validate(payload),
-        ResultCode.TX_INVALID_PAYLOAD,
+        NetworkResultCode.RESULT_CODE_TX_INVALID_PAYLOAD,
         'initialized network epoch'
     );
 });
@@ -120,7 +120,7 @@ test('PartialHtlcValidator rejects validator reward overflow before completion',
     await expectSharedValidatorError(
         t,
         () => new PartialHtlcValidator(state, validator.address, config).validate(payload),
-        ResultCode.TRANSFER_RECIPIENT_BALANCE_OVERFLOW,
+        NetworkResultCode.RESULT_CODE_TRANSFER_RECIPIENT_BALANCE_OVERFLOW,
         'validator reward'
     );
 
@@ -242,7 +242,7 @@ test('PartialHtlcValidator requires a signed lock before admitting a claim', asy
     await expectSharedValidatorError(
         t,
         () => new PartialHtlcValidator(state, validator.address, config).validate(claim),
-        ResultCode.TX_INVALID_PAYLOAD,
+        NetworkResultCode.RESULT_CODE_TX_INVALID_PAYLOAD,
         'not confirmed in signed state'
     );
 });
@@ -254,7 +254,7 @@ test('PartialHtlcValidator rejects a validator signing its own claim', async t =
     await expectSharedValidatorError(
         t,
         () => new PartialHtlcValidator(state, submitter.address, config).validate(claim),
-        ResultCode.SELF_VALIDATION_FORBIDDEN
+        NetworkResultCode.RESULT_CODE_SELF_VALIDATION_FORBIDDEN
     );
 });
 
@@ -264,11 +264,11 @@ test('PartialHtlcValidator rejects missing and already settled escrows', async t
     const validatorInstance = new PartialHtlcValidator(state, validator.address, config);
 
     txEntries.delete(escrowKey);
-    await expectSharedValidatorError(t, () => validatorInstance.validate(claim), ResultCode.TX_INVALID_PAYLOAD, 'does not exist');
+    await expectSharedValidatorError(t, () => validatorInstance.validate(claim), NetworkResultCode.RESULT_CODE_TX_INVALID_PAYLOAD, 'does not exist');
 
     const settled = escrowEntryUtils.makeClaim(escrow, preimage, uint64ToBuffer(10n), config.addressPrefix);
     txEntries.set(escrowKey, settled.claimedEscrowEntry);
-    await expectSharedValidatorError(t, () => validatorInstance.validate(claim), ResultCode.TX_ALREADY_EXISTS, 'already settled');
+    await expectSharedValidatorError(t, () => validatorInstance.validate(claim), NetworkResultCode.RESULT_CODE_TX_ALREADY_EXISTS, 'already settled');
 });
 
 test('PartialHtlcValidator rejects an already recorded claim transaction', async t => {
@@ -279,7 +279,7 @@ test('PartialHtlcValidator rejects an already recorded claim transaction', async
     await expectSharedValidatorError(
         t,
         () => new PartialHtlcValidator(state, validator.address, config).validate(claim),
-        ResultCode.TX_ALREADY_EXISTS,
+        NetworkResultCode.RESULT_CODE_TX_ALREADY_EXISTS,
         'already exists'
     );
 });
@@ -290,14 +290,14 @@ test('PartialHtlcValidator checks signed and unsigned claim epochs', async t => 
     const validatorInstance = new PartialHtlcValidator(state, validator.address, config);
 
     state.getCurrentEpochUnsigned = async () => 20n;
-    await expectSharedValidatorError(t, () => validatorInstance.validate(claim), ResultCode.TX_EXPIRED, 'expired');
+    await expectSharedValidatorError(t, () => validatorInstance.validate(claim), NetworkResultCode.RESULT_CODE_TX_EXPIRED, 'expired');
 
     state.getCurrentEpochUnsigned = async () => 10n;
     state.getCurrentEpoch = async () => 20n;
-    await expectSharedValidatorError(t, () => validatorInstance.validate(claim), ResultCode.TX_EXPIRED, 'expired');
+    await expectSharedValidatorError(t, () => validatorInstance.validate(claim), NetworkResultCode.RESULT_CODE_TX_EXPIRED, 'expired');
 
     state.getCurrentEpoch = async () => null;
-    await expectSharedValidatorError(t, () => validatorInstance.validate(claim), ResultCode.TX_INVALID_PAYLOAD, 'initialized');
+    await expectSharedValidatorError(t, () => validatorInstance.validate(claim), NetworkResultCode.RESULT_CODE_TX_INVALID_PAYLOAD, 'initialized');
 });
 
 test('PartialHtlcValidator rejects a wrong preimage and an invalid submitter signature', async t => {
@@ -308,13 +308,13 @@ test('PartialHtlcValidator rejects a wrong preimage and an invalid submitter sig
     await expectSharedValidatorError(
         t,
         () => validatorInstance.validate(wrongPreimageClaim),
-        ResultCode.TX_INVALID_PAYLOAD,
+        NetworkResultCode.RESULT_CODE_TX_INVALID_PAYLOAD,
         'preimage'
     );
 
     const claim = await buildClaim();
     claim.hco.is = b4a.alloc(claim.hco.is.length, 0xaa);
-    await expectSharedValidatorError(t, () => validatorInstance.validate(claim), ResultCode.TX_SIGNATURE_INVALID);
+    await expectSharedValidatorError(t, () => validatorInstance.validate(claim), NetworkResultCode.RESULT_CODE_TX_SIGNATURE_INVALID);
 });
 
 test('PartialHtlcValidator rejects a claim that would overflow a payout account', async t => {
@@ -328,7 +328,7 @@ test('PartialHtlcValidator rejects a claim that would overflow a payout account'
     await expectSharedValidatorError(
         t,
         () => new PartialHtlcValidator(state, validator.address, config).validate(claim),
-        ResultCode.TRANSFER_RECIPIENT_BALANCE_OVERFLOW,
+        NetworkResultCode.RESULT_CODE_TRANSFER_RECIPIENT_BALANCE_OVERFLOW,
         'overflow'
     );
 });
@@ -345,7 +345,7 @@ test('PartialHtlcValidator combines overlapping claim and fee payouts before ove
     await expectSharedValidatorError(
         t,
         () => validatorInstance.validate(claim),
-        ResultCode.TRANSFER_RECIPIENT_BALANCE_OVERFLOW,
+        NetworkResultCode.RESULT_CODE_TRANSFER_RECIPIENT_BALANCE_OVERFLOW,
         'overflow'
     );
 
@@ -397,12 +397,12 @@ test('PartialHtlcValidator requires a confirmed pending escrow', async t => {
     const admission = () => new PartialHtlcValidator(state, validator.address, config).validate(payload);
 
     signedEntries.delete(escrowKey);
-    await expectSharedValidatorError(t, admission, ResultCode.TX_INVALID_PAYLOAD, 'signed state');
+    await expectSharedValidatorError(t, admission, NetworkResultCode.RESULT_CODE_TX_INVALID_PAYLOAD, 'signed state');
     signedEntries.set(escrowKey, escrow);
     txEntries.delete(escrowKey);
-    await expectSharedValidatorError(t, admission, ResultCode.TX_INVALID_PAYLOAD, 'current state');
+    await expectSharedValidatorError(t, admission, NetworkResultCode.RESULT_CODE_TX_INVALID_PAYLOAD, 'current state');
     txEntries.set(escrowKey, escrowEntryUtils.makeRefund(escrow, uint64ToBuffer(100n), config.addressPrefix).refundedEscrowEntry);
-    await expectSharedValidatorError(t, admission, ResultCode.TX_ALREADY_EXISTS, 'already settled');
+    await expectSharedValidatorError(t, admission, NetworkResultCode.RESULT_CODE_TX_ALREADY_EXISTS, 'already settled');
 });
 
 test('PartialHtlcValidator waits for the signed refund epoch', async t => {
@@ -410,7 +410,7 @@ test('PartialHtlcValidator waits for the signed refund epoch', async t => {
     await expectSharedValidatorError(
         t,
         () => new PartialHtlcValidator(state, validator.address, config).validate(payload),
-        ResultCode.TX_INVALID_PAYLOAD,
+        NetworkResultCode.RESULT_CODE_TX_INVALID_PAYLOAD,
         'not been reached'
     );
 });
@@ -420,7 +420,7 @@ test('PartialHtlcValidator also waits for the unsigned refund epoch', async t =>
     await expectSharedValidatorError(
         t,
         () => new PartialHtlcValidator(state, validator.address, config).validate(payload),
-        ResultCode.TX_INVALID_PAYLOAD,
+        NetworkResultCode.RESULT_CODE_TX_INVALID_PAYLOAD,
         'not been reached'
     );
 });
@@ -433,7 +433,7 @@ test('PartialHtlcValidator rejects a refund that would overflow the stored recip
     await expectSharedValidatorError(
         t,
         () => new PartialHtlcValidator(state, validator.address, config).validate(payload),
-        ResultCode.TRANSFER_RECIPIENT_BALANCE_OVERFLOW,
+        NetworkResultCode.RESULT_CODE_TRANSFER_RECIPIENT_BALANCE_OVERFLOW,
         'overflow'
     );
 
@@ -447,7 +447,7 @@ test('PartialHtlcValidator rejects a corrupt refund recipient account but accept
     const admission = () => new PartialHtlcValidator(state, validator.address, config).validate(payload);
 
     txEntries.set(maker.address, b4a.from([1]));
-    await expectSharedValidatorError(t, admission, ResultCode.TX_INVALID_PAYLOAD, 'recipient account is invalid');
+    await expectSharedValidatorError(t, admission, NetworkResultCode.RESULT_CODE_TX_INVALID_PAYLOAD, 'recipient account is invalid');
 
     txEntries.delete(maker.address);
     t.ok(await admission(), 'a missing refund recipient account can be created during apply');
@@ -458,15 +458,15 @@ test('PartialHtlcValidator rejects refund replay, forged signature and self-vali
     const admission = candidate => new PartialHtlcValidator(state, validator.address, config).validate(candidate);
 
     txEntries.set(b4a.toString(payload.hro.tx, 'hex'), b4a.from([1]));
-    await expectSharedValidatorError(t, () => admission(payload), ResultCode.TX_ALREADY_EXISTS);
+    await expectSharedValidatorError(t, () => admission(payload), NetworkResultCode.RESULT_CODE_TX_ALREADY_EXISTS);
     txEntries.delete(b4a.toString(payload.hro.tx, 'hex'));
 
     const forged = {...payload, hro: {...payload.hro, is: b4a.alloc(payload.hro.is.length, 0xaa)}};
-    await expectSharedValidatorError(t, () => admission(forged), ResultCode.TX_SIGNATURE_INVALID);
+    await expectSharedValidatorError(t, () => admission(forged), NetworkResultCode.RESULT_CODE_TX_SIGNATURE_INVALID);
 
     const selfPayload = await applyStateMessageFactory(validator, config)
         .buildPartialHtlcRefundOperationMessage(validator.address, payload.hro.txv, payload.hro.li);
-    await expectSharedValidatorError(t, () => admission(selfPayload), ResultCode.SELF_VALIDATION_FORBIDDEN);
+    await expectSharedValidatorError(t, () => admission(selfPayload), NetworkResultCode.RESULT_CODE_SELF_VALIDATION_FORBIDDEN);
 });
 
 test('PartialHtlcValidator binds signer zero to the locker address', async t => {
@@ -478,7 +478,7 @@ test('PartialHtlcValidator binds signer zero to the locker address', async t => 
     await expectSharedValidatorError(
         t,
         () => new PartialHtlcValidator(createValidState(maker), validator.address, config).validate(payload),
-        ResultCode.TX_SIGNATURE_INVALID,
+        NetworkResultCode.RESULT_CODE_TX_SIGNATURE_INVALID,
         'signer zero'
     );
 });
@@ -491,7 +491,7 @@ test('PartialHtlcValidator verifies every supplied cosigner signature', async t 
     await expectSharedValidatorError(
         t,
         () => new PartialHtlcValidator(createValidState(maker), validator.address, config).validate(payload),
-        ResultCode.TX_SIGNATURE_INVALID,
+        NetworkResultCode.RESULT_CODE_TX_SIGNATURE_INVALID,
         'cosigner signatures'
     );
 
@@ -500,7 +500,7 @@ test('PartialHtlcValidator verifies every supplied cosigner signature', async t 
     await expectSharedValidatorError(
         t,
         () => new PartialHtlcValidator(createValidState(maker), validator.address, config).validate(unsatisfied),
-        ResultCode.SCHEMA_VALIDATION_FAILED,
+        NetworkResultCode.RESULT_CODE_SCHEMA_VALIDATION_FAILED,
         'Payload is invalid'
     );
 });
@@ -524,7 +524,7 @@ test('PartialHtlcValidator matches cosigner signatures only in signer-set order'
     await expectSharedValidatorError(
         t,
         () => validatorInstance.validate(payload),
-        ResultCode.TX_SIGNATURE_INVALID,
+        NetworkResultCode.RESULT_CODE_TX_SIGNATURE_INVALID,
         'signer-set order'
     );
 });
@@ -538,7 +538,7 @@ test('PartialHtlcValidator requires valid settlement addresses', async t => {
     await expectSharedValidatorError(
         t,
         () => new PartialHtlcValidator(createValidState(maker), validator.address, config).validate(payload),
-        ResultCode.TX_INVALID_PAYLOAD,
+        NetworkResultCode.RESULT_CODE_TX_INVALID_PAYLOAD,
         'claim address'
     );
 });
@@ -559,7 +559,7 @@ test('PartialHtlcValidator rejects signed high-bit settlement-address aliases', 
         await expectSharedValidatorError(
             t,
             () => validatorInstance.validate(payload),
-            ResultCode.TX_INVALID_PAYLOAD,
+            NetworkResultCode.RESULT_CODE_TX_INVALID_PAYLOAD,
             `${label} address`
         );
     }
@@ -589,7 +589,7 @@ test('PartialHtlcValidator rejects signed addresses with invalid checksums', asy
         await expectSharedValidatorError(
             t,
             () => validatorInstance.validate(payload),
-            field === 'address' ? ResultCode.REQUESTER_ADDRESS_INVALID : ResultCode.TX_INVALID_PAYLOAD,
+            field === 'address' ? NetworkResultCode.RESULT_CODE_REQUESTER_ADDRESS_INVALID : NetworkResultCode.RESULT_CODE_TX_INVALID_PAYLOAD,
             label
         );
     }
@@ -605,7 +605,7 @@ test('PartialHtlcValidator rejects a signed high-bit requester-address alias', a
     await expectSharedValidatorError(
         t,
         () => new PartialHtlcValidator(createValidState(maker), validator.address, config).validate(payload),
-        ResultCode.REQUESTER_ADDRESS_INVALID,
+        NetworkResultCode.RESULT_CODE_REQUESTER_ADDRESS_INVALID,
         'requesting address'
     );
 });
@@ -619,7 +619,7 @@ test('PartialHtlcValidator enforces an initialized epoch and minimum lock durati
     await expectSharedValidatorError(
         t,
         () => new PartialHtlcValidator(createValidState(maker), validator.address, config).validate(expiredPayload),
-        ResultCode.TX_INVALID_PAYLOAD,
+        NetworkResultCode.RESULT_CODE_TX_INVALID_PAYLOAD,
         'refund epoch'
     );
 
@@ -631,7 +631,7 @@ test('PartialHtlcValidator enforces an initialized epoch and minimum lock durati
             validator.address,
             config
         ).validate(validPayload),
-        ResultCode.TX_INVALID_PAYLOAD,
+        NetworkResultCode.RESULT_CODE_TX_INVALID_PAYLOAD,
         'initialized network epoch'
     );
 });
@@ -666,7 +666,7 @@ test('PartialHtlcValidator handles Buffer and Uint8Array refund epochs consisten
                 await expectSharedValidatorError(
                     t,
                     () => validatorInstance.validate(payload),
-                    ResultCode.TX_INVALID_PAYLOAD,
+                    NetworkResultCode.RESULT_CODE_TX_INVALID_PAYLOAD,
                     'refund epoch'
                 );
             } else {
@@ -680,7 +680,7 @@ test('PartialHtlcValidator handles Buffer and Uint8Array refund epochs consisten
             await expectSharedValidatorError(
                 t,
                 () => validatorInstance.validate(payload),
-                ResultCode.SCHEMA_VALIDATION_FAILED,
+                NetworkResultCode.RESULT_CODE_SCHEMA_VALIDATION_FAILED,
                 'Payload is invalid'
             );
         }
@@ -700,7 +700,7 @@ test('PartialHtlcValidator checks principal, surcharge, and network fee against 
             validator.address,
             config
         ).validate(payload),
-        ResultCode.TRANSFER_INSUFFICIENT_BALANCE,
+        NetworkResultCode.RESULT_CODE_TRANSFER_INSUFFICIENT_BALANCE,
         'principal, surcharge fee, and network fee'
     );
 
@@ -712,7 +712,7 @@ test('PartialHtlcValidator checks principal, surcharge, and network fee against 
     await expectSharedValidatorError(
         t,
         () => new PartialHtlcValidator(createValidState(maker), validator.address, config).validate(overflowPayload),
-        ResultCode.TRANSFER_AMOUNT_TOO_LARGE,
+        NetworkResultCode.RESULT_CODE_TRANSFER_AMOUNT_TOO_LARGE,
         'maximum allowed value'
     );
 });

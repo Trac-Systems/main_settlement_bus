@@ -6,7 +6,7 @@ import {
     ConsensusResultCode,
     NetworkOperationType,
     NONCE_BYTE_LENGTH,
-    ResultCode,
+    NetworkResultCode,
     SIGNATURE_BYTE_LENGTH,
 } from '../../../../../../../src/utils/constants.js';
 import {not_allowed_data_types} from '../../../../../../fixtures/check.fixtures.js';
@@ -29,7 +29,7 @@ const validFixture = {
     liveness_response: {
         nonce: b4a.alloc(NONCE_BYTE_LENGTH, 1),
         signature: b4a.alloc(SIGNATURE_BYTE_LENGTH, 2),
-        result: ResultCode.OK,
+        result: NetworkResultCode.RESULT_CODE_OK,
     },
     capabilities: ['cap:a'],
 };
@@ -109,7 +109,7 @@ test('V1ValidationSchema.validateV1LivenessResponse - result value validation', 
     t.absent(v.validateV1LivenessResponse(infinity), 'result Infinity should fail');
 
     const unknownCode = structuredClone(validFixture);
-    unknownCode.liveness_response.result = Math.max(...Object.values(ResultCode)) + 1;
+    unknownCode.liveness_response.result = Math.max(...Object.values(NetworkResultCode)) + 1;
     t.absent(v.validateV1LivenessResponse(unknownCode), 'unknown result code should fail');
 
     const consensusOnlyCode = structuredClone(validFixture);

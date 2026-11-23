@@ -7,7 +7,7 @@ import {
     createBroadcastTransactionOperationStrategies,
     resolveBroadcastTransactionOperationStrategy
 } from '../../../../../../../src/core/network/protocols/validators/v1/handlers/broadcastTransaction/BroadcastTransactionOperationStrategies.js';
-import {OperationType, ResultCode} from '../../../../../../../src/utils/constants.js';
+import {OperationType, NetworkResultCode} from '../../../../../../../src/utils/constants.js';
 import {V1ProtocolError} from '../../../../../../../src/core/network/protocols/validators/v1/V1ProtocolError.js';
 import applyOperationFixtures from '../../../../../../fixtures/applyOperation.fixtures.js';
 
@@ -261,7 +261,7 @@ test('resolveBroadcastTransactionOperationStrategy rejects unsupported transacti
     }
 
     t.ok(error instanceof V1ProtocolError);
-    t.is(error.resultCode, ResultCode.TX_INVALID_PAYLOAD);
+    t.is(error.resultCode, NetworkResultCode.RESULT_CODE_TX_INVALID_PAYLOAD);
     t.is(error.message, 'Unsupported transaction type: 9999');
 });
 
