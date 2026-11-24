@@ -19,8 +19,12 @@ class IndexerConnectionManager extends PeerConnectionManager {
     }
 
     async add(publicKey, connection) {
+        if (!this._canAddConnection(connection)) return;
         await this.#messages.attachChannel(connection);
-        if (connection.destroyed) return;
+        if (!this._canAddConnection(connection)) {
+            connection.protocolSessions?.indexer?.close();
+            return;
+        }
         if (!connection.protocolSessions?.indexer || connection.protocolSessions.indexer.closed) return;
         this._add(publicKey, connection)
     }
@@ -51,14 +55,10 @@ class IndexerConnectionManager extends PeerConnectionManager {
     }
 
     remove(publicKey, connection = null) {
-        const key = this._toHexString(publicKey);
-        const entry = this._connections.get(key);
+        const entry = this._untrackConnection(publicKey, connection);
         if (!entry) return;
-        if (connection && entry.connection !== connection) return;
 
-        const targetConnection = connection ?? entry.connection;
-        this._connections.delete(key);
-        targetConnection.protocolSessions.indexer?.close();
+        entry.connection?.protocolSessions?.indexer?.close();
     }
 
     async send(publicKey, message) {

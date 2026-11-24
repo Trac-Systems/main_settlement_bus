@@ -44,7 +44,7 @@ class Network extends ReadyResource {
     #validatorMessages;
     #indexerMessages;
     #indexerConnectionManager;
-    #consensusPeerBanRequestedListener;
+    #stateListeners;
     #epochAppenderSelector;
     #closing = false;
 
@@ -68,7 +68,14 @@ class Network extends ReadyResource {
         this.#validatorPendingRequestService = new ValidatorPendingRequestService(this.#config);
         this.#indexerPendingRequestService = new IndexerPendingRequestService(this.#config);
         this.#logger = new Logger(this.#config);
-        this.#consensusPeerBanRequestedListener = this.#handleConsensusPeerBanRequested.bind(this);
+        this.#stateListeners = [
+            [CustomEventType.CONSENSUS_PEER_BAN_REQUESTED, this.#onConsensusPeerBanRequested],
+            [CustomEventType.IS_INDEXER, this.#onIndexerPromotion],
+            [CustomEventType.UNWRITABLE, this.#onUnwritable],
+            [CustomEventType.IS_INDEXER, this.#onLocalIndexerPromotion],
+            [CustomEventType.IS_NON_INDEXER, this.#onIndexerDemotion],
+            [CustomEventType.GENESIS_EPOCH_CREATED, this.#onGenesisEpochCreated],
+        ];
     }
 
     get swarm() {
@@ -165,7 +172,8 @@ class Network extends ReadyResource {
         this.#assertCanReplicate();
 
         this.#logger.info(`Channel: ${b4a.toString(this.#config.channel)}`);
-        this.#listeners();
+        this.#attachStateListeners();
+        this.#attachConnectionListener();
 
         this.#swarm.join(this.#config.channel, { server: true, client: true });
         this.#swarm.flush();
@@ -181,7 +189,7 @@ class Network extends ReadyResource {
     async _close() {
         this.#logger.info('Network: closing gracefully...');
         this.#closing = true;
-        this.#state.off(CustomEventType.CONSENSUS_PEER_BAN_REQUESTED, this.#consensusPeerBanRequestedListener);
+        this.#detachStateListeners();
         await this.#epochCoordinatorService.close();
         await this.#epochAppenderSelector.close();
         await this.transactionPoolService.stop();
@@ -213,45 +221,56 @@ class Network extends ReadyResource {
         wakeup.addStream(stream);
     }
 
-    #listeners() {
-        this.#state.on(CustomEventType.CONSENSUS_PEER_BAN_REQUESTED, this.#consensusPeerBanRequestedListener);
-        this.#state.on(CustomEventType.IS_INDEXER, async (publicKey) => {
-            const publicKeyHex = this.#normalizePublicKey(publicKey);
-            this.#validatorConnectionManager.remove(publicKeyHex);
-            const indexerCount = await this.#state.indexerCount();
-            this.#indexerConnectionManager.setMax(indexerCount - 1);
-        });
+    #attachStateListeners() {
+        for (const [event, handler] of this.#stateListeners) {
+            this.#state.on(event, handler);
+        }
+    }
 
-        this.#state.on(CustomEventType.UNWRITABLE, (publicKey) => {
-            this.disconnectValidatorPeer(publicKey, 'peer became unwritable');
-        });
+    #detachStateListeners() {
+        for (const [event, handler] of this.#stateListeners) {
+            this.#state.off(event, handler);
+        }
+    }
 
-        this.#state.on(CustomEventType.IS_INDEXER, async bufferAddress => {
-            const address = tracCryptoApi.address.encode(this.#config.addressPrefix, bufferAddress);
-            if (address === this.#wallet.address) {
-                if (await this.#state.getCurrentEpoch() !== null) {
-                    this.#epochCoordinatorService.start();
-                }
-            }
-        });
+    #onIndexerPromotion = async publicKey => {
+        const publicKeyHex = this.#normalizePublicKey(publicKey);
+        this.#validatorConnectionManager.remove(publicKeyHex);
+        const indexerCount = await this.#state.indexerCount();
+        this.#indexerConnectionManager.setMax(indexerCount - 1);
+    };
 
-        this.#state.on(CustomEventType.IS_NON_INDEXER, async (bufferAddress) => {
-            const address = tracCryptoApi.address.encode(this.#config.addressPrefix, bufferAddress);
-            if (address === this.#wallet.address) {
-                await this.#epochCoordinatorService.stop();
-            } else {
-                this.#indexerConnectionManager.remove(bufferAddress);
-                const indexerCount = await this.#state.indexerCount();
-                this.#indexerConnectionManager.setMax(indexerCount - 1);
-            }
-        });
+    #onUnwritable = publicKey => {
+        this.disconnectValidatorPeer(publicKey, 'peer became unwritable');
+    };
 
-        this.#state.on(CustomEventType.GENESIS_EPOCH_CREATED, () => {
-            if (this.#state.isIndexer()) {
+    #onLocalIndexerPromotion = async bufferAddress => {
+        const address = tracCryptoApi.address.encode(this.#config.addressPrefix, bufferAddress);
+        if (address === this.#wallet.address) {
+            if (await this.#state.getCurrentEpoch() !== null) {
                 this.#epochCoordinatorService.start();
             }
-        });
+        }
+    };
 
+    #onIndexerDemotion = async bufferAddress => {
+        const address = tracCryptoApi.address.encode(this.#config.addressPrefix, bufferAddress);
+        if (address === this.#wallet.address) {
+            await this.#epochCoordinatorService.stop();
+        } else {
+            this.#indexerConnectionManager.remove(bufferAddress);
+            const indexerCount = await this.#state.indexerCount();
+            this.#indexerConnectionManager.setMax(indexerCount - 1);
+        }
+    };
+
+    #onGenesisEpochCreated = () => {
+        if (this.#state.isIndexer()) {
+            this.#epochCoordinatorService.start();
+        }
+    };
+
+    #attachConnectionListener() {
         this.#swarm.prependListener('connection', async (connection) => {
             if (this.#closing || this.closed) {
                 this.#destroyConnection(connection);
@@ -331,7 +350,7 @@ class Network extends ReadyResource {
     }
 
     /** Executes a ban requested by the consensus connection policy. */
-    #handleConsensusPeerBanRequested({ connection, error } = {}) {
+    #onConsensusPeerBanRequested = ({ connection, error } = {}) => {
         if (this.closing !== null || this.closed) return;
 
         const publicKey = this.#normalizePublicKey(connection?.remotePublicKey);
@@ -359,7 +378,7 @@ class Network extends ReadyResource {
             for (const activeConnection of connections) activeConnection.destroy();
         }
         this.#logger.info(`Network: ${peerInfo?.banned ? 'banned' : 'disconnected'} consensus peer ${publicKey}: ${error.message}`);
-    }
+    };
 
     #isPeerBanned(publicKey) {
         const key = this.#normalizePublicKey(publicKey);

@@ -19,6 +19,14 @@ export class PeerConnectionManager extends ReadyResource {
         this._config = config;
         this._logger = logger
     }
+
+    async _close() {
+        this.clear();
+    }
+
+    _canAddConnection(connection) {
+        return this.closing === null && !this.closed && !connection.destroyed && !connection.closed;
+    }
     
 
     setMax(maxPeers) {
@@ -36,6 +44,7 @@ export class PeerConnectionManager extends ReadyResource {
      * @returns {Boolean} - Returns true if the peer was added or updated, false otherwise
      */
     _add(publicKey, connection) {
+        if (!this._canAddConnection(connection)) return false;
         const publicKeyHex = this._toHexString(publicKey);
         if (this.maxConnectionsReached()) {
             this._logger.debug('add: max connections reached.');
@@ -114,7 +123,18 @@ export class PeerConnectionManager extends ReadyResource {
     }
     
     clear() {
-        this._connections.clear()
+        for (const publicKey of this._connections.keys()) this.remove(publicKey);
+    }
+
+    /** Removes only this manager's entry and close listener, preserving the shared transport. */
+    _untrackConnection(publicKey, connection = null) {
+        const publicKeyHex = this._toHexString(publicKey);
+        const entry = this._connections.get(publicKeyHex);
+        if (!entry || (connection && entry.connection !== connection)) return null;
+
+        this._connections.delete(publicKeyHex);
+        entry.connection?.off('close', entry.onClose);
+        return entry;
     }
 
     /**
@@ -129,12 +149,13 @@ export class PeerConnectionManager extends ReadyResource {
             this._logger.debug(`#append: tried to append existing peer: ${publicKeyToAddress(publicKey, this._config)}`);
             return;
         }
-        this._connections.set(publicKeyHex, {connection, sent: 0});
-        connection.on('close', () => {
+        const onClose = () => {
             this._logger.debug(`#append: connection closing for peer ${publicKeyToAddress(publicKey, this._config)}`);
             this.remove(publicKeyHex, connection);
             this._logger.debug(`#append: connection closed for peer ${publicKeyToAddress(publicKey, this._config)}`);
-        });
+        };
+        this._connections.set(publicKeyHex, {connection, sent: 0, onClose});
+        connection.on('close', onClose);
     }
 
     /**
@@ -143,17 +164,11 @@ export class PeerConnectionManager extends ReadyResource {
      * @param {Object} connection - The connection object
      */
     #update(publicKey, connection) {
-        // Note: Is there a good reason for the function 'update' to exist separately from 'append'?
-        // It seems that both could be merged into a single function that either adds or updates the entry.
-        // It would be preferable to keep them separated though, but we would need to review all usages to ensure correctness.
-        // Also, we should remove the 'else' branch below if we decide to keep 'update' and 'append' separated.
         const publicKeyHex = this._toHexString(publicKey);
         this._logger.debug(`#update: updating peer ${publicKeyToAddress(publicKey, this._config)}`);
-        if (this._connections.has(publicKeyHex)) {
-            this._connections.get(publicKeyHex).connection = connection;
-        } else {
-            this._connections.set(publicKeyHex, {connection, sent: 0});
-        }
+        const entry = this._untrackConnection(publicKeyHex);
+        this.#append(publicKeyHex, connection);
+        this._connections.get(publicKeyHex).sent = entry?.sent ?? 0;
     }
 
     /**

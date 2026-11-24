@@ -8,6 +8,7 @@ async function runTests() {
     await import('./TransactionRateLimiterService.test.js');
     await import('./ValidatorConnectionManager.test.js');
     await import('./IndexerConnectionManager.test.js');
+    await import('./PeerConnectionLifecycle.test.js');
     await import('./ValidatorMessageOrchestrator.test.js');
     // Run fake-timer request tests before transaction pool tests open Autobase instances.
     await import('../protocols/validators/v1/ValidatorPendingRequestService.test.js');

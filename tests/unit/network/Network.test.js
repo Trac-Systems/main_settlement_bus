@@ -58,7 +58,7 @@ function createMockConnection(publicKeyHex, { withProtocolSession = true, withCo
     };
 }
 
-async function loadNetwork({ isIndexer = false, currentEpoch = null, indexerCount = 0, walletAddress = 'trac_test' } = {}) {
+async function loadNetwork({ isIndexer = false, currentEpoch = null, indexerCount = 0, walletAddress = 'trac_test', state: providedState = null } = {}) {
     const { default: esmock } = await import('esmock');
     let swarmInstance = null;
     let validatorConnectionManagerInstance = null;
@@ -299,7 +299,7 @@ async function loadNetwork({ isIndexer = false, currentEpoch = null, indexerCoun
     };
 
     const store = new CorestoreMock();
-    const state = new EventEmitter();
+    const state = providedState ?? new EventEmitter();
     const connectionPolicy = new ConsensusV1ConnectionPolicy(state, new LoggerMock(), config);
     state.isAdmin = async () => false;
     state.isIndexer = () => isIndexer;
@@ -1049,6 +1049,34 @@ if (isBareRuntime) {
         connectionPolicy.requestPeerBan(connection, new V1ConsensusProtocolError(ConsensusResultCode.PUBLIC_KEY_MISMATCH, 'Address does not match remote public key.'));
         t.absent(peerInfo.ban.called, 'late ban requests cannot act on a closed network');
         t.absent(connection.destroy.called);
+    });
+
+    test('Network replacement removes all owned state listeners and preserves other subscribers', async t => {
+        const state = new EventEmitter();
+        const events = [
+            CustomEventType.CONSENSUS_PEER_BAN_REQUESTED,
+            CustomEventType.IS_INDEXER,
+            CustomEventType.UNWRITABLE,
+            CustomEventType.IS_NON_INDEXER,
+            CustomEventType.GENESIS_EPOCH_CREATED,
+        ];
+        const otherListener = sinon.spy();
+        for (const event of events) state.on(event, otherListener);
+
+        for (let cycle = 0; cycle < 3; cycle++) {
+            const { network } = await loadNetwork({ state });
+            t.teardown(() => network.close());
+            for (const event of events) {
+                t.is(state.listenerCount(event), event === CustomEventType.IS_INDEXER ? 3 : 2);
+            }
+            const closing = network.close();
+            for (const event of events) {
+                t.alike(state.rawListeners(event), [otherListener], 'detached before asynchronous shutdown');
+            }
+            await closing;
+            for (const event of events) state.emit(event, b4a.alloc(32, 1));
+        }
+        t.is(otherListener.callCount, events.length * 3, 'other subscribers still receive events');
     });
 
     test('Network#pendingConnectionsCount reflects active pending connections', async t => {
