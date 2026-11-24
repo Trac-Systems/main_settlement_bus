@@ -30,54 +30,51 @@ class ValidatorConnectionManager extends PeerConnectionManager {
 
     async _open() {
         await this.#healthCheckService.ready();
-        this.#subscribeToHealthChecks();
+        this.#healthCheckService.on(EventType.VALIDATOR_HEALTH_CHECK, this.#onHealthCheck);
     }
 
     async _close() {
+        this.#healthCheckService.off(EventType.VALIDATOR_HEALTH_CHECK, this.#onHealthCheck);
+        await super._close();
         await this.#healthCheckService.close();
     }
 
-    /**
-     * Subscribes to periodic validator health checks.
-     * @param {ReadyResource} healthCheckService
-     */
+    /** Handles a periodic validator health check. */
     // TODO: We should consider moving this to ValidatorObserver instead.
     // Keep here only if we forsee having health checks for non-validator connections in the future. 
     // For now, it seems that it would be better to keep this logic here.
-    #subscribeToHealthChecks() {
-        this.#healthCheckService.on(EventType.VALIDATOR_HEALTH_CHECK, async publicKey => {
-            if (!this.exists(publicKey) || !this.connected(publicKey)) {
-                this.#stopHealthCheck(publicKey);
-                return;
-            }
+    #onHealthCheck = async publicKey => {
+        if (!this.exists(publicKey) || !this.connected(publicKey)) {
+            this.#stopHealthCheck(publicKey);
+            return;
+        }
 
-            const connection = this.getConnection(publicKey);
-            if (!connection) {
-                this.#stopHealthCheck(publicKey);
-                this.remove(publicKey);
-                return;
-            }
+        const connection = this.getConnection(publicKey);
+        if (!connection) {
+            this.#stopHealthCheck(publicKey);
+            this.remove(publicKey);
+            return;
+        }
 
-            let success = false;
-            try {
-                const resultCode = await connection.protocolSessions.validator.sendHealthCheck();
-                success = resultCode === NetworkResultCode.RESULT_CODE_OK;
-            } catch {
-                success = false;
-            }
+        let success = false;
+        try {
+            const resultCode = await connection.protocolSessions.validator.sendHealthCheck();
+            success = resultCode === NetworkResultCode.RESULT_CODE_OK;
+        } catch {
+            success = false;
+        }
 
-            // An in-flight health check must not affect a replacement connection.
-            if (this.getConnection(publicKey) !== connection) return;
-            const publicKeyHex = this._toHexString(publicKey);
-            if (!success) {
-                const failures = (this.#healthCheckFailures.get(publicKeyHex) ?? 0) + 1;
-                this.#healthCheckFailures.set(publicKeyHex, failures);
-                if (failures >= this.#healthCheckFailureThreshold) this.remove(publicKey, connection);
-            } else {
-                this.#healthCheckFailures.delete(publicKeyHex);
-            }
-        });
-    }
+        // An in-flight health check must not affect a replacement connection.
+        if (this.getConnection(publicKey) !== connection) return;
+        const publicKeyHex = this._toHexString(publicKey);
+        if (!success) {
+            const failures = (this.#healthCheckFailures.get(publicKeyHex) ?? 0) + 1;
+            this.#healthCheckFailures.set(publicKeyHex, failures);
+            if (failures >= this.#healthCheckFailureThreshold) this.remove(publicKey, connection);
+        } else {
+            this.#healthCheckFailures.delete(publicKeyHex);
+        }
+    };
 
     #stopHealthCheck(publicKeyHex) {
         try {
@@ -88,6 +85,7 @@ class ValidatorConnectionManager extends PeerConnectionManager {
     }
 
     async add(publicKey, connection) {
+        if (!this._canAddConnection(connection)) return;
         this.#messages.attachChannel(connection);
         try {
             if (!connection.protocolSessions.validator.isProbed()) {
@@ -95,10 +93,13 @@ class ValidatorConnectionManager extends PeerConnectionManager {
             }
         } catch (err) {
             this._logger.error(`failed to probe peer with publicKey ${publicKey}: ${err?.message ?? err}`);
-        }        
+        }
+        // The transport or manager may have closed while the probe was pending.
+        if (!this._canAddConnection(connection)) return;
         if (this._add(publicKey, connection)) {
             this.#healthCheckFailures.delete(this._toHexString(publicKey));
         }
+        if (this.getConnection(publicKey) !== connection) return;
         
         if (connection.protocolSessions.validator.isHealthCheckSupported()) {
             this.#healthCheckService.start(publicKey);
@@ -109,13 +110,10 @@ class ValidatorConnectionManager extends PeerConnectionManager {
 
     remove(publicKey, connection = null) {
         const publicKeyHex = this._toHexString(publicKey);
-        const entry = this._connections.get(publicKeyHex);
-        if (!entry) return;
-        if (connection && entry.connection !== connection) return;
+        if (!this._untrackConnection(publicKeyHex, connection)) return;
 
         this.#stopHealthCheck(publicKeyHex);
         this.#healthCheckFailures.delete(publicKeyHex);
-        this._connections.delete(publicKeyHex);
     }
 
     async sendSingleMessage(message, publicKey) {
