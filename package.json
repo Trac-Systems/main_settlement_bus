@@ -20,6 +20,7 @@
   ],
   "scripts": {
     "start": "NODE_OPTIONS='--max-old-space-size=4096' node scripts/pear-runner.js",
+    "profile": "node --inspect=127.0.0.1:9229 --max-old-space-size=4096 msb.mjs",
     "rpc": "NODE_OPTIONS='--max-old-space-size=4096' node scripts/pear-runner.js --rpc --host ${npm_config_host} --port ${npm_config_port}",
     "env": "if [ -f .env ]; then set -a; . ./.env; set +a; fi; NODE_OPTIONS='--max-old-space-size=4096' node scripts/pear-runner.js --stores-directory ${STORES_DIRECTORY:-stores} --network ${NETWORK:-mainnet}",
     "env-rpc": "if [ -f .env ]; then set -a; . ./.env; set +a; fi; NODE_OPTIONS='--max-old-space-size=4096' node scripts/pear-runner.js --stores-directory ${STORES_DIRECTORY:-stores} --rpc --host ${MSB_HOST:-127.0.0.1} --port ${MSB_PORT:-5000} --network ${NETWORK:-mainnet}",
