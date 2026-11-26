@@ -9,12 +9,14 @@ class ValidatorV1Protocol extends ValidatorProtocolInterface {
     #router;
     #publicKeyHex;
     #pendingRequestService;
+    #connection;
 
     constructor(router, connection, pendingRequestService, config) {
         super(router, connection, pendingRequestService, config);
         this.#router = router;
         this.#publicKeyHex = connection.remotePublicKey.toString('hex');
         this.#pendingRequestService = pendingRequestService;
+        this.#connection = connection;
         this.init(connection);
     }
 
@@ -63,8 +65,11 @@ class ValidatorV1Protocol extends ValidatorProtocolInterface {
     }
 
     async send(message) {
+        if (this.#connection.destroyed || this.#connection.destroying || !this.#channel || this.#channel.closed) {
+            throw new Error('Validator connection is closed');
+        }
         const encodedMessage = encodeV1networkOperation(message);
-        const msgReplyPromise = this.#pendingRequestService.registerPendingRequest(this.#publicKeyHex, message);
+        const msgReplyPromise = this.#pendingRequestService.registerPendingRequest(this.#publicKeyHex, message, this.#connection);
         try {
             this.#session.send(encodedMessage);
         } catch (error) {

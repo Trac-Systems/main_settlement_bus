@@ -77,6 +77,7 @@ if (typeof globalThis.Bare !== 'undefined') {
             const context = setup(t);
             const { local, remote, session, remoteConsensus, remoteSender, otherSender, received } = await openSession(t, context);
             const result = session.send(proposal('pending')).catch(error => error);
+            t.is(context.pending.getPendingRequest('pending').connection, local, 'request belongs to its transport');
             const validatorSession = { active: true };
             local.protocolSessions.validator = validatorSession;
 

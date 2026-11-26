@@ -64,4 +64,16 @@ export default class BasePendingRequestService {
     _createShutdownError(id) {
         return new Error(`Pending request ${id} cancelled (shutdown).`);
     }
+
+
+    rejectPendingRequestsForConnection(connection, error) {
+        if (!connection) return 0;
+        let rejected = 0;
+        for (const [id, entry] of this._pendingRequests) {
+            if (entry.connection !== connection) continue;
+            this.rejectPendingRequest(id, error);
+            rejected++;
+        }
+        return rejected;
+    }
 }

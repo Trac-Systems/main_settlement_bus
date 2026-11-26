@@ -35,7 +35,7 @@ export default class IndexerPendingRequestService extends BasePendingRequestServ
     /*
     @returns {Promise}
     */
-    registerPendingRequest(peerPubKeyHex, message, session = null) {
+    registerPendingRequest(peerPubKeyHex, message, session = null, connection = null) {
         this.#validateRegisterInput(peerPubKeyHex, message);
         const id = message.session_id;
         const peerAddress = publicKeyToAddress(peerPubKeyHex, this.#config);
@@ -52,6 +52,7 @@ export default class IndexerPendingRequestService extends BasePendingRequestServ
             requestType: message.type,
             requestedTo: peerPubKeyHex,
             session,
+            connection,
             proofProposal: message.proof_proposal,
             timeoutId: null,
             resolve: null,

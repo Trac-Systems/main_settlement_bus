@@ -46,7 +46,7 @@ export default class ValidatorPendingRequestService extends BasePendingRequestSe
     /*
     @returns {Promise}
     */
-    registerPendingRequest(peerPubKeyHex, message) {
+    registerPendingRequest(peerPubKeyHex, message, connection = null) {
         this.#validateRegisterInput(peerPubKeyHex, message);
         const id = message.id;
         const peerAddress = publicKeyToAddress(peerPubKeyHex, this.#config);
@@ -63,6 +63,7 @@ export default class ValidatorPendingRequestService extends BasePendingRequestSe
             requestType: message.type,
             requestTxData: this.#extractRequestTxData(message),
             requestedTo: peerPubKeyHex,
+            connection,
             timeoutId: null,
             resolve: null,
             reject: null,

@@ -4,7 +4,8 @@ import b4a from 'b4a';
 import EventEmitter from 'bare-events';
 import tracCryptoApi from 'trac-crypto-api';
 import { WalletProvider } from 'trac-wallet';
-import { CONNECTION_STATUS, CustomEventType, ConsensusResultCode, ConsensusVersion } from '../../../src/utils/constants.js';
+import { CONNECTION_STATUS, CustomEventType, ConsensusResultCode, ConsensusVersion, NetworkOperationType } from '../../../src/utils/constants.js';
+import ValidatorPendingRequestService from '../../../src/core/network/protocols/validators/v1/ValidatorPendingRequestService.js';
 import { V1ConsensusProtocolError } from '../../../src/core/network/protocols/consensus/v1/V1ConsensusProtocolError.js';
 import ConsensusV1ConnectionPolicy from '../../../src/core/network/protocols/consensus/v1/ConsensusV1ConnectionPolicy.js';
 import ConsensusV1MessageRouter from '../../../src/core/network/protocols/consensus/v1/ConsensusV1MessageRouter.js';
@@ -68,6 +69,7 @@ async function loadNetwork({ isIndexer = false, currentEpoch = null, indexerCoun
     let validatorPendingRequestServiceInstance = null;
     let indexerPendingRequestServiceInstance = null;
     let consensusMessagesInstance = null;
+    let loggerInstance = null;
 
     class HyperswarmMock extends EventEmitter {
         constructor() {
@@ -81,7 +83,10 @@ async function loadNetwork({ isIndexer = false, currentEpoch = null, indexerCoun
                 if (!this.peers.has(publicKeyHex)) this.peers.set(publicKeyHex, createPeerInfo(target));
                 this.peers.get(publicKeyHex).explicit = true;
             });
-            this.leavePeer = sinon.stub();
+            this.leavePeer = sinon.stub().callsFake(target => {
+                const peer = this.peers.get(normalizePublicKey(target));
+                if (peer) peer.explicit = false;
+            });
             this.join = sinon.stub();
             this.flush = sinon.stub();
             this.destroy = sinon.stub();
@@ -150,13 +155,13 @@ async function loadNetwork({ isIndexer = false, currentEpoch = null, indexerCoun
         setWallet() {}
     }
 
-    class PendingRequestServiceMock {
-        constructor() {
+    class PendingRequestServiceMock extends ValidatorPendingRequestService {
+        constructor(config) {
+            super(config);
             validatorPendingRequestServiceInstance = this;
-            this.rejectPendingRequestsForPeer = sinon.stub();
+            sinon.spy(this, 'rejectPendingRequestsForPeer');
+            sinon.spy(this, 'rejectPendingRequestsForConnection');
         }
-        isProbePending() { return false; }
-        close() {}
     }
 
     class TransactionCommitServiceMock {
@@ -206,9 +211,13 @@ async function loadNetwork({ isIndexer = false, currentEpoch = null, indexerCoun
     }
 
     class LoggerMock {
-        info() {}
-        debug() {}
-        error() {}
+        constructor() {
+            loggerInstance = this;
+            this.info = sinon.spy();
+            this.debug = sinon.spy();
+            this.warn = sinon.spy();
+            this.error = sinon.spy();
+        }
     }
 
     class ValidatorMessagesMock {
@@ -283,6 +292,7 @@ async function loadNetwork({ isIndexer = false, currentEpoch = null, indexerCoun
         maxPendingConnections: 10,
         maxPendingRequestsInPendingRequestsService: 10,
         indexerPendingRequestTimeout: 5_000,
+        pendingRequestTimeout: 5_000,
         maxValidators: 5,
         maxPeers: 5,
         maxParallel: 1,
@@ -320,9 +330,32 @@ async function loadNetwork({ isIndexer = false, currentEpoch = null, indexerCoun
         validatorPendingRequestServiceInstance,
         indexerPendingRequestServiceInstance,
         consensusMessagesInstance,
+        logger: loggerInstance,
         connectionPolicy,
         state
     };
+}
+
+async function attachConnection(context, publicKey = 'dd'.repeat(32)) {
+    const connection = new EventEmitter();
+    connection.remotePublicKey = b4a.from(publicKey, 'hex');
+    connection.isInitiator = true;
+    connection.destroy = sinon.stub();
+    await context.swarmInstance.rawListeners('connection')[0](connection);
+    connection.protocolSessions.indexer = { close: sinon.stub() };
+    return connection;
+}
+
+function registerTransportRequests(context, connection, suffix) {
+    const publicKey = connection.remotePublicKey.toString('hex');
+    const validator = context.validatorPendingRequestServiceInstance.registerPendingRequest(
+        publicKey, { id: `validator-${suffix}`, type: NetworkOperationType.LIVENESS_REQUEST }, connection
+    ).catch(error => error);
+    const consensus = context.indexerPendingRequestServiceInstance.registerPendingRequest(
+        publicKey, { ...consensusFixtures.proofProposalHeader, session_id: `consensus-${suffix}` },
+        connection.protocolSessions.indexer, connection
+    ).catch(error => error);
+    return { validator, consensus };
 }
 
 if (isBareRuntime) {
@@ -330,6 +363,143 @@ if (isBareRuntime) {
         t.pass('skipped in Bare because esmock depends on node:module');
     });
 } else {
+    for (const [kind, error] of [
+        ['reset', Object.assign(new Error('native reset'), { code: 'ECONNRESET' })],
+        ['reset', new Error('connection reset by peer')],
+        ['timeout', Object.assign(new Error('native timeout'), { code: 'ETIMEDOUT' })],
+        ['timeout', new Error('connection timed out')],
+        ['timeout', new Error('Stream timed out')],
+        ['duplicate', Object.assign(new Error('DUPLICATE_CONNECTION: Duplicate connection'), { code: 'DUPLICATE_CONNECTION' })],
+        ['duplicate', new Error('Duplicate connection')],
+    ]) {
+        test(`Network handles ${kind} (${error.message}) without cancelling replacement requests or retries`, async t => {
+            const context = await loadNetwork();
+            t.teardown(() => context.network.close());
+            const { swarmInstance, validatorConnectionManagerInstance: manager, logger } = context;
+            const old = await attachConnection(context);
+            const replacement = await attachConnection(context);
+            const other = await attachConnection(context, 'ee'.repeat(32));
+            const publicKey = old.remotePublicKey.toString('hex');
+            const peer = createPeerInfo(old.remotePublicKey);
+            swarmInstance.peers.set(publicKey, peer);
+            swarmInstance._allConnections.set(old.remotePublicKey, replacement);
+            manager.add(publicKey, replacement);
+            const failed = registerTransportRequests(context, old, 'old');
+            const healthy = registerTransportRequests(context, replacement, 'new');
+            const unrelated = registerTransportRequests(context, other, 'other');
+
+            old.emit('error', error);
+            t.is(await failed.validator, error, 'validator request rejects immediately with the transport error');
+            t.is(await failed.consensus, error, 'consensus request rejects immediately with the transport error');
+            old.emit('error', error);
+            old.emit('close');
+
+            t.is(manager.validators.get(publicKey), replacement, 'replacement remains in the manager');
+            t.ok(old.destroy.calledOnce, 'failed transport is retired once');
+            t.absent(replacement.destroy.called);
+            t.absent(other.destroy.called);
+            t.absent(swarmInstance.leavePeer.called, 'transient failures preserve explicit retries');
+            t.ok(peer.explicit);
+            t.absent(peer.ban.called);
+            t.absent(swarmInstance.joinPeer.called, 'does not bypass Hyperswarm backoff');
+            for (const suffix of ['new', 'other']) {
+                t.ok(context.validatorPendingRequestServiceInstance.has(`validator-${suffix}`));
+                t.ok(context.indexerPendingRequestServiceInstance.has(`consensus-${suffix}`));
+                context.validatorPendingRequestServiceInstance.resolvePendingRequest(`validator-${suffix}`, 'ok');
+                context.indexerPendingRequestServiceInstance.resolvePendingRequest(`consensus-${suffix}`, 'ok');
+            }
+            t.alike(await Promise.all([healthy.validator, healthy.consensus, unrelated.validator, unrelated.consensus]), ['ok', 'ok', 'ok', 'ok']);
+            const log = kind === 'duplicate' ? logger.debug : logger.warn;
+            t.ok(log.calledOnce);
+            const peerAddress = tracCryptoApi.address.encode('trac', old.remotePublicKey);
+            t.ok(log.firstCall.args[0].includes(`(peer: ${peerAddress})`));
+            t.ok(log.firstCall.args[0].includes(error.message));
+            t.absent(logger.error.called);
+        });
+    }
+
+    test('Network retires a failed active validator before its request rejection is observed', async t => {
+        const context = await loadNetwork();
+        t.teardown(() => context.network.close());
+        const connection = await attachConnection(context);
+        const publicKey = connection.remotePublicKey.toString('hex');
+        context.validatorConnectionManagerInstance.add(publicKey, connection);
+        const pending = registerTransportRequests(context, connection, 'active');
+        const error = new Error('connection reset by peer');
+        connection.destroy.callsFake(() => connection.emit('close'));
+        connection.emit('error', error);
+        t.absent(context.validatorConnectionManagerInstance.connected(publicKey));
+        t.ok(context.validatorPendingRequestServiceInstance.rejectPendingRequestsForConnection.calledOnce);
+        t.absent(context.swarmInstance.leavePeer.called);
+        t.ok(context.indexerConnectionManagerInstance.remove.calledWithExactly(publicKey, connection));
+        t.ok(connection.protocolSessions.validator.close.calledOnce);
+        t.ok(connection.protocolSessions.indexer.close.calledOnce);
+        t.is(await pending.validator, error);
+        t.is(await pending.consensus, error);
+    });
+
+    test('Network limits reset and timeout warnings without delaying cleanup', async t => {
+        const context = await loadNetwork();
+        t.teardown(() => context.network.close());
+        let now = 100_000;
+        const time = sinon.stub(Date, 'now').callsFake(() => now);
+        t.teardown(() => time.restore());
+        const fail = async (message, publicKey) => {
+            const connection = await attachConnection(context, publicKey);
+            connection.emit('error', new Error(message));
+            connection.emit('close');
+            t.ok(connection.destroy.calledOnce, 'suppressed logging does not suppress cleanup');
+        };
+        await fail('connection reset by peer');
+        await fail('connection reset by peer');
+        await fail('connection reset by peer');
+        await fail('connection timed out');
+        await fail('connection reset by peer', 'ee'.repeat(32));
+        t.is(context.logger.warn.callCount, 1);
+        now += 30_000;
+        await fail('connection reset by peer');
+        t.is(context.logger.warn.callCount, 2);
+        t.ok(context.logger.warn.lastCall.args[0].includes('Suppressed connection warnings: 4'));
+
+        await fail('Duplicate connection');
+        await fail('Duplicate connection');
+        t.is(context.logger.debug.callCount, 2, 'duplicates use debug logging');
+        t.is(context.logger.warn.callCount, 2);
+        now += 30_000;
+        await fail('connection timed out');
+        t.is(context.logger.warn.callCount, 3);
+        t.ok(context.logger.warn.lastCall.args[0].includes('Suppressed connection warnings: 0'));
+    });
+
+    test('Network reports unexpected and missing errors and still settles pending requests', async t => {
+        const context = await loadNetwork();
+        t.teardown(() => context.network.close());
+        // A different error code must not be hidden just because its message resembles a reset.
+        for (const error of [Object.assign(new Error('connection reset by peer'), { code: 'INVALID_PROTOCOL' }), undefined]) {
+            const connection = await attachConnection(context);
+            const pending = registerTransportRequests(context, connection, 'unknown');
+            connection.emit('error', error);
+            const validatorError = await pending.validator;
+            t.ok(validatorError instanceof Error);
+            t.is(await pending.consensus, validatorError);
+            t.ok(connection.destroy.calledOnce);
+        }
+        t.is(context.logger.error.callCount, 2);
+        t.absent(context.logger.warn.called);
+        t.ok(context.logger.error.lastCall.args[0].includes('Unknown network connection error'));
+    });
+
+    test('Network suppresses transport diagnostics during shutdown but still cleans up', async t => {
+        const context = await loadNetwork();
+        const connection = await attachConnection(context);
+        await context.network.close();
+        connection.emit('error', new Error('connection reset by peer'));
+        connection.emit('close');
+        t.ok(connection.destroy.calledOnce);
+        t.absent(context.logger.warn.called);
+        t.absent(context.logger.error.called);
+    });
+
     test('Network rejoins a retained peer without explicit retries', async t => {
         const { network, swarmInstance } = await loadNetwork();
         t.teardown(() => network.close());
@@ -357,7 +527,7 @@ if (isBareRuntime) {
         const { network, swarmInstance, validatorConnectionManagerInstance: manager,
             validatorPendingRequestServiceInstance, indexerPendingRequestServiceInstance } = await loadNetwork();
         t.teardown(() => network.close());
-        const rejectIndexer = sinon.spy(indexerPendingRequestServiceInstance, 'rejectPendingRequestsForPeer');
+        const rejectIndexer = sinon.spy(indexerPendingRequestServiceInstance, 'rejectPendingRequestsForConnection');
         const publicKey = 'dd'.repeat(32);
         const handler = swarmInstance.rawListeners('connection')[0];
         const old = new EventEmitter();
@@ -372,7 +542,7 @@ if (isBareRuntime) {
         t.is(manager.validators.get(publicKey), replacement);
         t.alike(manager.removed, []);
         t.ok(old.protocolSessions.validator.close.calledOnce);
-        t.ok(validatorPendingRequestServiceInstance.rejectPendingRequestsForPeer.calledOnce);
+        t.ok(validatorPendingRequestServiceInstance.rejectPendingRequestsForConnection.calledOnce);
         t.ok(rejectIndexer.calledOnce);
         replacement.emit('close');
         t.absent(manager.exists(publicKey), 'closing the tracked connection removes the validator');
@@ -413,7 +583,7 @@ if (isBareRuntime) {
         const { network, swarmInstance, consensusMessagesInstance,
             validatorPendingRequestServiceInstance, indexerPendingRequestServiceInstance } = await loadNetwork();
         t.teardown(() => network.close());
-        const rejectIndexer = sinon.spy(indexerPendingRequestServiceInstance, 'rejectPendingRequestsForPeer');
+        const rejectIndexer = sinon.spy(indexerPendingRequestServiceInstance, 'rejectPendingRequestsForConnection');
         const error = new Error('consensus setup failed');
         const closeIndexer = sinon.stub();
         consensusMessagesInstance.prepareConnection = connection => {
@@ -425,8 +595,8 @@ if (isBareRuntime) {
         t.ok(connection.destroy.calledOnce);
         t.ok(connection.protocolSessions.validator.close.calledOnce);
         t.ok(closeIndexer.calledOnce);
-        t.ok(validatorPendingRequestServiceInstance.rejectPendingRequestsForPeer.calledWith('dd'.repeat(32), error));
-        t.ok(rejectIndexer.calledWith('dd'.repeat(32), error));
+        t.ok(validatorPendingRequestServiceInstance.rejectPendingRequestsForConnection.calledWith(connection, error));
+        t.ok(rejectIndexer.calledWith(connection, error));
     });
 
     test('Network handles a replication failure without leaving an unhandled connection', async t => {

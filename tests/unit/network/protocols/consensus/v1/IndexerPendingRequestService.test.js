@@ -62,6 +62,7 @@ test('registerPendingRequest stores the expected entry shape for proof proposals
         requestType: message.type,
         requestedTo: validPeerA,
         session: null,
+        connection: null,
         proofProposal: message.proof_proposal,
         timeoutId: entry.timeoutId,
         resolve: entry.resolve,

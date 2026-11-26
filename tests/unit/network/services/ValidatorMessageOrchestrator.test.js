@@ -1,12 +1,15 @@
 import { hook, test } from 'brittle';
 import sinon from 'sinon';
+import b4a from 'b4a';
+import EventEmitter from 'bare-events';
 import ValidatorMessageOrchestrator from '../../../../src/core/network/services/ValidatorMessageOrchestrator.js';
+import ValidatorConnectionManager from '../../../../src/core/network/services/ValidatorConnectionManager.js';
 import State from '../../../../src/core/state/State.js';
-import { OperationType, NetworkResultCode } from '../../../../src/utils/constants.js';
+import { OperationType, NetworkResultCode, NetworkOperationType } from '../../../../src/utils/constants.js';
 import { testKeyPair1, testKeyPair2, testKeyPair3 } from '../../../fixtures/apply.fixtures.js';
 import { publicKeyToAddress } from '../../../../src/utils/helpers.js';
 import { PeerConnectionManagerError } from '../../../../src/core/network/shared/PeerConnectionManager.js';
-import { ValidatorPendingRequestServiceTimeoutError } from '../../../../src/core/network/protocols/validators/v1/ValidatorPendingRequestService.js';
+import ValidatorPendingRequestService, { ValidatorPendingRequestServiceTimeoutError } from '../../../../src/core/network/protocols/validators/v1/ValidatorPendingRequestService.js';
 import { WalletProvider } from 'trac-wallet';
 import { config, overrideConfig } from '../../../helpers/config.js';
 
@@ -53,6 +56,54 @@ const createValidatorConnectionManager = ({
     getSentCount: sinon.stub().returns(sentCount),
 });
 
+function deferred() {
+    let resolve;
+    const promise = new Promise(done => { resolve = done; });
+    return { promise, resolve };
+}
+
+async function createReplacementContext(t, { preferredProtocol = 'v1', messageThreshold = 1000 } = {}) {
+    const config = overrideConfig({ maxRetries: 1, messageThreshold });
+    const wallet = await createWallet(config);
+    const pending = new ValidatorPendingRequestService(config);
+    const manager = new ValidatorConnectionManager(2, config, { debug() {} }, { attachChannel() {} });
+    await manager.ready();
+    t.teardown(async () => { pending.close(); await manager.close(); });
+    const state = { isValidatorAddress: async () => true, waitForUnsigned: sinon.stub().resolves(true) };
+    const orchestrator = new ValidatorMessageOrchestrator(manager, state, config, wallet);
+    const open = (replyImmediately = false, protocol = preferredProtocol) => {
+        const sent = deferred();
+        const requests = [];
+        const connection = new EventEmitter();
+        connection.remotePublicKey = b4a.from(VALIDATOR_KEY, 'hex');
+        connection.protocolSessions = {
+            validator: {
+                preferredProtocol: protocol,
+                supportedProtocols: { LEGACY: 'legacy', V1: 'v1' },
+                isProbed: () => true,
+                isHealthCheckSupported: () => false,
+                send(message) {
+                    requests.push(message);
+                    const result = protocol === 'v1'
+                        ? pending.registerPendingRequest(VALIDATOR_KEY, message, connection)
+                        : Promise.resolve(null);
+                    if (replyImmediately && protocol === 'v1') {
+                        pending.resolvePendingRequest(message.id, NetworkResultCode.RESULT_CODE_OK);
+                    }
+                    sent.resolve();
+                    return result;
+                },
+            },
+        };
+        return { connection, sent, requests };
+    };
+    const replace = async (old, replacement) => {
+        manager.remove(VALIDATOR_KEY, old.connection);
+        await manager.add(VALIDATOR_KEY, replacement.connection);
+    };
+    return { manager, pending, state, orchestrator, open, replace, message: createTransferMessage(config, wallet) };
+}
+
 // A dedicated sandbox instead of sinon's global default one: sinon.stub/sinon.restore()
 // operate on shared global state, so another test file's teardown calling sinon.restore()
 // while this file's console stubs are still active (or vice versa) can yank them out from
@@ -67,6 +118,99 @@ hook('setup', () => {
 
 hook('teardown', () => {
     consoleSandbox.restore();
+});
+
+for (const message of ['connection reset by peer', 'connection timed out', 'Duplicate connection']) {
+    test(`ValidatorMessageOrchestrator retries ${message} through the replacement without evicting it`, async t => {
+        const context = await createReplacementContext(t);
+        const { manager, pending, orchestrator, open, replace } = context;
+        const old = open();
+        await manager.add(VALIDATOR_KEY, old.connection);
+        const result = orchestrator.send(context.message);
+        await old.sent.promise;
+        const replacement = open(true);
+        await replace(old, replacement);
+        const parallel = pending.registerPendingRequest(VALIDATOR_KEY, {
+            id: 'replacement-health-check', type: NetworkOperationType.LIVENESS_REQUEST,
+        }, replacement.connection);
+
+        t.is(pending.rejectPendingRequestsForConnection(old.connection, new Error(message)), 1);
+        t.ok(await result, 'retry succeeds through the replacement');
+        t.is(manager.getConnection(VALIDATOR_KEY), replacement.connection, 'replacement stays tracked after the old rejection');
+        t.ok(pending.has('replacement-health-check'), 'another request on the replacement survives');
+        t.is(replacement.requests.length, 1, 'one retry is sent');
+        if (replacement.requests.length) {
+            t.absent(replacement.requests[0].id === old.requests[0].id, 'retry has a fresh request ID');
+            t.alike(replacement.requests[0].broadcast_transaction_request.data,
+                old.requests[0].broadcast_transaction_request.data, 'retry carries the same transaction');
+        }
+        pending.resolvePendingRequest('replacement-health-check', NetworkResultCode.RESULT_CODE_OK);
+        await parallel;
+    });
+}
+
+for (const resultCode of [NetworkResultCode.RESULT_CODE_OK, NetworkResultCode.RESULT_CODE_TIMEOUT, 99999]) {
+    test(`ValidatorMessageOrchestrator keeps the replacement when an old request returns ${resultCode}`, async t => {
+        const { manager, pending, orchestrator, open, replace, message } = await createReplacementContext(t, { messageThreshold: 1 });
+        const old = open();
+        await manager.add(VALIDATOR_KEY, old.connection);
+        const result = orchestrator.send(message);
+        await old.sent.promise;
+        const replacement = open();
+        await replace(old, replacement);
+        pending.resolvePendingRequest(old.requests[0].id, resultCode);
+
+        t.is(await result, resultCode === NetworkResultCode.RESULT_CODE_OK);
+        t.is(manager.getConnection(VALIDATOR_KEY), replacement.connection);
+        t.is(manager.getSentCount(VALIDATOR_KEY), 0, 'old success does not advance the replacement rotation counter');
+    });
+}
+
+for (const appeared of [true, false]) {
+    test(`ValidatorMessageOrchestrator keeps the replacement after a legacy state wait returns ${appeared}`, async t => {
+        const { manager, state, orchestrator, open, replace, message } = await createReplacementContext(t, {
+            preferredProtocol: 'legacy', messageThreshold: appeared ? 1 : 1000,
+        });
+        const waiting = deferred();
+        const outcome = deferred();
+        state.waitForUnsigned.onFirstCall().callsFake(() => { waiting.resolve(); return outcome.promise; });
+        const old = open();
+        await manager.add(VALIDATOR_KEY, old.connection);
+        const result = orchestrator.send(message);
+        await waiting.promise;
+        const replacement = open();
+        await replace(old, replacement);
+        outcome.resolve(appeared);
+
+        t.ok(await result);
+        t.is(manager.getConnection(VALIDATOR_KEY), replacement.connection);
+        t.is(replacement.requests.length, appeared ? 0 : 1);
+        t.is(manager.getSentCount(VALIDATOR_KEY), appeared ? 0 : 1);
+    });
+}
+
+test('ValidatorMessageOrchestrator reselects the protocol when the connection changes while building a request', async t => {
+    const { manager, orchestrator, open, replace, message } = await createReplacementContext(t);
+    const old = open();
+    const replacement = open(true, 'legacy');
+    await manager.add(VALIDATOR_KEY, old.connection);
+    const getConnection = manager.getConnection.bind(manager);
+    let replacementTask;
+    const lookup = sinon.stub(manager, 'getConnection').callsFake(publicKey => {
+        const connection = getConnection(publicKey);
+        if (connection === old.connection && !replacementTask) {
+            replacementTask = Promise.resolve().then(() => replace(old, replacement));
+        }
+        return connection;
+    });
+    t.teardown(() => lookup.restore());
+
+    t.ok(await orchestrator.send(message));
+    await replacementTask;
+    t.is(old.requests.length, 0, 'does not send through the superseded transport');
+    t.is(replacement.requests.length, 1);
+    t.is(replacement.requests[0], message, 'legacy replacement receives the canonical operation, not a v1 envelope');
+    t.is(manager.getConnection(VALIDATOR_KEY), replacement.connection);
 });
 
 for (const preferredProtocol of ['v1', 'legacy']) {
@@ -398,6 +542,18 @@ test('ValidatorMessageOrchestrator.send legacy path catches send error and retri
     t.is(sendSingleMessage.callCount, 2);
     t.is(state.waitForUnsigned.callCount, 1);
     t.is(validatorConnectionManager.remove.callCount, 0);
+});
+
+test('ValidatorMessageOrchestrator respects maxRetries when legacy sends keep failing', async t => {
+    const config = overrideConfig({ maxRetries: 1 });
+    const wallet = await createWallet(config);
+    const sendSingleMessage = sinon.stub().rejects(new Error('connection reset by peer'));
+    const manager = createValidatorConnectionManager({ preferredProtocol: 'legacy', sendSingleMessage });
+    const state = { isValidatorAddress: async () => true };
+    const orchestrator = new ValidatorMessageOrchestrator(manager, state, config);
+
+    t.is(await orchestrator.send(createTransferMessage(config, wallet)), false);
+    t.is(sendSingleMessage.callCount, 2, 'one initial send and one retry');
 });
 
 test('State.waitForUnsigned returns true when state entry appears', async t => {

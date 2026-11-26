@@ -85,94 +85,58 @@ class ValidatorMessageOrchestrator {
         if (!validatorPublicKey) return false;
         console.log("Sending message to validator:", publicKeyToAddress(validatorPublicKey, this.#config));
 
-        /* NOTE: Since the retry logic for Legacy is handled here, and is very unique to the protocol,
-        * it was decided to not change ValidatorMessageOrchestrator send method in the refactor to make protocols transparent.
-        * As the Legacy protocol is going to be deprecated soon, it was decided to keep the retry logic 
-        * here instead of abstracting it in the protocol implementation. 
-        * If we were to abstract it, we would need to add protocol-specific logic in the ValidatorProtocolSession
-        * or ValidatorProtocolInterface, which would make them less clean and more coupled with the specifics of the protocols.
-        * The parts to be refactored in the future are marked with TODO comments.
-        */
-
-        // TODO: After Legacy is deprecated, we don't need to check preferred protocol here.
         const validatorConnection = this.validatorConnectionManager.getConnection(validatorPublicKey);
         if (!validatorConnection) return this.send(message, retries + 1);
-        const preferredProtocol = validatorConnection.protocolSessions.validator.preferredProtocol;
-        let success = false;
-        if (preferredProtocol === validatorConnection.protocolSessions.validator.supportedProtocols.LEGACY) {
+        const { preferredProtocol, supportedProtocols } = validatorConnection.protocolSessions.validator;
 
+        if (preferredProtocol === supportedProtocols.LEGACY) {
             try {
-                success = await this.#attemptSendMessageForLegacy(validatorPublicKey, message);
+                if (await this.#attemptSendMessageForLegacy(validatorPublicKey, validatorConnection, message)) return true;
             } catch {
-                success = await this.send(message, retries + 1);
+                const sent = await this.send(message, retries + 1);
+                if (!sent) this.validatorConnectionManager.remove(validatorPublicKey, validatorConnection);
+                return sent;
             }
-            if (!success) {
-                // Remove validator and retry
-                this.validatorConnectionManager.remove(validatorPublicKey);
-                success = await this.send(message, retries + 1);
-            }
-        } else if (preferredProtocol === validatorConnection.protocolSessions.validator.supportedProtocols.V1) {
-            // TODO: This is probably better placed inside the V1 protocol definition.
-            // Both protocols should receive a 'canonical' message and solve the encodings internally
-            // Refactor 
-            const normalizedMessage = normalizeMessageByOperationType(message, this.#config)
-            const encodedTransaction = unsafeEncodeApplyOperation(normalizedMessage)
-            const v1Message = await networkMessageFactory(this.#wallet, this.#config)
-                .buildBroadcastTransactionRequest(
-                    generateUUID(),
-                    encodedTransaction,
-                    NETWORK_CAPABILITIES
-                );
-
-            await this.validatorConnectionManager.sendSingleMessage(v1Message, validatorPublicKey)
-                .then(
-                    async (resultCode) => {
-                        if (await this.#isIdempotentSuccess(resultCode, message)) {
-                            success = true;
-                            return;
-                        }
-
-                        // TODO: When we will deprecate the legacy protocol, we should refactor this scope, to propagate domain-error with result code.
-                        const action = resultToValidatorAction(resultCode);
-                        switch (action) {
-                            case SENDER_ACTION.SUCCESS:
-                                success = true;
-                                //TODO: Create a function for action below, and replace it also in legacy flow.
-                                this.incrementSentCount(validatorPublicKey);
-                                if (this.shouldRemove(validatorPublicKey)) {
-                                    this.validatorConnectionManager.remove(validatorPublicKey);
-                                }
-                                break;
-                            case SENDER_ACTION.ROTATE:
-                                this.validatorConnectionManager.remove(validatorPublicKey);
-                                break;
-                            case SENDER_ACTION.NO_ROTATE:
-                                // ignore
-                                break;
-                            default:
-                                this.validatorConnectionManager.remove(validatorPublicKey);
-                                console.warn(
-                                    `ValidatorMessageOrchestrator: Unrecognized action from connectionPolicies: ${action}.
-                                     ResultCode was: ${resultCode}. Removing validator ${publicKeyToAddress(validatorPublicKey, this.#config)}`
-                                );
-                                break;
-                        }
-                    }
-                )
-                .catch(
-                    async (err) => {
-                        if (isPeerConnectionError(err)) {
-                            success = await this.send(message, retries + 1);
-                            console.warn(`ValidatorMessageOrchestrator: Connection Error: ${err.message}`);
-                        } else {
-                            this.validatorConnectionManager.remove(validatorPublicKey);
-                            success = await this.send(message, retries + 1);
-                        }
-                    }
-                )
-
+            this.validatorConnectionManager.remove(validatorPublicKey, validatorConnection);
+            return this.send(message, retries + 1);
         }
-        return success;
+
+        if (preferredProtocol !== supportedProtocols.V1) return false;
+
+        const normalizedMessage = normalizeMessageByOperationType(message, this.#config);
+        const encodedTransaction = unsafeEncodeApplyOperation(normalizedMessage);
+        const v1Message = await networkMessageFactory(this.#wallet, this.#config)
+            .buildBroadcastTransactionRequest(generateUUID(), encodedTransaction, NETWORK_CAPABILITIES);
+
+        // Signing is asynchronous; a replacement may use a different protocol.
+        if (this.validatorConnectionManager.getConnection(validatorPublicKey) !== validatorConnection) {
+            return this.send(message, retries + 1);
+        }
+
+        try {
+            const resultCode = await this.validatorConnectionManager.sendSingleMessage(v1Message, validatorPublicKey);
+            if (await this.#isIdempotentSuccess(resultCode, message)) return true;
+
+            const action = resultToValidatorAction(resultCode);
+            if (action === SENDER_ACTION.SUCCESS) {
+                this.#recordSuccessfulSend(validatorPublicKey, validatorConnection);
+                return true;
+            }
+            if (action === SENDER_ACTION.NO_ROTATE) return false;
+
+            this.validatorConnectionManager.remove(validatorPublicKey, validatorConnection);
+            if (action !== SENDER_ACTION.ROTATE) {
+                console.warn(`ValidatorMessageOrchestrator: Unknown result code ${resultCode} from validator ${validatorPublicKey}`);
+            }
+            return false;
+        } catch (error) {
+            if (isPeerConnectionError(error)) {
+                console.warn(`ValidatorMessageOrchestrator: Connection Error: ${error.message}`);
+            } else {
+                this.validatorConnectionManager.remove(validatorPublicKey, validatorConnection);
+            }
+            return this.send(message, retries + 1);
+        }
     }
 
     /**
@@ -212,7 +176,7 @@ class ValidatorMessageOrchestrator {
     }
 
     // TODO: Delete this function after legacy protocol is deprecated
-    async #attemptSendMessageForLegacy(validatorPublicKey, message) {
+    async #attemptSendMessageForLegacy(validatorPublicKey, validatorConnection, message) {
         const deductedTxType = operationToPayload(message.type);
         await this.validatorConnectionManager.sendSingleMessage(message, validatorPublicKey);
         const appeared = await this.state.waitForUnsigned(
@@ -220,13 +184,19 @@ class ValidatorMessageOrchestrator {
             this.#config.messageValidatorResponseTimeout
         );
         if (appeared) {
-            this.incrementSentCount(validatorPublicKey);
-            if (this.shouldRemove(validatorPublicKey)) {
-                this.validatorConnectionManager.remove(validatorPublicKey);
-            }
+            this.#recordSuccessfulSend(validatorPublicKey, validatorConnection);
             return true;
         }
         return false;
+    }
+
+    #recordSuccessfulSend(publicKey, connection) {
+        // A late response belongs to the transport that sent the request.
+        if (this.validatorConnectionManager.getConnection(publicKey) !== connection) return;
+        this.incrementSentCount(publicKey);
+        if (this.shouldRemove(publicKey)) {
+            this.validatorConnectionManager.remove(publicKey, connection);
+        }
     }
 
     incrementSentCount(validatorPubKey) {

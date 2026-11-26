@@ -5,7 +5,7 @@ import b4a from 'b4a';
 import TransactionPoolService from './services/TransactionPoolService.js';
 import ValidatorObserverService from './services/ValidatorObserverService.js';
 import ValidatorMessages from './protocols/validators/ValidatorMessages.js';
-import { sleep } from '../../utils/helpers.js';
+import { publicKeyToAddress, sleep } from '../../utils/helpers.js';
 import { TRAC_NAMESPACE, CONNECTION_STATUS } from '../../utils/constants.js';
 import ValidatorConnectionManager from './services/ValidatorConnectionManager.js';
 import ValidatorMessageOrchestrator from './services/ValidatorMessageOrchestrator.js';
@@ -21,6 +21,23 @@ import tracCryptoApi from 'trac-crypto-api'
 import IndexerMessages from './protocols/consensus/IndexerMessages.js';
 import IndexerPendingRequestService from './protocols/consensus/v1/IndexerPendingRequestService.js';
 import { createEpochAppenderSelector } from '../consensus/epochAppenderSelection/createEpochAppenderSelector.js';
+
+const ConnectionErrorType = Object.freeze({
+    RESET: 0,
+    TIMEOUT: 1,
+    DUPLICATE: 2,
+    UNEXPECTED: 3,
+});
+
+const connectionErrorTypes = new Map([
+    ['ECONNRESET', ConnectionErrorType.RESET],
+    ['connection reset by peer', ConnectionErrorType.RESET],
+    ['ETIMEDOUT', ConnectionErrorType.TIMEOUT],
+    ['connection timed out', ConnectionErrorType.TIMEOUT],
+    ['Stream timed out', ConnectionErrorType.TIMEOUT],
+    ['DUPLICATE_CONNECTION', ConnectionErrorType.DUPLICATE],
+    ['Duplicate connection', ConnectionErrorType.DUPLICATE],
+]);
 
 const wakeup = new w();
 
@@ -47,6 +64,8 @@ class Network extends ReadyResource {
     #stateListeners;
     #epochAppenderSelector;
     #closing = false;
+    #lastConnectionWarningAt = null;
+    #suppressedConnectionWarnings = 0;
 
     /**
      * @param {State} state
@@ -282,40 +301,40 @@ class Network extends ReadyResource {
                 return;
             }
 
-            /*
-             Here is the issue:
-             
-             The current session is supposed to be attached as soon as possible (mostly to respond to probe since there is no connection ready signal on this level)
-             Since the connection was started from the other side, this havent gone through "qualification" which happens on tryConnect.
-             Because of that, we need to assume the current connection is that of a validator (who responds to probe) and later override it if necessary.
-             This is leaky for two reasons: first we need to keep a reference to messages and disclose the connection structure in this class.
-             second is that the protocol itself doesnt fit the connection life-cycle (this is a bigger problem that also touched on DHT factory structure being "swallowed by swarm")
-             */
             const publicKey = b4a.toString(connection.remotePublicKey, 'hex');
+            let errorType = null;
 
-            connection.on('close', () => {
-                this.#rejectAllPendingRequests(publicKey, new Error('Connection closed before response'));
-                this.#swarm?.leavePeer(connection.remotePublicKey);
-                this.#validatorConnectionManager.remove(publicKey, connection);
-                this.#closeProtocolSessions(connection);
+            const failConnection = (error, type) => {
+                if (errorType !== null) return;
+                errorType = type;
+                this.#detachConnection(publicKey, connection, error);
+                this.#destroyConnection(connection);
+                this.#logConnectionError(connection.remotePublicKey, error, type);
+            };
+
+            connection.on('error', error => {
+                const cause = error ?? new Error('Unknown network connection error');
+                const type = connectionErrorTypes.get(cause.code ?? cause.message) ?? ConnectionErrorType.UNEXPECTED;
+                failConnection(cause, type);
             });
 
-            connection.on('error', (error) => {
-                this.#rejectAllPendingRequests(publicKey, error ?? new Error('Connection error before response'));
-                if (
-                    error && error.message && (
-                        error.message.includes('connection reset by peer') ||
-                        error.message.includes('Duplicate connection') ||
-                        error.message.includes('connection timed out'))
-                ) {
-                    // TODO: decide if we want to handle this error in a specific way. It generates a lot of logs.
-                    return;
+            connection.on('close', () => {
+                if (errorType === null) {
+                    this.#detachConnection(publicKey, connection, new Error('Connection closed before response'));
+                    this.#closeProtocolSessions(connection);
+                } else if (errorType !== ConnectionErrorType.UNEXPECTED) {
+                    return; // Let Hyperswarm reconnect or finish swapping duplicate connections.
                 }
-                this.#logger.error(error?.message ?? 'Unknown network connection error');
+
+                const current = this.#swarm?._allConnections.get(connection.remotePublicKey);
+                if (!current || current === connection) {
+                    this.#swarm?.leavePeer(connection.remotePublicKey);
+                }
             });
 
             try {
                 this.#prepareConnection(connection);
+                // Incoming validator probes can arrive before we know the peer's role.
                 this.#validatorMessages.prepareConnection(connection);
                 this.#indexerMessages.prepareConnection(connection);
                 await this.#promotePendingConnection(publicKey, connection);
@@ -325,11 +344,7 @@ class Network extends ReadyResource {
                     this.#destroyConnection(connection);
                 }
             } catch (error) {
-                this.#rejectAllPendingRequests(publicKey, error ?? new Error('Connection setup failed'));
-                this.#destroyConnection(connection);
-                if (!this.#closing) {
-                    this.#logger.error(error?.message ?? 'Unknown network connection setup error');
-                }
+                failConnection(error ?? new Error('Connection setup failed'), ConnectionErrorType.UNEXPECTED);
             }
         });
     }
@@ -493,6 +508,13 @@ class Network extends ReadyResource {
         this.#indexerPendingRequestService.rejectPendingRequestsForPeer(publicKey, error);
     }
 
+    #detachConnection(publicKey, connection, error) {
+        this.#validatorPendingRequestService.rejectPendingRequestsForConnection(connection, error);
+        this.#indexerPendingRequestService.rejectPendingRequestsForConnection(connection, error);
+        this.#validatorConnectionManager.remove(publicKey, connection);
+        this.#indexerConnectionManager.remove(publicKey, connection);
+    }
+
     #clearPendingValidatorConnection(publicKeyHex) {
         if (!this.#pendingConnections.has(publicKeyHex)) return false;
 
@@ -524,6 +546,35 @@ class Network extends ReadyResource {
         if (typeof connection.destroy === 'function') connection.destroy();
         else if (typeof connection.end === 'function') connection.end();
     }
+
+    #logConnectionError(publicKey, error, type) {
+        if (this.#closing || this.closed) return;
+
+        const peerAddress = publicKeyToAddress(publicKey, this.#config);
+        const message = `Network: ${error.message} (peer: ${peerAddress})`;
+
+        if (type === ConnectionErrorType.DUPLICATE) {
+            this.#logger.debug(message);
+            return;
+        }
+
+        if (type === ConnectionErrorType.UNEXPECTED) {
+            this.#logger.error(message);
+            return;
+        }
+
+        // One warning per 30 seconds across all reset and timeout errors.
+        const now = Date.now();
+        if (this.#lastConnectionWarningAt !== null && now - this.#lastConnectionWarningAt < 30_000) {
+            this.#suppressedConnectionWarnings++;
+            return;
+        }
+
+        this.#logger.warn(`${message}. Suppressed connection warnings: ${this.#suppressedConnectionWarnings}`);
+        this.#lastConnectionWarningAt = now;
+        this.#suppressedConnectionWarnings = 0;
+    }
+
 }
 
 export default Network;

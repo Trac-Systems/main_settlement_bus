@@ -9,12 +9,14 @@ class ConsensusV1Protocol {
     #pendingRequestService;
     #publicKeyHex;
     #connectionPolicy;
+    #connection;
 
     constructor(router, connection, pendingRequestService, onClose, connectionPolicy) {
         this.#router = router;
         this.#pendingRequestService = pendingRequestService;
         this.#publicKeyHex =connection.remotePublicKey.toString('hex');
         this.#connectionPolicy = connectionPolicy;
+        this.#connection = connection;
         this.#init(connection, onClose);
     }
 
@@ -48,9 +50,9 @@ class ConsensusV1Protocol {
     }
 
     async send(message) {
-        if (this.closed) throw new Error('Consensus session is closed');
+        if (this.closed || this.#connection.destroyed || this.#connection.destroying) throw new Error('Consensus session is closed');
         const encodedMessage = encodeConsensusMessage(message);
-        const msgReplyPromise = this.#pendingRequestService.registerPendingRequest(this.#publicKeyHex, message, this);
+        const msgReplyPromise = this.#pendingRequestService.registerPendingRequest(this.#publicKeyHex, message, this, this.#connection);
         try {
             this.#session.send(encodedMessage);
         } catch (error) {
