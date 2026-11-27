@@ -2,6 +2,8 @@
 // Each edit is [original, replacement]; the original must occur exactly once in the unpatched file.
 // Keep this file free of backticks and dollar-brace sequences inside the edit texts (String.raw templates).
 
+import remoteBitfield from './remote-bitfield-11.18.3.mjs'
+
 // Upstream c24f37a6 (#911): a close event that already fired cannot detach a later attachment.
 const closedStreamGuard = [
     String.raw`  attachTo(protomux) {
@@ -16,6 +18,7 @@ const closedStreamGuard = [
 export default {
     version: '11.18.3',
     file: 'lib/replicator.js',
+    additionalPatches: [remoteBitfield],
     originalSha256: '2e7a2631a0d8e805861339bbc75e6f6de75565813cf201256105408c53c8ac93',
     patchedSha256: '1ba2f169d20840d41333cc55e8fbb7da9bc5b4698d808739ad97acce0cbe0f1a',
     // Only this exact released v1 file is eligible for an in-place upgrade.

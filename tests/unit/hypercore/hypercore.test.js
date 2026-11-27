@@ -5,6 +5,7 @@ async function runHypercoreStallfixTests() {
     await import('./status.test.js');
     await import('./stallfix.test.js');
     await import('./closed-stream.test.js');
+    await import('./remote-bitfield.test.js');
     // the install-script tests need Node (fs, child processes)
     if (typeof Bare === 'undefined') await import('./apply.test.js');
     test.resume();

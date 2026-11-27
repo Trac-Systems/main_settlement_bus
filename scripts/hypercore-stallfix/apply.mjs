@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// OPENMAYHEM-STALLFIX: install-time Hypercore patch (identical copy in trac-msb and trac-peer, run from postinstall).
+// OPENMAYHEM-STALLFIX: install-time Hypercore backports, run from postinstall.
 //
 // Why: Hypercore block requests have no age limit, and a responder that has paused a peer drops that peer's block
 // requests silently. A node whose needed request sits on such a peer never advances until the connection closes.
@@ -9,12 +9,13 @@
 //   - backports upstream 8cf8ad9 (#896) fix 2 (a stale block-queue entry no longer consumes a peer update);
 //   - answers NOT_AVAILABLE (max 16 per minute per peer, silent beyond) to a peer we paused, instead of silence.
 //   - backports upstream c24f37a (#911): never attach a stream that closed while the core was opening (v2).
+//   - backports upstream #874 on 11.18.3 to skip absent remote bitfield pages when clearing bits.
 // No wire-format change: patched and unpatched nodes interoperate.
 //
 // What this script does: finds every Hypercore copy this package loads (its own resolution plus the copies that
 // autobase, corestore, trac-msb and trac-peer resolve from here, hoisted or nested), and for each copy:
-//   - supported version, file hash = original  -> applies the patch set (each original text must occur exactly once),
-//                                                 checks the result hash, writes atomically (tmp + rename);
+//   - supported version, original hashes      -> prepares each file (each original text must occur exactly once),
+//                                                 checks all result hashes, writes each file atomically (tmp + rename);
 //   - supported version, file hash = patched   -> "already patched" (idempotent; safe when both packages run it);
 //   - supported version, file hash = released v1 -> upgrades only the marker and #911 guard, checks the result hash;
 //   - supported version, any other content      -> exit 1 with a clear message (nothing is written);
@@ -105,25 +106,16 @@ export function sha256Hex(text) {
     return sha256(text)
 }
 
-export function inspectCopy(copy, sets) {
-    const pkg = JSON.parse(fs.readFileSync(path.join(copy.dir, 'package.json'), 'utf8'))
-    const set = sets.get(pkg.version) || null
-    const result = { dir: copy.dir, from: copy.from, version: pkg.version, supported: set !== null, state: null, sha256: null }
-    if (set === null) {
-        result.state = 'unsupported-version'
-        return result
-    }
-    const file = path.join(copy.dir, set.file)
+function inspectFile(file, set) {
     const text = fs.readFileSync(file, 'utf8')
     // keep the inspected text: patching must not re-read the file, a parallel run may have replaced it meanwhile
-    Object.defineProperty(result, 'text', { value: text, enumerable: false })
-    result.sha256 = sha256(text)
-    if (result.sha256 === set.patchedSha256) result.state = 'patched'
-    else if (result.sha256 === set.originalSha256) result.state = 'original'
-    else if (result.sha256 === set.previousPatchedSha256) result.state = 'previous-patched'
-    else if (text.includes('OPENMAYHEM-STALLFIX')) result.state = 'other-stallfix-revision'
-    else result.state = 'mismatch'
-    return result
+    const hash = sha256(text)
+    let state = 'mismatch'
+    if (hash === set.patchedSha256) state = 'patched'
+    else if (hash === set.originalSha256) state = 'original'
+    else if (hash === set.previousPatchedSha256) state = 'previous-patched'
+    else if (set.previousPatchedSha256 && text.includes('OPENMAYHEM-STALLFIX')) state = 'other-stallfix-revision'
+    return { text, hash, state }
 }
 
 export async function run({ packageDir, check = false, quiet = false, log = console.log, warn = console.error } = {}) {
@@ -137,49 +129,68 @@ export async function run({ packageDir, check = false, quiet = false, log = cons
 
     const results = []
     for (const copy of copies) {
-        const r = inspectCopy(copy, sets)
-        const where = r.dir + ' (via ' + r.from + ')'
-        if (r.state === 'unsupported-version') {
-            warn(tag + ' WARNING: hypercore ' + r.version + ' at ' + where + ' is not a supported version (' + [...sets.keys()].join(', ') + '); NOT patched')
-        } else if (r.state === 'patched') {
-            if (!quiet) log(tag + ' hypercore ' + r.version + ' at ' + where + ': already patched (sha256 ' + r.sha256 + ')')
-        } else if ((r.state === 'original' || r.state === 'previous-patched') && check) {
-            warn(tag + ' hypercore ' + r.version + ' at ' + where + ': NOT patched to v2' + (r.state === 'previous-patched' ? ' (released v1 needs upgrade)' : ''))
-            failed = true
-        } else if (r.state === 'original' || r.state === 'previous-patched') {
-            const set = sets.get(r.version)
-            const file = path.join(r.dir, set.file)
-            const upgrading = r.state === 'previous-patched'
-            let patched
+        const { version } = JSON.parse(fs.readFileSync(path.join(copy.dir, 'package.json'), 'utf8'))
+        const set = sets.get(version)
+        const where = 'hypercore ' + version + ' at ' + copy.dir + ' (via ' + copy.from + ')'
+        if (!set) {
+            warn(tag + ' WARNING: ' + where + ' is not a supported version (' + [...sets.keys()].join(', ') + '); NOT patched')
+            results.push({ ...copy, version, supported: false, state: 'unsupported-version', sha256: null })
+            continue
+        }
+
+        const writes = []
+        let copyFailed = false
+        for (const patch of [set, ...(set.additionalPatches ?? [])]) {
+            const file = path.join(copy.dir, patch.file)
+            const { text, hash, state } = inspectFile(file, patch)
+            const result = { ...copy, version, file: patch.file, supported: true, state, sha256: hash }
+            results.push(result)
+            const location = where + ' ' + patch.file
+            const label = patch.label ?? 'v2'
+
+            if (state === 'patched') {
+                if (!quiet) log(tag + ' ' + location + ': already patched (sha256 ' + hash + ')')
+                continue
+            }
+            const upgrading = state === 'previous-patched'
+            if (state !== 'original' && !upgrading) {
+                const otherRevision = state === 'other-stallfix-revision' ? ', patched by a different stallfix revision' : ''
+                const previous = patch.previousPatchedSha256 ? ', released v1 ' + patch.previousPatchedSha256 : ''
+                warn(tag + ' ERROR: ' + where + ' has unexpected ' + patch.file + ' content (sha256 ' + hash + otherRevision +
+                    '; expected original ' + patch.originalSha256 + previous + ' or patched ' + label + ' ' + patch.patchedSha256 + '). Refusing to patch.')
+                copyFailed = true
+                continue
+            }
+            if (check) {
+                warn(tag + ' ' + location + ': NOT patched to ' + label + (upgrading ? ' (released v1 needs upgrade)' : ''))
+                copyFailed = true
+                continue
+            }
+
             try {
-                patched = applyPatchSet(r.text, upgrading ? { edits: set.upgradeEdits } : set)
+                const patched = applyPatchSet(text, upgrading ? { edits: patch.upgradeEdits } : patch)
+                if (sha256(patched) !== patch.patchedSha256) throw new Error('patched result has an unexpected hash')
+                const action = upgrading ? 'UPGRADED v1 -> v2' : 'PATCHED ' + label
+                writes.push({ file, patched, hash: patch.patchedSha256, result, location, action })
             } catch (err) {
-                warn(tag + ' ERROR: hypercore ' + r.version + ' at ' + where + ': ' + err.message + '; nothing written')
-                failed = true
-                results.push(r)
-                continue
+                warn(tag + ' ERROR: ' + location + ': ' + err.message + '; nothing written')
+                copyFailed = true
             }
-            if (sha256(patched) !== set.patchedSha256) {
-                warn(tag + ' ERROR: hypercore ' + r.version + ' at ' + where + ': patched result has an unexpected hash; nothing written')
-                failed = true
-                results.push(r)
-                continue
-            }
+        }
+
+        if (copyFailed) {
+            failed = true
+            continue
+        }
+        for (const { file, patched, hash, result, location, action } of writes) {
             // atomic: a parallel run (trac-msb and trac-peer postinstall) writes the same bytes, rename keeps one
             const tmp = file + '.stallfix-' + process.pid + '.tmp'
             fs.writeFileSync(tmp, patched)
             fs.renameSync(tmp, file)
-            r.state = 'patched'
-            r.sha256 = set.patchedSha256
-            log(tag + ' hypercore ' + r.version + ' at ' + where + ': ' + (upgrading ? 'UPGRADED v1 -> v2' : 'PATCHED v2') + ' (sha256 ' + r.sha256 + ')')
-        } else {
-            const set = sets.get(r.version)
-            warn(tag + ' ERROR: hypercore ' + r.version + ' at ' + where + ' has unexpected ' + set.file + ' content (sha256 ' + r.sha256 +
-        (r.state === 'other-stallfix-revision' ? ', patched by a different stallfix revision' : '') +
-        '; expected original ' + set.originalSha256 + ', released v1 ' + set.previousPatchedSha256 + ' or patched v2 ' + set.patchedSha256 + '). Refusing to patch.')
-            failed = true
+            result.state = 'patched'
+            result.sha256 = hash
+            log(tag + ' ' + location + ': ' + action + ' (sha256 ' + hash + ')')
         }
-        results.push(r)
     }
     return { ok: !failed, results }
 }
@@ -189,7 +200,7 @@ if (process.argv[1] && fs.realpathSync(process.argv[1]) === fileURLToPath(import
     const packageDir = path.resolve(here, '..', '..')
     run({ packageDir, check: args.includes('--check'), quiet: args.includes('--quiet') }).then(({ ok }) => {
         if (!ok) {
-            console.error('[hypercore-stallfix] FAILED: see the messages above. The Hypercore replication stall fix is not in place.')
+            console.error('[hypercore-stallfix] FAILED: see the messages above for the affected Hypercore backports.')
             process.exit(1)
         }
     }, (err) => {

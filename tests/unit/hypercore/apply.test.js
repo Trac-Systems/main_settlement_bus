@@ -14,8 +14,11 @@ const pkgRoot = path.resolve(here, '..', '..', '..')
 const scriptsDir = path.join(pkgRoot, 'scripts', 'hypercore-stallfix')
 const sets = await loadPatchSets()
 
-// Pristine replicator.js per supported version that is installed here (patched or not).
+// Pristine sources from the installed copies (patched or not).
+const bitfieldVersion = '11.18.3'
+const [bitfieldPatch] = sets.get(bitfieldVersion).additionalPatches
 const pristine = new Map()
+let pristineBitfield = null
 for (const copy of findHypercoreCopies(pkgRoot)) {
     const version = JSON.parse(fs.readFileSync(path.join(copy.dir, 'package.json'), 'utf8')).version
     const set = sets.get(version)
@@ -24,6 +27,10 @@ for (const copy of findHypercoreCopies(pkgRoot)) {
     const sha = sha256Hex(text)
     if (sha === set.originalSha256) pristine.set(version, text)
     else if (sha === set.patchedSha256) pristine.set(version, unapplyPatchSet(text, set))
+    if (version === bitfieldVersion) {
+        const bitfield = fs.readFileSync(path.join(copy.dir, bitfieldPatch.file), 'utf8')
+        pristineBitfield = sha256Hex(bitfield) === bitfieldPatch.patchedSha256 ? unapplyPatchSet(bitfield, bitfieldPatch) : bitfield
+    }
 }
 const versions = [...pristine.keys()]
 
@@ -40,6 +47,7 @@ function hypercoreAt(dir, version, text) {
     writePkg(dir, { name: 'hypercore', version })
     fs.mkdirSync(path.join(dir, 'lib'), { recursive: true })
     fs.writeFileSync(path.join(dir, 'lib', 'replicator.js'), text)
+    if (version === bitfieldVersion) fs.writeFileSync(path.join(dir, bitfieldPatch.file), pristineBitfield)
 }
 
 function packageWithScript(dir, name) {
@@ -80,7 +88,7 @@ test('apply: hoisted + nested layout, both packages, idempotent, concurrent', as
     const peer = path.join(root, 'node_modules', 'trac-peer')
     packageWithScript(msb, 'trac-msb')
     packageWithScript(peer, 'trac-peer')
-    const v18 = versions.includes('11.18.3') ? '11.18.3' : versions[0]
+    const v18 = versions.includes(bitfieldVersion) ? bitfieldVersion : versions[0]
     const hoisted = path.join(root, 'node_modules', 'hypercore')
     hypercoreAt(hoisted, v18, pristine.get(v18))
     const nested = path.join(peer, 'node_modules', 'hypercore')
@@ -101,6 +109,9 @@ test('apply: hoisted + nested layout, both packages, idempotent, concurrent', as
         t.is(b.code, 0, 'trac-peer script ok, round ' + round)
     }
     t.is(replicatorSha(hoisted), sets.get(v18).patchedSha256, 'hoisted copy patched')
+    if (v18 === bitfieldVersion) {
+        t.is(sha256Hex(fs.readFileSync(path.join(hoisted, bitfieldPatch.file), 'utf8')), bitfieldPatch.patchedSha256, 'hoisted remote bitfield patched')
+    }
     if (v8) t.is(replicatorSha(nested), sets.get(v8).patchedSha256, 'nested copy patched')
     t.absent(fs.readdirSync(path.join(hoisted, 'lib')).some((f) => f.includes('.stallfix-')), 'no temp files left')
 
@@ -152,10 +163,40 @@ test('apply: unsupported version warns loudly and changes nothing; --check fails
     t.is(replicatorSha(hc), sets.get(versions[0]).originalSha256, '--check writes nothing')
 })
 
-test('apply: run() API reports every copy', async (t) => {
+test('apply: run() API reports installed patches', async (t) => {
     const res = await run({ packageDir: pkgRoot, check: true, log: () => {}, warn: () => {} })
     t.ok(res.ok, 'this package\'s own copies are patched (postinstall ran)')
     t.ok(res.results.length >= 1)
+})
+
+test('apply: verifies and applies #874 to an existing v2 installation', { skip: !versions.includes(bitfieldVersion) }, async (t) => {
+    const root = tmpdir()
+    t.teardown(() => fs.rmSync(root, { recursive: true, force: true }))
+    packageWithScript(root, 'trac-msb')
+    const hc = path.join(root, 'node_modules', 'hypercore')
+    const set = sets.get(bitfieldVersion)
+    const replicator = pristine.get(bitfieldVersion)
+    const bitfieldFile = path.join(hc, bitfieldPatch.file)
+    hypercoreAt(hc, bitfieldVersion, applyPatchSet(replicator, set))
+    t.is(sha256Hex(pristineBitfield), bitfieldPatch.originalSha256, 'exact original bitfield bytes')
+    const check = await runScript(root, ['--check'])
+    t.is(check.code, 1, 'check requires the backport')
+    t.ok(check.out.includes('lib/remote-bitfield.js: NOT patched to #874'))
+    t.is(fs.readFileSync(bitfieldFile, 'utf8'), pristineBitfield, 'check writes nothing')
+
+    t.is((await runScript(root)).code, 0, 'installation succeeds')
+    t.is(sha256Hex(fs.readFileSync(bitfieldFile, 'utf8')), bitfieldPatch.patchedSha256, 'backport matches expected bytes')
+    t.is(replicatorSha(hc), set.patchedSha256, 'replicator remains on v2')
+    t.is((await runScript(root, ['--check'])).code, 0, 'both files pass the check')
+
+    hypercoreAt(hc, bitfieldVersion, replicator)
+    const changed = pristineBitfield + '\n// unexpected modification\n'
+    fs.writeFileSync(bitfieldFile, changed)
+    const invalid = await runScript(root)
+    t.is(invalid.code, 1, 'unexpected bitfield source refused')
+    t.ok(invalid.out.includes('unexpected lib/remote-bitfield.js content'))
+    t.is(fs.readFileSync(bitfieldFile, 'utf8'), changed, 'bitfield is unchanged')
+    t.is(replicatorSha(hc), set.originalSha256, 'both files are validated before writing')
 })
 
 test('apply: released v1 upgrades to v2; check is read-only and altered v1 is refused', async (t) => {
