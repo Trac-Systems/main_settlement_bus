@@ -346,6 +346,12 @@ async function attachConnection(context, publicKey = 'dd'.repeat(32)) {
     return connection;
 }
 
+async function failTransport(context, publicKey, message) {
+    const connection = await attachConnection(context, publicKey);
+    connection.emit('error', new Error(message));
+    connection.emit('close');
+}
+
 function registerTransportRequests(context, connection, suffix) {
     const publicKey = connection.remotePublicKey.toString('hex');
     const validator = context.validatorPendingRequestServiceInstance.registerPendingRequest(
@@ -469,6 +475,83 @@ if (isBareRuntime) {
         await fail('connection timed out');
         t.is(context.logger.warn.callCount, 3);
         t.ok(context.logger.warn.lastCall.args[0].includes('Suppressed connection warnings: 0'));
+    });
+
+    test('Network pauses one peer after five recent transport failures and admits it again after five minutes', async t => {
+        const context = await loadNetwork();
+        const { network, swarmInstance, store } = context;
+        const clock = sinon.useFakeTimers();
+        t.teardown(async () => { clock.restore(); await network.close(); });
+        const key = 'dd'.repeat(32);
+        const otherKey = 'ee'.repeat(32);
+        const peer = createPeerInfo(b4a.from(key, 'hex'));
+        swarmInstance.peers.set(key, peer);
+        swarmInstance.peers.set(otherKey, createPeerInfo(b4a.from(otherKey, 'hex')));
+
+        await failTransport(context, key, 'connection reset by peer');
+        clock.tick(90_000);
+        await failTransport(context, key, 'connection timed out');
+        clock.tick(30_001); // Only the first failure has expired.
+        await failTransport(context, key, 'Duplicate connection');
+        await failTransport(context, otherKey, 'connection timed out');
+        for (let i = 0; i < 3; i++) await failTransport(context, key, 'connection reset by peer');
+        t.absent(peer.banned);
+        await failTransport(context, key, 'connection timed out');
+        t.ok(peer.banned);
+        t.absent(swarmInstance.peers.get(otherKey).banned);
+        const address = tracCryptoApi.address.encode('trac', peer.publicKey);
+        t.ok(context.logger.warn.calledWithMatch(`pausing connections to ${address}`));
+
+        clock.tick(299_999);
+        t.is(await network.tryConnect(key, 'validator'), CONNECTION_STATUS.IGNORED);
+        t.absent(swarmInstance.joinPeer.called);
+        const late = createMockConnection(key);
+        const onConnection = swarmInstance.rawListeners('connection')[0];
+        await onConnection(late);
+        t.ok(late.destroy.calledOnce);
+        t.absent(store.replicate.calledWith(late));
+
+        clock.tick(1);
+        t.absent(peer.banned);
+        t.ok(swarmInstance.joinPeer.calledOnceWithExactly(peer.publicKey));
+        const recovered = createMockConnection(key);
+        await onConnection(recovered);
+        t.ok(store.replicate.calledWith(recovered));
+    });
+
+    test('Network admits a discovery peer again without requesting a direct connection', async t => {
+        const context = await loadNetwork();
+        const clock = sinon.useFakeTimers();
+        t.teardown(async () => { clock.restore(); await context.network.close(); });
+        const key = 'dd'.repeat(32);
+        const peer = createPeerInfo(b4a.from(key, 'hex'));
+        peer.explicit = false;
+        context.swarmInstance.peers.set(key, peer);
+        for (let i = 0; i < 5; i++) await failTransport(context, key, 'connection timed out');
+        t.ok(peer.banned);
+        clock.tick(300_000);
+        t.absent(peer.banned);
+        t.absent(context.swarmInstance.joinPeer.called);
+        const incoming = await attachConnection(context, key);
+        t.ok(context.store.replicate.calledWith(incoming));
+    });
+
+    test('Network keeps a consensus ban issued during a transport cooldown', async t => {
+        const context = await loadNetwork();
+        const clock = sinon.useFakeTimers();
+        t.teardown(async () => { clock.restore(); await context.network.close(); });
+        const key = 'dd'.repeat(32);
+        const connection = createMockConnection(key);
+        const peer = createPeerInfo(connection.remotePublicKey);
+        context.swarmInstance.peers.set(key, peer);
+        for (let i = 0; i < 5; i++) await failTransport(context, key, 'connection reset by peer');
+        t.ok(peer.banned);
+        context.state.emit(CustomEventType.CONSENSUS_PEER_BAN_REQUESTED, {
+            connection, error: new V1ConsensusProtocolError(ConsensusResultCode.PUBLIC_KEY_MISMATCH, 'Peer identity mismatch'),
+        });
+        clock.tick(300_000);
+        t.ok(peer.banned);
+        t.absent(context.swarmInstance.joinPeer.called);
     });
 
     test('Network reports unexpected and missing errors and still settles pending requests', async t => {

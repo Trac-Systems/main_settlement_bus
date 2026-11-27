@@ -39,6 +39,10 @@ const connectionErrorTypes = new Map([
     ['Duplicate connection', ConnectionErrorType.DUPLICATE],
 ]);
 
+const PEER_FAILURE_LIMIT = 5;
+const PEER_FAILURE_WINDOW_MS = 2 * 60_000;
+const PEER_COOLDOWN_MS = 5 * 60_000;
+
 const wakeup = new w();
 
 class Network extends ReadyResource {
@@ -66,6 +70,7 @@ class Network extends ReadyResource {
     #closing = false;
     #lastConnectionWarningAt = null;
     #suppressedConnectionWarnings = 0;
+    #peerFailures = new Map();
 
     /**
      * @param {State} state
@@ -208,6 +213,7 @@ class Network extends ReadyResource {
     async _close() {
         this.#logger.info('Network: closing gracefully...');
         this.#closing = true;
+        for (const publicKey of this.#peerFailures.keys()) this.#clearPeerFailures(publicKey);
         this.#detachStateListeners();
         await this.#epochCoordinatorService.close();
         await this.#epochAppenderSelector.close();
@@ -307,6 +313,9 @@ class Network extends ReadyResource {
             const failConnection = (error, type) => {
                 if (errorType !== null) return;
                 errorType = type;
+                if (type === ConnectionErrorType.RESET || type === ConnectionErrorType.TIMEOUT) {
+                    this.#recordPeerFailure(publicKey);
+                }
                 this.#detachConnection(publicKey, connection, error);
                 this.#destroyConnection(connection);
                 this.#logConnectionError(connection.remotePublicKey, error, type);
@@ -372,6 +381,7 @@ class Network extends ReadyResource {
         if (!publicKey) return;
 
         // Hyperswarm retains the ban for this swarm's lifetime, but does not close the socket.
+        this.#clearPeerFailures(publicKey);
         const peerInfo = this.#swarm.peers.get(publicKey);
         peerInfo?.ban(true);
         const connections = new Set([connection]);
@@ -398,6 +408,45 @@ class Network extends ReadyResource {
     #isPeerBanned(publicKey) {
         const key = this.#normalizePublicKey(publicKey);
         return this.#swarm.peers.get(key)?.banned === true;
+    }
+
+    #clearPeerFailures(publicKey) {
+        const entry = this.#peerFailures.get(publicKey);
+        if (!entry) return;
+        clearTimeout(entry.timer);
+        this.#peerFailures.delete(publicKey);
+    }
+
+    #recordPeerFailure(publicKey) {
+        const peer = this.#swarm?.peers.get(publicKey);
+        if (this.#closing || !peer || peer.banned) return;
+
+        const now = Date.now();
+        const previous = this.#peerFailures.get(publicKey);
+        const failures = previous?.failures.filter(time => now - time < PEER_FAILURE_WINDOW_MS) ?? [];
+        failures.push(now);
+        this.#clearPeerFailures(publicKey);
+
+        if (failures.length < PEER_FAILURE_LIMIT) {
+            const timer = setTimeout(() => this.#peerFailures.delete(publicKey), PEER_FAILURE_WINDOW_MS);
+            this.#peerFailures.set(publicKey, { failures, timer });
+            return;
+        }
+
+        peer.ban(true);
+        const timer = setTimeout(() => {
+            this.#peerFailures.delete(publicKey);
+            peer.ban(false);
+            if (peer.explicit) {
+                this.#swarm.joinPeer(peer.publicKey);
+            } else {
+                // Release Hyperswarm's retained entry for peers reached through discovery.
+                this.#swarm.leavePeer(peer.publicKey);
+            }
+        }, PEER_COOLDOWN_MS);
+        this.#peerFailures.set(publicKey, { failures, timer });
+        const address = publicKeyToAddress(publicKey, this.#config);
+        this.#logger.warn(`Network: pausing connections to ${address} for ${PEER_COOLDOWN_MS / 60_000} min after ${failures.length} transport failures`);
     }
 
     disconnectValidatorPeer(publicKey, reason = 'validator peer invalidated') {
