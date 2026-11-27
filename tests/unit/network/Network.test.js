@@ -2,7 +2,8 @@ import { test } from 'brittle';
 import sinon from 'sinon';
 import b4a from 'b4a';
 import EventEmitter from 'bare-events';
-import { CONNECTION_STATUS } from '../../../src/utils/constants.js';
+import { CONNECTION_STATUS, EventType } from '../../../src/utils/constants.js';
+import ConnectionManager from '../../../src/core/network/services/ConnectionManager.js';
 
 const isBareRuntime = typeof globalThis.Bare !== 'undefined';
 
@@ -17,6 +18,7 @@ async function loadNetwork(options = {}) {
     let swarmInstance = null;
     let connectionManagerInstance = null;
     let pendingRequestServiceInstance = null;
+    const startHealthCheck = sinon.spy();
 
     class HyperswarmMock extends EventEmitter {
         constructor() {
@@ -81,6 +83,7 @@ async function loadNetwork(options = {}) {
         }
 
         subscribeToHealthChecks() {}
+        close() { this.validators.clear(); }
     }
 
     class TransactionPoolServiceMock {
@@ -118,7 +121,7 @@ async function loadNetwork(options = {}) {
 
     class ValidatorHealthCheckServiceMock extends EventEmitter {
         async ready() {}
-        start() {}
+        start = startHealthCheck;
         stop() {}
         has() { return false; }
         close() {}
@@ -144,7 +147,7 @@ async function loadNetwork(options = {}) {
         hyperswarm: HyperswarmMock,
         '../../../src/core/network/services/TransactionPoolService.js': { default: TransactionPoolServiceMock },
         '../../../src/core/network/services/ValidatorObserverService.js': { default: ValidatorObserverServiceMock },
-        '../../../src/core/network/services/ConnectionManager.js': { default: ConnectionManagerMock },
+        '../../../src/core/network/services/ConnectionManager.js': { default: options.useRealManager ? ConnectionManager : ConnectionManagerMock },
         '../../../src/core/network/services/MessageOrchestrator.js': { default: MessageOrchestratorMock },
         '../../../src/core/network/services/TransactionRateLimiterService.js': { default: TransactionRateLimiterServiceMock },
         '../../../src/core/network/services/PendingRequestService.js': { default: PendingRequestServiceMock },
@@ -152,6 +155,7 @@ async function loadNetwork(options = {}) {
         '../../../src/core/network/services/ValidatorHealthCheckService.js': { default: ValidatorHealthCheckServiceMock },
         '../../../src/core/network/protocols/NetworkMessages.js': { default: NetworkMessagesMock },
         '../../../src/utils/logger.js': { Logger: LoggerMock },
+        '../../../src/utils/helpers.js': { sleep: sinon.stub().resolves() },
     });
 
     const Network = NetworkModule.default;
@@ -159,7 +163,8 @@ async function loadNetwork(options = {}) {
         enableWallet: true,
         connectTimeoutMs: 1_000,
         maxPendingConnections: 10,
-        maxValidators: 5,
+        maxValidators: options.maxValidators ?? 5,
+        addressPrefix: 'trac',
         maxPeers: 5,
         maxParallel: 1,
         maxServerConnections: 5,
@@ -180,7 +185,7 @@ async function loadNetwork(options = {}) {
     };
     await network.replicate({}, store, wallet);
 
-    return { network, swarmInstance, connectionManagerInstance, pendingRequestServiceInstance, store, wallet };
+    return { network, swarmInstance, connectionManagerInstance, pendingRequestServiceInstance, startHealthCheck, store, wallet };
 }
 
 function deferred() {
@@ -196,6 +201,60 @@ if (isBareRuntime) {
         t.pass('skipped in Bare because esmock depends on node:module');
     });
 } else {
+    test('Network releases only its own network and swarm listeners', async t => {
+        const { network, swarmInstance } = await loadNetwork();
+        await network.ready();
+        const otherListener = sinon.spy();
+        const events = [EventType.VALIDATOR_CONNECTION_READY, EventType.VALIDATOR_CONNECTION_TIMEOUT];
+        for (const event of events) network.on(event, otherListener);
+        swarmInstance.on('connection', otherListener);
+        network.setupNetworkListeners();
+        for (const event of events) t.is(network.listenerCount(event), 2);
+        swarmInstance.destroy.callsFake(async () => {
+            t.alike(swarmInstance.rawListeners('connection'), [otherListener]);
+        });
+        const closing = network.close();
+        for (const event of events) t.alike(network.rawListeners(event), [otherListener]);
+        await closing;
+    });
+
+    for (const interruption of ['transport closes', 'network closes', 'pool is full']) {
+        test(`Network skips validator admission and health checks when ${interruption} during a probe`, async t => {
+            const { network, swarmInstance, startHealthCheck } = await loadNetwork({
+                useRealManager: true,
+                maxValidators: interruption === 'pool is full' ? 0 : 1,
+            });
+            await network.ready();
+            t.teardown(() => network.close());
+            const publicKey = 'a'.repeat(64);
+            const target = b4a.from(publicKey, 'hex');
+            const connection = new EventEmitter();
+            const probe = deferred();
+            connection.remotePublicKey = target;
+            connection.protocolSession = {
+                isProbed: () => false,
+                probe: sinon.stub().returns(probe.promise),
+                isHealthCheckSupported: () => true,
+            };
+            swarmInstance.peers.set(publicKey, { publicKey: target, explicit: true });
+            swarmInstance._allConnections.set(target, connection);
+            await network.tryConnect(publicKey, 'validator');
+            t.ok(connection.protocolSession.probe.calledOnce);
+
+            if (interruption === 'transport closes') {
+                connection.destroyed = true;
+                connection.emit('close');
+            } else if (interruption === 'network closes') {
+                await network.close();
+            }
+            probe.resolve();
+            await probe.promise;
+            t.absent(network.validatorConnectionManager.exists(publicKey));
+            t.is(connection.listenerCount('close'), 0);
+            t.absent(startHealthCheck.called);
+        });
+    }
+
     test('Network#tryConnect rejoins a retained peer without explicit retries', async t => {
         const { network, swarmInstance } = await loadNetwork();
         t.teardown(() => network.cleanupPendingConnections());
@@ -273,6 +332,8 @@ if (isBareRuntime) {
         const connection = new EventEmitter();
         connection.remotePublicKey = b4a.from(publicKey, 'hex');
         connection.destroy = sinon.stub();
+        const onError = sinon.spy();
+        connection.on('error', onError);
 
         swarmInstance.emit('connection', connection);
         await new Promise(resolve => setTimeout(resolve, 0));
@@ -280,6 +341,8 @@ if (isBareRuntime) {
         connectionManagerInstance.addValidator(publicKey, connection);
         connection.emit('close');
 
+        t.alike(connection.rawListeners('error'), [onError]);
+        t.is(connection.listenerCount('close'), 0);
         t.absent(connectionManagerInstance.exists(publicKey), 'tracked validator should be removed');
         t.alike(
             connectionManagerInstance.removed,

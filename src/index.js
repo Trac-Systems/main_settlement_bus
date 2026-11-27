@@ -37,7 +37,7 @@ export class MainSettlementBus extends ReadyResource {
     #wallet;
     #network;
     #state;
-    #isClosing = false;
+    #stateListeners = [];
     #config
     #replicationGuard = null;
 
@@ -78,8 +78,17 @@ export class MainSettlementBus extends ReadyResource {
 
         await this.#state.ready();
         await this.#network.ready();
-        await this.#stateEventsListener();
+        this.#attachStateListeners();
+        try {
+            await this.#startReplication();
+        } catch (error) {
+            // ReadyResource skips _close when _open rejects.
+            await this._close();
+            throw error;
+        }
+    }
 
+    async #startReplication() {
         if (this.#wallet) {
             this.#printWalletInfo();
         }
@@ -100,8 +109,6 @@ export class MainSettlementBus extends ReadyResource {
         const adminEntry = await this.#state.getAdminEntry();
         await this.#setUpRoleAutomatically(adminEntry);
 
-
-
         console.log(`isIndexer: ${this.#state.isIndexer()}`);
         console.log(`isWriter: ${this.#state.isWritable()}`);
         console.log("MSB Unsigned Length:", this.#state.getUnsignedLength());
@@ -115,7 +122,8 @@ export class MainSettlementBus extends ReadyResource {
     async _close() {
         console.log("Closing everything gracefully... This may take a moment.");
 
-        this.#isClosing = true;
+        for (const [emitter, event, handler] of this.#stateListeners) emitter.off(event, handler);
+        this.#stateListeners = [];
         this.#replicationGuard?.stop();
         await this.#network.close();
 
@@ -225,35 +233,21 @@ export class MainSettlementBus extends ReadyResource {
         return nodeEntry?.isWhitelisted && !this.isAdmin(adminEntry);
     }
 
-    async #stateEventsListener() {
-        this.#state.on(CustomEventType.IS_INDEXER, (publicKey) => {
-            if (this.#isClosing) return;
-            this.#network.disconnectValidatorPeer(publicKey, 'peer promoted to indexer');
-        });
-
-        this.#state.on(CustomEventType.UNWRITABLE, (publicKey) => {
-            if (this.#isClosing) return;
-            this.#network.disconnectValidatorPeer(publicKey, 'peer became unwritable');
-        });
-
-        this.#state.base.on(EventType.IS_INDEXER, () => {
-            console.log("Current node is an indexer");
-        });
-
-        this.#state.base.on(EventType.IS_NON_INDEXER, async () => {
-            // Prevent further actions if closing is in progress
-            // The reason is that getNodeEntry is async and may cause issues if we will access state after closing
-            if (this.#isClosing) return;
-            console.log("Current node is not an indexer anymore");
-        });
-
-        this.#state.base.on(EventType.WRITABLE, async () => {
-            console.log("Current node is writable");
-        });
-
-        this.#state.base.on(EventType.UNWRITABLE, async () => {
-            console.log("Current node is unwritable");
-        });
+    #attachStateListeners() {
+        const state = this.#state;
+        this.#stateListeners = [
+            [state, CustomEventType.IS_INDEXER, key => {
+                if (!this.closing) this.#network.disconnectValidatorPeer(key, 'peer promoted to indexer');
+            }],
+            [state, CustomEventType.UNWRITABLE, key => {
+                if (!this.closing) this.#network.disconnectValidatorPeer(key, 'peer became unwritable');
+            }],
+            [state.base, EventType.IS_INDEXER, () => console.log("Current node is an indexer")],
+            [state.base, EventType.IS_NON_INDEXER, () => console.log("Current node is not an indexer anymore")],
+            [state.base, EventType.WRITABLE, () => console.log("Current node is writable")],
+            [state.base, EventType.UNWRITABLE, () => console.log("Current node is unwritable")],
+        ];
+        for (const [emitter, event, handler] of this.#stateListeners) emitter.on(event, handler);
     }
 
     async getConfirmedTxInfo(txHash) {

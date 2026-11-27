@@ -3,6 +3,7 @@ import { hook, test } from 'brittle'
 import { default as EventEmitter } from "bare-events"
 import { testKeyPair1, testKeyPair2, testKeyPair3, testKeyPair4, testKeyPair5, testKeyPair6, testKeyPair7, testKeyPair8 } from "../../../fixtures/apply.fixtures.js";
 import ConnectionManager, { ConnectionManagerError } from "../../../../src/core/network/services/ConnectionManager.js";
+import ValidatorHealthCheckService from "../../../../src/core/network/services/ValidatorHealthCheckService.js";
 import { tick } from "../../../helpers/setupApplyTests.js";
 import b4a from 'b4a'
 import { createConfig, ENV } from "../../../../src/config/env.js";
@@ -237,6 +238,45 @@ test('ConnectionManager', () => {
     })
 
     test('remove', async () => {
+        test('repeated detach on a shared transport releases only the validator listener', t => {
+            const { key, connection } = createV1Connection(testKeyPair1.publicKey);
+            const manager = makeManager(1, []);
+            const otherListener = sinon.spy();
+            connection.on('close', otherListener);
+            let maxListeners = 0;
+            for (let cycle = 0; cycle < 25; cycle++) {
+                manager.addValidator(key, connection);
+                maxListeners = Math.max(maxListeners, connection.listenerCount('close'));
+                manager.remove(key, { endConnection: false });
+            }
+            t.is(maxListeners, 2);
+            t.alike(connection.rawListeners('close'), [otherListener]);
+            t.absent(connection.end.called);
+        })
+
+        test('close detaches live transports and cancels their scheduled health checks', async t => {
+            const health = new ValidatorHealthCheckService();
+            await health.ready();
+            t.teardown(() => health.close());
+            const otherListener = sinon.spy();
+            health.on(EventType.VALIDATOR_HEALTH_CHECK, otherListener);
+            const peers = [createV1Connection(testKeyPair1.publicKey), createV1Connection(testKeyPair2.publicKey)];
+            const manager = makeManager(2, peers);
+            manager.subscribeToHealthChecks(health);
+            for (const { key } of peers) health.start(key);
+            t.is(health.size, 2);
+
+            manager.close();
+            t.is(health.size, 0);
+            t.alike(health.rawListeners(EventType.VALIDATOR_HEALTH_CHECK), [otherListener]);
+            t.is(manager.connectionCount(), 0);
+            for (const { key, connection } of peers) {
+                t.absent(manager.addValidator(key, connection));
+                t.is(connection.listenerCount('close'), 0);
+                t.absent(connection.end.called);
+            }
+        })
+
         test('removes a validator by public key', async t => {
             reset()
             const connectionManager = makeManager()
@@ -317,6 +357,23 @@ test('ConnectionManager', () => {
     })
 
     test('health checks (strict)', async () => {
+        test('a late health check cannot evict a re-added validator on the same transport', async t => {
+            let finish;
+            const pending = new Promise(resolve => { finish = resolve; });
+            const peer = createV1Connection(testKeyPair1.publicKey, () => pending);
+            const manager = makeManager(1, [peer], { validatorHealthCheckFailureThreshold: 1 });
+            const health = makeHealthCheckService();
+            manager.subscribeToHealthChecks(health);
+            t.teardown(() => manager.close());
+            health.emit(EventType.VALIDATOR_HEALTH_CHECK, testKeyPair1.publicKey, 'hc-1');
+            manager.remove(peer.key, { endConnection: false });
+            manager.addValidator(peer.key, peer.connection);
+            finish(ResultCode.TIMEOUT);
+            await tick();
+            t.ok(manager.isCurrent(peer.key, peer.connection));
+            t.absent(peer.connection.end.called);
+        });
+
         test('keeps validator on OK response', async t => {
             try {
                 const v1Conn = createV1Connection(testKeyPair1.publicKey, sinon.stub().resolves(ResultCode.OK));

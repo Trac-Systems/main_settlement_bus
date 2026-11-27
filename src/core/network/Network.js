@@ -11,7 +11,7 @@ import {
     EventType,
     CONNECTION_STATUS
 } from '../../utils/constants.js';
-import ConnectionManager from './services/ConnectionManager.js';
+import ConnectionManager, { isConnectionClosing } from './services/ConnectionManager.js';
 import MessageOrchestrator from './services/MessageOrchestrator.js';
 import TransactionRateLimiterService from './services/TransactionRateLimiterService.js';
 import PendingRequestService from './services/PendingRequestService.js';
@@ -40,6 +40,7 @@ class Network extends ReadyResource {
     #validatorHealthCheckService;
     #logger;
     #closing = false;
+    #onSwarmConnection;
 
     /**
      * @param {State} state
@@ -94,6 +95,9 @@ class Network extends ReadyResource {
     async _close() {
         this.#logger.info('Network: closing gracefully...');
         this.#closing = true;
+        this.cleanupNetworkListeners();
+        this.cleanupPendingConnections();
+        this.#validatorConnectionManager.close();
         await this.transactionPoolService.stopPool();
         await sleep(100);
         await this.#validatorObserverService.stopValidatorObserver();
@@ -102,15 +106,14 @@ class Network extends ReadyResource {
             await this.#validatorHealthCheckService.close();
         }
 
-        this.cleanupNetworkListeners();
-        this.cleanupPendingConnections();
         this.#pendingRequestsService.close();
         this.#transactionCommitService.close();
 
         const swarm = this.#swarm;
         if (swarm !== null) {
-            if (typeof swarm.removeAllListeners === 'function') {
-                swarm.removeAllListeners('connection');
+            if (this.#onSwarmConnection) {
+                swarm.off('connection', this.#onSwarmConnection);
+                this.#onSwarmConnection = null;
             }
             await swarm.destroy();
             if (this.#swarm === swarm) {
@@ -120,50 +123,54 @@ class Network extends ReadyResource {
     }
 
     setupNetworkListeners() {
-        this.on(EventType.VALIDATOR_CONNECTION_TIMEOUT, ({ publicKey, type, timeoutMs }) => {
-            this.#logger.debug(`Network Event: VALIDATOR_CONNECTION_TIMEOUT | PublicKey: ${publicKey} | Type: ${type} | TimeoutMs: ${timeoutMs}`);
-            this.#pendingConnections.delete(publicKey);
-        });
-
-        this.on(EventType.VALIDATOR_CONNECTION_READY, async ({ publicKey, type, connection }) => {
-            this.#logger.debug(`Network Event: VALIDATOR_CONNECTION_READY | PublicKey: ${publicKey} | Type: ${type}`);
-            const { timeoutId } = this.#pendingConnections.get(publicKey);
-
-            if (!timeoutId) return;
-
-            clearTimeout(timeoutId);
-            this.#pendingConnections.delete(publicKey);
-
-            if (type === 'validator') {
-                try {
-                    if (!connection.protocolSession.isProbed()) await connection.protocolSession.probe();
-                } catch (err) {
-                    this.#logger.debug(`failed to probe peer with publicKey ${publicKey}: ${err?.message ?? err}`);
-                }
-
-                this.#validatorConnectionManager.addValidator(publicKey, connection);
-
-                let healthCheckSupported = false;
-                try {
-                    healthCheckSupported = connection.protocolSession.isHealthCheckSupported();
-                } catch (err) {
-                    this.#logger.debug(`health check support unknown for peer with publicKey ${publicKey}: ${err?.message ?? err}`);
-                }
-
-                if (healthCheckSupported) {
-                    this.#validatorHealthCheckService.start(publicKey);
-                } else {
-                    this.#validatorHealthCheckService.stop(publicKey);
-                }
-            }
-
-        });
+        if (this.#closing) return;
+        this.cleanupNetworkListeners();
+        this.on(EventType.VALIDATOR_CONNECTION_TIMEOUT, this.#onConnectionTimeout);
+        this.on(EventType.VALIDATOR_CONNECTION_READY, this.#onConnectionReady);
     }
 
     cleanupNetworkListeners() {
-        this.removeAllListeners(EventType.VALIDATOR_CONNECTION_TIMEOUT);
-        this.removeAllListeners(EventType.VALIDATOR_CONNECTION_READY);
+        this.off(EventType.VALIDATOR_CONNECTION_TIMEOUT, this.#onConnectionTimeout);
+        this.off(EventType.VALIDATOR_CONNECTION_READY, this.#onConnectionReady);
     }
+
+    #onConnectionTimeout = ({ publicKey, type, timeoutMs }) => {
+        this.#logger.debug(`Network Event: VALIDATOR_CONNECTION_TIMEOUT | PublicKey: ${publicKey} | Type: ${type} | TimeoutMs: ${timeoutMs}`);
+        this.#pendingConnections.delete(publicKey);
+    };
+
+    #onConnectionReady = async ({ publicKey, type, connection }) => {
+        this.#logger.debug(`Network Event: VALIDATOR_CONNECTION_READY | PublicKey: ${publicKey} | Type: ${type}`);
+        const pending = this.#pendingConnections.get(publicKey);
+        if (!pending) return;
+
+        clearTimeout(pending.timeoutId);
+        this.#pendingConnections.delete(publicKey);
+        if (type !== 'validator' || isConnectionClosing(connection)) return;
+
+        try {
+            if (!connection.protocolSession.isProbed()) await connection.protocolSession.probe();
+        } catch (err) {
+            this.#logger.debug(`failed to probe peer with publicKey ${publicKey}: ${err?.message ?? err}`);
+        }
+
+        if (this.#closing || isConnectionClosing(connection)) return;
+        this.#validatorConnectionManager.addValidator(publicKey, connection);
+        if (!this.#validatorConnectionManager.isCurrent(publicKey, connection)) return;
+
+        let healthCheckSupported = false;
+        try {
+            healthCheckSupported = connection.protocolSession.isHealthCheckSupported();
+        } catch (err) {
+            this.#logger.debug(`health check support unknown for peer with publicKey ${publicKey}: ${err?.message ?? err}`);
+        }
+
+        if (healthCheckSupported) {
+            this.#validatorHealthCheckService.start(publicKey);
+        } else {
+            this.#validatorHealthCheckService.stop(publicKey);
+        }
+    };
 
     cleanupPendingConnections() {
         for (const { timeoutId } of this.#pendingConnections.values()) {
@@ -182,6 +189,8 @@ class Network extends ReadyResource {
         if (!this.#swarm) {
             const { wallet: wrappedWallet, keyPair } = await this.#getOrGenerateWallet(store, wallet);
             this.#assertCanReplicate();
+
+            if (this.#swarm) return;
 
             this.#wallet = wrappedWallet
             this.#validatorMessageOrchestrator.setWallet(this.#wallet);
@@ -213,51 +222,33 @@ class Network extends ReadyResource {
 
             this.#logger.info(`Channel: ${b4a.toString(this.#config.channel)}`);
 
-            this.#swarm.on('connection', async (connection) => {
+            this.#onSwarmConnection = async (connection) => {
                 if (this.#closing) {
                     this.#destroyConnection(connection);
                     return;
                 }
-
-                try {
-                    // Per-peer connection initialization:
-                    // - attach Protomux (legacy + v1 channels/messages)
-                    // - attach connection.protocolSession (used later by tryConnect / orchestrators to send messages)
-                    await this.#networkMessages.setupProtomuxMessages(connection);
-
-                    // Pear v3 can deliver a late swarm connection while shutdown is
-                    // already closing the Corestore. Do not replicate a connection
-                    // after close has begun; store.replicate would otherwise throw.
-                    if (this.#closing || this.#swarm === null) {
-                        this.#destroyConnection(connection);
-                        return;
-                    }
-
-                    // ATTENTION: Must be called AFTER the protomux init above
-                    const stream = store.replicate(connection);
-                    wakeup.addStream(stream);
-                } catch (error) {
-                    const publicKey = connection.remotePublicKey
-                        ? b4a.toString(connection.remotePublicKey, 'hex')
-                        : 'unknown';
-                    this.#pendingRequestsService.rejectPendingRequestsForPeer(
-                        publicKey,
-                        error ?? new Error('Connection setup failed')
-                    );
-                    this.#destroyConnection(connection);
-                    if (!this.#closing) {
-                        this.#logger.error(error?.message ?? 'Unknown network connection setup error');
-                    }
-                    return;
-                }
+                if (isConnectionClosing(connection)) return;
 
                 const publicKey = b4a.toString(connection.remotePublicKey, 'hex');
-                if (this.#pendingConnections.has(publicKey)) {
-                    const { type } = this.#pendingConnections.get(publicKey);
-                    await this.#finalizeConnection(publicKey, type, connection);
-                }
-
-                connection.on('close', () => {
+                const onError = (error) => {
+                    this.#pendingRequestsService.rejectPendingRequestsForPeer(
+                        publicKey,
+                        error ?? new Error('Connection error before response')
+                    );
+                    if (
+                        error && error.message && (
+                            error.message.includes('connection reset by peer') ||
+                            error.message.includes('Duplicate connection') ||
+                            error.message.includes('connection timed out'))
+                    ) {
+                        // TODO: decide if we want to handle this error in a specific way. It generates a lot of logs.
+                        return;
+                    }
+                    this.#logger.error(error?.message ?? 'Unknown network connection error');
+                };
+                connection.on('error', onError);
+                connection.once('close', () => {
+                    connection.off('error', onError);
                     this.#pendingRequestsService.rejectPendingRequestsForPeer(
                         publicKey,
                         new Error('Connection closed before response')
@@ -274,24 +265,42 @@ class Network extends ReadyResource {
                     }
                 });
 
-                connection.on('error', (error) => {
-                    this.#pendingRequestsService.rejectPendingRequestsForPeer(
-                        publicKey,
-                        error ?? new Error('Connection error before response')
-                    );
-                    if (
-                        error && error.message && (
-                            error.message.includes('connection reset by peer') ||
-                            error.message.includes('Duplicate connection') ||
-                            error.message.includes('connection timed out'))
-                    ) {
-                        // TODO: decide if we want to handle this error in a specific way. It generates a lot of logs.
+                try {
+                    // Per-peer connection initialization:
+                    // - attach Protomux (legacy + v1 channels/messages)
+                    // - attach connection.protocolSession (used later by tryConnect / orchestrators to send messages)
+                    await this.#networkMessages.setupProtomuxMessages(connection);
+
+                    // Pear v3 can deliver a late swarm connection while shutdown is
+                    // already closing the Corestore. Do not replicate a connection
+                    // after close has begun; store.replicate would otherwise throw.
+                    if (this.#closing || this.#swarm === null) {
+                        this.#destroyConnection(connection);
                         return;
                     }
-                    this.#logger.error(error?.message ?? 'Unknown network connection error');
-                });
 
-            });
+                    if (isConnectionClosing(connection)) return;
+                    // ATTENTION: Must be called AFTER the protomux init above
+                    const stream = store.replicate(connection);
+                    wakeup.addStream(stream);
+                } catch (error) {
+                    this.#pendingRequestsService.rejectPendingRequestsForPeer(
+                        publicKey,
+                        error ?? new Error('Connection setup failed')
+                    );
+                    this.#destroyConnection(connection);
+                    if (!this.#closing) {
+                        this.#logger.error(error?.message ?? 'Unknown network connection setup error');
+                    }
+                    return;
+                }
+
+                if (this.#pendingConnections.has(publicKey)) {
+                    const { type } = this.#pendingConnections.get(publicKey);
+                    await this.#finalizeConnection(publicKey, type, connection);
+                }
+            };
+            this.#swarm.on('connection', this.#onSwarmConnection);
 
             this.#swarm.join(this.#config.channel, { server: true, client: true });
             this.#swarm.flush();
@@ -340,6 +349,7 @@ class Network extends ReadyResource {
     }
 
     async tryConnect(publicKey, type = null) {
+        if (this.#closing) return CONNECTION_STATUS.IGNORED;
         if (this.#swarm === null) throw new Error('Network swarm is not initialized');
         if (this.#pendingConnections.has(publicKey) || this.#pendingConnections.size >= this.#maxPendingConnections) {
             this.#logger.debug(`Network.tryConnect: Connection to peer: ${publicKey} as type: ${type} is already pending or max pending connections reached.`);

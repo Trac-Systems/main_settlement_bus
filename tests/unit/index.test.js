@@ -2,11 +2,11 @@ import { test } from 'brittle';
 import sinon from 'sinon';
 import b4a from 'b4a';
 import EventEmitter from 'bare-events';
-import { CustomEventType } from '../../src/utils/constants.js';
+import { CustomEventType, EventType } from '../../src/utils/constants.js';
 
 const isBareRuntime = typeof globalThis.Bare !== 'undefined';
 
-async function loadMainSettlementBus() {
+async function loadMainSettlementBus({ replicate = sinon.stub().resolves() } = {}) {
     const { default: esmock } = await import('esmock');
     let stateInstance = null;
     let networkInstance = null;
@@ -38,7 +38,7 @@ async function loadMainSettlementBus() {
     class NetworkMock {
         constructor() {
             this.ready = sinon.stub().resolves();
-            this.replicate = sinon.stub().resolves();
+            this.replicate = replicate;
             this.close = sinon.stub().resolves();
             this.disconnectValidatorPeer = sinon.stub().returns(true);
             networkInstance = this;
@@ -92,6 +92,16 @@ if (isBareRuntime) {
         t.pass('skipped in Bare because esmock depends on node:module');
     });
 } else {
+    test('MainSettlementBus releases state listeners when replication fails to start', async t => {
+        const loaded = await loadMainSettlementBus({ replicate: sinon.stub().rejects(new Error('replication failed')) });
+        const msb = new loaded.MainSettlementBus(buildConfig());
+        await t.exception(() => msb.ready(), /replication failed/);
+        await msb.close();
+        t.is(loaded.state.listenerCount(CustomEventType.IS_INDEXER), 0);
+        t.is(loaded.state.base.listenerCount(EventType.WRITABLE), 0);
+        t.ok(loaded.network.close.calledOnce);
+    });
+
     test('MainSettlementBus disconnects validator peers when state role events invalidate them', async t => {
         const consoleLog = sinon.stub(console, 'log');
         t.teardown(() => consoleLog.restore());
@@ -132,12 +142,26 @@ if (isBareRuntime) {
         const msb = new loaded.MainSettlementBus(buildConfig());
 
         await msb.ready();
-        await msb.close();
-
+        const events = [
+            [loaded.state, CustomEventType.IS_INDEXER],
+            [loaded.state, CustomEventType.UNWRITABLE],
+            [loaded.state.base, EventType.IS_INDEXER],
+            [loaded.state.base, EventType.IS_NON_INDEXER],
+            [loaded.state.base, EventType.WRITABLE],
+            [loaded.state.base, EventType.UNWRITABLE],
+        ];
+        const otherListener = sinon.spy();
+        for (const [emitter, event] of events) emitter.on(event, otherListener);
+        const closing = msb.close();
+        for (const [emitter, event] of events) {
+            t.alike(emitter.rawListeners(event), [otherListener], event);
+        }
         loaded.network.disconnectValidatorPeer.resetHistory();
         loaded.state.emit(CustomEventType.UNWRITABLE, b4a.alloc(32, 8));
         loaded.state.emit(CustomEventType.IS_INDEXER, b4a.alloc(32, 9));
 
+        t.ok(otherListener.calledTwice);
         t.is(loaded.network.disconnectValidatorPeer.callCount, 0, 'closing nodes should not mutate validator connections from late events');
+        await closing;
     });
 }
