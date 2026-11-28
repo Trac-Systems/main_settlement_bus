@@ -1,4 +1,4 @@
-// Exact-text patch set for hypercore 11.18.3 lib/replicator.js (OPENMAYHEM-STALLFIX v2).
+// Exact-text patch set for hypercore 11.18.3 lib/replicator.js.
 // Each edit is [original, replacement]; the original must occur exactly once in the unpatched file.
 // Keep this file free of backticks and dollar-brace sequences inside the edit texts (String.raw templates).
 
@@ -15,18 +15,96 @@ const closedStreamGuard = [
 `
 ]
 
+// Coalesce wireSync snapshots while the shared transport is backpressured.
+const wireSyncBackpressure = [
+    [
+        String.raw`    if (this._shouldUpdateCanUpgrade() === true) this._updateCanUpgradeAndSync()
+    else this.sendSync()
+`,
+        String.raw`    if (this.removed || this.channel.closed) return
+    if (!this.protomux.drained) {
+      this.needsSync = true
+      return
+    }
+
+    if (this._shouldUpdateCanUpgrade() === true) this._updateCanUpgradeAndSync()
+    else this.sendSync()
+`
+    ],
+    [
+        String.raw`  sendSync() {
+    if (this.syncsProcessing !== 0) {
+`,
+        String.raw`  sendSync(initial = false) {
+    if (this.removed || this.channel.closed) return
+    if (this.syncsProcessing !== 0 || (!initial && !this.protomux.drained)) {
+`
+    ],
+    [
+        String.raw`    this.sendSync()
+
+    const contig = Math.min(this.core.state.length, this.core.header.hints.contiguousLength)
+`,
+        String.raw`    // Keep the initial sync ahead of the first availability announcement.
+    this.sendSync(true)
+
+    const contig = Math.min(this.core.state.length, this.core.header.hints.contiguousLength)
+`
+    ],
+    [
+        String.raw`    this.remoteOpened = false
+    this.removed = true
+    this.remoteRequests.clear() // cancel all
+`,
+        String.raw`    this.remoteOpened = false
+    this.removed = true
+    this.needsSync = false
+    this.remoteRequests.clear() // cancel all
+`
+    ],
+    [
+        String.raw`    if (canUpgrade === this.canUpgrade) {
+      return
+    }
+`,
+        String.raw`    if (canUpgrade === this.canUpgrade) {
+      if (this.needsSync) this.sendSync()
+      return
+    }
+`
+    ],
+    [
+        String.raw`  ondrain() {
+    return this._handleRequests()
+`,
+        String.raw`  ondrain() {
+    if (this.needsSync && this.remoteOpened) this.signalUpgrade()
+    return this._handleRequests()
+`
+    ]
+]
+
 export default {
     version: '11.18.3',
     file: 'lib/replicator.js',
+    label: 'v2 + wireSync backpressure',
     additionalPatches: [remoteBitfield],
     originalSha256: '2e7a2631a0d8e805861339bbc75e6f6de75565813cf201256105408c53c8ac93',
-    patchedSha256: '1ba2f169d20840d41333cc55e8fbb7da9bc5b4698d808739ad97acce0cbe0f1a',
-    // Only this exact released v1 file is eligible for an in-place upgrade.
+    patchedSha256: '9dd24c49a48ce14c6804ed68f90e44a70163433247811ff1c7fccc55922e751c',
+    // Only these exact released files are eligible for an in-place upgrade.
     previousPatchedSha256: '79944caa33cc875d563f7eba8b820ffbd9323984d30e2fd6c58030804ded2f6c',
     upgradeEdits: [
         ['// OPENMAYHEM-STALLFIX v1 (hypercore 11.18.3).', '// OPENMAYHEM-STALLFIX v2 (hypercore 11.18.3).'],
         ["const STALLFIX = 'openmayhem-stallfix-v1'", "const STALLFIX = 'openmayhem-stallfix-v2'"],
-        closedStreamGuard
+        closedStreamGuard,
+        ...wireSyncBackpressure
+    ],
+    additionalUpgrades: [
+        {
+            label: 'v2',
+            sha256: '1ba2f169d20840d41333cc55e8fbb7da9bc5b4698d808739ad97acce0cbe0f1a',
+            edits: wireSyncBackpressure
+        }
     ],
     edits: [
     // 1. Constants + marker.
@@ -432,6 +510,7 @@ function setDownloadingLater(repl, downloading, session) {
 `
         ],
         // Upstream #911, in addition to the existing stall fixes.
-        closedStreamGuard
+        closedStreamGuard,
+        ...wireSyncBackpressure
     ]
 }

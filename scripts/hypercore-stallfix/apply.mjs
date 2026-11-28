@@ -17,7 +17,7 @@
 //   - supported version, original hashes      -> prepares each file (each original text must occur exactly once),
 //                                                 checks all result hashes, writes each file atomically (tmp + rename);
 //   - supported version, file hash = patched   -> "already patched" (idempotent; safe when both packages run it);
-//   - supported version, file hash = released v1 -> upgrades only the marker and #911 guard, checks the result hash;
+//   - supported version, hash of a previous release -> applies that release's upgrade edits and checks the result hash;
 //   - supported version, any other content      -> exit 1 with a clear message (nothing is written);
 //   - unsupported version                       -> loud warning, no change.
 // Usage: node scripts/hypercore-stallfix/apply.mjs [--check] [--quiet]
@@ -106,16 +106,23 @@ export function sha256Hex(text) {
     return sha256(text)
 }
 
-function inspectFile(file, set) {
+export function getPatchUpgrades(set) {
+    const additional = set.additionalUpgrades ?? []
+    if (!set.previousPatchedSha256) return additional
+    return [{ label: 'v1', sha256: set.previousPatchedSha256, edits: set.upgradeEdits }, ...additional]
+}
+
+function inspectFile(file, set, upgrades) {
     const text = fs.readFileSync(file, 'utf8')
     // keep the inspected text: patching must not re-read the file, a parallel run may have replaced it meanwhile
     const hash = sha256(text)
+    const upgrade = upgrades.find((candidate) => candidate.sha256 === hash)
     let state = 'mismatch'
     if (hash === set.patchedSha256) state = 'patched'
     else if (hash === set.originalSha256) state = 'original'
-    else if (hash === set.previousPatchedSha256) state = 'previous-patched'
-    else if (set.previousPatchedSha256 && text.includes('OPENMAYHEM-STALLFIX')) state = 'other-stallfix-revision'
-    return { text, hash, state }
+    else if (upgrade) state = 'previous-patched'
+    else if (upgrades.length && text.includes('OPENMAYHEM-STALLFIX')) state = 'other-stallfix-revision'
+    return { text, hash, state, upgrade }
 }
 
 export async function run({ packageDir, check = false, quiet = false, log = console.log, warn = console.error } = {}) {
@@ -142,7 +149,8 @@ export async function run({ packageDir, check = false, quiet = false, log = cons
         let copyFailed = false
         for (const patch of [set, ...(set.additionalPatches ?? [])]) {
             const file = path.join(copy.dir, patch.file)
-            const { text, hash, state } = inspectFile(file, patch)
+            const upgrades = getPatchUpgrades(patch)
+            const { text, hash, state, upgrade } = inspectFile(file, patch, upgrades)
             const result = { ...copy, version, file: patch.file, supported: true, state, sha256: hash }
             results.push(result)
             const location = where + ' ' + patch.file
@@ -152,25 +160,24 @@ export async function run({ packageDir, check = false, quiet = false, log = cons
                 if (!quiet) log(tag + ' ' + location + ': already patched (sha256 ' + hash + ')')
                 continue
             }
-            const upgrading = state === 'previous-patched'
-            if (state !== 'original' && !upgrading) {
+            if (state !== 'original' && !upgrade) {
                 const otherRevision = state === 'other-stallfix-revision' ? ', patched by a different stallfix revision' : ''
-                const previous = patch.previousPatchedSha256 ? ', released v1 ' + patch.previousPatchedSha256 : ''
+                const previous = upgrades.map(({ label, sha256 }) => ', released ' + label + ' ' + sha256).join('')
                 warn(tag + ' ERROR: ' + where + ' has unexpected ' + patch.file + ' content (sha256 ' + hash + otherRevision +
                     '; expected original ' + patch.originalSha256 + previous + ' or patched ' + label + ' ' + patch.patchedSha256 + '). Refusing to patch.')
                 copyFailed = true
                 continue
             }
             if (check) {
-                warn(tag + ' ' + location + ': NOT patched to ' + label + (upgrading ? ' (released v1 needs upgrade)' : ''))
+                warn(tag + ' ' + location + ': NOT patched to ' + label + (upgrade ? ' (released ' + upgrade.label + ' needs upgrade)' : ''))
                 copyFailed = true
                 continue
             }
 
             try {
-                const patched = applyPatchSet(text, upgrading ? { edits: patch.upgradeEdits } : patch)
+                const patched = applyPatchSet(text, upgrade ?? patch)
                 if (sha256(patched) !== patch.patchedSha256) throw new Error('patched result has an unexpected hash')
-                const action = upgrading ? 'UPGRADED v1 -> v2' : 'PATCHED ' + label
+                const action = upgrade ? 'UPGRADED ' + upgrade.label + ' -> ' + label : 'PATCHED ' + label
                 writes.push({ file, patched, hash: patch.patchedSha256, result, location, action })
             } catch (err) {
                 warn(tag + ' ERROR: ' + location + ': ' + err.message + '; nothing written')

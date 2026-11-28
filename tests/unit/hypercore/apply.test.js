@@ -7,7 +7,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
-import { loadPatchSets, unapplyPatchSet, applyPatchSet, sha256Hex, findHypercoreCopies, run } from '../../../scripts/hypercore-stallfix/apply.mjs'
+import { loadPatchSets, unapplyPatchSet, applyPatchSet, sha256Hex, findHypercoreCopies, getPatchUpgrades, run } from '../../../scripts/hypercore-stallfix/apply.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const pkgRoot = path.resolve(here, '..', '..', '..')
@@ -169,7 +169,7 @@ test('apply: run() API reports installed patches', async (t) => {
     t.ok(res.results.length >= 1)
 })
 
-test('apply: verifies and applies #874 to an existing v2 installation', { skip: !versions.includes(bitfieldVersion) }, async (t) => {
+test('apply: verifies #874 independently of the current replicator backport', { skip: !versions.includes(bitfieldVersion) }, async (t) => {
     const root = tmpdir()
     t.teardown(() => fs.rmSync(root, { recursive: true, force: true }))
     packageWithScript(root, 'trac-msb')
@@ -186,7 +186,7 @@ test('apply: verifies and applies #874 to an existing v2 installation', { skip: 
 
     t.is((await runScript(root)).code, 0, 'installation succeeds')
     t.is(sha256Hex(fs.readFileSync(bitfieldFile, 'utf8')), bitfieldPatch.patchedSha256, 'backport matches expected bytes')
-    t.is(replicatorSha(hc), set.patchedSha256, 'replicator remains on v2')
+    t.is(replicatorSha(hc), set.patchedSha256, 'replicator matches the current patch')
     t.is((await runScript(root, ['--check'])).code, 0, 'both files pass the check')
 
     hypercoreAt(hc, bitfieldVersion, replicator)
@@ -199,30 +199,34 @@ test('apply: verifies and applies #874 to an existing v2 installation', { skip: 
     t.is(replicatorSha(hc), set.originalSha256, 'both files are validated before writing')
 })
 
-test('apply: released v1 upgrades to v2; check is read-only and altered v1 is refused', async (t) => {
+test('apply: released revisions upgrade to the current patch', async (t) => {
     const root = tmpdir()
     t.teardown(() => fs.rmSync(root, { recursive: true, force: true }))
     const msb = path.join(root, 'node_modules', 'trac-msb')
     const hc = path.join(root, 'node_modules', 'hypercore')
     packageWithScript(msb, 'trac-msb')
-    for (const v of versions) {
+    t.ok(getPatchUpgrades(sets.get(bitfieldVersion)).some(({ label }) => label === 'v2'), '11.18.3 supports upgrading from v2')
+    const inputs = versions.flatMap((v) => getPatchUpgrades(sets.get(v)).map((revision) => ({ v, revision })))
+    for (const { v, revision } of inputs) {
         const set = sets.get(v)
-        const previous = releasedV1(v)
-        t.is(sha256Hex(previous), set.previousPatchedSha256, v + ' exact released v1 bytes')
+        const previous = unapplyPatchSet(applyPatchSet(pristine.get(v), set), revision)
+        const name = v + ' ' + revision.label
+        t.is(sha256Hex(previous), revision.sha256, name + ' exact released bytes')
         hypercoreAt(hc, v, previous)
         const check = await runScript(msb, ['--check'])
-        t.is(check.code, 1, v + ' v1 is not current')
-        t.is(replicatorSha(hc), set.previousPatchedSha256, v + ' check leaves v1 unchanged')
+        t.is(check.code, 1, name + ' requires an upgrade')
+        t.ok(check.out.includes('released ' + revision.label + ' needs upgrade'), name + ' check names the revision')
+        t.is(replicatorSha(hc), revision.sha256, name + ' check is read-only')
         const upgrade = await runScript(msb)
-        t.is(upgrade.code, 0, v + ' upgrade succeeds')
-        t.ok(upgrade.out.includes('UPGRADED v1 -> v2'), v + ' visible upgrade')
-        t.is(replicatorSha(hc), set.patchedSha256, v + ' upgrade matches pristine install')
-        t.is((await runScript(msb)).code, 0, v + ' repeat succeeds')
-        t.is((await runScript(msb, ['--check'])).code, 0, v + ' current check passes')
+        t.is(upgrade.code, 0, name + ' upgrade succeeds')
+        t.ok(upgrade.out.includes('UPGRADED ' + revision.label + ' -> ' + (set.label ?? 'v2')), name + ' visible upgrade')
+        t.is(replicatorSha(hc), set.patchedSha256, name + ' upgrade matches pristine install')
+        t.is((await runScript(msb)).code, 0, name + ' repeat succeeds')
+        t.is((await runScript(msb, ['--check'])).code, 0, name + ' current check passes')
         const changed = previous + '\n// unexpected modification\n'
         hypercoreAt(hc, v, changed)
-        t.is((await runScript(msb)).code, 1, v + ' modified v1 refused')
-        t.is(replicatorSha(hc), sha256Hex(changed), v + ' refused file unchanged')
+        t.is((await runScript(msb)).code, 1, name + ' modified revision refused')
+        t.is(replicatorSha(hc), sha256Hex(changed), name + ' refused file unchanged')
     }
 })
 

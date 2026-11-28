@@ -7,7 +7,7 @@ import path from 'node:path'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import { execFileSync } from 'node:child_process'
-import { loadPatchSets, findHypercoreCopies, applyPatchSet, unapplyPatchSet, sha256Hex } from '../../../scripts/hypercore-stallfix/apply.mjs'
+import { loadPatchSets, findHypercoreCopies, applyPatchSet, unapplyPatchSet, getPatchUpgrades, sha256Hex } from '../../../scripts/hypercore-stallfix/apply.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const require = createRequire(import.meta.url)
@@ -97,13 +97,18 @@ if (process.argv[2] === '--measure') {
             if (!set || seen.has(pkg.version)) continue
             seen.add(pkg.version)
             let original = fs.readFileSync(path.join(copy.dir, set.file), 'utf8')
-            if (sha256Hex(original) === set.previousPatchedSha256) original = applyPatchSet(original, { edits: set.upgradeEdits })
+            const installedHash = sha256Hex(original)
+            const upgrades = getPatchUpgrades(set)
+            const installed = upgrades.find(({ sha256 }) => sha256 === installedHash)
+            if (installed) original = applyPatchSet(original, installed)
             if (sha256Hex(original) === set.patchedSha256) original = unapplyPatchSet(original, set)
             assert.equal(sha256Hex(original), set.originalSha256, 'verified pristine input')
-            const v2 = applyPatchSet(original, set)
-            const v1 = unapplyPatchSet(v2, { edits: set.upgradeEdits })
+            const current = applyPatchSet(original, set)
+            const upgradeFromV2 = upgrades.find(({ label }) => label === 'v2')
+            const v2 = upgradeFromV2 ? unapplyPatchSet(current, upgradeFromV2) : current
+            const v1 = unapplyPatchSet(current, { edits: set.upgradeEdits })
             assert.equal(sha256Hex(v1), set.previousPatchedSha256, 'exact released v1')
-            assert.equal(sha256Hex(v2), set.patchedSha256, 'exact v2')
+            assert.equal(sha256Hex(v2), upgradeFromV2?.sha256 ?? set.patchedSha256, 'exact v2')
             for (const [mode, source] of [['pristine', original], ['v1', v1], ['v2', v2]]) {
                 const trial = path.join(scratch, pkg.version, mode)
                 const moduleDir = path.join(trial, 'hypercore')
