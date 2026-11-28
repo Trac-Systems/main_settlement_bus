@@ -8,9 +8,11 @@
  *
  * Tests can grab `network.adminBootstrap` (the first node) plus the rest from `network.peers`,
  * call `await network.sync()` to replicate, and `await network.teardown()` in their cleanup hook.
+ * Set `useStateBase` to replicate the Autobase instances created and opened by State.
  */
 
 import State from '../../src/core/state/State.js';
+import Autobase from 'autobase';
 import {
     create,
     createStores,
@@ -47,7 +49,8 @@ export class StateNetworkFactory {
         autobaseOptions = {},
         open = defaultOpenHyperbeeView,
         seedIndexers = true,
-        stateClass = State
+        stateClass = State,
+        useStateBase = false
     } = {}) {
         if (nodes < 1) throw new Error('StateNetworkFactory requires at least one node');
         this.#options = {
@@ -57,7 +60,8 @@ export class StateNetworkFactory {
             autobaseOptions,
             open,
             seedIndexers,
-            stateClass
+            stateClass,
+            useStateBase
         };
     }
 
@@ -87,10 +91,10 @@ export class StateNetworkFactory {
     }
 
     async #initialize() {
-        const { nodes, valueEncoding, stateOptions, autobaseOptions, open, seedIndexers, stateClass } = this.#options;
+        const { nodes, valueEncoding, stateOptions, autobaseOptions, open, seedIndexers, stateClass, useStateBase } = this.#options;
 
         const stateStores = await createStores(nodes, this.#harness);
-        const { bases } = await create(nodes, this.#harness, {
+        const { bases } = useStateBase ? { bases: [] } : await create(nodes, this.#harness, {
             apply: async () => {},
             open,
             valueEncoding,
@@ -103,7 +107,7 @@ export class StateNetworkFactory {
 
         await Promise.all(bases.map(base => base.ready()));
 
-        const bootstrapKey = bases[0].local.key;
+        const bootstrapKey = useStateBase ? await Autobase.getLocalKey(stateStores[0]) : bases[0].local.key;
         const descriptors = [];
 
         for (let i = 0; i < nodes; i++) {
@@ -112,7 +116,13 @@ export class StateNetworkFactory {
             const stateConfig = overrideConfig({ ...stateOptions, bootstrap: bootstrapKey })
             const state = new stateClass(stateStores[i].session(), wallet, stateConfig);
 
-            bases[i]._handlers.apply = state.applyHandler;
+            if (useStateBase) {
+                this.#harness.teardown(() => state.close(), { order: 4 });
+                await state.ready();
+                bases.push(state.base);
+            } else {
+                bases[i]._handlers.apply = state.applyHandler;
+            }
             descriptors.push({
                 index: i,
                 name: bases[i].name,

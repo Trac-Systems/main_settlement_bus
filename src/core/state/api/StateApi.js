@@ -1,4 +1,9 @@
 import b4a from 'b4a';
+import compactEncoding from 'compact-encoding';
+import Hypercore from 'hypercore';
+import { MerkleTreeBatch } from 'hypercore/lib/merkle-tree.js';
+import { wire } from 'hypercore/lib/messages.js';
+import Verifier from 'hypercore/lib/verifier.js';
 import { CONSENSUS_CONFIG_INDEX_SIZE, EntryType, EPOCH_BYTE_LENGTH, HASH_BYTE_LENGTH } from '../../../utils/constants.js';
 import { isHexString, isTransactionRecordPut, sleep } from '../../../utils/helpers.js';
 import tracCryptoApi from 'trac-crypto-api';
@@ -418,11 +423,28 @@ export const stateApi = baseState => class extends baseState {
         });
     }
 
-    async verifyProofOfPublication(proof) {
-        // Valid concern. We currently rely on Hypercore’s internal fully-remote-proof helper, which requires low-level storage access
-        const out = await remote.verify(this._store.storage, proof);
-        if (!out) throw new Error('Proof of publication verification failed');
-        return out;
+    async verifyProofOfPublication(buffer) {
+        // The signed writer registry can arrive before the writer's Hypercore manifest.
+        const state = { buffer, start: 0, end: buffer.byteLength };
+        const discoveryKey = compactEncoding.fixed32.decode(state);
+        const proof = wire.data.decode(state);
+        const { manifest, block, upgrade } = proof;
+        if (manifest?.signers.length !== 1 || manifest.allowPatch ||
+            !block?.value || !upgrade?.signature || upgrade.start !== 0) {
+            throw new Error('Proof of publication verification failed');
+        }
+
+        const verifier = Verifier.fromManifest(manifest);
+        const batch = new MerkleTreeBatch({
+            roots: [], fork: 0, length: 0, byteLength: 0, prologue: verifier.prologue,
+        });
+        // The upgrade must include the proven block and end at a head signed by the writer.
+        if (!b4a.equals(discoveryKey, Hypercore.discoveryKey(verifier.manifestHash)) ||
+            !batch.verifyUpgrade(proof) || batch.length <= (verifier.prologue?.length ?? 0) ||
+            !verifier.verify(batch, batch.signature)) {
+            throw new Error('Proof of publication verification failed');
+        }
+        return { proof };
     }
 
     async getIndexerSequenceState() {

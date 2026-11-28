@@ -14,6 +14,7 @@
 
 import { test } from 'brittle';
 import './validatorSelection.test.js';
+import './publicationProof.test.js';
 import sinon from 'sinon';
 import { createStores, createBase, defaultOpenHyperbeeView } from '../helpers/autobaseTestHelpers.js';
 import { setupStateNetwork } from '../helpers/StateNetworkFactory.js';
